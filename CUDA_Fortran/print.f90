@@ -1,10 +1,10 @@
 module print
   implicit none
 contains
-  subroutine print_vtk(step,nx,ny,nz,nyp,nzp,dx,dy,dz,gamma,Qp)
+  subroutine print_vtk(step,nx,ny,nz,nyp,nzp,dX,dY,dZ,gamma,Qp)
     use set_parallel
     integer, intent(in) :: step, nx, ny, nz, nyp, nzp
-    real(8), intent(in) :: dx, dy, dz, gamma, Qp(nx,nyp,nzp,5,4)
+    real(8), intent(in) :: dX, dY, dZ, gamma, Qp(nx,nyp,nzp,5,4)
     integer i, j, k
     real(8), dimension(nx,ny,nz) :: rho, u, v, w, p
     real(8) Q(nx,ny,nz,5)
@@ -26,7 +26,7 @@ contains
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
-          write(10,"(3(f9.4,1x))") (i-1)*dx, (j-1)*dy, (k-1)*dz
+          write(10,"(3(f9.4,1x))") (i-1)*(1.d0/dX), (j-1)*(1.d0/dY), (k-1)*(1.d0/dZ)
         enddo
       enddo
     enddo

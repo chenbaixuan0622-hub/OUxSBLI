@@ -4,7 +4,8 @@ program main
   use set_init
   use calc_time_dev
   implicit none
-  integer nx, ny, nz, nyp, nzp, nt, np
+  integer nx, ny, nz, nyp, nzp, nt, np, ni, nj, nk
+  integer blockDim(3)
   real(8) gamma, T, mu, kappa, Cp, RHO, L, M, pi, dx, dy, dz, dt
   real(8), allocatable :: Q(:,:,:,:,:)
   real(8) t0, t1
@@ -34,6 +35,10 @@ program main
   dy = 2.0d0 * pi / dble(ny - 1)
   dz = 2.0d0 * pi / dble(nz - 1)
   
+  dx = 1.d0 / dx
+  dy = 1.d0 / dy
+  dz = 1.d0 / dz
+
   ! time
   dt = 0.01d0
 
@@ -48,12 +53,25 @@ program main
   ! parallel computing
   call set_index(ny,nz,nyp,nzp)
   allocate(Q(nx,nyp,nzp,5,4))
+
+  ! define block size
+  ! 8 * 8 * 8 = 512 threads
+  blockDim(1) = 8
+  blockDim(2) = 8
+  blockDim(3) = 8
+  ni = (nx - 4) / blockDim(1)
+  nj = (nyp - 4) / blockDim(2)
+  nk = (nzp - 4) / blockDim(3)
+  if (mod(nx-4,ni)/=0 .or. mod(nyp-4,nj)/=0 .or. mod(nzp-4,nk)/=0 .or. ni<5 .or. nj<5 .or. nk<5) then
+    write(*,*) 'Cannot split properly'
+    stop
+  endif
   
   ! set initial condition
   call TaylorGreen(nx,ny,nz,nyp,nzp,gamma,RHO,L,M,Q)
 
   call cpu_time(t0)
-  call RungeKutta(nx,ny,nz,nyp,nzp,nt,np,dx,dy,dz,dt,gamma,mu,kappa,Cp,Q)
+  call RungeKutta(nx,ny,nz,nyp,nzp,ni,nj,nk,blockDim,nt,np,dx,dy,dz,dt,gamma,mu,kappa,Cp,Q)
   call cpu_time(t1)
   print *, 'elapsed time:', t1-t0
 
