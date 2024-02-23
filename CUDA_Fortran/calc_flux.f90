@@ -1,18 +1,19 @@
 module calc_flux
+  use cudafor
   use calc_term
-  use mod_variables
   implicit none
 contains
-  attributes(device) subroutine calcE(nx, ny, nz, gamma, rho, u, v, w, p, E)
+  subroutine calcE(nx, ny, nz, gamma, rho, u, v, w, p, E)
     integer, intent(in), value :: nx, ny, nz
     real(8), intent(in), value :: gamma
     real(8), intent(in), dimension(nx,ny,nz) :: rho, u, v, w, p
     real(8), intent(out), dimension(nx-3,ny,nz,5) :: E
     integer :: i, j, k
-    !real(8), dimension(3) :: rho_d, u_d, v_d, w_d, p_d 
-    !real(8), dimension(3) :: P_keep, RhoU, RhoUU, RhoUV, RhoUW, IE, RhoUIE, RhoUKE, UP, RhoUU_P, E_total
-    do k = 1, nz
-      do j = 1, ny
+    real(8), dimension(3) :: rho_d, u_d, v_d, w_d, p_d 
+    real(8), dimension(3) :: P_keep, RhoU, RhoUU, RhoUV, RhoUW, IE, RhoUIE, RhoUKE, UP, RhoUU_P, E_total
+    !$cuf kernel do <<<*,*>>>
+    do k = 3, nz-2
+      do j = 3, ny-2
         do i = 1, nx-3
           rho_d = rho(i:i+3,j,k)
           u_d = u(i:i+3,j,k)
@@ -39,18 +40,19 @@ contains
       enddo
     enddo
   end subroutine calcE
-
-  attributes(device) subroutine calcF(nx, ny, nz, gamma, rho, u, v, w, p, F)
+  
+  subroutine calcF(nx, ny, nz, gamma, rho, u, v, w, p, F)
     integer, intent(in), value :: nx, ny, nz
     real(8), intent(in), value :: gamma
     real(8), intent(in), dimension(nx,ny,nz) :: rho, u, v, w, p
     real(8), intent(out) :: F(nx,ny-3,nz,5)
     integer :: i, j, k
-    !real(8), dimension(3) :: rho_d, u_d, v_d, w_d, p_d 
-    !real(8), dimension(3) :: P_keep, RhoV, RhoVU, RhoVV, RhoVW, IE, RhoVIE, RhoVKE, VP, RhoVV_P, E_total
-    do k = 1, nz
+    real(8), dimension(3) :: rho_d, u_d, v_d, w_d, p_d 
+    real(8), dimension(3) :: P_keep, RhoV, RhoVU, RhoVV, RhoVW, IE, RhoVIE, RhoVKE, VP, RhoVV_P, E_total
+    !$cuf kernel do <<<*,*>>>
+    do k = 3, nz-2
       do j = 1, ny-3
-        do i = 1, nx
+        do i = 3, nx-2
           rho_d = rho(i,j:j+3,k)
           u_d = u(i,j:j+3,k)
           v_d = v(i,j:j+3,k)
@@ -77,17 +79,18 @@ contains
     enddo
   end subroutine calcF
 
-  attributes(device) subroutine calcG(nx, ny, nz, gamma, rho, u, v, w, p, G)
+  subroutine calcG(nx, ny, nz, gamma, rho, u, v, w, p, G)
     integer, intent(in), value :: nx, ny, nz
     real(8), intent(in), value :: gamma
     real(8), intent(in), dimension(nx,ny,nz) :: rho, u, v, w, p
     real(8), intent(out) :: G(nx,ny,nz-3,5)
     integer :: i, j, k
-    !real(8), dimension(3) :: rho_d, u_d, v_d, w_d, p_d 
-    !real(8), dimension(3) :: P_keep, RhoW, RhoWU, RhoWV, RhoWW, IE, RhoWIE, RhoWKE, WP, RhoWW_P, E_total
+    real(8), dimension(3) :: rho_d, u_d, v_d, w_d, p_d 
+    real(8), dimension(3) :: P_keep, RhoW, RhoWU, RhoWV, RhoWW, IE, RhoWIE, RhoWKE, WP, RhoWW_P, E_total
+    !$cuf kernel do <<<*,*>>>
     do k = 1, nz-3
-      do j = 1, ny
-        do i = 1, nx
+      do j = 3, ny-2
+        do i = 3, nx-2
           rho_d = rho(i,j,k:k+3)
           u_d = u(i,j,k:k+3)
           v_d = v(i,j,k:k+3)
@@ -113,48 +116,4 @@ contains
       enddo
     enddo
   end subroutine calcG
-
-  attributes(device) subroutine calc_EFG(nx, ny, nz, dX, dY, dZ, gamma, mu, kappa, Cp, Q, R)
-    integer, intent(in), value :: nx, ny, nz
-    real(8), intent(in), value :: dX, dY, dZ, gamma, mu, kappa, Cp
-    real(8), intent(in) :: Q(nx,ny,nz,5)
-    real(8), intent(out) :: R(nx-4,ny-4,nz-4,5)
-    real(8), dimension(nx,ny,nz) :: rho, u, v, w, p!, T
-    real(8), dimension(nx-3,ny-4,nz-4,5) :: E
-    real(8), dimension(nx-4,ny-3,nz-4,5) :: F
-    real(8), dimension(nx-4,ny-4,nz-3,5) :: G
-    real(8), dimension(nx,ny-4,nz-4) :: rhox, ux, vx, wx, px
-    real(8), dimension(nx-4,ny,nz-4) :: rhoy, uy, vy, wy, py
-    real(8), dimension(nx-4,ny-4,nz) :: rhoz, uz, vz, wz, pz
-    rho = Q(:,:,:,1)
-    u = Q(:,:,:,2) / rho
-    v = Q(:,:,:,3) / rho
-    w = Q(:,:,:,4) / rho
-    p = (gamma - 1.d0) * (Q(:,:,:,5) - 0.5d0 * rho * (u ** 2 + v ** 2 + w ** 2))
-    !T = ((Q(:,:,:,5) + p) / rho - 0.5d0 * (u ** 2 + v ** 2 + w ** 2)) / Cp
-    
-    rhox = rho(:,3:ny-2,3:nz-2)
-    ux = u(:,3:ny-2,3:nz-2)
-    vx = v(:,3:ny-2,3:nz-2)
-    wx = w(:,3:ny-2,3:nz-2)
-    px = p(:,3:ny-2,3:nz-2)
-    rhoy = rho(3:nx-2,:,3:nz-2)
-    uy = u(3:nx-2,:,3:nz-2)
-    vy = v(3:nx-2,:,3:nz-2)
-    wy = w(3:nx-2,:,3:nz-2)
-    py = p(3:nx-2,:,3:nz-2)
-    rhoz = rho(3:nx-2,3:ny-2,:)
-    uz = u(3:nx-2,3:ny-2,:)
-    vz = v(3:nx-2,3:ny-2,:)
-    wz = w(3:nx-2,3:ny-2,:)
-    pz = p(3:nx-2,3:ny-2,:)
-
-    call calcE(nx, ny-4, nz-4, gamma, rhox, ux, vx, wx, px, E)
-    call calcF(nx-4, ny, nz-4, gamma, rhoy, uy, vy, wy, py, F)
-    call calcG(nx-4, ny-4, nz, gamma, rhoz, uz, vz, wz, pz, G)
-
-    R = dX * (-E(1:nx-4,:,:,:) + E(2:nx-3,:,:,:))&
-    + dY * (-F(:,1:ny-4,:,:) + F(:,2:ny-3,:,:))&
-    + dZ * (-G(:,:,1:nz-4,:) + G(:,:,2:nz-3,:))
-  end subroutine calc_EFG
 end module calc_flux

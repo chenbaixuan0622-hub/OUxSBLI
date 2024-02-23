@@ -1,6 +1,6 @@
 FC = nvfortran
 
-OUTPUT_OPTIN = -cuda -acc -gpu=cc75 -fast -Minfo
+OUTPUT_OPTIN = -cuda -acc -gpu=cc75 -fast -Minfo -Mchkstk -g
 
 .SUFFIXES : .f90
 
@@ -23,7 +23,7 @@ OBJ =	mod_variables.o \
 		main.o
 
 a.out: $(OBJ)
-		$(FC) -cuda -acc -gpu=cc75 -fast -Minfo -I./ $^
+		$(FC) -cuda -acc -gpu=cc75 -fast -Minfo -g -I./ $^
 
 $(TARGET): $(OBJ)
 		$(LINK.f) $^ $(LOADLIBES) $(LDLIBS) -o $@
