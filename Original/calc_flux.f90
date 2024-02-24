@@ -44,11 +44,10 @@ contains
     real(8), intent(in) :: gamma
     real(8), intent(in), dimension(nx,ny,nz) :: rho, u, v, w, p
     real(8), intent(out), dimension(nx-3,ny-4,nz-4,5) :: E
-    integer i, j, k, offset
+    integer i, j, k
     real(8), dimension(3) :: P_keep, RhoU, UP
     ! 2nd-order accuracy : offset = 1
     ! 4th-order accuracy : offset = 2
-    offset = na / 2
     do k = 3, nz-2
       do j = 3, ny-2
         do i = 1, nx-3
@@ -68,8 +67,8 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine calc_F2(nx, ny, nz, gamma, rho, u, v, w, p, F)
-    integer, intent(in) :: nx, ny, nz
+  subroutine calc_F2(na, nx, ny, nz, gamma, rho, u, v, w, p, F)
+    integer, intent(in) :: na, nx, ny, nz
     real(8), intent(in) :: gamma
     real(8), intent(in), dimension(nx,ny,nz) :: rho, u, v, w, p
     real(8), intent(out) :: F(nx-2,ny-1,nz-2,5)
@@ -97,24 +96,23 @@ contains
     integer, intent(in) :: na, nx, ny, nz
     real(8), intent(in) :: gamma
     real(8), intent(in), dimension(nx,ny,nz) :: rho, u, v, w, p
-    real(8), intent(out) :: F(nx-na,ny-na+1,nz-na,5)
-    integer i, j, k, offset
-    real(8), dimension(na-1) :: P_keep, RhoV, VP
+    real(8), intent(out) :: F(nx-4,ny-3,nz-4,5)
+    integer i, j, k
+    real(8), dimension(3) :: P_keep, RhoV, VP
     ! 2nd-order accuracy : offset = 1
     ! 4th-order accuracy : offset = 2
-    offset = na / 2
-    do k = 1+offset, nz-offset
-      do j = 1, ny-na+1
-        do i = 1+offset, nx-offset
-          call Phi(p(i,j:j+na-1,k), P_keep)
-          call RhoPhi(rho(i,j:j+na-1,k), v(i,j:j+na-1,k), RhoV)
-          call PhiPsi(v(i,j:j+na-1,k), p(i,j:j+na-1,k), VP)
-          F(i-offset,j,k-offset,1) = Flux(RhoV)
-          F(i-offset,j,k-offset,2) = Flux(RhoPhiU(RhoV, u(i,j:j+na-1,k)))
-          F(i-offset,j,k-offset,3) = Flux(RhoPhiU(RhoV, v(i,j:j+na-1,k)) + P_keep)
-          F(i-offset,j,k-offset,4) = Flux(RhoPhiU(RhoV, w(i,j:j+na-1,k)))
-          F(i-offset,j,k-offset,5) = Flux(RhoPhiU(RhoV, p(i,j:j+na-1,k) / rho(i,j:j+na-1,k)) / (gamma - 1.0d0)&
-          + RhoUPhiPhi(RhoV, u(i,j:j+na-1,k), v(i,j:j+na-1,k), w(i,j:j+na-1,k)) + VP)
+    do k = 3, nz-2
+      do j = 1, ny-3
+        do i = 3, nx-2
+          call Phi(p(i,j:j+3,k), P_keep)
+          call RhoPhi(rho(i,j:j+3,k), v(i,j:j+3,k), RhoV)
+          call PhiPsi(v(i,j:j+3,k), p(i,j:j+3,k), VP)
+          F(i-2,j,k-2,1) = Flux(RhoV)
+          F(i-2,j,k-2,2) = Flux(RhoPhiU(RhoV, u(i,j:j+3,k)))
+          F(i-2,j,k-2,3) = Flux(RhoPhiU(RhoV, v(i,j:j+3,k)) + P_keep)
+          F(i-2,j,k-2,4) = Flux(RhoPhiU(RhoV, w(i,j:j+3,k)))
+          F(i-2,j,k-2,5) = Flux(RhoPhiU(RhoV, p(i,j:j+3,k) / rho(i,j:j+3,k)) / (gamma - 1.0d0)&
+          + RhoUPhiPhi(RhoV, u(i,j:j+3,k), v(i,j:j+3,k), w(i,j:j+3,k)) + VP)
         enddo
       enddo
     enddo
@@ -122,8 +120,8 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine calc_G2(nx, ny, nz, gamma, rho, u, v, w, p, G)
-    integer, intent(in) :: nx, ny, nz
+  subroutine calc_G2(na, nx, ny, nz, gamma, rho, u, v, w, p, G)
+    integer, intent(in) :: na, nx, ny, nz
     real(8), intent(in) :: gamma
     real(8), intent(in), dimension(nx,ny,nz) :: rho, u, v, w, p
     real(8), intent(out) :: G(nx-2,ny-2,nz-1,5)
@@ -151,24 +149,23 @@ contains
     integer, intent(in) :: na, nx, ny, nz
     real(8), intent(in) :: gamma
     real(8), intent(in), dimension(nx,ny,nz) :: rho, u, v, w, p
-    real(8), intent(out) :: G(nx-na,ny-na,nz-na+1,5)
-    integer i, j, k, offset
-    real(8), dimension(na-1) :: P_keep, RhoW, WP
+    real(8), intent(out) :: G(nx-4,ny-4,nz-3,5)
+    integer i, j, k
+    real(8), dimension(3) :: P_keep, RhoW, WP
     ! 2nd-order accuracy : offset = 1
     ! 4th-order accuracy : offset = 2
-    offset = na / 2
-    do k = 1, nz-na+1
-      do j = 1+offset, ny-offset
-        do i = 1+offset, nx-offset
-          call Phi(p(i,j,k:k+na-1), P_keep)
-          call RhoPhi(rho(i,j,k:k+na-1), w(i,j,k:k+na-1), RhoW)
-          call PhiPsi(w(i,j,k:k+na-1), p(i,j,k:k+na-1), WP)
-          G(i-offset,j-offset,k,1) = Flux(RhoW)
-          G(i-offset,j-offset,k,2) = Flux(RhoPhiU(RhoW, u(i,j,k:k+na-1)))
-          G(i-offset,j-offset,k,3) = Flux(RhoPhiU(RhoW, v(i,j,k:k+na-1)))
-          G(i-offset,j-offset,k,4) = Flux(RhoPhiU(RhoW, w(i,j,k:k+na-1)) + P_keep)
-          G(i-offset,j-offset,k,5) = Flux(RhoPhiU(RhoW, p(i,j,k:k+na-1) / rho(i,j,k:k+na-1)) / (gamma - 1.d0)&
-          + RhoUPhiPhi(RhoW, u(i,j,k:k+na-1), v(i,j,k:k+na-1), w(i,j,k:k+na-1)) + WP)
+    do k = 1, nz-3
+      do j = 3, ny-2
+        do i = 3, nx-2
+          call Phi(p(i,j,k:k+3), P_keep)
+          call RhoPhi(rho(i,j,k:k+3), w(i,j,k:k+3), RhoW)
+          call PhiPsi(w(i,j,k:k+3), p(i,j,k:k+3), WP)
+          G(i-2,j-2,k,1) = Flux(RhoW)
+          G(i-2,j-2,k,2) = Flux(RhoPhiU(RhoW, u(i,j,k:k+3)))
+          G(i-2,j-2,k,3) = Flux(RhoPhiU(RhoW, v(i,j,k:k+3)))
+          G(i-2,j-2,k,4) = Flux(RhoPhiU(RhoW, w(i,j,k:k+3)) + P_keep)
+          G(i-2,j-2,k,5) = Flux(RhoPhiU(RhoW, p(i,j,k:k+3) / rho(i,j,k:k+3)) / (gamma - 1.d0)&
+          + RhoUPhiPhi(RhoW, u(i,j,k:k+3), v(i,j,k:k+3), w(i,j,k:k+3)) + WP)
         enddo
       enddo
     enddo
