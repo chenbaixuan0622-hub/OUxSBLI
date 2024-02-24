@@ -1,0 +1,74 @@
+module calc_steps
+  implicit none
+contains
+  function R(dX,dY,dZ,E,F,G) result(ans)
+    real(8), intent(in) :: dX, dY, dZ
+    real(8), intent(in), dimension(2,5) :: E, F, G
+    real(8) :: ans(5)
+    ans = dX * (-E(1,:) + E(2,:)) +dY * (-F(1,:) + F(2,:)) + dZ * (-G(1,:) + G(2,:))
+  end function R
+
+  subroutine calc_step1(na,nx,ny,nz,dX,dY,dZ,dt,E,F,G,Q,Q2)
+    integer, intent(in) :: na, nx, ny, nz
+    real(8), intent(in) :: dX, dY, dZ, dt
+    real(8), intent(in) :: E(nx-na+1,ny-na,nz-na,5), F(nx-na,ny-na+1,nz-na,5), G(nx-na,ny-na,nz-na+1,5)
+    real(8), intent(in), dimension(nx,ny,nz,5) :: Q
+    real(8), intent(out), dimension(nx,ny,nz,5) :: Q2
+    integer i, j, k, offset
+    ! 2nd-order accuracy : offset = 1
+    ! 4th-order accuracy : offset = 2
+    offset = na / 2
+    do k = 1+offset, nz-offset
+      do j = 1+offset, ny-offset
+        do i = 1+offset, nx-offset
+          Q2(i,j,k,:) = Q(i,j,k,:)&
+          -dt*R(dX,dY,dZ,E(i-offset:i-offset+1,j-offset,k-offset,:),&
+          F(i-offset,j-offset:j-offset+1,k-offset,:),G(i-offset,j-offset,k-offset:k-offset+1,:))
+        enddo
+      enddo
+    enddo
+  end subroutine calc_step1
+  
+  subroutine calc_step2(na,nx,ny,nz,dX,dY,dZ,dt,E,F,G,Q,Q2,Q3)
+    integer, intent(in) :: na, nx, ny,nz
+    real(8), intent(in) :: dX, dY, dZ, dt
+    real(8), intent(in) :: E(nx-na+1,ny-na,nz-na,5), F(nx-na,ny-na+1,nz-na,5), G(nx-na,ny-na,nz-na+1,5)
+    real(8), intent(in), dimension(nx,ny,nz,5) :: Q
+    real(8), intent(in), dimension(nx,ny,nz,5) :: Q2
+    real(8), intent(out), dimension(nx,ny,nz,5) :: Q3
+    integer i, j, k, offset
+    ! 2nd-order accuracy : offset = 1
+    ! 4th-order accuracy : offset = 2
+    offset = na / 2
+    do k = 1+offset, nz-offset
+      do j = 1+offset, ny-offset
+        do i = 1+offset, nx-offset
+          Q3(i,j,k,:) = 0.75d0 * Q(i,k,j,:) + 0.25d0 * Q2(i,j,k,:)&
+          -0.25d0*dt*R(dX,dY,dZ,E(i-offset:i-offset+1,j-offset,k-offset,:),&
+          F(i-offset,j-offset:j-offset+1,k-offset,:),G(i-offset,j-offset,k-offset:k-offset+1,:))
+        enddo
+      enddo
+    enddo
+  end subroutine calc_step2
+  
+  subroutine calc_step3(na,nx,ny,nz,dX,dY,dZ,dt,E,F,G,Q3,Q)
+    integer, intent(in) :: na, nx, ny, nz
+    real(8), intent(in) :: dX, dY, dZ, dt
+    real(8), intent(in) :: E(nx-na+1,ny-na,nz-na,5), F(nx-na,ny-na+1,nz-na,5), G(nx-na,ny-na,nz-na+1,5)
+    real(8), intent(in), dimension(nx,ny,nz,5) :: Q3
+    real(8), intent(inout), dimension(nx,ny,nz,5) :: Q
+    integer i, j, k, offset
+    ! 2nd-order accuracy : offset = 1
+    ! 4th-order accuracy : offset = 2
+    offset = na / 2
+    do k = 1+offset, nz-offset
+      do j = 1+offset, ny-offset
+        do i = 1+offset, nx-offset
+          Q(i,j,k,:) = (Q(i,j,k,:) + 2.0d0 * Q3(i,j,k,:)&
+          -2.0d0*dt*R(dX,dY,dZ,E(i-offset:i-offset+1,j-offset,k-offset,:),&
+          F(i-offset,j-offset:j-offset+1,k-offset,:),G(i-offset,j-offset,k-offset:k-offset+1,:)))/3.d0
+        enddo
+      enddo
+    enddo
+  end subroutine calc_step3
+end module calc_steps
