@@ -6,41 +6,45 @@ module set_bc
   end interface
   
 contains
-  subroutine set_cyclic_bc2(na,nx,ny,nz,Q)
-  integer, intent(in) :: na, nx, ny, nz
-  real(8), intent(inout) :: Q(nx,ny,nz,5)
-  integer i, j, k
-  do k = 2, nz-1
-    do j = 2, ny-1
-      Q(1,j,k,:) = Q(nx-1,j,k,:)
-      Q(nx,j,k,:) = Q(2,j,k,:)
+  subroutine set_cyclic_bc2(id,nx,ny,nz,Q)
+    integer(kind=2), intent(in) :: id
+    integer, intent(in) :: nx, ny, nz
+    real(8), intent(inout) :: Q(nx,ny,nz,5)
+    integer i, j, k
+    do k = 2, nz-1
+      do j = 2, ny-1
+        Q(1,j,k,:) = Q(nx-1,j,k,:)
+        Q(nx,j,k,:) = Q(2,j,k,:)
+      enddo
     enddo
-  enddo
 
-  do k = 2, nz-1
-    do i = 2, nx-1
-      Q(i,1,k,:) = Q(i,ny-1,k,:)
-      Q(i,ny,k,:) = Q(i,2,k,:)
+    do k = 2, nz-1
+      do i = 2, nx-1
+        Q(i,1,k,:) = Q(i,ny-1,k,:)
+        Q(i,ny,k,:) = Q(i,2,k,:)
+      enddo
     enddo
-  enddo
 
-  do k = 2, nz-1
-    Q(1,1,k,:) = Q(nx-1,ny-1,k,:)
-    Q(nx,1,k,:) = Q(2,ny-1,k,:)
-    Q(1,ny,k,:) = Q(nx-1,2,k,:)
-    Q(nx,ny,k,:) = Q(2,2,k,:)
-  enddo
-
-  do j = 1, ny
-    do i = 1, nx
-      Q(i,j,1,:) = Q(i,j,nz-1,:)
-      Q(i,j,nz,:) = Q(i,j,2,:)
+    do k = 2, nz-1
+      Q(1,1,k,:) = Q(nx-1,ny-1,k,:)
+      Q(nx,1,k,:) = Q(2,ny-1,k,:)
+      Q(1,ny,k,:) = Q(nx-1,2,k,:)
+      Q(nx,ny,k,:) = Q(2,2,k,:)
     enddo
-  enddo
+
+    do j = 1, ny
+      do i = 1, nx
+        Q(i,j,1,:) = Q(i,j,nz-1,:)
+        Q(i,j,nz,:) = Q(i,j,2,:)
+      enddo
+    enddo
   end subroutine
 
-  subroutine set_cyclic_bc4(na,nx,ny,nz,Q)
-    integer, intent(in) :: na, nx, ny, nz
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  subroutine set_cyclic_bc4(id,nx,ny,nz,Q)
+    integer(kind=4), intent(in) :: id
+    integer, intent(in) :: nx, ny, nz
     real(8), intent(inout) :: Q(nx,ny,nz,5)
     integer i, j, k
   

@@ -4,14 +4,13 @@ program main
   use calc_time_dev
   use print
   implicit none
-  integer na, nx, ny, nz, nt, np
+  integer nx, ny, nz, nt, np
   real(8) gamma, T, mu, kappa, Cp, RHO, L, M, pi, dx, dy, dz, dt
   real(8), allocatable :: Q(:,:,:,:)
   real(8) t0, t1
   
   ! read file
   open(28,file='input.d', action='read')
-  read(28,*) na
   read(28,*) nx
   read(28,*) ny
   read(28,*) nz
@@ -23,11 +22,6 @@ program main
   read(28,*) L
   read(28,*) M
   close(28)
-  
-  if (na /= 2 .and. na /= 4) then
-    print *, na, "Only 2nd-order accuracy and 4th-order accuracy solver are available"
-    stop
-  endif
 
   ! set grid
   pi = acos(-1.0d0)
@@ -50,10 +44,10 @@ program main
   allocate(Q(nx,ny,nz,5))
   
   ! set initial condition
-  call TaylorGreen(na,nx,ny,nz,gamma,RHO,L,M,Q)
+  call TaylorGreen(nx,ny,nz,gamma,RHO,L,M,Q)
 
   call cpu_time(t0)
-  call RungeKutta(na,nx,ny,nz,nt,np,dx,dy,dz,dt,gamma,mu,kappa,Cp,Q)
+  call RungeKutta(nx,ny,nz,nt,np,dx,dy,dz,dt,gamma,mu,kappa,Cp,Q)
   call cpu_time(t1)
   print *, 'elapsed time:', t1-t0
 
