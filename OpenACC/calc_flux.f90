@@ -44,32 +44,26 @@ contains
   end subroutine calc_E2
 
   subroutine calc_E4(id, nx, ny, nz, gamma, rho, u, v, w, p, E)
-    integer(kind=4), intent(in), value :: id
-    integer, intent(in), value :: nx, ny, nz
-    real(8), intent(in), value :: gamma
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
-    real(8), intent(out), dimension(nx-3,ny-4,nz-4,5), device :: E
+    integer(kind=4), intent(in) :: id
+    integer, intent(in) :: nx, ny, nz
+    real(8), intent(in) :: gamma
+    real(8), intent(in), dimension(nx,ny,nz) :: rho, u, v, w, p
+    real(8), intent(out), dimension(nx-3,ny-4,nz-4,5) :: E
     integer i, j, k
-    real(8), dimension(3) :: RhoU, RhoUU_P, IE, Energy
-    !$acc kernels deviceptr(rho,u,v,w,p,E)
-    !$acc loop private(RhoU, RhoUU_P, IE, Energy)
+    real(8) RhoU(3)
     do k = 3, nz-2
       do j = 3, ny-2
         do i = 1, nx-3
-          RhoU(:)  = RhoPhi(rho(i:i+3,j,k), u(i:i+3,j,k))
-          RhoUU_P(:) = RhoPhiU(RhoU, u(i:i+3,j,k)) + Phi(p(i:i+3,j,k))
-          IE(:) = p(i:i+3,j,k) / ((gamma - 1.d0) * rho(i:i+3,j,k))
-          Energy(:) = RhoPhiU(RhoU, IE) + RhoUPhiPhi(RhoU, u(i:i+3,j,k), v(i:i+3,j,k), w(i:i+3,j,k)) &
-          & + PhiPsi(u(i:i+3,j,k), p(i:i+3,j,k))
+          RhoU  = RhoPhi(rho(i:i+3,j,k), u(i:i+3,j,k))
           E(i,j-2,k-2,1) = Flux(RhoU)
-          E(i,j-2,k-2,2) = Flux(RhoUU_P)
+          E(i,j-2,k-2,2) = Flux(RhoPhiU(RhoU, u(i:i+3,j,k)) + Phi(p(i:i+3,j,k)))
           E(i,j-2,k-2,3) = Flux(RhoPhiU(RhoU, v(i:i+3,j,k)))
           E(i,j-2,k-2,4) = Flux(RhoPhiU(RhoU, w(i:i+3,j,k)))
-          E(i,j-2,k-2,5) = Flux(Energy)
+          E(i,j-2,k-2,5) = Flux(RhoPhiU(RhoU, p(i:i+3,j,k) / rho(i:i+3,j,k)) / (gamma - 1.d0)&
+          + RhoUPhiPhi(RhoU, u(i:i+3,j,k), v(i:i+3,j,k), w(i:i+3,j,k)) + PhiPsi(u(i:i+3,j,k), p(i:i+3,j,k)))
         enddo
       enddo
     enddo
-    !$acc end kernels
   end subroutine calc_E4
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -104,33 +98,28 @@ contains
   end subroutine calc_F2
 
   subroutine calc_F4(id, nx, ny, nz, gamma, rho, u, v, w, p, F)
-    integer(kind=4), intent(in), value :: id
-    integer, intent(in), value :: nx, ny, nz
-    real(8), intent(in), value :: gamma
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
-    real(8), intent(out), device :: F(nx-4,ny-3,nz-4,5)
+    integer(kind=4), intent(in) :: id
+    integer, intent(in) :: nx, ny, nz
+    real(8), intent(in) :: gamma
+    real(8), intent(in), dimension(nx,ny,nz) :: rho, u, v, w, p
+    real(8), intent(out) :: F(nx-4,ny-3,nz-4,5)
     integer i, j, k
-    real(8), dimension(3) :: RhoV, RhoVV_P, IE, Energy
-    !$acc kernels deviceptr(rho,u,v,w,p,F)
-    !$acc loop private(RhoV, RhoVV_P, IE, Energy)
+    real(8) RhoV(3)
     do k = 3, nz-2
       do j = 1, ny-3
         do i = 3, nx-2
-          RhoV(:) = RhoPhi(rho(i,j:j+3,k), v(i,j:j+3,k))
-          RhoVV_P(:) = RhoPhiU(RhoV, v(i,j:j+3,k)) + Phi(p(i,j:j+3,k))
-          IE(:) = p(i,j:j+3,k) / ((gamma - 1.0d0) * rho(i,j:j+3,k))
-          Energy(:) = RhoPhiU(RhoV, IE) + RhoUPhiPhi(RhoV, u(i,j:j+3,k), v(i,j:j+3,k), w(i,j:j+3,k)) &
-          & + PhiPsi(v(i,j:j+3,k), p(i,j:j+3,k))
+          RhoV = RhoPhi(rho(i,j:j+3,k), v(i,j:j+3,k))
           F(i-2,j,k-2,1) = Flux(RhoV)
           F(i-2,j,k-2,2) = Flux(RhoPhiU(RhoV, u(i,j:j+3,k)))
-          F(i-2,j,k-2,3) = Flux(RhoVV_P)
+          F(i-2,j,k-2,3) = Flux(RhoPhiU(RhoV, v(i,j:j+3,k)) + Phi(p(i,j:j+3,k)))
           F(i-2,j,k-2,4) = Flux(RhoPhiU(RhoV, w(i,j:j+3,k)))
-          F(i-2,j,k-2,5) = Flux(Energy)
+          F(i-2,j,k-2,5) = Flux(RhoPhiU(RhoV, p(i,j:j+3,k) / rho(i,j:j+3,k)) / (gamma - 1.0d0)&
+          + RhoUPhiPhi(RhoV, u(i,j:j+3,k), v(i,j:j+3,k), w(i,j:j+3,k)) + PhiPsi(v(i,j:j+3,k), p(i,j:j+3,k)))
         enddo
       enddo
     enddo
-    !$acc end kernels
   end subroutine calc_F4
+
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -164,31 +153,25 @@ contains
   end subroutine calc_G2
 
   subroutine calc_G4(id, nx, ny, nz, gamma, rho, u, v, w, p, G)
-    integer(kind=4), intent(in), value :: id
-    integer, intent(in), value :: nx, ny, nz
-    real(8), intent(in), value :: gamma
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
-    real(8), intent(out), device :: G(nx-4,ny-4,nz-3,5)
+    integer(kind=4), intent(in) :: id
+    integer, intent(in) :: nx, ny, nz
+    real(8), intent(in) :: gamma
+    real(8), intent(in), dimension(nx,ny,nz) :: rho, u, v, w, p
+    real(8), intent(out) :: G(nx-4,ny-4,nz-3,5)
     integer i, j, k
-    real(8), dimension(3) :: RhoW, RhoWW_P, IE, Energy
-    !$acc kernels deviceptr(rho,u,v,w,p,G)
-    !$acc loop private(RhoW, RhoWW_P, IE, Energy)
+    real(8) RhoW(3)
     do k = 1, nz-3
       do j = 3, ny-2
         do i = 3, nx-2
-          RhoW(:) = RhoPhi(rho(i,j,k:k+3), w(i,j,k:k+3))
-          RhoWW_P(:) = RhoPhiU(RhoW, w(i,j,k:k+3)) + Phi(p(i,j,k:k+3))
-          IE(:) = p(i,j,k:k+3) / ((gamma - 1.d0) * rho(i,j,k:k+3))
-          Energy(:) = RhoPhiU(RhoW, IE) + RhoUPhiPhi(RhoW, u(i,j,k:k+3), v(i,j,k:k+3), w(i,j,k:k+3)) &
-          & + PhiPsi(w(i,j,k:k+3), p(i,j,k:k+3))
+          RhoW = RhoPhi(rho(i,j,k:k+3), w(i,j,k:k+3))
           G(i-2,j-2,k,1) = Flux(RhoW)
           G(i-2,j-2,k,2) = Flux(RhoPhiU(RhoW, u(i,j,k:k+3)))
           G(i-2,j-2,k,3) = Flux(RhoPhiU(RhoW, v(i,j,k:k+3)))
-          G(i-2,j-2,k,4) = Flux(RhoWW_P)
-          G(i-2,j-2,k,5) = Flux(Energy)
+          G(i-2,j-2,k,4) = Flux(RhoPhiU(RhoW, w(i,j,k:k+3)) + Phi(p(i,j,k:k+3)))
+          G(i-2,j-2,k,5) = Flux(RhoPhiU(RhoW, p(i,j,k:k+3) / rho(i,j,k:k+3)) / (gamma - 1.d0)&
+          + RhoUPhiPhi(RhoW, u(i,j,k:k+3), v(i,j,k:k+3), w(i,j,k:k+3)) + PhiPsi(w(i,j,k:k+3), p(i,j,k:k+3)))
         enddo
       enddo
     enddo
-    !$acc end kernels
   end subroutine calc_G4
 end module calc_flux
