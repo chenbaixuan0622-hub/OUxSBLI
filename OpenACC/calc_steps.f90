@@ -2,14 +2,6 @@ module calc_steps
   use mod_globals, only : accuracy
   implicit none
 contains
-  function R(dX,dY,dZ,E,F,G) result(ans)
-    !$acc routine
-    real(8), intent(in), value :: dX, dY, dZ
-    real(8), intent(in), dimension(2,5), device :: E, F, G
-    real(8) :: ans(5)
-    ans(:) = dX * (-E(1,:) + E(2,:)) +dY * (-F(1,:) + F(2,:)) + dZ * (-G(1,:) + G(2,:))
-  end function R
-
   subroutine calc_step1(nx,ny,nz,dX,dY,dZ,dt,E,F,G,Q,Q2)
     integer, intent(in), value :: nx, ny, nz
     real(8), intent(in), value :: dX, dY, dZ, dt
@@ -27,9 +19,10 @@ contains
     do k = 1+offset, nz-offset
       do j = 1+offset, ny-offset
         do i = 1+offset, nx-offset
-          Q2(i,j,k,:) = Q(i,j,k,:)&
-          -dt*R(dX,dY,dZ,E(i-offset:i-offset+1,j-offset,k-offset,:),&
-          F(i-offset,j-offset:j-offset+1,k-offset,:),G(i-offset,j-offset,k-offset:k-offset+1,:))
+          Q2(i,j,k,:) = Q(i,j,k,:) - dt * ( &
+          & -dX * (-E(i-offset,j-offset,k-offset,:) + E(i-offset+1,j-offset,k-offset,:)) &
+          & -dY * (-F(i-offset,j-offset,k-offset,:) + F(i-offset,j-offset+1,k-offset,:)) &
+          & -dZ * (-G(i-offset,j-offset,k-offset,:) + G(i-offset,j-offset,k-offset+1,:)))
         enddo
       enddo
     enddo
@@ -54,9 +47,10 @@ contains
     do k = 1+offset, nz-offset
       do j = 1+offset, ny-offset
         do i = 1+offset, nx-offset
-          Q3(i,j,k,:) = 0.75d0 * Q(i,k,j,:) + 0.25d0 * Q2(i,j,k,:)&
-          -0.25d0*dt*R(dX,dY,dZ,E(i-offset:i-offset+1,j-offset,k-offset,:),&
-          F(i-offset,j-offset:j-offset+1,k-offset,:),G(i-offset,j-offset,k-offset:k-offset+1,:))
+          Q3(i,j,k,:) = 0.75d0 * Q(i,k,j,:) + 0.25d0 * Q2(i,j,k,:) - 0.25d0 * dt * ( &
+          & -dX * (-E(i-offset,j-offset,k-offset,:) + E(i-offset+1,j-offset,k-offset,:)) &
+          & -dY * (-F(i-offset,j-offset,k-offset,:) + F(i-offset,j-offset+1,k-offset,:)) &
+          & -dZ * (-G(i-offset,j-offset,k-offset,:) + G(i-offset,j-offset,k-offset+1,:)))
         enddo
       enddo
     enddo
@@ -80,9 +74,10 @@ contains
     do k = 1+offset, nz-offset
       do j = 1+offset, ny-offset
         do i = 1+offset, nx-offset
-          Q(i,j,k,:) = (Q(i,j,k,:) + 2.0d0 * Q3(i,j,k,:)&
-          -2.0d0*dt*R(dX,dY,dZ,E(i-offset:i-offset+1,j-offset,k-offset,:),&
-          F(i-offset,j-offset:j-offset+1,k-offset,:),G(i-offset,j-offset,k-offset:k-offset+1,:)))/3.d0
+          Q(i,j,k,:) = (Q(i,j,k,:) + 2.0d0 * Q3(i,j,k,:) - 2.d0 * dt * ( &
+          & -dX * (-E(i-offset,j-offset,k-offset,:) + E(i-offset+1,j-offset,k-offset,:)) &
+          & -dY * (-F(i-offset,j-offset,k-offset,:) + F(i-offset,j-offset+1,k-offset,:)) &
+          & -dZ * (-G(i-offset,j-offset,k-offset,:) + G(i-offset,j-offset,k-offset+1,:)))) / 3.d0
         enddo
       enddo
     enddo

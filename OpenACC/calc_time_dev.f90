@@ -54,23 +54,22 @@ contains
         call calc_E(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
         call calc_F(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
-        !call calc_step1(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q_d,Q2)
+        call calc_step1(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q_d,Q2)
         call set_cyclic_bc_d(id,nx,ny,nz,Q2)
 
         call calc_quantities(nx,ny,nz,gamma,Q2,rho,u,v,w,p)
         call calc_E(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
         call calc_F(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
-        !call calc_step2(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q_d,Q2,Q3)
+        call calc_step2(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q_d,Q2,Q3)
         call set_cyclic_bc_d(id,nx,ny,nz,Q3)
 
         call calc_quantities(nx,ny,nz,gamma,Q3,rho,u,v,w,p)
         call calc_E(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
         call calc_F(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
-        !call calc_step3(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q3,Q_d)
+        call calc_step3(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q3,Q_d)
         call set_cyclic_bc_d(id,nx,ny,nz,Q_d)
-        !print *, t1
       enddo
       Q = Q_d
       call print_vtk(t2,nx,ny,nz,dx,dy,dz,gamma,Q)
