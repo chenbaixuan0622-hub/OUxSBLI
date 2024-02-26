@@ -5,7 +5,7 @@ program main
   use print
   implicit none
   integer nx, ny, nz, nt, np
-  real(8) gamma, T, mu, kappa, Cp, RHO, L, M, pi, dx, dy, dz, dt
+  real(8) gamma, T, mu, kappa, Cp, Cs, RHO, L, M, pi, dx, dy, dz, dt
   real(8), allocatable :: Q(:,:,:,:)
   real(8) t0, t1
   
@@ -17,6 +17,7 @@ program main
   read(28,*) nt
   read(28,*) np
   read(28,*) gamma
+  read(28,*) Cs
   read(28,*) T
   read(28,*) RHO
   read(28,*) L
@@ -47,7 +48,7 @@ program main
   call TaylorGreen(nx,ny,nz,gamma,RHO,L,M,Q)
 
   call cpu_time(t0)
-  call RungeKutta(nx,ny,nz,nt,np,dx,dy,dz,dt,gamma,mu,kappa,Cp,Q)
+  call RungeKutta(nx,ny,nz,nt,np,dx,dy,dz,dt,gamma,mu,kappa,Cp,Cs,Q)
   call cpu_time(t1)
   print *, 'elapsed time:', t1-t0
 
