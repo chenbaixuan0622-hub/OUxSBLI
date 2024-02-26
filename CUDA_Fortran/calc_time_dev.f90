@@ -58,12 +58,21 @@ contains
     print '(1x, a, a, i1,a)', prop%name(1:len), " (GPU) is available"
 
     ! thread num must be less than 1024
-    blocksE = dim3((nx-accuracy+1)/3,(ny-accuracy)/7,(nz-accuracy)/7)
-    blocksF = dim3((nx-accuracy)/7,(ny-accuracy+1)/3,(nz-accuracy)/7)
-    blocksG = dim3((nx-accuracy)/7,(ny-accuracy)/7,(nz-accuracy+1)/3)
-    threadsE = dim3(3,7,7)
-    threadsF = dim3(7,3,7)
-    threadsG = dim3(7,7,3)
+    if (accuracy == 2) then
+      blocksE = dim3((nx-accuracy+1)/3,(ny-accuracy)/7,(nz-accuracy)/7)
+      blocksF = dim3((nx-accuracy)/7,(ny-accuracy+1)/3,(nz-accuracy)/7)
+      blocksG = dim3((nx-accuracy)/7,(ny-accuracy)/7,(nz-accuracy+1)/3)
+      threadsE = dim3(3,7,7)
+      threadsF = dim3(7,3,7)
+      threadsG = dim3(7,7,3)
+    else if (accuracy == 4) then
+      blocksE = dim3((nx-accuracy+1),(ny-accuracy)/16,(nz-accuracy)/16)
+      blocksF = dim3((nx-accuracy)/16,(ny-accuracy+1),(nz-accuracy)/16)
+      blocksG = dim3((nx-accuracy)/16,(ny-accuracy)/16,(nz-accuracy+1))
+      threadsE = dim3(1,16,16)
+      threadsF = dim3(16,1,16)
+      threadsG = dim3(16,16,1)
+    endif
 
     Q_d = Q
     do t2 = 1, np
