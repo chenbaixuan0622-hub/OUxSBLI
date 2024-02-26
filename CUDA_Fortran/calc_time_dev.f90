@@ -35,11 +35,13 @@ contains
     use set_bc
     use print
     integer, intent(in) :: nx, ny, nz, nt, np
-    real(8), intent(in) :: dx, dy, dz, dt, gamma, mu, kappa, Cp
+    real(8), intent(in) :: dx, dy, dz, dt, gamma, kappa, Cp
+    real(8), intent(inout) :: mu
     real(8), intent(inout) :: Q(nx,ny,nz,5)
     integer t1, t2
     integer(kind=2**(accuracy/2)) :: id
-    real(8) dxi, dyi, dzi
+    real(8) dxi, dyi, dzi, delta
+    real(8), parameter :: Cs = 0.18d0
     ! GPU
     integer stat, len
     type(cudaDeviceProp) :: prop
@@ -55,6 +57,7 @@ contains
     dxi = 1.0d0 / dx
     dyi = 1.0d0 / dy
     dzi = 1.0d0 / dz
+    delta = (dx * dy * dz) ** (1.d0 / 3.d0)
 
     ! check active device
     print *,"\nChecking for GPU"
@@ -84,45 +87,59 @@ contains
     Ev = 0.d0
     Fv = 0.d0
     Gv = 0.d0
+    mu = 0.d0
     do t2 = 1, np
       do t1 = 1, nt
         call calc_quantities(nx,ny,nz,gamma,Cp,Q_d,rho,u,v,w,p,T)
+        ! Euler
         call calc_E<<<blocksE,threadsE>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
-        !print *, trim(cudaGetErrorString(cudaGetLastError()))
         call calc_F<<<blocksF,threadsF>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
-        !print *, trim(cudaGetErrorString(cudaGetLastError()))
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
         !print *, trim(cudaGetErrorString(cudaGetLastError()))
-        call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Ev)
-        !print *, trim(cudaGetErrorString(cudaGetLastError()))
-        call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Fv)
-        !print *, trim(cudaGetErrorString(cudaGetLastError()))
-        call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Gv)
-        !print *, trim(cudaGetErrorString(cudaGetLastError()))
+        ! visc
+        !call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Ev)
+        !call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Fv)
+        !call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Gv)
+        ! visc + LES
+        call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
+        call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
+        call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
         stat = cudaDeviceSynchronize()
         !call calc_step1(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q_d,Q2)
         call calc_step1(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Ev,Fv,Gv,Q_d,Q2)
         call set_cyclic_bc_d(id,nx,ny,nz,Q2)
 
         call calc_quantities(nx,ny,nz,gamma,Cp,Q2,rho,u,v,w,p,T)
+        ! Euler
         call calc_E<<<blocksE,threadsE>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
         call calc_F<<<blocksF,threadsF>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
-        call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Ev)
-        call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Fv)
-        call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Gv)
+        ! visc
+        !call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Ev)
+        !call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Fv)
+        !call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Gv)
+        ! visc + LES
+        call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
+        call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
+        call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
         stat = cudaDeviceSynchronize()
         !call calc_step2(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q_d,Q2,Q3)
         call calc_step2(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Ev,Fv,Gv,Q_d,Q2,Q3)
         call set_cyclic_bc_d(id,nx,ny,nz,Q3)
 
         call calc_quantities(nx,ny,nz,gamma,Cp,Q3,rho,u,v,w,p,T)
+        ! Euler
         call calc_E<<<blocksE,threadsE>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
         call calc_F<<<blocksF,threadsF>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
-        call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Ev)
-        call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Fv)
-        call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Gv)
+        ! visc
+        !call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Ev)
+        !call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Fv)
+        !call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Gv)
+        ! visc + LES
+        call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
+        call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
+        call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
         stat = cudaDeviceSynchronize()
         !call calc_step3(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q3,Q_d)
         call calc_step3(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Ev,Fv,Gv,Q3,Q_d)
