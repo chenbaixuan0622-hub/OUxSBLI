@@ -28,13 +28,15 @@ contains
     integer, intent(in) :: nx, ny, nz, nt, np
     real(8), intent(in) :: dx, dy, dz, dt, gamma, mu, kappa, Cp
     real(8), intent(inout) :: Q(nx,ny,nz,5)
-    integer t1, t2, stat
+    integer t1, t2
     integer(kind=2**(accuracy/2)) :: id
     real(8) dxi, dyi, dzi
+    ! GPU
+    integer stat, len
+    type(cudaDeviceProp) :: prop
     type(dim3) :: blocks, threads
     type(dim3) :: blocks_offset, threads_offset
     type(dim3) :: blocksE, blocksF, blocksG, threadsE, threadsF, threadsG
-    ! GPU
     real(8), dimension(nx,ny,nz,5), device :: Q_d, Q2, Q3
     real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p
     real(8), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
@@ -43,6 +45,13 @@ contains
     dxi = 1.0d0 / dx
     dyi = 1.0d0 / dy
     dzi = 1.0d0 / dz
+
+    ! check active device
+    print *,"\nChecking for GPU"
+    stat = cudaSetDevice(0)
+    stat = cudaGetDeviceProperties(prop,0)
+    len = verify(prop%name, ' ', .true.)
+    print '(1x, a, a, i1,a)', prop%name(1:len), " (GPU) is available"
 
     blocks = dim3(nx/50,ny/50,nz/50)
     threads = dim3(50,50,50)
@@ -59,17 +68,17 @@ contains
     do t2 = 1, np
       do t1 = 1, nt
         call calc_quantities<<<blocks,threads>>>(nx,ny,nz,gamma,Q_d,rho,u,v,w,p)
-        !if(stat /= cudaSuccess) print *, trim(cudaGetErrorString(stat))
+        if(stat /= cudaSuccess) print *, trim(cudaGetErrorString(stat))
         stat = cudaDeviceSynchronize()
         call calc_E<<<blocksE,threadsE>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
-        !if(stat /= cudaSuccess) print *, trim(cudaGetErrorString(stat))
+        if(stat /= cudaSuccess) print *, trim(cudaGetErrorString(stat))
         call calc_F<<<blocksF,threadsF>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
-        !if(stat /= cudaSuccess) print *, trim(cudaGetErrorString(stat))
+        if(stat /= cudaSuccess) print *, trim(cudaGetErrorString(stat))
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
-        !if(stat /= cudaSuccess) print *, trim(cudaGetErrorString(stat))
+        if(stat /= cudaSuccess) print *, trim(cudaGetErrorString(stat))
         stat = cudaDeviceSynchronize()
         call calc_step1<<<blocks_offset,threads_offset>>>(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q_d,Q2)
-        !if(stat /= cudaSuccess) print *, trim(cudaGetErrorString(stat))
+        if(stat /= cudaSuccess) print *, trim(cudaGetErrorString(stat))
         stat = cudaDeviceSynchronize()
         call set_cyclic_bc_d(id,nx,ny,nz,Q2)
         stat = cudaDeviceSynchronize()
@@ -81,7 +90,7 @@ contains
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
         stat = cudaDeviceSynchronize()
         call calc_step2<<<blocks_offset,threads_offset>>>(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q_d,Q2,Q3)
-        !if(stat /= cudaSuccess) print *, trim(cudaGetErrorString(stat))
+        if(stat /= cudaSuccess) print *, trim(cudaGetErrorString(stat))
         stat = cudaDeviceSynchronize()
         call set_cyclic_bc_d(id,nx,ny,nz,Q3)
         stat = cudaDeviceSynchronize()
@@ -93,7 +102,7 @@ contains
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
         stat = cudaDeviceSynchronize()
         call calc_step3<<<blocks_offset,threads_offset>>>(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q3,Q_d)
-        !if(stat /= cudaSuccess) print *, trim(cudaGetErrorString(stat))
+        if(stat /= cudaSuccess) print *, trim(cudaGetErrorString(stat))
         stat = cudaDeviceSynchronize()
         call set_cyclic_bc_d(id,nx,ny,nz,Q_d)
         stat = cudaDeviceSynchronize()
