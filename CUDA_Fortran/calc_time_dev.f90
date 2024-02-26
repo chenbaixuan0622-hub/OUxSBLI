@@ -1,20 +1,26 @@
 module calc_time_dev
   implicit none
 contains
-  attributes(global) subroutine calc_quantities(nx,ny,nz,gamma,Q,rho,u,v,w,p)
+  subroutine calc_quantities(nx,ny,nz,gamma,Q,rho,u,v,w,p)
     integer, intent(in), value :: nx, ny, nz
     real(8), intent(in), value :: gamma
     real(8), intent(in), dimension(nx,ny,nz,5), device :: Q
     real(8), intent(out), dimension(nx,ny,nz), device :: rho, u, v, w, p
     integer i, j, k
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z
-    rho(i,j,k) = Q(i,j,k,1)
-    u(i,j,k) = Q(i,j,k,2) / rho(i,j,k)
-    v(i,j,k) = Q(i,j,k,3) / rho(i,j,k)
-    w(i,j,k) = Q(i,j,k,4) / rho(i,j,k)
-    p(i,j,k) = (gamma-1.d0)*(Q(i,j,k,5)-0.5d0*rho(i,j,k)*(u(i,j,k)**2+v(i,j,k)**2+w(i,j,k)**2))
+    !$acc kernels deviceptr(Q,rho,u,v,w,p)
+    !$acc loop collapse(3)
+    do k = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          rho(i,j,k) = Q(i,j,k,1)
+          u(i,j,k) = Q(i,j,k,2) / rho(i,j,k)
+          v(i,j,k) = Q(i,j,k,3) / rho(i,j,k)
+          w(i,j,k) = Q(i,j,k,4) / rho(i,j,k)
+          p(i,j,k) = (gamma-1.d0)*(Q(i,j,k,5)-0.5d0*rho(i,j,k)*(u(i,j,k)**2+v(i,j,k)**2+w(i,j,k)**2))
+        enddo
+      enddo
+    enddo
+    !$acc end kernels
   end subroutine
 
   subroutine RungeKutta(nx,ny,nz,nt,np,dx,dy,dz,dt,gamma,mu,kappa,Cp,Q)
@@ -34,8 +40,6 @@ contains
     ! GPU
     integer stat, len
     type(cudaDeviceProp) :: prop
-    type(dim3) :: blocks, threads
-    type(dim3) :: blocks_offset, threads_offset
     type(dim3) :: blocksE, blocksF, blocksG, threadsE, threadsF, threadsG
     real(8), dimension(nx,ny,nz,5), device :: Q_d, Q2, Q3
     real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p
@@ -54,10 +58,6 @@ contains
     print '(1x, a, a, i1,a)', prop%name(1:len), " (GPU) is available"
 
     ! thread num must be less than 1024
-    blocks = dim3(nx/10,ny/10,nz/10)
-    threads = dim3(10,10,10)
-    blocks_offset = dim3((nx-accuracy)/7,(ny-accuracy)/7,(nz-accuracy)/7)
-    threads_offset = dim3(7,7,7)
     blocksE = dim3((nx-accuracy+1)/3,(ny-accuracy)/7,(nz-accuracy)/7)
     blocksF = dim3((nx-accuracy)/7,(ny-accuracy+1)/3,(nz-accuracy)/7)
     blocksG = dim3((nx-accuracy)/7,(ny-accuracy)/7,(nz-accuracy+1)/3)
@@ -68,9 +68,7 @@ contains
     Q_d = Q
     do t2 = 1, np
       do t1 = 1, nt
-        call calc_quantities<<<blocks,threads>>>(nx,ny,nz,gamma,Q_d,rho,u,v,w,p)
-        !print *, trim(cudaGetErrorString(cudaGetLastError()))
-        stat = cudaDeviceSynchronize()
+        call calc_quantities(nx,ny,nz,gamma,Q_d,rho,u,v,w,p)
         call calc_E<<<blocksE,threadsE>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
         !print *, trim(cudaGetErrorString(cudaGetLastError()))
         call calc_F<<<blocksF,threadsF>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
@@ -78,33 +76,24 @@ contains
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
         !print *, trim(cudaGetErrorString(cudaGetLastError()))
         stat = cudaDeviceSynchronize()
-        call calc_step1<<<blocks_offset,threads_offset>>>(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q_d,Q2)
-        !print *, trim(cudaGetErrorString(cudaGetLastError()))
-        stat = cudaDeviceSynchronize()
+        call calc_step1(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q_d,Q2)
         call set_cyclic_bc_d(id,nx,ny,nz,Q2)
-        stat = cudaDeviceSynchronize()
 
-        call calc_quantities<<<blocks,threads>>>(nx,ny,nz,gamma,Q2,rho,u,v,w,p)
-        stat = cudaDeviceSynchronize()
+        call calc_quantities(nx,ny,nz,gamma,Q2,rho,u,v,w,p)
         call calc_E<<<blocksE,threadsE>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
         call calc_F<<<blocksF,threadsF>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
         stat = cudaDeviceSynchronize()
-        call calc_step2<<<blocks_offset,threads_offset>>>(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q_d,Q2,Q3)
-        stat = cudaDeviceSynchronize()
+        call calc_step2(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q_d,Q2,Q3)
         call set_cyclic_bc_d(id,nx,ny,nz,Q3)
-        stat = cudaDeviceSynchronize()
 
-        call calc_quantities<<<blocks,threads>>>(nx,ny,nz,gamma,Q3,rho,u,v,w,p)
-        stat = cudaDeviceSynchronize()
+        call calc_quantities(nx,ny,nz,gamma,Q3,rho,u,v,w,p)
         call calc_E<<<blocksE,threadsE>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
         call calc_F<<<blocksF,threadsF>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
         stat = cudaDeviceSynchronize()
-        call calc_step3<<<blocks_offset,threads_offset>>>(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q3,Q_d)
-        stat = cudaDeviceSynchronize()
+        call calc_step3(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q3,Q_d)
         call set_cyclic_bc_d(id,nx,ny,nz,Q_d)
-        stat = cudaDeviceSynchronize()
       enddo
       Q = Q_d
       call print_vtk(t2,nx,ny,nz,dx,dy,dz,gamma,Q)
