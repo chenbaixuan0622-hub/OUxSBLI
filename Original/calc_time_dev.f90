@@ -26,7 +26,8 @@ contains
     use iso_fortran_env
     use mod_globals, only : accuracy
     use calc_steps
-    use calc_flux
+    use calc_KEEP
+    use calc_SLAU
     use calc_visc
     use set_bc
     use print
@@ -38,13 +39,14 @@ contains
     integer(kind=2**(accuracy/2)) :: id
     real(8) dxi, dyi, dzi, delta
     real(8), dimension(nx,ny,nz,5) :: Q2, Q3
-    real(8), dimension(nx,ny,nz) :: rho, u, v, w, p, T
     real(8) E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     real(8) F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8) G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     real(8) Ev(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     real(8) Fv(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8) Gv(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    ! KEEP
+    real(8), dimension(nx,ny,nz) :: rho, u, v, w, p, T
     dxi = 1.0d0 / dx
     dyi = 1.0d0 / dy
     dzi = 1.0d0 / dz
