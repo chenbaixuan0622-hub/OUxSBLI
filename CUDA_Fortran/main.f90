@@ -33,7 +33,7 @@ program main
   dz = Lz / dble(nz - 1)
   
   ! time
-  dt = 0.01d0
+  dt = 0.03d0
 
   ! calc physical properties
   mu = (1.4592d-6 * T ** (1.5d0)) / (109.1d0 + T)
