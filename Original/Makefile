@@ -1,6 +1,6 @@
-FC = gfortran
+FC = nvfortran
 
-OUTPUT_OPTIN = -O2
+OUTPUT_OPTIN = -fast
 
 .SUFFIXES : .f90
 
@@ -25,7 +25,7 @@ OBJ =	mod_globals.o \
 		main.o
 
 a.out: $(OBJ)
-		$(FC) -O2 -I./ $^
+		$(FC) -fast -I./ $^
 
 $(TARGET): $(OBJ)
 		$(LINK.f) $^ $(LOADLIBES) $(LDLIBS) -o $@

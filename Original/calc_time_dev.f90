@@ -44,13 +44,13 @@ contains
         call calc_F(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
         ! visc 
-        !call calc_Ev(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Ev)
-        !call calc_Fv(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Fv)
-        !call calc_Gv(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Gv)
+        !call calc_Ev(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Ev)
+        !call calc_Fv(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Fv)
+        !call calc_Gv(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Gv)
         ! visc + LES
-        call calc_Ev(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
-        call calc_Fv(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
-        call calc_Gv(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
+        call calc_Ev(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
+        call calc_Fv(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
+        call calc_Gv(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
         call calc_step1(nx,ny,nz,dxi,dyi,dzi,dt,(E-Ev),(F-Fv),(G-Gv),Q,Q2)
         call set_cyclic_bc(id,nx,ny,nz,Q2)
 
@@ -60,13 +60,13 @@ contains
         call calc_F(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
         ! visc
-        !call calc_Ev(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Ev)
-        !call calc_Fv(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Fv)
-        !call calc_Gv(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Gv)
+        !call calc_Ev(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Ev)
+        !call calc_Fv(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Fv)
+        !call calc_Gv(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Gv)
         ! visc + LES
-        call calc_Ev(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
-        call calc_Fv(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
-        call calc_Gv(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
+        call calc_Ev(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
+        call calc_Fv(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
+        call calc_Gv(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
         call calc_step2(nx,ny,nz,dxi,dyi,dzi,dt,(E-Ev),(F-Fv),(G-Gv),Q,Q2,Q3)
         call set_cyclic_bc(id,nx,ny,nz,Q3)
 
@@ -76,13 +76,13 @@ contains
         call calc_F(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
         ! visc
-        !call calc_Ev(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Ev)
-        !call calc_Fv(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Fv)
-        !call calc_Gv(id,nx,ny,nz,dX,dY,dZ,mu,kappa,u,v,w,T,Gv)
+        !call calc_Ev(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Ev)
+        !call calc_Fv(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Fv)
+        !call calc_Gv(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Gv)
         ! visc + LES
-        call calc_Ev(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
-        call calc_Fv(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
-        call calc_Gv(id,nx,ny,nz,dX,dY,dZ,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
+        call calc_Ev(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
+        call calc_Fv(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
+        call calc_Gv(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
         call calc_step3(nx,ny,nz,dxi,dyi,dzi,dt,(E-Ev),(F-Fv),(G-Gv),Q3,Q)
         call set_cyclic_bc(id,nx,ny,nz,Q)
       enddo
