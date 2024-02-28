@@ -10,7 +10,7 @@ contains
     real(8), intent(in), dimension(nx,ny,nz,5), device :: Q
     real(8), intent(out), dimension(nx,ny,nz), device :: rho, u, v, w, p
     integer i, j, k
-    !$acc kernels deviceptr(Q,rho,u,v,w,p,T)
+    !$acc kernels deviceptr(Q,rho,u,v,w,p)
     !$acc loop collapse(3)
     do k = 1, nz
       do j = 1, ny
