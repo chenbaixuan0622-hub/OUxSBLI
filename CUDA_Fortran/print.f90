@@ -19,7 +19,7 @@ contains
     write(10,"('u')")
     write(10,"('ASCII')")
     write(10,"('DATASET STRUCTURED_GRID')")
-    write(10,"('DIMENSIONS',3(1x,i4))") nx, ny, nz
+    write(10,"('DIMENSIONS',3(1x,i3))") nx, ny, nz
     write(10,"('POINTS',i9,' float')") nx * ny * nz
     do k = 1, nz
       do j = 1, ny
@@ -47,7 +47,7 @@ contains
     write(11,"('v')")
     write(11,"('ASCII')")
     write(11,"('DATASET STRUCTURED_GRID')")
-    write(11,"('DIMENSIONS',3(1x,i4))") nx, ny, nz
+    write(11,"('DIMENSIONS',3(1x,i3))") nx, ny, nz
     write(11,"('POINTS',i9,' float')") nx * ny * nz
     do k = 1, nz
       do j = 1, ny
@@ -75,7 +75,7 @@ contains
     write(12,"('w')")
     write(12,"('ASCII')")
     write(12,"('DATASET STRUCTURED_GRID')")
-    write(12,"('DIMENSIONS',3(1x,i4))") nx, ny, nz
+    write(12,"('DIMENSIONS',3(1x,i3))") nx, ny, nz
     write(12,"('POINTS',i9,' float')") nx * ny * nz
     do k = 1, nz
       do j = 1, ny
@@ -97,37 +97,4 @@ contains
     enddo
     close(12)
   end subroutine print_vtk
-
-  subroutine print_message(nx, ny, nz, nt, np, dx, dy, dz, dt, U, mu, gamma, kappa, Cp, elapsedTime)
-    integer, intent(in) :: nx, ny, nz, nt, np
-    real(8), intent(in) :: dt, dx, dy, dz, mu, U, gamma, kappa, Cp, elapsedTime
-    real(8) Lx, Ly, Lz, endTime
-    Lx = nx * dx
-    Ly = ny * dy
-    Lz = nz * dz
-    endTime = nt * np * dt
-    open(13,file="output_message.txt")
-    write(13,"('mesh information')")
-    write(13,"('Lx =',i9,'was devided by',i4,'dx =',i9)") Lx, nx, dx
-    write(13,"('Ly =',i9,'was devided by',i4,'dy =',i9)") Ly, ny, dy
-    write(13,"('Lz =',i9,'was devided by',i4,'dz =',i9)") Lz, nz, dz
-    write(13,"('\n')")
-
-    write(13,"('simulation time')")
-    write(13,"('start time     =',i9)") 0.d0
-    write(13,"('end time       =',i9)") endTime
-    write(13,"('dt             =',i9)") dt
-    write(13,"('Courant number =',i9)") U * dt / dx
-    write(13,"('\n')")
-
-    write(13,"('Physical properties')")
-    write(13,"('gamma =',i9,' [Pa s]')") gamma
-    write(13,"('mu    =',i9,' [Pa s]')") mu
-    write(13,"('kappa =',i9,' [W/(m K)]')") kappa
-    write(13,"('Cp    =',i9,' [J/(kg K)]')") Cp
-    write(13,"('\n')")
-
-    write(13,"('elapsed time =',i9)") elapsedTime
-    close(13)
-  end subroutine print_message
 end module print
