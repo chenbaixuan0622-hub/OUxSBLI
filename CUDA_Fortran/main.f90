@@ -50,6 +50,6 @@ program main
   call RungeKutta(nx,ny,nz,nt,np,dx,dy,dz,dt,gamma,mu,kappa,Cp,Q)
   call cpu_time(t1)
 
-  call print_message(nx,ny,nz,dx,dy,dz,dt,M,mu,gamma,kappa,Cp,t1-t0)
+  !call print_message(nx,ny,nz,nt,np,dx,dy,dz,dt,M,mu,gamma,kappa,Cp,t1-t0)
   deallocate(Q)
 end program main

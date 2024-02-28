@@ -98,13 +98,14 @@ contains
     close(12)
   end subroutine print_vtk
 
-  subroutine print_message(nx, ny, nz, dx, dy, dz, dt, U, mu, gamma, kappa, Cp, elapsedTime)
-    integer, intent(in) :: nx, ny, nz
+  subroutine print_message(nx, ny, nz, nt, np, dx, dy, dz, dt, U, mu, gamma, kappa, Cp, elapsedTime)
+    integer, intent(in) :: nx, ny, nz, nt, np
     real(8), intent(in) :: dt, dx, dy, dz, mu, U, gamma, kappa, Cp, elapsedTime
     real(8) Lx, Ly, Lz, endTime
     Lx = nx * dx
     Ly = ny * dy
     Lz = nz * dz
+    endTime = nt * np * dt
     open(13,file="output_message.txt")
     write(13,"('mesh information')")
     write(13,"('Lx =',i9,'was devided by',i4,'dx =',i9)") Lx, nx, dx
