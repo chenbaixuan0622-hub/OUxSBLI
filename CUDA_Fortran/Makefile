@@ -18,8 +18,8 @@ OBJ =	mod_globals.o \
 		calc_visc.o \
 		calc_flux.o \
 		calc_steps.o \
-		calc_time_dev.o \
 		print.o \
+		calc_time_dev.o \
 		main.o
 
 a.out: $(OBJ)
