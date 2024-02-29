@@ -35,9 +35,9 @@ program main
   mu = (1.4592d-6 * T ** (1.5d0)) / (109.1d0 + T)
   kappa = (2.334d-3 * T ** (1.5d0)) / (164.54d0 + T)
   Cp = 1030.5d0 - 0.19975d0 * T + 3.9734d-4 * T ** 2
-  !write(*,*) 'mu =',mu,' [Pa s]'
-  !write(*,*) 'kappa =',kappa,' [W/(m K)]'
-  !write(*,*) 'Cp =',Cp,' [J/(kg K)]'
+  write(*,*) 'mu =',mu,' [Pa s]'
+  write(*,*) 'kappa =',kappa,' [W/(m K)]'
+  write(*,*) 'Cp =',Cp,' [J/(kg K)]'
 
   ! parallel computing
   allocate(Q(nx,ny,nz,5))
@@ -48,6 +48,7 @@ program main
   call cpu_time(t0)
   call RungeKutta(nx,ny,nz,nt,np,dx,dy,dz,dt,gamma,mu,kappa,Cp,Q)
   call cpu_time(t1)
+  write(*,*) 'elapsed time =', t1-t0, '[s]'
 
   deallocate(Q)
 end program main
