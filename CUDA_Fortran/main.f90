@@ -48,7 +48,6 @@ program main
   call cpu_time(t0)
   call RungeKutta(nx,ny,nz,nt,np,dx,dy,dz,dt,gamma,mu,kappa,Cp,Q)
   call cpu_time(t1)
-  !print *, 'elapsed time:', t1-t0
 
   deallocate(Q)
 end program main
