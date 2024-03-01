@@ -49,5 +49,40 @@ contains
     enddo
     !$acc end kernels     
   end subroutine calc_quantities_T
+
+  subroutine calc_kinetic_energy(nx,ny,nz,rho,u,v,w,ke)
+    integer, intent(in), value :: nx, ny, nz
+    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w
+    real(8), intent(out) :: ke
+    integer i, j, k
+    !$acc kernels deviceptr(rho,u,v,w)
+    !$acc loop collapse(3) reduction(+:ke)
+    do k = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          ke = rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2)
+        enddo
+      enddo
+    enddo
+    !$acc end kernels
+  end subroutine calc_kinetic_energy
+
+  subroutine calc_entropy(nx,ny,nz,Cv,Cp,rho,p,s)
+    integer, intent(in), value :: nx, ny, nz
+    real(8), intent(in), value :: Cv, Cp
+    real(8), intent(in), dimension(nx,ny,nz), device :: rho, p
+    real(8), intent(out) :: s
+    integer i, j, k
+    !$acc kernels deviceptr(rho,p)
+    !$acc loop collapse(3) reduction(+:s)
+    do k = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          s = Cv * log(p(i,j,k)) - Cp * log(rho(i,j,k))
+        enddo
+      enddo
+    enddo
+    !$acc end kernels
+  end subroutine calc_entropy
 end module calc_physical_quantities
   
