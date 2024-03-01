@@ -39,8 +39,7 @@ contains
     ! check active device
     stat = cudaSetDevice(0)
     stat = cudaGetDeviceProperties(prop,0)
-    len = verify(prop%name, ' ', .true.)
-    print '(1x, a, a, i1,a)', prop%name(1:len), " (GPU) is available"
+    len = verify(prop%name, ' ', .true.) 
 
     ! thread num must be less than 1024
     if (accuracy == 2) then
