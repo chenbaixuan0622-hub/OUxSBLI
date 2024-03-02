@@ -1,3 +1,37 @@
-# 2nd-order KEEP with viscous term and turbulent model (Smagorinsky) is avairable.
-# 4th-order KEEP without viscous term is avairable. However, appropriate gridDim and blockDim must be chosen.
-# 2nd-order and 4th-order SLAU are TBA
+<h1>
+Compressible solver
+</h1>
+<p>
+This solver accelerated by GPU can deal with compressible flow. KEEP scheme is available. (2024/3/2)
+</p>
+
+<h2>
+KEEP scheme
+</h2>
+<p>
+This scheme can calcurate Taylor-Green vortex 20000 steps, which means 2 [sec] (Non-dimensional). 
+</p>
+
+<h2>
+Usage
+</h2>
+<ul>
+<li> Edit input.d file grid, physical properties, and simulation time etc</li>
+<li> Edit mod_globals.f90 file to choose accuracy. 2nd-order accuracy and 4th-order accuracy are available. </li> 
+<li> make!</li>
+</ul>
+
+<h2>
+Reference
+</h2>
+<ul>
+<li><a href="https://www.sciencedirect.com/science/article/abs/pii/S0021999118305916">
+Yuichi Kuya, Kosuke Totani, Soshi Kawai, Kinetic energy and entropy preserving schemes for compressible flows by split convective forms, Journal of Computational Physics, 2018</a>
+</li>
+<li><a href="https://www.sciencedirect.com/science/article/abs/pii/S0021999121003776">
+Yuichi Kuya, Soshi Kawai, High-order accurate kinetic-enrgy and entropy preserving (KEEP) schemes on curvilinear grids, Journal of Computational Physics, 2021</a>
+</li>
+<li><a href="https://docs.nvidia.com/hpc-sdk/pgi-compilers/2017/pgi17cudaforug.pdf">
+CUDA FORTRAN PROGRAMMING GUIDE AND REFERENCE, 2017</a>
+</li>
+</ul>
