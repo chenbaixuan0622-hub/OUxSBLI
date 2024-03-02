@@ -18,6 +18,7 @@ Usage
 <ul>
 <li> Edit input.d file grid, physical properties, and simulation time etc</li>
 <li> Edit mod_globals.f90 file to choose accuracy. 2nd-order accuracy and 4th-order accuracy are available. </li> 
+<li> Edit calc_time_dev.f90 to choose appropriate gridDim and blockDim. The number of threads should be a multiple of 32 to make the most of GPU.</li>
 <li> make!</li>
 </ul>
 
