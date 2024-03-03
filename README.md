@@ -1,8 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+</head>
+
+<body>
 <h1>
 Compressible solver
 </h1>
 <p>
-This solver accelerated by GPU can deal with compressible flow. KEEP scheme is available. (2024/3/2)
+This solver accelerated by GPU can deal with compressible flows. KEEP scheme is available. (2024/3/2)
 </p>
 
 <h2>
@@ -43,3 +50,5 @@ Yuichi Kuya, Soshi Kawai, High-order accurate kinetic-enrgy and entropy preservi
 CUDA FORTRAN PROGRAMMING GUIDE AND REFERENCE, 2017</a>
 </li>
 </ul>
+</body>
+</html>
