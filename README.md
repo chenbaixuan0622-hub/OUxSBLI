@@ -9,8 +9,15 @@ This solver accelerated by GPU can deal with compressible flow. KEEP scheme is a
 KEEP scheme
 </h2>
 <p>
-This scheme can calcurate Taylor-Green vortex 20000 steps, which means 2 [sec] (Non-dimensional). 
+Taylor-Green vortex was calculated. 
 </p>
+
+<h2>
+Dependency
+</h2>
+<ul>
+<li>nvfortran 24.1-0</li>
+</ul>
 
 <h2>
 Usage
@@ -19,7 +26,7 @@ Usage
 <li> Edit input.d file grid, physical properties, and simulation time etc</li>
 <li> Edit mod_globals.f90 file to choose accuracy. 2nd-order accuracy and 4th-order accuracy are available. </li> 
 <li> Edit calc_time_dev.f90 to choose appropriate gridDim and blockDim. The number of threads should be a multiple of 32 to make the most of GPU.</li>
-<li> make!</li>
+<li><pre>$ make</pre></li>
 </ul>
 
 <h2>
