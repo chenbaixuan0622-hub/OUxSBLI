@@ -17,6 +17,13 @@ time info
 dt                       =  0.1000E-01
 non-dimentional dt       =  0.5000E-03
 Courant number           =  0.2037E-01
-end time                 =  0.2000E+03
-non-dimentional end time =  0.1000E+02
-elapsed time             =      3242[s]
+end time                 =  0.1000E+03
+non-dimentional end time =  0.5000E+01
+elapsed time             =      2379[s]
+time info
+dt                       =  0.1000E-01
+non-dimentional dt       =  0.5000E-03
+Courant number           =  0.2037E-01
+end time                 =  0.1000E+03
+non-dimentional end time =  0.5000E+01
+elapsed time             =      2459[s]
