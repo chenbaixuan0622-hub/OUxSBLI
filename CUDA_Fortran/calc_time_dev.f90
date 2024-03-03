@@ -4,7 +4,7 @@ contains
   subroutine RungeKutta(nx,ny,nz,nt,np,dx,dy,dz,dt,gamma,mu,kappa,Cv,Cp,Cs,Q)
     use iso_fortran_env
     use cudafor
-    use mod_globals, only : accuracy
+    use mod_globals, only : accuracy, id_visc, id_turbulence
     use calc_physical_quantities
     use calc_steps
     use calc_flux
@@ -44,12 +44,12 @@ contains
 
     ! thread num must be less than 1024
     if (accuracy == 2) then
-      blocksE = dim3((nx-accuracy+1)/10,(ny-accuracy)/7,(nz-accuracy)/7)
-      blocksF = dim3((nx-accuracy)/7,(ny-accuracy+1)/10,(nz-accuracy)/7)
-      blocksG = dim3((nx-accuracy)/7,(ny-accuracy)/7,(nz-accuracy+1)/10)
-      threadsE = dim3(10,7,7)
-      threadsF = dim3(7,10,7)
-      threadsG = dim3(7,7,10)
+      blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/5,(nz-accuracy)/5)
+      blocksF = dim3((nx-accuracy)/5,(ny-accuracy+1)/32,(nz-accuracy)/5)
+      blocksG = dim3((nx-accuracy)/5,(ny-accuracy)/5,(nz-accuracy+1)/32)
+      threadsE = dim3(32,5,5)
+      threadsF = dim3(5,32,5)
+      threadsG = dim3(5,5,32)
     else if (accuracy == 4) then
       blocksE = dim3((nx-accuracy+1),(ny-accuracy)/16,(nz-accuracy)/16)
       blocksF = dim3((nx-accuracy)/16,(ny-accuracy+1),(nz-accuracy)/16)
@@ -59,73 +59,110 @@ contains
       threadsG = dim3(16,16,1)
     endif
 
+    ! copy on GPU
     Q_d = Q
-    Ev = 0.d0
-    Fv = 0.d0
-    Gv = 0.d0
-    mu = 0.d0
-    itr = 1
     do t2 = 1, np
       do t1 = 1, nt
         call calc_quantities(nx,ny,nz,gamma,Cp,Q_d,rho,u,v,w,p,T)
+        
         ! Euler
         call calc_E<<<blocksE,threadsE>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
         call calc_F<<<blocksF,threadsF>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
         !print *, trim(cudaGetErrorString(cudaGetLastError()))
-        ! visc
-        !call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Ev)
-        !call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Fv)
-        !call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Gv)
-        ! visc + LES
-        call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
-        call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
-        call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
+
+        if (id_visc == 1 .and. id_turbulence /= 1) then
+          ! visc only
+          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Ev)
+          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Fv)
+          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Gv)
+        endif
+        if (id_turbulence == 1) then
+          if (id_visc /= 1) then
+            mu = 0.d0
+          endif
+          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
+          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
+          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
+        endif
+
         stat = cudaDeviceSynchronize()
-        !call calc_step1(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q_d,Q2)
-        call calc_step1(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Ev,Fv,Gv,Q_d,Q2)
+
+        if (id_visc == 1 .or. id_turbulence == 1) then
+          call calc_step1(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Ev,Fv,Gv,Q_d,Q2)
+        else
+          call calc_step1(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q_d,Q2)
+        endif
+        
         call set_cyclic_bc_d(id,nx,ny,nz,Q2)
         
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
         call calc_quantities(nx,ny,nz,gamma,Cp,Q2,rho,u,v,w,p,T)
+        
         ! Euler
         call calc_E<<<blocksE,threadsE>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
         call calc_F<<<blocksF,threadsF>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
-        ! visc
-        !call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Ev)
-        !call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Fv)
-        !call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Gv)
-        ! visc + LES
-        call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
-        call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
-        call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
+        
+        if (id_visc == 1 .and. id_turbulence /= 1) then
+          ! visc only
+          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Ev)
+          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Fv)
+          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Gv)
+        endif      
+        if (id_turbulence == 1) then
+          if (id_visc /= 1) then
+            mu = 0.d0
+          endif
+          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
+          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
+          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
+        endif
+        
         stat = cudaDeviceSynchronize()
-        !call calc_step2(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q_d,Q2,Q3)
-        call calc_step2(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Ev,Fv,Gv,Q_d,Q2,Q3)
+
+        if (id_visc == 1 .or. id_turbulence == 1) then
+          call calc_step2(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Ev,Fv,Gv,Q_d,Q2,Q3)
+        else
+          call calc_step2(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q_d,Q2,Q3)
+        endif
+
         call set_cyclic_bc_d(id,nx,ny,nz,Q3)
 
+        !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        
         call calc_quantities(nx,ny,nz,gamma,Cp,Q3,rho,u,v,w,p,T)
+        
         ! Euler
         call calc_E<<<blocksE,threadsE>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
         call calc_F<<<blocksF,threadsF>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
-        ! visc
-        !call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Ev)
-        !call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Fv)
-        !call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Gv)
-        ! visc + LES
-        call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
-        call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
-        call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
-        stat = cudaDeviceSynchronize()
-        !call calc_step3(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q3,Q_d)
-        call calc_step3(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Ev,Fv,Gv,Q3,Q_d)
-        call set_cyclic_bc_d(id,nx,ny,nz,Q_d)
         
-        ! calc kinetic energy and entropy
-        !call calc_kinetic_energy(nx,ny,nz,itr,rho,u,v,w,ke)
-        !call calc_entropy(nx,ny,nz,itr,Cv,Cp,rho,p,s)
-        !itr = itr + 1 
+        if (id_visc == 1 .or. id_turbulence /= 1) then
+          ! visc
+          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Ev)
+          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Fv)
+          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Gv)
+        endif
+        if (id_turbulence == 1) then
+          if (id_visc /= 1) then
+            mu = 0.d0
+          endif
+          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
+          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
+          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
+        endif
+        
+        stat = cudaDeviceSynchronize()
+
+        if (id_visc == 1 .or. id_turbulence == 1) then
+          call calc_step3(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Ev,Fv,Gv,Q3,Q_d)
+        else
+          call calc_step3(nx,ny,nz,dxi,dyi,dzi,dt,E,F,G,Q3,Q_d)
+        endif
+        
+        call set_cyclic_bc_d(id,nx,ny,nz,Q_d)
       enddo
       Q = Q_d
       call print_vtk(t2,nx,ny,nz,dx,dy,dz,gamma,Q)
