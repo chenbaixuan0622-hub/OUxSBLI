@@ -1,5 +1,6 @@
 program main
   use, intrinsic :: iso_fortran_env
+  use mod_globals, only : id_visc, id_turbulence
   use set_init
   use calc_time_dev
   implicit none
@@ -44,11 +45,20 @@ program main
   open(1, file="output.d")
   write(1,"('physical properties')")
   write(1,"('gamma =', f7.4)") gamma
-  write(1,"('mu    =', e12.4, '[Pa s]')") mu
-  write(1,"('kappa =', e12.4, '[W/(m K)]')") kappa
-  write(1,"('Cv    =', f10.4, '[J/(kg K)]')") Cv
-  write(1,"('Cp    =', f10.4, '[J/(kg K)]')") Cp
-  write(1,"('Re    =', f10.4)") RHO * U_ref * L / mu
+  if (id_visc == 1) then
+    write(1,"('Navier-Stokes solver was chosen')")
+    write(1,"('mu    =', e12.4, '[Pa s]')") mu
+    write(1,"('kappa =', e12.4, '[W/(m K)]')") kappa
+    write(1,"('Cv    =', f10.4, '[J/(kg K)]')") Cv
+    write(1,"('Cp    =', f10.4, '[J/(kg K)]')") Cp
+    write(1,"('Re    =', f10.4)") RHO * U_ref * L / mu
+  else
+    write(1,"('Euler solver was chosen')")
+  endif
+  if (id_turbulence == 1) then
+    write(1,"('turbulent model was used')")
+    write(1,"('Cs    =', f10.4)") Cs
+  endif
   write(1,"('\n')")
 
   write(1,"('mesh info')")
