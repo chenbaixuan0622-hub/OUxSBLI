@@ -18,7 +18,7 @@ KEEP scheme
 <p>
 Taylor-Green vortex was calculated. 
 </p>
-<img src="./CUDA_Fortran/data/animation/Vorticity.gif" alt="Taylor-Green vortex">
+<img src="./CUDA_Fortran/data_Euler/wx/Vorticity.gif" alt="Taylor-Green vortex">
 
 <h2>
 Dependency
