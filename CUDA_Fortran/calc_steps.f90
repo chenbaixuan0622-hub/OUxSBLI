@@ -124,7 +124,7 @@ contains
     do k = 1+offset, nz-offset
       do j = 1+offset, ny-offset
         do i = 1+offset, nx-offset
-          Q3(i,j,k,:) = 0.75d0 * Q(i,k,j,:) + 0.25d0 * Q2(i,j,k,:) - 0.25d0 * dt * ( &
+          Q3(i,j,k,:) = 0.75d0 * Q(i,j,k,:) + 0.25d0 * Q2(i,j,k,:) - 0.25d0 * dt * ( &
           & -dX * (-E(i-offset,j-offset,k-offset,:) + E(i-offset+1,j-offset,k-offset,:) &
           & + Ev(i-offset,j-offset,k-offset,:) - Ev(i-offset+1,j-offset,k-offset,:)) &
           & -dY * (-F(i-offset,j-offset,k-offset,:) + F(i-offset,j-offset+1,k-offset,:) &
