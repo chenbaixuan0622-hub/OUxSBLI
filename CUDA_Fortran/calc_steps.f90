@@ -104,7 +104,7 @@ contains
   end subroutine calc_step2_Euler
 
   subroutine calc_step2_NS(nx,ny,nz,dX,dY,dZ,dt,E,F,G,Ev,Fv,Gv,Q,Q2,Q3)
-    integer, intent(in), value :: nx, ny,nz
+    integer, intent(in), value :: nx, ny, nz
     real(8), intent(in), value :: dX, dY, dZ, dt
     real(8), intent(in), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     real(8), intent(in), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
