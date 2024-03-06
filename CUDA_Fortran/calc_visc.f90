@@ -41,12 +41,13 @@ contains
     real(8), intent(in), value :: dX, dY, dZ, delta, Cs
     real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, T
     real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: Ev
-    integer i, j, k
+    integer i, j, k, offset
     real(8) mux, muy1, muy2, muz1, muz2, kappa
     real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, txx, txy, txz
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
+    offset = accuracy / 2
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset - 1
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
+    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
 
     ! x direction
     call calc_mu(T(i,j,k),T(i+1,j,k),mux)
@@ -70,11 +71,11 @@ contains
     txy = uy + vx
     txz = wx + uz
     call calc_kappa(T(i,j,k),T(i+1,j,k),kappa)
-    Ev(i,j-1,k-1,1) = 0.d0
-    Ev(i,j-1,k-1,2) = txx
-    Ev(i,j-1,k-1,3) = txy
-    Ev(i,j-1,k-1,4) = txz
-    Ev(i,j-1,k-1,5) = txx * 0.5d0 *(u(i,j,k) + u(i+1,j,k)) + txy * 0.5d0 *(v(i,j,k) + v(i+1,j,k)) &
+    Ev(i-offset+1,j-offset,k-offset,1) = 0.d0
+    Ev(i-offset+1,j-offset,k-offset,2) = txx
+    Ev(i-offset+1,j-offset,k-offset,3) = txy
+    Ev(i-offset+1,j-offset,k-offset,4) = txz
+    Ev(i-offset+1,j-offset,k-offset,5) = txx * 0.5d0 *(u(i,j,k) + u(i+1,j,k)) + txy * 0.5d0 *(v(i,j,k) + v(i+1,j,k)) &
     & + txz * 0.5d0 *(w(i,j,k) + w(i+1,j,k)) + kappa * (-T(i,j,k) + T(i+1,j,k))
   end subroutine calc_Ev
   
@@ -83,12 +84,13 @@ contains
     real(8), intent(in), value :: dX, dY, dZ, delta, Cs
     real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, T
     real(8), intent(out), device :: Fv(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
-    integer i, j, k
+    integer i, j, k, offset
     real(8) muy, muz1, muz2, mux1, mux2, kappa
     real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, tyx, tyy, tyz
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
+    offset = accuracy / 2
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
+    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
 
     ! y direction
     call calc_mu(T(i,j,k),T(i,j+1,k),muy)
@@ -112,11 +114,11 @@ contains
     tyy = 2.d0 * (2.d0 * vy - wz - ux) / 3.d0
     tyz = vz + wy
     call calc_kappa(T(i,j,k),T(i,j+1,k),kappa)
-    Fv(i-1,j,k-1,1) = 0.d0
-    Fv(i-1,j,k-1,2) = tyx
-    Fv(i-1,j,k-1,3) = tyy
-    Fv(i-1,j,k-1,4) = tyz
-    Fv(i-1,j,k-1,5) = tyx * 0.5d0 * (u(i,j,k) + u(i,j+1,k)) + tyy * 0.5d0 * (v(i,j,k) + v(i,j+1,k)) &
+    Fv(i-offset,j-offset+1,k-offset,1) = 0.d0
+    Fv(i-offset,j-offset+1,k-offset,2) = tyx
+    Fv(i-offset,j-offset+1,k-offset,3) = tyy
+    Fv(i-offset,j-offset+1,k-offset,4) = tyz
+    Fv(i-offset,j-offset+1,k-offset,5) = tyx * 0.5d0 * (u(i,j,k) + u(i,j+1,k)) + tyy * 0.5d0 * (v(i,j,k) + v(i,j+1,k)) &
     & + tyz * 0.5d0 * (w(i,j,k) + w(i,j+1,k)) + kappa * (-T(i,j,k) + T(i,j+1,k))
   end subroutine calc_Fv
   
@@ -125,11 +127,12 @@ contains
     real(8), intent(in), value :: dX, dY, dZ, delta, Cs
     real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, T
     real(8), intent(out), device :: Gv(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
-    integer i, j, k
+    integer i, j, k, offset
     real(8) muz, mux1, mux2, muy1, muy2, kappa
     real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, tzx, tzy, tzz
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
+    offset = accuracy / 2
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
     
     ! z direction
@@ -154,11 +157,11 @@ contains
     tzy = vz + wy
     tzz = 2.d0 * (2.d0 * wz - ux - vy) / 3.d0
     call calc_kappa(T(i,j,k),T(i,j,k+1),kappa)
-    Gv(i-1,j-1,k,1) = 0.d0
-    Gv(i-1,j-1,k,2) = tzx
-    Gv(i-1,j-1,k,3) = tzy
-    Gv(i-1,j-1,k,4) = tzz
-    Gv(i-1,j-1,k,5) = tzx * 0.5d0 * (u(i,j,k) + u(i,j,k+1)) + tzy * 0.5d0 * (v(i,j,k) + v(i,j,k+1)) &
+    Gv(i-offset,j-offset,k-offset+1,1) = 0.d0
+    Gv(i-offset,j-offset,k-offset+1,2) = tzx
+    Gv(i-offset,j-offset,k-offset+1,3) = tzy
+    Gv(i-offset,j-offset,k-offset+1,4) = tzz
+    Gv(i-offset,j-offset,k-offset+1,5) = tzx * 0.5d0 * (u(i,j,k) + u(i,j,k+1)) + tzy * 0.5d0 * (v(i,j,k) + v(i,j,k+1)) &
     & + tzz * 0.5d0 * (w(i,j,k) + w(i,j,k+1)) + kappa * (-T(i,j,k) + T(i,j,k+1))
   end subroutine calc_Gv
 end module calc_visc
