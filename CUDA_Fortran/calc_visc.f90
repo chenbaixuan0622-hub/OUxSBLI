@@ -1,5 +1,5 @@
 module calc_visc
-  use mod_globals, only : id_turbulence
+  use mod_globals, only : accuracy, id_turbulence
   use calc_Sutherland
   implicit none
 contains
@@ -36,12 +36,11 @@ contains
             & + mu2 * (-u1 + u6 - u4 + u5)) 
   end function u_y
 
-  attributes(global) subroutine calc_Ev(id, nx, ny, nz, dX, dY, dZ, delta, Cs, rho, u, v, w, T, Ev)
-    integer(kind=2), intent(in), value :: id
+  attributes(global) subroutine calc_Ev(nx, ny, nz, dX, dY, dZ, delta, Cs, rho, u, v, w, T, Ev)
     integer, intent(in), value :: nx, ny, nz
     real(8), intent(in), value :: dX, dY, dZ, delta, Cs
     real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, T
-    real(8), intent(out), dimension(nx-1,ny-2,nz-2,5), device :: Ev
+    real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: Ev
     integer i, j, k
     real(8) mux, muy1, muy2, muz1, muz2, kappa
     real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, txx, txy, txz
@@ -79,12 +78,11 @@ contains
     & + txz * 0.5d0 *(w(i,j,k) + w(i+1,j,k)) + kappa * (-T(i,j,k) + T(i+1,j,k))
   end subroutine calc_Ev
   
-  attributes(global) subroutine calc_Fv(id, nx, ny, nz, dX, dY, dZ, delta, Cs, rho, u, v, w, T, Fv)
-    integer(kind=2), intent(in), value :: id
+  attributes(global) subroutine calc_Fv(nx, ny, nz, dX, dY, dZ, delta, Cs, rho, u, v, w, T, Fv)
     integer, intent(in), value :: nx, ny, nz
     real(8), intent(in), value :: dX, dY, dZ, delta, Cs
     real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, T
-    real(8), intent(out), device :: Fv(nx-2,ny-1,nz-2,5)
+    real(8), intent(out), device :: Fv(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
     real(8) muy, muz1, muz2, mux1, mux2, kappa
     real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, tyx, tyy, tyz
@@ -122,12 +120,11 @@ contains
     & + tyz * 0.5d0 * (w(i,j,k) + w(i,j+1,k)) + kappa * (-T(i,j,k) + T(i,j+1,k))
   end subroutine calc_Fv
   
-  attributes(global) subroutine calc_Gv(id, nx, ny, nz, dX, dY, dZ, delta, Cs, rho, u, v, w, T, Gv)
-    integer(kind=2), intent(in), value :: id
+  attributes(global) subroutine calc_Gv(nx, ny, nz, dX, dY, dZ, delta, Cs, rho, u, v, w, T, Gv)
     integer, intent(in), value :: nx, ny, nz
     real(8), intent(in), value :: dX, dY, dZ, delta, Cs
     real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, T
-    real(8), intent(out), device :: Gv(nx-2,ny-2,nz-1,5)
+    real(8), intent(out), device :: Gv(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
     real(8) muz, mux1, mux2, muy1, muy2, kappa
     real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, tzx, tzy, tzz

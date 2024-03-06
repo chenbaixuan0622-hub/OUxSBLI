@@ -76,9 +76,9 @@ contains
         !print *, trim(cudaGetErrorString(cudaGetLastError()))
 
         if (id_visc == 1 .or. id_turbulence == 1) then
-          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Ev)
-          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Fv)
-          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Gv)
+          call calc_Ev<<<blocksE,threadsE>>>(nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Ev)
+          call calc_Fv<<<blocksF,threadsF>>>(nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Fv)
+          call calc_Gv<<<blocksG,threadsG>>>(nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Gv)
         endif
 
         stat = cudaDeviceSynchronize()
@@ -104,9 +104,9 @@ contains
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
         
         if (id_visc == 1 .and. id_turbulence == 1) then
-          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Ev)
-          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Fv)
-          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Gv)
+          call calc_Ev<<<blocksE,threadsE>>>(nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Ev)
+          call calc_Fv<<<blocksF,threadsF>>>(nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Fv)
+          call calc_Gv<<<blocksG,threadsG>>>(nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Gv)
         endif      
         
         stat = cudaDeviceSynchronize()
@@ -132,9 +132,9 @@ contains
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
         
         if (id_visc == 1 .or. id_turbulence == 1) then
-          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Ev)
-          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Fv)
-          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Gv)
+          call calc_Ev<<<blocksE,threadsE>>>(nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Ev)
+          call calc_Fv<<<blocksF,threadsF>>>(nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Fv)
+          call calc_Gv<<<blocksG,threadsG>>>(nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Gv)
         endif
         
         stat = cudaDeviceSynchronize()
