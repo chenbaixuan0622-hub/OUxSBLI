@@ -1,7 +1,7 @@
 module calc_time_dev
   implicit none
 contains
-  subroutine RungeKutta(nx,ny,nz,nt,np,dx,dy,dz,dt,gamma,mu,kappa,Cv,Cp,Cs,Q)
+  subroutine RungeKutta(nx,ny,nz,nt,np,dx,dy,dz,dt,gamma,T0,Cs,Q)
     use iso_fortran_env
     use cudafor
     use mod_globals, only : accuracy, id_visc, id_turbulence
@@ -12,8 +12,8 @@ contains
     use set_bc
     use print
     integer, intent(in) :: nx, ny, nz, nt, np
-    real(8), intent(in) :: dx, dy, dz, dt, gamma, kappa, Cv, Cp, Cs
-    real(8), intent(inout) :: mu
+    real(8), intent(in) :: dx, dy, dz, dt, gamma, Cs
+    real(8), intent(in) :: T0(nx,ny,nz)
     real(8), intent(inout) :: Q(nx,ny,nz,5)
     integer t1, t2, itr
     integer(kind=2**(accuracy/2)) :: id
@@ -61,29 +61,25 @@ contains
 
     ! copy on GPU
     Q_d = Q
+    T = T0
     do t2 = 1, np
       do t1 = 1, nt
-        call calc_quantities(nx,ny,nz,gamma,Cp,Q_d,rho,u,v,w,p,T)
-        
+        if (id_visc == 1 .or. id_turbulence == 1) then
+          call calc_quantities_T(nx,ny,nz,gamma,Q_d,rho,u,v,w,p,T)
+        else
+          call calc_quantities(nx,ny,nz,gamma,Q_d,rho,u,v,w,p)
+        endif
+
         ! Euler
         call calc_E<<<blocksE,threadsE>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
         call calc_F<<<blocksF,threadsF>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
         !print *, trim(cudaGetErrorString(cudaGetLastError()))
 
-        if (id_visc == 1 .and. id_turbulence /= 1) then
-          ! visc only
-          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Ev)
-          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Fv)
-          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Gv)
-        endif
-        if (id_turbulence == 1) then
-          if (id_visc /= 1) then
-            mu = 0.d0
-          endif
-          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
-          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
-          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
+        if (id_visc == 1 .or. id_turbulence == 1) then
+          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Ev)
+          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Fv)
+          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Gv)
         endif
 
         stat = cudaDeviceSynchronize()
@@ -98,27 +94,22 @@ contains
         
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-        call calc_quantities(nx,ny,nz,gamma,Cp,Q2,rho,u,v,w,p,T)
-        
+        if (id_visc == 1 .or. id_turbulence == 1) then
+          call calc_quantities_T(nx,ny,nz,gamma,Q2,rho,u,v,w,p,T)
+        else
+          call calc_quantities(nx,ny,nz,gamma,Q2,rho,u,v,w,p)
+        endif
+
         ! Euler
         call calc_E<<<blocksE,threadsE>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
         call calc_F<<<blocksF,threadsF>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
         
-        if (id_visc == 1 .and. id_turbulence /= 1) then
-          ! visc only
-          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Ev)
-          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Fv)
-          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Gv)
+        if (id_visc == 1 .and. id_turbulence == 1) then
+          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Ev)
+          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Fv)
+          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Gv)
         endif      
-        if (id_turbulence == 1) then
-          if (id_visc /= 1) then
-            mu = 0.d0
-          endif
-          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
-          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
-          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
-        endif
         
         stat = cudaDeviceSynchronize()
 
@@ -132,26 +123,21 @@ contains
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
-        call calc_quantities(nx,ny,nz,gamma,Cp,Q3,rho,u,v,w,p,T)
+        if (id_visc == 1 .or. id_turbulence == 1) then
+          call calc_quantities_T(nx,ny,nz,gamma,Q3,rho,u,v,w,p,T)
+        else
+          call calc_quantities(nx,ny,nz,gamma,Q3,rho,u,v,w,p)
+        endif
         
         ! Euler
         call calc_E<<<blocksE,threadsE>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
         call calc_F<<<blocksF,threadsF>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
         
-        if (id_visc == 1 .or. id_turbulence /= 1) then
-          ! visc
-          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Ev)
-          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Fv)
-          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,u,v,w,T,Gv)
-        endif
-        if (id_turbulence == 1) then
-          if (id_visc /= 1) then
-            mu = 0.d0
-          endif
-          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Ev)
-          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Fv)
-          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,mu,kappa,delta,Cs,rho,u,v,w,T,Gv)
+        if (id_visc == 1 .or. id_turbulence == 1) then
+          call calc_Ev<<<blocksE,threadsE>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Ev)
+          call calc_Fv<<<blocksF,threadsF>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Fv)
+          call calc_Gv<<<blocksG,threadsG>>>(id,nx,ny,nz,dxi,dyi,dzi,delta,Cs,rho,u,v,w,T,Gv)
         endif
         
         stat = cudaDeviceSynchronize()

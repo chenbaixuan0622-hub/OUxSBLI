@@ -7,7 +7,8 @@ program main
   integer nx, ny, nz, nt, np
   real(8) gamma, T, mu, kappa, Cv, Cp, Cs, U_ref, RHO, L, M, pi, Lx, Ly, Lz, dx, dy, dz, dt, non_dt
   real(8), allocatable :: Q(:,:,:,:)
-  real(8) t0, t1
+  real(8), allocatable :: T0(:,:,:)
+  real(8) t_start, t_end
   
   ! read file
   open(28,file='input.d', action='read')
@@ -70,13 +71,15 @@ program main
 
   ! parallel computing
   allocate(Q(nx,ny,nz,5))
-  
+  allocate(T0(nx,ny,nz))
+
   ! set initial condition
   call TaylorGreen(nx,ny,nz,gamma,RHO,L,M,Q)
+  T0(:,:,:) = T
 
-  call cpu_time(t0)
-  call RungeKutta(nx,ny,nz,nt,np,dx,dy,dz,dt,gamma,mu,kappa,Cv,Cp,Cs,Q)
-  call cpu_time(t1)
+  call cpu_time(t_start)
+  call RungeKutta(nx,ny,nz,nt,np,dx,dy,dz,dt,gamma,T0,Cs,Q)
+  call cpu_time(t_end)
   non_dt = dt / (L / U_ref)
   open(1,file="output.d",position='append')
   write(1,"('time info')")
@@ -85,7 +88,7 @@ program main
   write(1,"('Courant number           =', e12.4)") U_ref * dt / dx
   write(1,"('end time                 =', e12.4)") nt * np * dt
   write(1,"('non-dimentional end time =', e12.4)") nt * np * non_dt  
-  write(1,"('elapsed time             =', i10, '[s]')") int(t1-t0)
+  write(1,"('elapsed time             =', i10, '[s]')") int(t_end-t_start)
   close(1)
-  deallocate(Q)
+  deallocate(Q,T0)
 end program main
