@@ -70,7 +70,6 @@ contains
           call calc_quantities(nx,ny,nz,gamma,Q_d,rho,u,v,w,p)
         endif
 
-        ! Euler
         call calc_E<<<blocksE,threadsE>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
         call calc_F<<<blocksF,threadsF>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
@@ -100,7 +99,6 @@ contains
           call calc_quantities(nx,ny,nz,gamma,Q2,rho,u,v,w,p)
         endif
 
-        ! Euler
         call calc_E<<<blocksE,threadsE>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
         call calc_F<<<blocksF,threadsF>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
@@ -129,7 +127,6 @@ contains
           call calc_quantities(nx,ny,nz,gamma,Q3,rho,u,v,w,p)
         endif
         
-        ! Euler
         call calc_E<<<blocksE,threadsE>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,E)
         call calc_F<<<blocksF,threadsF>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,F)
         call calc_G<<<blocksG,threadsG>>>(id,nx,ny,nz,gamma,rho,u,v,w,p,G)
