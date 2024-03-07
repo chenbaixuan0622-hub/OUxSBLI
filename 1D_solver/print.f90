@@ -1,54 +1,24 @@
 module print
   implicit none
 contains
-  subroutine print_vtk(step,nx,ny,dx,dy,gamma,Q)
-    integer, intent(in) :: step, nx, ny
-    real(8), intent(in) :: dx, dy, gamma, Q(nx,ny,4)
-    integer i, j
-    real(8), dimension(nx,ny) :: rho, u, v, p
+  subroutine print_vtk(step,nx,dx,gamma,Q)
+    integer, intent(in) :: step, nx
+    real(8), intent(in) :: dx, gamma, Q(nx,3)
+    integer i
+    real(8), dimension(nx) :: rho, u, p
     character(len=40) filename
-    rho = Q(:,:,1)
-    u = Q(:,:,2) / rho
-    v = Q(:,:,3) / rho
-    p = (gamma - 1.d0) * (Q(:,:,4) - 0.5d0 * rho * (u ** 2 + v ** 2 ))
+    rho = Q(:,1)
+    u = Q(:,2) / rho
+    p = (gamma - 1.d0) * (Q(:,3) - 0.5d0 * rho * u ** 2)
     
-    write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtk"
+    write(filename, "(a, i5.5,a)") "data/Q",int(step),".d"
     open(10,file=filename)
-    write(10,"('# vtk DataFile Version 3.0')")
-    write(10,"('Q')")
-    write(10,"('ASCII')")
-    write(10,"('DATASET STRUCTURED_GRID')")
-    write(10,"('DIMENSIONS',2(1x,i3))") nx, ny
-    write(10,"('POINTS',i9,' float')") nx * ny
-    do j = 1, ny
-      do i = 1, nx
-        write(10,"(i2(f9.4,1x))") (i-1)*dx, (j-1)*dy
-      enddo
-    enddo 
-
-    write(10,"('POINT_DATA',i9)") nx * ny
-    write(10,"('VECTORS Velocity float')")
-    do j = 1, ny
-      do i = 1, nx
-        write(10,"(2(f9.4,1x))") u(i,j), v(i,j)
-      enddo
+    write(10,"('# Q.d')")
+    write(10,"('# x     y0      y1      y2')")
+    do i = 1, nx
+      write(10,"(4(f9.4,1x))") (i-1)*dx, rho(i), u(i), p(i)
     enddo
-
-    write(10,"('SCALARS rho float')")
-    write(10,"('LOOKUP_TABLE default')")
-    do j = 1, ny
-      do i = 1, nx
-        write(10,"(f9.4,1x)") rho(i,j)
-      enddo
-    enddo
-    
-    write(10,"('SCALARS P float')")
-    write(10,"('LOOKUP_TABLE default')")
-    do j = 1, ny
-      do i = 1, nx
-        write(10,"(f9.4,1x)") p(i,j)
-      enddo
-    enddo
+    write(10,"('# end of file')")
     close(10)
   end subroutine print_vtk
 end module print

@@ -13,153 +13,106 @@ module calc_steps
     module procedure calc_step3_Euler, calc_step3_NS
   end interface
 contains
-  subroutine calc_step1_Euler(nx,dX,dt,E,Q,Q2)
+  subroutine calc_step1_Euler(nx,dtdx,E,Q,Q2)
     integer, intent(in), value :: nx
-    real(8), intent(in), value :: dX, dt
-    real(8), intent(in), device :: E(nx-accuracy+1,3)
-    real(8), intent(in), dimension(nx,3), device :: Q
-    real(8), intent(out), dimension(nx,3), device :: Q2
+    real(8), intent(in), value :: dtdx
+    real(8), intent(in) :: E(nx-accuracy+1,3)
+    real(8), intent(in), dimension(nx,3) :: Q
+    real(8), intent(out), dimension(nx,3) :: Q2
     integer i, offset
     ! 2nd-order accuracy : offset = 1
     ! 4th-order accuracy : offset = 2
     offset = accuracy / 2
     do i = 1+offset, nx-offset
-      Q2(i,:) = Q(i,:) - dt * ( &
-              & -dX * (-E(i-offset,:) + E(i-offset+1,:)))
+      Q2(i,:) = Q(i,:) - dtdx * (-E(i-offset,:) + E(i-offset+1,:))
     enddo
   end subroutine calc_step1_Euler
 
-  subroutine calc_step1_NS(nx,ny,dX,dY,dt,E,F,Ev,Fv,Q,Q2)
-    integer, intent(in), value :: nx, ny
-    real(8), intent(in), value :: dX, dY, dt
-    real(8), intent(in), device :: E(nx-accuracy+1,ny-accuracy,4)
-    real(8), intent(in), device :: F(nx-accuracy,ny-accuracy+1,4)
-    real(8), intent(in), device :: Ev(nx-accuracy+1,ny-accuracy,4)
-    real(8), intent(in), device :: Fv(nx-accuracy,ny-accuracy+1,4)
-    real(8), intent(in), dimension(nx,ny,4), device :: Q
-    real(8), intent(out), dimension(nx,ny,4), device :: Q2
-    integer i, j, offset
+  subroutine calc_step1_NS(nx,dtdx,E,Ev,Q,Q2)
+    integer, intent(in), value :: nx
+    real(8), intent(in), value :: dtdx
+    real(8), intent(in) :: E(nx-accuracy+1,3)
+    real(8), intent(in) :: Ev(nx-accuracy+1,3)
+    real(8), intent(in), dimension(nx,3) :: Q
+    real(8), intent(out), dimension(nx,3) :: Q2
+    integer i, offset
     ! 2nd-order accuracy : offset = 1
     ! 4th-order accuracy : offset = 2
-    !$acc kernels deviceptr(E,F,Q,Q2)
     offset = accuracy / 2
-    !$acc loop collapse(2)
-    do j = 1+offset, ny-offset
-      do i = 1+offset, nx-offset
-        Q2(i,j,:) = Q(i,j,:) - dt * ( &
-                & -dX * (-E(i-offset,j-offset,:) + E(i-offset+1,j-offset,:) & 
-                & + Ev(i-offset,j-offset,:) - Ev(i-offset+1,j-offset,:)) &
-                & -dY * (-F(i-offset,j-offset,:) + F(i-offset,j-offset+1,:) &
-                & + Fv(i-offset,j-offset,:) - Fv(i-offset,j-offset+1,:)))
-      enddo
+    do i = 1+offset, nx-offset
+      Q2(i,:) = Q(i,:) &
+                & - dtdx * (-E(i-offset,:) + E(i-offset+1,:) + Ev(i-offset,:) - Ev(i-offset+1,:))
     enddo
-    !$acc end kernels
   end subroutine calc_step1_NS
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   
-  subroutine calc_step2_Euler(nx,ny,dX,dY,dt,E,F,Q,Q2,Q3)
-    integer, intent(in), value :: nx, ny
-    real(8), intent(in), value :: dX, dY, dt
-    real(8), intent(in), device :: E(nx-accuracy+1,ny-accuracy,4)
-    real(8), intent(in), device :: F(nx-accuracy,ny-accuracy+1,4)
-    real(8), intent(in), dimension(nx,ny,4), device :: Q
-    real(8), intent(in), dimension(nx,ny,4), device :: Q2
-    real(8), intent(out), dimension(nx,ny,4), device :: Q3
-    integer i, j, offset
+  subroutine calc_step2_Euler(nx,dtdx,E,Q,Q2,Q3)
+    integer, intent(in), value :: nx
+    real(8), intent(in), value :: dtdx
+    real(8), intent(in) :: E(nx-accuracy+1,3)
+    real(8), intent(in), dimension(nx,3) :: Q
+    real(8), intent(in), dimension(nx,3) :: Q2
+    real(8), intent(out), dimension(nx,3) :: Q3
+    integer i, offset
     ! 2nd-order accuracy : offset = 1
     ! 4th-order accuracy : offset = 2
-    !$acc kernels deviceptr(E,F,Q,Q2,Q3)
     offset = accuracy / 2
-    !$acc loop collapse(2)
-    do j = 1+offset, ny-offset
-      do i = 1+offset, nx-offset
-        Q3(i,j,:) = 0.75d0 * Q(i,j,:) + 0.25d0 * Q2(i,j,:) - 0.25d0 * dt * ( &
-                & -dX * (-E(i-offset,j-offset,:) + E(i-offset+1,j-offset,:)) &
-                & -dY * (-F(i-offset,j-offset,:) + F(i-offset,j-offset+1,:))) 
-      enddo
+    do i = 1+offset, nx-offset
+      Q3(i,:) = 0.75d0 * Q(i,:) + 0.25d0 * Q2(i,:) - 0.25d0 * dtdx * (-E(i-offset,:) + E(i-offset+1,:))
     enddo
-    !$acc end kernels
   end subroutine calc_step2_Euler
 
-  subroutine calc_step2_NS(nx,ny,dX,dY,dt,E,F,Ev,Fv,Q,Q2,Q3)
-    integer, intent(in), value :: nx, ny
-    real(8), intent(in), value :: dX, dY, dt
-    real(8), intent(in), device :: E(nx-accuracy+1,ny-accuracy,4)
-    real(8), intent(in), device :: F(nx-accuracy,ny-accuracy+1,4)
-    real(8), intent(in), device :: Ev(nx-accuracy+1,ny-accuracy,4)
-    real(8), intent(in), device :: Fv(nx-accuracy,ny-accuracy+1,4)
-    real(8), intent(in), dimension(nx,ny,4), device :: Q
-    real(8), intent(in), dimension(nx,ny,4), device :: Q2
-    real(8), intent(out), dimension(nx,ny,4), device :: Q3
-    integer i, j, offset
+  subroutine calc_step2_NS(nx,dtdx,E,Ev,Q,Q2,Q3)
+    integer, intent(in), value :: nx
+    real(8), intent(in), value :: dtdx
+    real(8), intent(in) :: E(nx-accuracy+1,3)
+    real(8), intent(in) :: Ev(nx-accuracy+1,3)
+    real(8), intent(in), dimension(nx,3) :: Q
+    real(8), intent(in), dimension(nx,3) :: Q2
+    real(8), intent(out), dimension(nx,3) :: Q3
+    integer i, offset
     ! 2nd-order accuracy : offset = 1
     ! 4th-order accuracy : offset = 2
-    !$acc kernels deviceptr(E,F,Q,Q2,Q3)
     offset = accuracy / 2
-    !$acc loop collapse(2)
-    do j = 1+offset, ny-offset
-      do i = 1+offset, nx-offset
-        Q3(i,j,:) = 0.75d0 * Q(i,j,:) + 0.25d0 * Q2(i,j,:) - 0.25d0 * dt * ( &
-                & -dX * (-E(i-offset,j-offset,:) + E(i-offset+1,j-offset,:) &
-                & + Ev(i-offset,j-offset,:) - Ev(i-offset+1,j-offset,:)) &
-                & -dY * (-F(i-offset,j-offset,:) + F(i-offset,j-offset+1,:) &
-                & + Fv(i-offset,j-offset,:) - Fv(i-offset,j-offset+1,:))) 
-      enddo
+    do i = 1+offset, nx-offset
+      Q3(i,:) = 0.75d0 * Q(i,:) + 0.25d0 * Q2(i,:) - 0.25d0 * &
+                & dtdx * (-E(i-offset,:) + E(i-offset+1,:) + Ev(i-offset,:) - Ev(i-offset+1,:))
     enddo
-    !$acc end kernels
   end subroutine calc_step2_NS
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   
-  subroutine calc_step3_Euler(nx,ny,dX,dY,dt,E,F,Q3,Q)
-    integer, intent(in), value :: nx, ny
-    real(8), intent(in), value :: dX, dY, dt
-    real(8), intent(in), device :: E(nx-accuracy+1,ny-accuracy,4)
-    real(8), intent(in), device :: F(nx-accuracy,ny-accuracy+1,4)
-    real(8), intent(in), dimension(nx,ny,4), device :: Q3
-    real(8), intent(inout), dimension(nx,ny,4), device :: Q
-    integer i, j, offset
+  subroutine calc_step3_Euler(nx,dtdx,E,Q3,Q)
+    integer, intent(in), value :: nx
+    real(8), intent(in), value :: dtdx
+    real(8), intent(in) :: E(nx-accuracy+1,3)
+    real(8), intent(in), dimension(nx,3) :: Q3
+    real(8), intent(inout), dimension(nx,3) :: Q
+    integer i, offset
     ! 2nd-order accuracy : offset = 1
     ! 4th-order accuracy : offset = 2
-    !$acc kernels deviceptr(E,F,Q3,Q)
     offset = accuracy / 2
-    !$acc loop collapse(2)
-    do j = 1+offset, ny-offset
-      do i = 1+offset, nx-offset
-        Q(i,j,:) = (Q(i,j,:) + 2.0d0 * Q3(i,j,:) - 2.d0 * dt * ( &
-                & -dX * (-E(i-offset,j-offset,:) + E(i-offset+1,j-offset,:)) &
-                & -dY * (-F(i-offset,j-offset,:) + F(i-offset,j-offset+1,:)))) / 3.d0 
-      enddo
+    do i = 1+offset, nx-offset
+      Q(i,:) = (Q(i,:) + 2.d0 * Q3(i,:) - 2.d0 * dtdx * (-E(i-offset,:) + E(i-offset+1,:))) / 3.d0
     enddo
-    !$acc end kernels
   end subroutine calc_step3_Euler
 
-  subroutine calc_step3_NS(nx,ny,dX,dY,dt,E,F,Ev,Fv,Q3,Q)
-    integer, intent(in), value :: nx, ny
-    real(8), intent(in), value :: dX, dY, dt
-    real(8), intent(in), device :: E(nx-accuracy+1,ny-accuracy,4)
-    real(8), intent(in), device :: F(nx-accuracy,ny-accuracy+1,4)
-    real(8), intent(in), device :: Ev(nx-accuracy+1,ny-accuracy,4)
-    real(8), intent(in), device :: Fv(nx-accuracy,ny-accuracy+1,4)
-    real(8), intent(in), dimension(nx,ny,4), device :: Q3
-    real(8), intent(inout), dimension(nx,ny,4), device :: Q
-    integer i, j, offset
+  subroutine calc_step3_NS(nx,dtdx,E,Ev,Q3,Q)
+    integer, intent(in), value :: nx
+    real(8), intent(in), value :: dtdx
+    real(8), intent(in) :: E(nx-accuracy+1,3)
+    real(8), intent(in) :: Ev(nx-accuracy+1,3)
+    real(8), intent(in), dimension(nx,3) :: Q3
+    real(8), intent(inout), dimension(nx,3) :: Q
+    integer i, offset
     ! 2nd-order accuracy : offset = 1
     ! 4th-order accuracy : offset = 2
-    !$acc kernels deviceptr(E,F,Q3,Q)
     offset = accuracy / 2
-    !$acc loop collapse(2)
-    do j = 1+offset, ny-offset
-      do i = 1+offset, nx-offset
-        Q(i,j,:) = (Q(i,j,:) + 2.0d0 * Q3(i,j,:) - 2.d0 * dt * ( &
-                & -dX * (-E(i-offset,j-offset,:) + E(i-offset+1,j-offset,:) & 
-                & + Ev(i-offset,j-offset,:) - Ev(i-offset+1,j-offset,:)) &
-                & -dY * (-F(i-offset,j-offset,:) + F(i-offset,j-offset+1,:) &
-                & + Fv(i-offset,j-offset,:) - Fv(i-offset,j-offset+1,:)))) / 3.d0
-      enddo
+    do i = 1+offset, nx-offset
+      Q(i,:) = (Q(i,:) + 2.d0 * Q3(i,:) - 2.d0 * &
+                & dtdx * (-E(i-offset,:) + E(i-offset+1,:) + Ev(i-offset,:) - Ev(i-offset+1,:))) / 3.d0
     enddo
-    !$acc end kernels
   end subroutine calc_step3_NS
 end module calc_steps
 
