@@ -33,13 +33,13 @@ contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  attributes(device) function RhoUPhiPhi(rhou, u, v, w) result(ans)
+  attributes(device) function RhoUPhiPhi(rhou, u, v) result(ans)
     real(8), intent(in), dimension(3), device :: rhou
-    real(8), intent(in), dimension(4), device :: u, v, w
+    real(8), intent(in), dimension(4), device :: u, v
     real(8), dimension(3) :: ans
-    ans(1) = rhou(1) * 0.5d0 * (u(2) * u(3) + v(2) * v(3) + w(2) * w(3))
-    ans(2) = rhou(2) * 0.5d0 * (u(2) * u(4) + v(2) * v(4) + w(2) * w(4))
-    ans(3) = rhou(3) * 0.5d0 * (u(1) * u(3) + v(1) * v(3) + w(1) * w(3))
+    ans(1) = rhou(1) * 0.5d0 * (u(2) * u(3) + v(2) * v(3))
+    ans(2) = rhou(2) * 0.5d0 * (u(2) * u(4) + v(2) * v(4))
+    ans(3) = rhou(3) * 0.5d0 * (u(1) * u(3) + v(1) * v(3))
   end function RhoUPhiPhi
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

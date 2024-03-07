@@ -1,8 +1,5 @@
 module calc_Sutherland
   implicit none
-  interface calc_mu
-    module procedure calc_mu2, calc_mu4
-  end interface
 contains
   attributes(device) function mu(T) result(ans)
     real(8), intent(in), value :: T
@@ -10,19 +7,12 @@ contains
     ans = (1.4592d-6 * T ** 1.5d0) / (109.1d0 + T)
   end function mu
 
-  attributes(device) subroutine calc_mu2(T1,T2,mu_mean)
+  attributes(device) subroutine calc_mu(T1,T2,mu_mean)
     real(8), intent(in), value :: T1, T2
     real(8), intent(out) :: mu_mean
     real(8) mu1, mu2
     mu_mean = 0.5d0 * (mu(T1) + mu(T2)) 
-  end subroutine calc_mu2
-
-  attributes(device) subroutine calc_mu4(T1,T2,T3,T4,mu_mean)
-    real(8), intent(in), value :: T1, T2, T3, T4
-    real(8), intent(out) :: mu_mean
-    real(8) mu1, mu2, mu3, mu4
-    mu_mean = 0.25d0 * (mu(T1) + mu(T2) + mu(T3) + mu(T4)) 
-  end subroutine calc_mu4
+  end subroutine calc_mu
 
   attributes(device) subroutine calc_kappa(T1,T2,kappa)
     real(8), intent(in), value :: T1, T2
@@ -33,3 +23,4 @@ contains
     kappa =  0.5d0 * (kappa1 + kappa2)
   end subroutine calc_kappa
 end module calc_Sutherland
+
