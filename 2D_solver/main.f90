@@ -5,9 +5,10 @@ program main
   use calc_time_dev
   implicit none
   integer nx, ny, nt, np
-  real(8) gamma, alpha, T, mu, kappa, Cv, Cp, U_ref, rhol, rhor, pl, pr, Lx, Ly, Lz, dx, dy, dz, dt, non_dt
+  real(8) gamma, alpha, T, mu, kappa, Cv, Cp, U_ref, rho, rhol, rhor, pl, pr, Lx, Ly, Lz, dx, dy, dz, dt, non_dt
   real(8), allocatable :: Q(:,:,:)
-  real(8) t0, t1
+  real(8), allocatable :: T0(:,:)
+  real(8) t_start, t_end
   
   ! read file
   open(28,file='input.d', action='read')
@@ -32,7 +33,8 @@ program main
   
   ! time
   dt = 0.01d0
-  U_ref = M
+
+  Rho = 0.5d0 * (rhol + rhor)
 
   ! calc physical properties
   mu = (1.4592d-6 * T ** (1.5d0)) / (109.1d0 + T)
@@ -48,7 +50,7 @@ program main
     write(1,"('kappa =', e12.4, '[W/(m K)]')") kappa
     write(1,"('Cv    =', f10.4, '[J/(kg K)]')") Cv
     write(1,"('Cp    =', f10.4, '[J/(kg K)]')") Cp
-    write(1,"('Re    =', f10.4)") RHO * U_ref * Lx / mu
+    write(1,"('Re    =', f10.4)") Rho * U_ref * Lx / mu
   else
     write(1,"('Euler solver was chosen')")
   endif
@@ -62,13 +64,15 @@ program main
 
   ! parallel computing
   allocate(Q(nx,ny,4))
+  allocate(T0(nx,ny))
   
   ! set initial condition
-  call shock_tube(nx,ny,nz,gamma,rhol,rhor,pl,pr,Q)
+  call shock_tube(nx,ny,gamma,rhol,rhor,pl,pr,Q)
+  T0 = T
 
-  call cpu_time(t0)
-  call RungeKutta(nx,ny,nt,np,dx,dy,dt,gamma,mu,kappa,Cv,Cp,Q)
-  call cpu_time(t1)
+  call cpu_time(t_start)
+  call RungeKutta(nx,ny,nt,np,dx,dy,dt,gamma,T0,Q)
+  call cpu_time(t_end)
   non_dt = dt / (Lx / U_ref)
   open(1,file="output.d",position='append')
   write(1,"('time info')")
@@ -77,8 +81,8 @@ program main
   write(1,"('Courant number           =', e12.4)") U_ref * dt / dx
   write(1,"('end time                 =', e12.4)") nt * np * dt
   write(1,"('non-dimentional end time =', e12.4)") nt * np * non_dt  
-  write(1,"('elapsed time             =', i10, '[s]')") int(t1-t0)
+  write(1,"('elapsed time             =', i10, '[s]')") int(t_end-t_start)
   close(1)
-  deallocate(Q)
+  deallocate(Q,T0)
 end program main
 

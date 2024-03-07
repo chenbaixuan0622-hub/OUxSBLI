@@ -48,6 +48,9 @@ Yuichi Kuya, Kosuke Totani, Soshi Kawai, Kinetic energy and entropy preserving s
 <li><a href="https://www.sciencedirect.com/science/article/abs/pii/S0021999121003776">
 Yuichi Kuya, Soshi Kawai, High-order accurate kinetic-enrgy and entropy preserving (KEEP) schemes on curvilinear grids, Journal of Computational Physics, 2021</a>
 </li>
+<li><a href="https://www.sciencedirect.com/science/article/pii/S187775031630299X?via%3Dihub">
+Christian T. Jacobs, Satya P. Jammy, Neil D. Sandham, OpenSBLI: A framework for the automated derivation and parallel execution of finite difference solvers on a range of computer architectures</a>
+</li>
 <li><a href="https://docs.nvidia.com/hpc-sdk/pgi-compilers/2017/pgi17cudaforug.pdf">
 CUDA FORTRAN PROGRAMMING GUIDE AND REFERENCE, 2017</a>
 </li>

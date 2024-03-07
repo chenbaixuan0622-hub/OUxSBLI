@@ -58,7 +58,6 @@ contains
                 & + Ev(i-offset,j-offset,:) - Ev(i-offset+1,j-offset,:)) &
                 & -dY * (-F(i-offset,j-offset,:) + F(i-offset,j-offset+1,:) &
                 & + Fv(i-offset,j-offset,:) - Fv(i-offset,j-offset+1,:)))
-        enddo
       enddo
     enddo
     !$acc end kernels
@@ -137,8 +136,7 @@ contains
       do i = 1+offset, nx-offset
         Q(i,j,:) = (Q(i,j,:) + 2.0d0 * Q3(i,j,:) - 2.d0 * dt * ( &
                 & -dX * (-E(i-offset,j-offset,:) + E(i-offset+1,j-offset,:)) &
-                & -dY * (-F(i-offset,j-offset,:) + F(i-offset,j-offset+1,:)))
-        enddo
+                & -dY * (-F(i-offset,j-offset,:) + F(i-offset,j-offset+1,:)))) / 3.d0 
       enddo
     enddo
     !$acc end kernels
@@ -171,3 +169,4 @@ contains
     !$acc end kernels
   end subroutine calc_step3_NS
 end module calc_steps
+

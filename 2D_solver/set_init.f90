@@ -2,9 +2,9 @@ module set_init
   implicit none
 contains
   subroutine shock_tube(nx,ny,gamma,rhol,rhor,pl,pr,Q)
-    integer, intent(in) :: nx, ny, nz
+    integer, intent(in) :: nx, ny
     real(8), intent(in) :: gamma, rhol, rhor, pl, pr
-    real(8), intent(out), dimension(nx,ny,nz,5) :: Q
+    real(8), intent(out), dimension(nx,ny,4) :: Q
     ! left half
     Q(1:int(0.5*nx),:,1) = rhol
     Q(1:int(0.5*nx),:,4) = pl / (gamma - 1.d0)
@@ -16,3 +16,4 @@ contains
     Q(:,:,3) = 0.d0
   end subroutine shock_tube
 end module set_init
+

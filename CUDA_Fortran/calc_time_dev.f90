@@ -51,12 +51,12 @@ contains
       threadsF = dim3(5,32,5)
       threadsG = dim3(5,5,32)
     else if (accuracy == 4) then
-      blocksE = dim3((nx-accuracy+1),(ny-accuracy)/16,(nz-accuracy)/16)
-      blocksF = dim3((nx-accuracy)/16,(ny-accuracy+1),(nz-accuracy)/16)
-      blocksG = dim3((nx-accuracy)/16,(ny-accuracy)/16,(nz-accuracy+1))
-      threadsE = dim3(1,16,16)
-      threadsF = dim3(16,1,16)
-      threadsG = dim3(16,16,1)
+      blocksE = dim3((nx-accuracy+1)/2,(ny-accuracy)/11,(nz-accuracy)/11)
+      blocksF = dim3((nx-accuracy)/11,(ny-accuracy+1)/2,(nz-accuracy)/11)
+      blocksG = dim3((nx-accuracy)/11,(ny-accuracy)/11,(nz-accuracy+1)/2)
+      threadsE = dim3(2,11,11)
+      threadsF = dim3(11,2,11)
+      threadsG = dim3(11,11,2)
     endif
 
     ! copy on GPU
