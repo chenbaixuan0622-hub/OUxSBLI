@@ -1,4 +1,4 @@
-module calc_flux
+module calc_KEEP
   use calc_term
   implicit none
   interface calc_E
@@ -47,5 +47,5 @@ contains
       E(i,3) = Flux(Energy(:))
     enddo
   end subroutine calc_E4
-end module calc_flux
+end module calc_KEEP
 
