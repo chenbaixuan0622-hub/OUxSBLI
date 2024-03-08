@@ -2,6 +2,12 @@ module calc_SLAU
   use calc_MUSCL
   implicit none
 contains
+  function energy(gamma,p,rho,u) result(e)
+    real(8), intent(in) :: gamma, p, rho, u 
+    real(8) :: e
+    e = p / (gamma - 1.d0) + 0.5d0 * rho * u ** 2
+  end function energy
+
   function enthalpy(e,p,rho) result(h)
     real(8), intent(in) :: e, p, rho
     real(8) :: h
@@ -20,7 +26,7 @@ contains
     real(8), intent(in), dimension(nx,3) :: Q
     real(8), intent(out), dimension(nx-1,3) :: F
     integer i
-    real(8) rhol, rhor, ul, ur, pl, pr, el, er, hl, hr, mass, Pressure, dp, c, cl, cr
+    real(8) rhol, rhor, pl, pr, el, er, hl, hr, mass, Pressure, dp, c, cl, cr
     real(8) vn, x, g, M_p, M_m, M, Vl, Vr, V_p, V_m, V_bar, V_bar_p, V_bar_m, beta_p, beta_m
     real(8), dimension(3) :: d1, d2, d3, Ql, Qr, phil, phir, Normal
     Normal(1) = 0.d0
@@ -51,13 +57,15 @@ contains
       pr = Qr(3)
 
       ! calc SLAU
+      el = energy(gamma,pl,rhol,Vl)
+      er = energy(gamma,pr,rhor,Vr)
       hl = enthalpy(el,pl,rhol)
       hr = enthalpy(er,pr,rhor)
       phil(1) = 1.d0
-      phil(2) = ul
+      phil(2) = Vl
       phil(3) = hl
       phir(1) = 1.d0
-      phir(2) = ur
+      phir(2) = Vr
       phir(3) = hr
       cl = speed_of_sound(gamma,pl,rhol)
       cr = speed_of_sound(gamma,pr,rhor)

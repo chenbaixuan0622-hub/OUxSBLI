@@ -21,10 +21,20 @@ Taylor-Green vortex was calculated.
 <img src="./3D_solver/data_NS/wx/Vorticity.gif" alt="Taylor-Green vortex">
 
 <h2>
+SLAU scheme
+</h2>
+<p>
+1 dimensional shock tube was calculated.
+</p>
+<img src="./.visuals/shock_tube_SLAU.png">
+
+<h2>
 Dependency
 </h2>
 <ul>
-<li>nvfortran 24.1-0</li>
+<li>nvfortran</li>
+<li>ParaView</li>
+<li>gnuplot</li>
 </ul>
 
 <h2>

@@ -6,8 +6,8 @@ contains
     use mod_globals, only : accuracy, id_visc, id_scheme
     use calc_physical_quantities
     use calc_steps
-    use calc_KEEP
-    !use calc_SLAU
+    !use calc_KEEP
+    use calc_SLAU
     use calc_visc
     use set_bc
     use print
@@ -38,11 +38,11 @@ contains
           call calc_quantities(nx,gamma,Q,rho,u,p)
         endif
 
-        !Qs(:,1) = rho(:)
-        !Qs(:,2) = u(:)
-        !Qs(:,3) = p(:)
-        !call calc_E(nx,gamma,k,b,Qs,E)
-        call calc_E(id,nx,gamma,rho,u,p,E)
+        Qs(:,1) = rho(:)
+        Qs(:,2) = u(:)
+        Qs(:,3) = p(:)
+        call calc_E(nx,gamma,k,b,Qs,E)
+        !call calc_E(id,nx,gamma,rho,u,p,E)
 
         if (id_visc == 1) then 
           call calc_Ev(nx,dxi,u,T,Ev)
@@ -64,11 +64,11 @@ contains
           call calc_quantities(nx,gamma,Q2,rho,u,p)
         endif
         
-        !Qs(:,1) = rho(:)
-        !Qs(:,2) = u(:)
-        !Qs(:,3) = p(:)
-        !call calc_E(nx,gamma,k,b,Qs,E)
-        call calc_E(id,nx,gamma,rho,u,p,E)
+        Qs(:,1) = rho(:)
+        Qs(:,2) = u(:)
+        Qs(:,3) = p(:)
+        call calc_E(nx,gamma,k,b,Qs,E)
+        !call calc_E(id,nx,gamma,rho,u,p,E)
         
         if (id_visc == 1) then
           call calc_Ev(nx,dxi,u,T,Ev)
@@ -90,11 +90,11 @@ contains
           call calc_quantities(nx,gamma,Q3,rho,u,p)
         endif
 
-        !Qs(:,1) = rho(:)
-        !Qs(:,2) = u(:)
-        !Qs(:,3) = p(:)
-        !call calc_E(nx,gamma,k,b,Qs,E)
-        call calc_E(id,nx,gamma,rho,u,p,E)
+        Qs(:,1) = rho(:)
+        Qs(:,2) = u(:)
+        Qs(:,3) = p(:)
+        call calc_E(nx,gamma,k,b,Qs,E)
+        !call calc_E(id,nx,gamma,rho,u,p,E)
         
         if (id_visc == 1) then
           call calc_Ev(nx,dxi,u,T,Ev)

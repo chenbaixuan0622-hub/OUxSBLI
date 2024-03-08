@@ -12,7 +12,7 @@ set tics font "Times-New-Roman,10"
 set xtics nomirror
 set ytics nomirror
 
-datafile = "Q00001.d"
+datafile = "Q00010.d"
 
 set multiplot layout 1, 3
 
