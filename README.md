@@ -9,7 +9,7 @@
 Compressible solver
 </h1>
 <p>
-This solver accelerated by GPU can deal with compressible flows. KEEP scheme is available. (2024/3/2)
+2D and 3D solvers are accelerated by GPU
 </p>
 
 <h2>
@@ -18,7 +18,7 @@ KEEP scheme
 <p>
 Taylor-Green vortex was calculated. 
 </p>
-<img src="./3D_solver/data_NS/wx/Vorticity.gif" alt="Taylor-Green vortex">
+<img src="./visuals/Vorticity.gif" alt="Taylor-Green vortex">
 
 <h2>
 SLAU scheme
@@ -26,7 +26,7 @@ SLAU scheme
 <p>
 1 dimensional shock tube was calculated.
 </p>
-<img src="./visuals/shock_tube_SLAU.png">
+<img src="./visuals/shock_tube_SLAU.png" alt="shock-tube">
 
 <h2>
 Dependency
