@@ -26,7 +26,7 @@ SLAU scheme
 <p>
 1 dimensional shock tube was calculated.
 </p>
-<img src="./.visuals/shock_tube_SLAU.png">
+<img src="./visuals/shock_tube_SLAU.png">
 
 <h2>
 Dependency
