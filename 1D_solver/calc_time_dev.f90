@@ -6,8 +6,8 @@ contains
     use mod_globals, only : accuracy, id_visc, id_scheme
     use calc_physical_quantities
     use calc_steps
-    !use calc_KEEP
-    use calc_SLAU
+    use calc_KEEP, calc_E_KEEP => calc_E
+    use calc_SLAU, calc_E_SLAU => calc_E
     use calc_visc
     use set_bc
     use print
@@ -19,7 +19,7 @@ contains
     integer(kind=2**(accuracy/2)) :: id
     real(8) dxi, dtdx
     real(8) k, b
-    real(8), dimension(nx,3) :: Q2, Q3, Qs
+    real(8), dimension(nx,3) :: Q2, Q3
     real(8), dimension(nx) :: rho, u, p, T
     real(8) :: E(nx-accuracy+1,3)
     real(8) :: Ev(nx-accuracy+1,3)
@@ -38,11 +38,12 @@ contains
           call calc_quantities(nx,gamma,Q,rho,u,p)
         endif
 
-        Qs(:,1) = rho(:)
-        Qs(:,2) = u(:)
-        Qs(:,3) = p(:)
-        call calc_E(nx,gamma,k,b,Qs,E)
-        !call calc_E(id,nx,gamma,rho,u,p,E)
+        if (id_scheme == 1) then
+          call calc_E_KEEP(id,nx,gamma,rho,u,p,E)
+        else
+          call calc_E_SLAU(nx,gamma,k,b,rho,u,p,E)
+        endif
+
 
         if (id_visc == 1) then 
           call calc_Ev(nx,dxi,u,T,Ev)
@@ -64,11 +65,11 @@ contains
           call calc_quantities(nx,gamma,Q2,rho,u,p)
         endif
         
-        Qs(:,1) = rho(:)
-        Qs(:,2) = u(:)
-        Qs(:,3) = p(:)
-        call calc_E(nx,gamma,k,b,Qs,E)
-        !call calc_E(id,nx,gamma,rho,u,p,E)
+        if (id_scheme == 1) then
+          call calc_E_KEEP(id,nx,gamma,rho,u,p,E)
+        else
+          call calc_E_SLAU(nx,gamma,k,b,rho,u,p,E)
+        endif
         
         if (id_visc == 1) then
           call calc_Ev(nx,dxi,u,T,Ev)
@@ -90,11 +91,11 @@ contains
           call calc_quantities(nx,gamma,Q3,rho,u,p)
         endif
 
-        Qs(:,1) = rho(:)
-        Qs(:,2) = u(:)
-        Qs(:,3) = p(:)
-        call calc_E(nx,gamma,k,b,Qs,E)
-        !call calc_E(id,nx,gamma,rho,u,p,E)
+        if (id_scheme == 1) then
+          call calc_E_KEEP(id,nx,gamma,rho,u,p,E)
+        else
+          call calc_E_SLAU(nx,gamma,k,b,rho,u,p,E)
+        endif
         
         if (id_visc == 1) then
           call calc_Ev(nx,dxi,u,T,Ev)

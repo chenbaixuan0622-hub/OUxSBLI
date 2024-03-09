@@ -20,18 +20,22 @@ contains
     c = sqrt(gamma * p / rho)
   end function speed_of_sound
 
-  subroutine calc_E(nx, gamma, k, b, Q, F)
+  subroutine calc_E(nx, gamma, k, b, rho, u, p, F)
     integer, intent(in) :: nx
     real(8), intent(in) :: gamma, k, b
-    real(8), intent(in), dimension(nx,3) :: Q
+    real(8), intent(in), dimension(nx) :: rho, u, p
     real(8), intent(out), dimension(nx-1,3) :: F
     integer i
     real(8) rhol, rhor, pl, pr, el, er, hl, hr, mass, Pressure, dp, c, cl, cr
     real(8) vn, x, g, M_p, M_m, M, Vl, Vr, V_p, V_m, V_bar, V_bar_p, V_bar_m, beta_p, beta_m
     real(8), dimension(3) :: d1, d2, d3, Ql, Qr, phil, phir, Normal
+    real(8), dimension(nx,3) :: Q
     Normal(1) = 0.d0
     Normal(2) = 1.d0
     Normal(3) = 0.d0
+    Q(:,1) = rho
+    Q(:,2) = u
+    Q(:,3) = p
     ! Q(rho, u, p)
     do i = 1, nx-1
       ! calc MUSCL
