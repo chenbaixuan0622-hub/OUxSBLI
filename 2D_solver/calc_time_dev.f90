@@ -4,10 +4,11 @@ contains
   subroutine RungeKutta(nx,ny,nt,np,dx,dy,dt,gamma,T0,Q)
     use iso_fortran_env
     use cudafor
-    use mod_globals, only : accuracy, id_visc
+    use mod_globals, only : accuracy, id_visc, id_scheme
     use calc_physical_quantities
     use calc_steps
-    use calc_flux
+    use calc_KEEP, calc_E_KEEP => calc_E, calc_F_KEEP => calc_F
+    use calc_SLAU, calc_E_SLAU => calc_E, calc_F_SLAU => calc_F
     use calc_visc
     use set_bc
     use print
@@ -17,7 +18,7 @@ contains
     real(8), intent(in) :: T0(nx,ny)
     integer t1, t2, itr
     integer(kind=2**(accuracy/2)) :: id
-    real(8) dxi, dyi
+    real(8) k, b, dxi, dyi, dtdx, dtdy
     ! GPU
     integer stat, len
     type(cudaDeviceProp) :: prop
@@ -31,7 +32,12 @@ contains
     real(8), device :: ke(nt*np)
     real(8), device :: s(nt*np)
     dxi = 1.0d0 / dx
-    dyi = 1.0d0 / dy 
+    dyi = 1.0d0 / dy
+    dtdx = dt * dxi
+    dtdy = dt * dyi
+
+    k = 0.d0
+    b = (3.d0 - k) / (1.d0 - k)
 
     ! check active device
     stat = cudaSetDevice(0)
@@ -62,9 +68,14 @@ contains
           call calc_quantities(nx,ny,gamma,Q_d,rho,u,v,p)
         endif
 
-        call calc_E<<<blocksE,threadsE>>>(id,nx,ny,gamma,rho,u,v,p,E)
-        call calc_F<<<blocksF,threadsF>>>(id,nx,ny,gamma,rho,u,v,p,F)
-        !print *, trim(cudaGetErrorString(cudaGetLastError()))
+        if (id_scheme == 1) then
+          call calc_E_KEEP<<<blocksE,threadsE>>>(id,nx,ny,gamma,rho,u,v,p,E)
+          call calc_F_KEEP<<<blocksF,threadsF>>>(id,nx,ny,gamma,rho,u,v,p,F)
+          !print *, trim(cudaGetErrorString(cudaGetLastError()))
+        else
+          call calc_E_SLAU<<<blocksE,threadsE>>>(nx,ny,gamma,k,b,rho,u,v,p,E)
+          call calc_F_SLAU<<<blocksF,threadsF>>>(nx,ny,gamma,k,b,rho,u,v,p,F)
+        endif
 
         if (id_visc == 1) then 
           call calc_Ev<<<blocksE,threadsE>>>(nx,ny,dxi,dyi,u,v,T,Ev)
@@ -74,9 +85,9 @@ contains
         stat = cudaDeviceSynchronize()
 
         if (id_visc == 1) then
-          call calc_step1(nx,ny,dxi,dyi,dt,E,F,Ev,Fv,Q_d,Q2)
+          call calc_step1(nx,ny,dtdx,dtdy,E,F,Ev,Fv,Q_d,Q2)
         else
-          call calc_step1(nx,ny,dxi,dyi,dt,E,F,Q_d,Q2)
+          call calc_step1(nx,ny,dtdx,dtdy,E,F,Q_d,Q2)
         endif
         
         call set_tube_bc(id,nx,ny,gamma,Q2)
@@ -89,8 +100,13 @@ contains
           call calc_quantities(nx,ny,gamma,Q2,rho,u,v,p)
         endif
         
-        call calc_E<<<blocksE,threadsE>>>(id,nx,ny,gamma,rho,u,v,p,E)
-        call calc_F<<<blocksF,threadsF>>>(id,nx,ny,gamma,rho,u,v,p,F)
+        if (id_scheme == 1) then
+          call calc_E_KEEP<<<blocksE,threadsE>>>(id,nx,ny,gamma,rho,u,v,p,E)
+          call calc_F_KEEP<<<blocksF,threadsF>>>(id,nx,ny,gamma,rho,u,v,p,F)
+        else
+          call calc_E_SLAU<<<blocksE,threadsE>>>(nx,ny,gamma,k,b,rho,u,v,p,E)
+          call calc_F_SLAU<<<blocksF,threadsF>>>(nx,ny,gamma,k,b,rho,u,v,p,F)
+        endif
         
         if (id_visc == 1) then
           call calc_Ev<<<blocksE,threadsE>>>(nx,ny,dxi,dyi,u,v,T,Ev)
@@ -100,9 +116,9 @@ contains
         stat = cudaDeviceSynchronize()
 
         if (id_visc == 1) then
-          call calc_step2(nx,ny,dxi,dyi,dt,E,F,Ev,Fv,Q_d,Q2,Q3)
+          call calc_step2(nx,ny,dtdx,dtdy,E,F,Ev,Fv,Q_d,Q2,Q3)
         else
-          call calc_step2(nx,ny,dxi,dyi,dt,E,F,Q_d,Q2,Q3)
+          call calc_step2(nx,ny,dtdx,dtdy,E,F,Q_d,Q2,Q3)
         endif
 
         call set_tube_bc(id,nx,ny,gamma,Q3)
@@ -115,8 +131,13 @@ contains
           call calc_quantities(nx,ny,gamma,Q3,rho,u,v,p)
         endif
 
-        call calc_E<<<blocksE,threadsE>>>(id,nx,ny,gamma,rho,u,v,p,E)
-        call calc_F<<<blocksF,threadsF>>>(id,nx,ny,gamma,rho,u,v,p,F)
+        if (id_scheme == 1) then
+          call calc_E_KEEP<<<blocksE,threadsE>>>(id,nx,ny,gamma,rho,u,v,p,E)
+          call calc_F_KEEP<<<blocksF,threadsF>>>(id,nx,ny,gamma,rho,u,v,p,F)
+        else
+          call calc_E_SLAU<<<blocksE,threadsE>>>(nx,ny,gamma,k,b,rho,u,v,p,E)
+          call calc_F_SLAU<<<blocksF,threadsF>>>(nx,ny,gamma,k,b,rho,u,v,p,F)
+        endif
         
         if (id_visc == 1) then
           call calc_Ev<<<blocksE,threadsE>>>(nx,ny,dxi,dyi,u,v,T,Ev)
@@ -126,9 +147,9 @@ contains
         stat = cudaDeviceSynchronize()
 
         if (id_visc == 1) then
-          call calc_step3(nx,ny,dxi,dyi,dt,E,F,Ev,Fv,Q3,Q_d)
+          call calc_step3(nx,ny,dtdx,dtdy,E,F,Ev,Fv,Q3,Q_d)
         else
-          call calc_step3(nx,ny,dxi,dyi,dt,E,F,Q3,Q_d)
+          call calc_step3(nx,ny,dtdx,dtdy,E,F,Q3,Q_d)
         endif
         
         call set_tube_bc(id,nx,ny,gamma,Q_d)

@@ -1,4 +1,4 @@
-module calc_flux
+module calc_KEEP
   use calc_term
   implicit none
   interface calc_E
@@ -107,4 +107,5 @@ contains
     F(i-2,j,3) = Flux(RhoVV_P(:))
     F(i-2,j,4) = Flux(Energy(:))
   end subroutine calc_F4
-end module calc_flux
+end module calc_KEEP
+
