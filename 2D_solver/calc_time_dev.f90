@@ -49,7 +49,7 @@ contains
       blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/5,1)
       blocksF = dim3((nx-accuracy)/5,(ny-accuracy+1)/32,1)
       threadsE = dim3(32,5,1)
-      threadsF = dim3(5,32,1)
+      threadsF = dim3(13,32,1)
     else if (accuracy == 4) then
       blocksE = dim3((nx-accuracy+1),(ny-accuracy)/16,1)
       blocksF = dim3((nx-accuracy)/16,(ny-accuracy+1),1)
@@ -90,7 +90,8 @@ contains
           call calc_step1(nx,ny,dtdx,dtdy,E,F,Q_d,Q2)
         endif
         
-        call set_tube_bc(id,nx,ny,gamma,Q2)
+        !call set_tube_bc(id,nx,ny,gamma,Q2)
+        call wind_tunnel_with_a_step(nx,ny,gamma,Q2)
         
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
@@ -121,7 +122,8 @@ contains
           call calc_step2(nx,ny,dtdx,dtdy,E,F,Q_d,Q2,Q3)
         endif
 
-        call set_tube_bc(id,nx,ny,gamma,Q3)
+        !call set_tube_bc(id,nx,ny,gamma,Q3)
+        call wind_tunnel_with_a_step(nx,ny,gamma,Q3)
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
@@ -152,7 +154,8 @@ contains
           call calc_step3(nx,ny,dtdx,dtdy,E,F,Q3,Q_d)
         endif
         
-        call set_tube_bc(id,nx,ny,gamma,Q_d)
+        !call set_tube_bc(id,nx,ny,gamma,Q_d)
+        call wind_tunnel_with_a_step(nx,ny,gamma,Q_d)
       enddo
       Q = Q_d
       call print_vtk(t2,nx,ny,dx,dy,gamma,Q)
