@@ -1,6 +1,21 @@
 module calc_time_dev
   implicit none
 contains
+  subroutine vecadd(nx,ny,Ev,E)
+    integer, intent(in), value :: nx, ny
+    real(8), intent(in), device :: Ev(nx,ny,4)
+    real(8), intent(inout), device :: E(nx,ny,4)
+    integer i, j
+    !$acc kernels deviceptr(E,Ev)
+    !$acc loop collapse(2)
+    do j = 1, ny
+      do i = 1, nx
+        E(i,j,:) = E(i,j,:) - Ev(i,j,:)
+      enddo
+    enddo
+    !$acc end kernels
+  end subroutine vecadd
+
   subroutine RungeKutta(nx,ny,nt,np,dx,dy,dt,gamma,T0,Q)
     use iso_fortran_env
     use cudafor
@@ -22,7 +37,7 @@ contains
     ! GPU
     integer stat, len
     type(cudaDeviceProp) :: prop
-    type(dim3) :: blocksE, blocksF, threadsE, threadsF
+    type(dim3) :: blocksE, blocksF, threadsE, threadsF, blocks, threads
     real(8), dimension(nx,ny,4), device :: Q_d, Q2, Q3
     real(8), dimension(nx,ny), device :: rho, u, v, p, T
     real(8), device :: E(nx-accuracy+1,ny-accuracy,4)
@@ -49,7 +64,9 @@ contains
       blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/5,1)
       blocksF = dim3((nx-accuracy)/5,(ny-accuracy+1)/32,1)
       threadsE = dim3(32,5,1)
-      threadsF = dim3(13,32,1)
+      threadsF = dim3(5,32,1)
+      blocks = dim3((nx-accuracy)/5,(ny-accuracy)/5,1)
+      threads = dim3(5,5,1)
     else if (accuracy == 4) then
       blocksE = dim3((nx-accuracy+1),(ny-accuracy)/16,1)
       blocksF = dim3((nx-accuracy)/16,(ny-accuracy+1),1)
@@ -85,11 +102,11 @@ contains
         stat = cudaDeviceSynchronize()
 
         if (id_visc == 1) then
-          call calc_step1(nx,ny,dtdx,dtdy,E,F,Ev,Fv,Q_d,Q2)
-        else
-          call calc_step1(nx,ny,dtdx,dtdy,E,F,Q_d,Q2)
+          call vecadd(nx-accuracy+1,ny-accuracy,Ev,E)
+          call vecadd(nx-accuracy,ny-accuracy+1,Fv,F)
         endif
-        
+
+        call calc_step1<<<blocks,threads>>>(nx,ny,dtdx,dtdy,E,F,Q_d,Q2)
         !call set_tube_bc(id,nx,ny,gamma,Q2)
         call wind_tunnel_with_a_step(nx,ny,gamma,Q2)
         
@@ -117,11 +134,11 @@ contains
         stat = cudaDeviceSynchronize()
 
         if (id_visc == 1) then
-          call calc_step2(nx,ny,dtdx,dtdy,E,F,Ev,Fv,Q_d,Q2,Q3)
-        else
-          call calc_step2(nx,ny,dtdx,dtdy,E,F,Q_d,Q2,Q3)
+          call vecadd(nx-accuracy+1,ny-accuracy,Ev,E)
+          call vecadd(nx-accuracy,ny-accuracy+1,Fv,F)
         endif
 
+        call calc_step2<<<blocks,threads>>>(nx,ny,dtdx,dtdy,E,F,Q_d,Q2,Q3)
         !call set_tube_bc(id,nx,ny,gamma,Q3)
         call wind_tunnel_with_a_step(nx,ny,gamma,Q3)
 
@@ -149,11 +166,11 @@ contains
         stat = cudaDeviceSynchronize()
 
         if (id_visc == 1) then
-          call calc_step3(nx,ny,dtdx,dtdy,E,F,Ev,Fv,Q3,Q_d)
-        else
-          call calc_step3(nx,ny,dtdx,dtdy,E,F,Q3,Q_d)
+          call vecadd(nx-accuracy+1,ny-accuracy,Ev,E)
+          call vecadd(nx-accuracy,ny-accuracy+1,Fv,F)
         endif
-        
+
+        call calc_step3<<<blocks,threads>>>(nx,ny,dtdx,dtdy,E,F,Q3,Q_d)
         !call set_tube_bc(id,nx,ny,gamma,Q_d)
         call wind_tunnel_with_a_step(nx,ny,gamma,Q_d)
       enddo
