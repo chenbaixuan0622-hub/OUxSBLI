@@ -1,7 +1,7 @@
 program main
   use, intrinsic :: iso_fortran_env
   use mod_globals, only : id_visc
-  use set_init
+  use set
   use calc_time_dev
   implicit none
   integer nx, ny, nt, np
@@ -67,8 +67,7 @@ program main
   allocate(T0(nx,ny))
   
   ! set initial condition
-  call shock_tube(nx,ny,gamma,rhol,rhor,pl,pr,Q)
-  !call wind_tunnel_with_a_step(nx,ny,gamma,Q)
+  call set_init(nx,ny,gamma,Q)
   T0 = T
 
   call cpu_time(t_start)

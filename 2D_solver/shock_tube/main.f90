@@ -1,7 +1,7 @@
 program main
   use, intrinsic :: iso_fortran_env
   use mod_globals, only : id_visc
-  use set_init
+  use set
   use calc_time_dev
   implicit none
   integer nx, ny, nt, np
@@ -50,7 +50,6 @@ program main
     write(1,"('kappa =', e12.4, '[W/(m K)]')") kappa
     write(1,"('Cv    =', f10.4, '[J/(kg K)]')") Cv
     write(1,"('Cp    =', f10.4, '[J/(kg K)]')") Cp
-    write(1,"('Re    =', f10.4)") Rho * U_ref * Lx / mu
   else
     write(1,"('Euler solver was chosen')")
   endif
@@ -66,22 +65,17 @@ program main
   allocate(Q(nx,ny,4))
   allocate(T0(nx,ny))
   
-  ! set initial condition
-  call shock_tube(nx,ny,gamma,rhol,rhor,pl,pr,Q)
-  !call wind_tunnel_with_a_step(nx,ny,gamma,Q)
+  call set_init(nx,ny,gamma,rhol,rhor,pl,pr,Q)
   T0 = T
 
   call cpu_time(t_start)
   call RungeKutta(nx,ny,nt,np,dx,dy,dt,gamma,T0,Q)
   call cpu_time(t_end)
-  non_dt = dt / (Lx / U_ref)
+  
   open(1,file="output.d",position='append')
   write(1,"('time info')")
   write(1,"('dt                       =', e12.4)") dt
-  write(1,"('non-dimentional dt       =', e12.4)") non_dt
-  write(1,"('Courant number           =', e12.4)") U_ref * dt / dx
   write(1,"('end time                 =', e12.4)") nt * np * dt
-  write(1,"('non-dimentional end time =', e12.4)") nt * np * non_dt  
   write(1,"('elapsed time             =', i10, '[s]')") int(t_end-t_start)
   close(1)
   deallocate(Q,T0)
