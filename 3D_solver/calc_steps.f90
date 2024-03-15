@@ -54,7 +54,7 @@ contains
     integer i, j, k, offset
     ! 2nd-order accuracy : offset = 1
     ! 4th-order accuracy : offset = 2
-    !$acc kernels deviceptr(E,F,G,Q,Q2)
+    !$acc kernels deviceptr(E,F,G,Ev,Fv,Gv,Q,Q2)
     offset = accuracy / 2
     !$acc loop collapse(3)
     do k = 1+offset, nz-offset
@@ -118,7 +118,7 @@ contains
     integer i, j, k, offset
     ! 2nd-order accuracy : offset = 1
     ! 4th-order accuracy : offset = 2
-    !$acc kernels deviceptr(E,F,G,Q,Q2,Q3)
+    !$acc kernels deviceptr(E,F,G,Ev,Fv,Gv,Q,Q2,Q3)
     offset = accuracy / 2
     !$acc loop collapse(3)
     do k = 1+offset, nz-offset
@@ -180,7 +180,7 @@ contains
     integer i, j, k, offset
     ! 2nd-order accuracy : offset = 1
     ! 4th-order accuracy : offset = 2
-    !$acc kernels deviceptr(E,F,G,Q3,Q)
+    !$acc kernels deviceptr(E,F,G,Ev,Fv,Gv,Q3,Q)
     offset = accuracy / 2
     !$acc loop collapse(3)
     do k = 1+offset, nz-offset

@@ -71,7 +71,7 @@ contains
     integer, intent(in), value :: nx, ny
     real(8), intent(in), value :: gamma, k, b
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
-    real(8), intent(out), dimension(nx-1,ny-2,4), device :: E
+    real(8), intent(out), dimension(nx-1,ny-accuracy,4), device :: E
     integer i, j
     integer :: offset = accuracy / 2
     real(8) rhol, rhor, pl, pr
@@ -115,7 +115,7 @@ contains
     integer, intent(in), value :: nx, ny
     real(8), intent(in), value :: gamma, k, b
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
-    real(8), intent(out), dimension(nx-2,ny-1,4), device :: F
+    real(8), intent(out), dimension(nx-accuracy,ny-1,4), device :: F
     integer i, j
     integer :: offset = accuracy / 2
     real(8) rhol, rhor, pl, pr
