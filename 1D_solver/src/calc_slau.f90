@@ -1,4 +1,4 @@
-module calc_SLAU
+module calc_slau
   use calc_MUSCL
   implicit none
 contains
@@ -102,5 +102,5 @@ contains
       F(i,:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:)) + Pressure * Normal(:)
     enddo
   end subroutine
-end module calc_SLAU
+end module calc_slau
 

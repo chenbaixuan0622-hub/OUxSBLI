@@ -1,5 +1,5 @@
 module calc_visc
-  use mod_globals, only : accuracy
+  use mod_globals, only : accuracy, offset
   use calc_Sutherland
   implicit none
 contains
@@ -8,10 +8,9 @@ contains
     real(8), intent(in), value :: dX
     real(8), intent(in), dimension(nx) :: u, T
     real(8), intent(out), dimension(nx-accuracy+1,3) :: Ev
-    integer i, offset
+    integer i
     real(8) mu, kappa
     real(8) txx
-    offset = accuracy / 2
     do i = 1 + offset - 1, nx - offset
       call calc_mu(T(i),T(i+1),mu)
       txx = 4.d0 * mu * dX * (-u(i) + u(i+1)) / 3.d0
