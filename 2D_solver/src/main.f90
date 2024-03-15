@@ -1,26 +1,14 @@
 program main
   use, intrinsic :: iso_fortran_env
-  use mod_globals, only : id_visc, Lx, Ly
+  use mod_globals, only : id_visc, Lx, Ly, nx, ny, nt, np, dt, gamma, T
   use set
   use calc_time_dev
   implicit none
-  integer nx, ny, nt, np
-  real(8) gamma, T, mu, kappa, Cv, Cp, dx, dy, dt
+  real(8) mu, kappa, Cv, Cp, dx, dy
   real(8), allocatable :: Q(:,:,:)
   real(8), allocatable :: T0(:,:)
   real(8) t_start, t_end
   
-  ! read file
-  open(28,file='input.d', action='read')
-  read(28,*) nx
-  read(28,*) ny
-  read(28,*) nt
-  read(28,*) np
-  read(28,*) dt
-  read(28,*) gamma
-  read(28,*) T
-  close(28)
-
   ! set grid
   dx = Lx / dble(nx - 1)
   dy = Ly / dble(ny - 1)

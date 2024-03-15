@@ -1,10 +1,42 @@
 module mod_globals
+  use cudafor
   implicit none
   integer, parameter :: accuracy = 2 ! only 2nd-order accuracy is available
+  integer, parameter :: offset = accuracy / 2
   integer, parameter :: id_visc = 1
   !!!!!!!!!!!!!!!!!!!!!!!
   ! id_scheme ! 1  KEEP !
   !           ! 2  SLAU !
   !!!!!!!!!!!!!!!!!!!!!!!
   integer, parameter :: id_scheme = 2
+
+  ! mesh
+  real(8), parameter :: Lx = 1.d0
+  real(8), parameter :: Ly = 0.3d0
+  integer, parameter :: nx = 1025
+  integer, parameter :: ny = 257
+
+  ! GPU
+  type(dim3) :: blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/5,1)
+  type(dim3) :: blocksF = dim3((nx-accuracy)/5,(ny-accuracy+1)/32,1)
+  type(dim3) :: blocks = dim3((nx-accuracy)/5,(ny-accuracy)/5,1)
+  type(dim3) :: threadsE = dim3(32,5,1)
+  type(dim3) :: threadsF = dim3(11,32,1)
+  type(dim3) :: threads = dim3(11,5,1)
+
+  ! time
+  integer, parameter :: nt = 1000
+  integer, parameter :: np = 10
+  real(8), parameter :: dt = 0.00001d0
+
+  ! physical properties
+  real(8), parameter :: gamma = 1.4d0
+
+  ! initial condition
+  real(8), parameter :: T = 300.d0
+  real(8), parameter :: rhol = 1.d0
+  real(8), parameter :: rhor = 0.125d0
+  real(8), parameter :: pl = 1.d0
+  real(8), parameter :: pr = 0.1d0
 end module mod_globals
+
