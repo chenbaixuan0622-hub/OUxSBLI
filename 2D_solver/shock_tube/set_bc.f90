@@ -38,12 +38,13 @@ contains
   subroutine wind_tunnel_with_a_step(nx,ny,gamma,Q)
     integer, intent(in), value :: nx, ny
     real(8), intent(in), value :: gamma
-    real(8), intent(in), device :: Q(nx,ny,4)
+    real(8), intent(inout), device :: Q(nx,ny,4)
     integer i, j, k, nxs, nys
     real(8), parameter :: rho0 = 1.4d0, u0 = 3.d0, p0 = 1.d0
     real(8) p_bottom, p_top, p_step_left, p_step_top
-    nxs = int(nx * 0.2)
-    nys = int(ny * 0.2)
+    nxs = int(0.2 * nx)
+    nys = int(0.2 * ny)
+    
     !$acc kernels deviceptr(Q)
     !$acc loop independent
     do j = 1, ny
@@ -55,9 +56,11 @@ contains
       ! outlet
       Q(nx,j,:) = Q(nx-1,j,:)
     enddo
-    
-    !$acc loop independent
-    do i = 1, nx
+    !$acc end kernels
+
+    !$acc kernels deviceptr(Q)
+    !$acc loop independent private(p_bottom,p_top)
+    do i = 2, nx-1
       ! bottom wll
       Q(i,1,1) = Q(i,2,1)
       Q(i,1,2) = 0.d0
@@ -65,16 +68,18 @@ contains
       p_bottom = (gamma - 1.d0) * (Q(i,2,4) - 0.5d0 * (Q(i,2,2)**2 + Q(i,2,3)**2) / Q(i,2,1))
       Q(i,1,4) = p_bottom / (gamma - 1.d0)
       ! top wall
-      Q(i,nx,1) = Q(i,nx-1,2)
-      Q(i,nx,2) = 0.d0
-      Q(i,nx,3) = 0.d0
-      p_top = (gamma - 1.d0) * (Q(i,nx-1,4) - 0.5d0 * (Q(i,nx-1,2)**2 + Q(i,nx-1,3)**2) / Q(i,nx-1,1))
-      Q(i,nx,4) = p_top / (gamma - 1.d0)
+      Q(i,ny,1) = Q(i,ny-1,2)
+      Q(i,ny,2) = 0.d0
+      Q(i,ny,3) = 0.d0
+      p_top = (gamma - 1.d0) * (Q(i,ny-1,4) - 0.5d0 * (Q(i,ny-1,2)**2 + Q(i,ny-1,3)**2) / Q(i,ny-1,1))
+      Q(i,ny,4) = p_top / (gamma - 1.d0)
     enddo
+    !$acc end kernels
 
     ! step
-    !$acc loop independent
-    do j = 1, nys
+    !$acc kernels deviceptr(Q)
+    !$acc loop independent private(p_step_left)
+    do j = 2, nys
       ! left
       Q(nxs:nxs+1,j,1) = Q(nxs-1,j,1)
       Q(nxs:nxs+1,j,2) = 0.d0
@@ -82,26 +87,17 @@ contains
       p_step_left = (gamma - 1.d0) * (Q(nxs-1,j,4) - 0.5d0 * (Q(nxs-1,j,2)**2 + Q(nxs-1,j,3)**2) / Q(nxs-1,j,1))
       Q(nxs:nxs+1,j,4) = p_step_left / (gamma - 1.d0)
     enddo
+    !$acc end kernels
 
-    !$acc loop independent
-    do i = nxs, nx
+    !$acc kernels deviceptr(Q)
+    !$acc loop independent private(p_step_top)
+    do i = nxs+2, nx
       ! top
       Q(i,nys-1:nys,1) = Q(i,nys+1,1)
       Q(i,nys-1:nys,2) = 0.d0
       Q(i,nys-1:nys,3) = 0.d0
       p_step_top = (gamma - 1.d0) * (Q(i,nys+1,4) - 0.5d0 * (Q(i,nys+1,2)**2 + Q(i,nys+1,3)**2) / Q(i,nys+1,1))
       Q(i,nys-1:nys,4) = p_step_top / (gamma - 1.d0)
-    enddo
-
-    !$acc loop independent
-    do j = 1, nys-2
-      !$acc loop independent
-      do i = nxs+2, nx
-        Q(i,j,1) = rho0
-        Q(i,j,2) = 0.d0
-        Q(i,j,3) = 0.d0
-        Q(i,j,4) = p0 / (gamma - 1.d0)
-      enddo
     enddo
     !$acc end kernels
   end subroutine wind_tunnel_with_a_step

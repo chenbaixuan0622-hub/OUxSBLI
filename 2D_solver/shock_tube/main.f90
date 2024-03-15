@@ -67,8 +67,8 @@ program main
   allocate(T0(nx,ny))
   
   ! set initial condition
-  !call shock_tube(nx,ny,gamma,rhol,rhor,pl,pr,Q)
-  call wind_tunnel_with_a_step(nx,ny,gamma,Q)
+  call shock_tube(nx,ny,gamma,rhol,rhor,pl,pr,Q)
+  !call wind_tunnel_with_a_step(nx,ny,gamma,Q)
   T0 = T
 
   call cpu_time(t_start)

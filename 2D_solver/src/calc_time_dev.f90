@@ -2,7 +2,6 @@ module calc_time_dev
   implicit none
 contains
   subroutine RungeKutta(nx,ny,nt,np,dx,dy,dt,gamma,T0,Q)
-    use iso_fortran_env
     use cudafor
     use mod_globals, only : accuracy, id_visc, id_scheme
     use calc_physical_quantities
@@ -92,8 +91,8 @@ contains
         endif
 
         call calc_step1<<<blocks,threads>>>(nx,ny,dtdx,dtdy,E,F,Q_d,Q2)
-        !call set_tube_bc(id,nx,ny,gamma,Q2)
-        call wind_tunnel_with_a_step(nx,ny,gamma,Q2)
+        call set_tube_bc(id,nx,ny,gamma,Q2)
+        !call wind_tunnel_with_a_step(nx,ny,gamma,Q2)
         
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
@@ -124,8 +123,8 @@ contains
         endif
 
         call calc_step2<<<blocks,threads>>>(nx,ny,dtdx,dtdy,E,F,Q_d,Q2,Q3)
-        !call set_tube_bc(id,nx,ny,gamma,Q3)
-        call wind_tunnel_with_a_step(nx,ny,gamma,Q3)
+        call set_tube_bc(id,nx,ny,gamma,Q3)
+        !call wind_tunnel_with_a_step(nx,ny,gamma,Q3)
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
@@ -156,8 +155,8 @@ contains
         endif
 
         call calc_step3<<<blocks,threads>>>(nx,ny,dtdx,dtdy,E,F,Q3,Q_d)
-        !call set_tube_bc(id,nx,ny,gamma,Q_d)
-        call wind_tunnel_with_a_step(nx,ny,gamma,Q_d)
+        call set_tube_bc(id,nx,ny,gamma,Q_d)
+        !call wind_tunnel_with_a_step(nx,ny,gamma,Q_d)
       enddo
       Q = Q_d
       call print_vtk(t2,nx,ny,dx,dy,gamma,Q)
