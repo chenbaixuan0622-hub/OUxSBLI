@@ -1,4 +1,4 @@
-module calc_Sutherland
+module calc_sutherland
   implicit none
   interface calc_mu
     module procedure calc_mu2, calc_mu4
@@ -32,5 +32,5 @@ contains
     kappa2 = (2.334d-3 * T2 ** 1.5d0) / (164.54d0 + T2)
     kappa =  0.5d0 * (kappa1 + kappa2)
   end subroutine calc_kappa
-end module calc_Sutherland
+end module calc_sutherland
 

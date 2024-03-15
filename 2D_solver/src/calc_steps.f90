@@ -15,9 +15,9 @@ contains
     real(8), intent(in), device :: F(nx-accuracy,ny-accuracy+1,4)
     real(8), intent(in), dimension(nx,ny,4), device :: Q
     real(8), intent(out), dimension(nx,ny,4), device :: Q2
-    integer i, j, k, offset
+    integer i, j, k
+    integer :: offset = accuracy / 2
     real(8) R
-    offset = accuracy / 2
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     do k = 1, 4
@@ -35,9 +35,9 @@ contains
     real(8), intent(in), dimension(nx,ny,4), device :: Q
     real(8), intent(in), dimension(nx,ny,4), device :: Q2
     real(8), intent(out), dimension(nx,ny,4), device :: Q3
-    integer i, j, k, offset
+    integer i, j, k
+    integer :: offset = accuracy / 2
     real(8) R
-    offset = accuracy / 2
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     do k = 1, 4
@@ -54,9 +54,9 @@ contains
     real(8), intent(in), device :: F(nx-accuracy,ny-accuracy+1,4)
     real(8), intent(in), dimension(nx,ny,4), device :: Q3
     real(8), intent(inout), dimension(nx,ny,4), device :: Q
-    integer i, j, k, offset
+    integer i, j, k
+    integer :: offset = accuracy / 2
     real(8) R
-    offset = accuracy / 2
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     do k = 1, 4

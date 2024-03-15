@@ -1,4 +1,4 @@
-module calc_MUSCL
+module calc_muscl
   implicit none
 contains
   attributes(device) function minmod(x,y) result(ans)
@@ -35,5 +35,5 @@ contains
       Qr(i) = ar(Q2(i),k,b,d3(i),d2(i))
     enddo
   end subroutine MUSCL
-end module calc_MUSCL
+end module calc_muscl
 

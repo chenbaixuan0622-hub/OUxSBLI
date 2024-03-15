@@ -1,4 +1,4 @@
-module calc_SLAU
+module calc_slau
   use calc_MUSCL
   implicit none
 contains
@@ -153,5 +153,5 @@ contains
     pr = Qr(4)
     F(i-offset,j,:) = flux_SLAU(2,gamma,rhol,rhor,pl,pr,Vl,Vr,Normal)
   end subroutine calc_F
-end module calc_SLAU
+end module calc_slau
 
