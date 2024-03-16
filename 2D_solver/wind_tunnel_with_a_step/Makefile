@@ -37,6 +37,6 @@ set_init.o: mod_globals.mod
 calc_KEEP.o: calc_term.mod
 calc_visc.o: calc_sutherland.mod
 calc_SLAU.o: calc_muscl.mod
-calc_time_dev.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_keep.mod calc_slau.mod calc_visc.mod calc_steps.mod
+calc_time_dev.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_keep.mod calc_slau.mod calc_visc.mod calc_steps.mod print.mod
 main.o: main.f90 mod_globals.mod set.mod calc_time_dev.mod
 
