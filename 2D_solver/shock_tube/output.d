@@ -12,3 +12,7 @@ Lx =   1.0000 was devided by1024 dx =  0.9766E-03
 Ly =   0.3000 was devided by 256 dy =  0.1172E-02
 
 
+time info
+dt                       =  0.1000E-04
+end time                 =  0.1000E+00
+elapsed time             =       153[s]

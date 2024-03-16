@@ -24,11 +24,11 @@ contains
             & + mu2 * (-u1 + u6 - u4 + u5)) 
   end function u_y
 
-  attributes(global) subroutine calc_Ev(nx, ny, dX, dY, u, v, T, Ev)
+  attributes(global) subroutine calc_Ev(nx, ny, dX, dY, u, v, T, E)
     integer, intent(in), value :: nx, ny
     real(8), intent(in), value :: dX, dY
     real(8), intent(in), dimension(nx,ny), device :: u, v, T
-    real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,4), device :: Ev
+    real(8), intent(inout), dimension(nx-accuracy+1,ny-accuracy,4), device :: E
     integer i, j, offset
     real(8) mux, muy1, muy2, kappa
     real(8) ux, uy, vx, vy, txx, txy
@@ -50,18 +50,17 @@ contains
     txx = 2.d0 * (2.d0 * ux - vy) / 3.d0
     txy = uy + vx
     call calc_kappa(T(i,j),T(i+1,j),kappa)
-    Ev(i-offset+1,j-offset,1) = 0.d0
-    Ev(i-offset+1,j-offset,2) = txx
-    Ev(i-offset+1,j-offset,3) = txy
-    Ev(i-offset+1,j-offset,4) = txx * 0.5d0 *(u(i,j) + u(i+1,j)) + txy * 0.5d0 *(v(i,j) + v(i+1,j)) &
+    E(i-offset+1,j-offset,2) = E(i-offset+1,j-offset,2) - txx
+    E(i-offset+1,j-offset,3) = E(i-offset+1,j-offset,3) - txy
+    E(i-offset+1,j-offset,4) = E(i-offset+1,j-offset,4) - txx * 0.5d0 *(u(i,j) + u(i+1,j)) + txy * 0.5d0 *(v(i,j) + v(i+1,j)) &
     & + kappa * (-T(i,j) + T(i+1,j))
   end subroutine calc_Ev
   
-  attributes(global) subroutine calc_Fv(nx, ny, dX, dY, u, v, T, Fv)
+  attributes(global) subroutine calc_Fv(nx, ny, dX, dY, u, v, T, F)
     integer, intent(in), value :: nx, ny
     real(8), intent(in), value :: dX, dY
     real(8), intent(in), dimension(nx,ny), device :: u, v, T
-    real(8), intent(out), device :: Fv(nx-accuracy,ny-accuracy+1,4)
+    real(8), intent(inout), device :: F(nx-accuracy,ny-accuracy+1,4)
     integer i, j, offset
     real(8) muy, mux1, mux2, kappa
     real(8) ux, uy, vx, vy, tyx, tyy
@@ -83,10 +82,9 @@ contains
     tyx = uy + vx
     tyy = 2.d0 * (2.d0 * vy - ux) / 3.d0
     call calc_kappa(T(i,j),T(i,j+1),kappa)
-    Fv(i-offset,j-offset+1,1) = 0.d0
-    Fv(i-offset,j-offset+1,2) = tyx
-    Fv(i-offset,j-offset+1,3) = tyy
-    Fv(i-offset,j-offset+1,4) = tyx * 0.5d0 * (u(i,j) + u(i,j+1)) + tyy * 0.5d0 * (v(i,j) + v(i,j+1)) &
+    F(i-offset,j-offset+1,2) = F(i-offset,j-offset+1,2) - tyx
+    F(i-offset,j-offset+1,3) = F(i-offset,j-offset+1,3) - tyy
+    F(i-offset,j-offset+1,4) = F(i-offset,j-offset+1,4) - tyx * 0.5d0 * (u(i,j) + u(i,j+1)) + tyy * 0.5d0 * (v(i,j) + v(i,j+1)) &
     & + kappa * (-T(i,j) + T(i,j+1))
   end subroutine calc_Fv
 end module calc_visc

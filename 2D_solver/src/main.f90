@@ -1,17 +1,13 @@
 program main
   use, intrinsic :: iso_fortran_env
-  use mod_globals, only : id_visc, Lx, Ly, nx, ny, nt, np, dt, gamma, T
+  use mod_globals, only : id_visc, Lx, Ly, nx, ny, nt, np, dx, dy, dt, gamma, T
   use set
   use calc_time_dev
   implicit none
-  real(8) mu, kappa, Cv, Cp, dx, dy
+  real(8) mu, kappa, Cv, Cp
   real(8), allocatable :: Q(:,:,:)
   real(8), allocatable :: T0(:,:)
   real(8) t_start, t_end
-  
-  ! set grid
-  dx = Lx / dble(nx - 1)
-  dy = Ly / dble(ny - 1)
   
   ! calc physical properties
   mu = (1.4592d-6 * T ** (1.5d0)) / (109.1d0 + T)
@@ -42,11 +38,11 @@ program main
   allocate(Q(nx,ny,4))
   allocate(T0(nx,ny))
   
-  call set_init(nx,ny,gamma,Q)
+  call set_init(nx,ny,Q)
   T0 = T
 
   call cpu_time(t_start)
-  call RungeKutta(nx,ny,nt,np,dx,dy,dt,gamma,T0,Q)
+  call RungeKutta(nx,ny,nt,np,T0,Q)
   call cpu_time(t_end)
   
   open(1,file="output.d",position='append')

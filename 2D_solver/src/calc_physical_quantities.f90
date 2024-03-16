@@ -1,24 +1,9 @@
 module calc_physical_quantities
+  use mod_globals, only : gamma
   implicit none
 contains
-  subroutine vecadd(nx,ny,Ev,E)
+  subroutine calc_quantities(nx,ny,Q,rho,u,v,p)
     integer, intent(in), value :: nx, ny
-    real(8), intent(in), device :: Ev(nx,ny,4)
-    real(8), intent(inout), device :: E(nx,ny,4)
-    integer i, j
-    !$acc kernels deviceptr(E,Ev)
-    !$acc loop collapse(2)
-    do j = 1, ny
-      do i = 1, nx
-        E(i,j,:) = E(i,j,:) - Ev(i,j,:)
-      enddo
-    enddo
-    !$acc end kernels
-  end subroutine
-
-  subroutine calc_quantities(nx,ny,gamma,Q,rho,u,v,p)
-    integer, intent(in), value :: nx, ny
-    real(8), intent(in), value :: gamma
     real(8), intent(in), dimension(nx,ny,4), device :: Q
     real(8), intent(out), dimension(nx,ny), device :: rho, u, v, p
     integer i, j
@@ -35,9 +20,8 @@ contains
     !$acc end kernels
   end subroutine calc_quantities
   
-  subroutine calc_quantities_T(nx,ny,gamma,Q,rho,u,v,p,T)
+  subroutine calc_quantities_T(nx,ny,Q,rho,u,v,p,T)
     integer, intent(in), value :: nx, ny
-    real(8), intent(in), value :: gamma
     real(8), intent(in), dimension(nx,ny,4), device :: Q
     real(8), intent(out), dimension(nx,ny), device :: rho, u, v, p, T
     integer i, j

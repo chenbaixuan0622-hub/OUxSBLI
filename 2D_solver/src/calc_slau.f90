@@ -1,9 +1,10 @@
 module calc_slau
+  use mod_globals, only : gamma
   use calc_MUSCL
   implicit none
 contains
-  attributes(device) function energy(gamma,p,rho,u,v) result(e)
-    real(8), intent(in), value :: gamma, p, rho, u , v
+  attributes(device) function energy(p,rho,u,v) result(e)
+    real(8), intent(in), value :: p, rho, u , v
     real(8) :: e
     e = p / (gamma - 1.d0) + 0.5d0 * rho * (u ** 2 + v ** 2)
   end function energy
@@ -14,27 +15,27 @@ contains
     h = (e + p) / rho
   end function enthalpy
 
-  attributes(device) function speed_of_sound(gamma,p,rho) result(c)
-    real(8), intent(in), value :: gamma, p, rho
+  attributes(device) function speed_of_sound(p,rho) result(c)
+    real(8), intent(in), value :: p, rho
     real(8) :: c
     c = sqrt(gamma * p / rho)
   end function speed_of_sound
 
-  attributes(device) function flux_SLAU(dim,gamma,rhol,rhor,pl,pr,Vl,Vr,Normal) result(Flux)
+  attributes(device) function flux_SLAU(dim,rhol,rhor,pl,pr,Vl,Vr,Normal) result(Flux)
     integer, intent(in), value :: dim ! x:1, y:2
-    real(8), intent(in), value :: gamma, rhol, rhor, pl, pr
+    real(8), intent(in), value :: rhol, rhor, pl, pr
     real(8), intent(in), dimension(2), device :: Vl, Vr
     real(8), intent(in), dimension(4), device :: Normal
     real(8) :: Flux(4)
     real(8) el, er, hl, hr, cl, cr, c
     real(8) vn, V_p, V_m, V_bar, V_bar_p, V_bar_m, M_p, M_m, M, x, g, dp, mass, beta_p, beta_m, Pressure
     real(8), dimension(4) :: phil, phir
-    el = energy(gamma,pl,rhol,Vl(1),Vl(2))
-    er = energy(gamma,pr,rhor,Vr(1),Vr(2))
+    el = energy(pl,rhol,Vl(1),Vl(2))
+    er = energy(pr,rhor,Vr(1),Vr(2))
     hl = enthalpy(el,pl,rhol)
     hr = enthalpy(er,pr,rhor)
-    cl = speed_of_sound(gamma,pl,rhol)
-    cr = speed_of_sound(gamma,pr,rhor)
+    cl = speed_of_sound(pl,rhol)
+    cr = speed_of_sound(pr,rhor)
     c = 0.5d0 * (cl + cr)
     ! What is vn?
     vn = 0.d0
@@ -66,10 +67,10 @@ contains
     Flux(:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:)) + Pressure * Normal(:)
   end function flux_SLAU
 
-  attributes(global) subroutine calc_E(nx, ny, gamma, k, b, rho, u, v, p, E)
+  attributes(global) subroutine calc_E(nx, ny, k, b, rho, u, v, p, E)
     use mod_globals, only : accuracy
     integer, intent(in), value :: nx, ny
-    real(8), intent(in), value :: gamma, k, b
+    real(8), intent(in), value :: k, b
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
     real(8), intent(out), dimension(nx-1,ny-accuracy,4), device :: E
     integer i, j
@@ -107,13 +108,13 @@ contains
     Vr(:) = (/Qr(2), Qr(3)/)
     pl = Ql(4)
     pr = Qr(4)
-    E(i,j-offset,:) = flux_SLAU(1,gamma,rhol,rhor,pl,pr,Vl,Vr,Normal)
+    E(i,j-offset,:) = flux_SLAU(1,rhol,rhor,pl,pr,Vl,Vr,Normal)
   end subroutine calc_E
 
-  attributes(global) subroutine calc_F(nx, ny, gamma, k, b, rho, u, v, p, F)
+  attributes(global) subroutine calc_F(nx, ny, k, b, rho, u, v, p, F)
     use mod_globals, only : accuracy
     integer, intent(in), value :: nx, ny
-    real(8), intent(in), value :: gamma, k, b
+    real(8), intent(in), value :: k, b
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
     real(8), intent(out), dimension(nx-accuracy,ny-1,4), device :: F
     integer i, j
@@ -151,7 +152,7 @@ contains
     Vr(:) = (/Qr(2), Qr(3)/)
     pl = Ql(4)
     pr = Qr(4)
-    F(i-offset,j,:) = flux_SLAU(2,gamma,rhol,rhor,pl,pr,Vl,Vr,Normal)
+    F(i-offset,j,:) = flux_SLAU(2,rhol,rhor,pl,pr,Vl,Vr,Normal)
   end subroutine calc_F
 end module calc_slau
 
