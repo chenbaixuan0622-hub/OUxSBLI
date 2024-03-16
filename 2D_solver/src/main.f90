@@ -42,7 +42,7 @@ program main
   T0 = T
 
   call cpu_time(t_start)
-  call RungeKutta(nx,ny,nt,np,T0,Q)
+  call RungeKutta(T0,Q)
   call cpu_time(t_end)
   
   open(1,file="output.d",position='append')

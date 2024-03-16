@@ -1,9 +1,9 @@
 module calc_time_dev
   implicit none
 contains
-  subroutine RungeKutta(nx,ny,nt,np,T0,Q)
+  subroutine RungeKutta(T0,Q)
     use cudafor
-    use mod_globals, only : accuracy, id_visc, id_scheme, dx, dy, &
+    use mod_globals, only : accuracy, id_visc, id_scheme, nx, ny, nt, np, dx, dy, &
             & blocksE, blocksF, blocks, threadsE, threadsF, threads
     use calc_physical_quantities
     use calc_steps
@@ -12,7 +12,6 @@ contains
     use calc_visc
     use set
     use print
-    integer, intent(in) :: nx, ny, nt, np
     real(8), intent(inout) :: Q(nx,ny,4)
     real(8), intent(in) :: T0(nx,ny)
     integer t1, t2, itr
@@ -60,7 +59,7 @@ contains
 
         stat = cudaDeviceSynchronize()
 
-        call calc_step1<<<blocks,threads>>>(nx,ny,E,F,Q_d,Q2)
+        call calc_step1<<<blocks,threads>>>(E,F,Q_d,Q2)
         call set_bc(nx,ny,Q2)
         
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -88,7 +87,7 @@ contains
         
         stat = cudaDeviceSynchronize()
 
-        call calc_step2<<<blocks,threads>>>(nx,ny,E,F,Q_d,Q2,Q3)
+        call calc_step2<<<blocks,threads>>>(E,F,Q_d,Q2,Q3)
         call set_bc(nx,ny,Q3)
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -116,7 +115,7 @@ contains
         
         stat = cudaDeviceSynchronize()
 
-        call calc_step3<<<blocks,threads>>>(nx,ny,E,F,Q3,Q_d)
+        call calc_step3<<<blocks,threads>>>(E,F,Q3,Q_d)
         call set_bc(nx,ny,Q_d)
       enddo
       Q = Q_d
