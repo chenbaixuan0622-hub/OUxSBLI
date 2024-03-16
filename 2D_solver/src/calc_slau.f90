@@ -1,26 +1,9 @@
 module calc_slau
-  use mod_globals, only : gamma
+  use mod_globals, only : accuracy, offset
+  use calc_common
   use calc_MUSCL
   implicit none
 contains
-  attributes(device) function energy(p,rho,u,v) result(e)
-    real(8), intent(in), value :: p, rho, u , v
-    real(8) :: e
-    e = p / (gamma - 1.d0) + 0.5d0 * rho * (u ** 2 + v ** 2)
-  end function energy
-
-  attributes(device) function enthalpy(e,p,rho) result(h)
-    real(8), intent(in), value :: e, p, rho
-    real(8) :: h
-    h = (e + p) / rho
-  end function enthalpy
-
-  attributes(device) function speed_of_sound(p,rho) result(c)
-    real(8), intent(in), value :: p, rho
-    real(8) :: c
-    c = sqrt(gamma * p / rho)
-  end function speed_of_sound
-
   attributes(device) function flux_SLAU(dim,rhol,rhor,pl,pr,Vl,Vr,Normal) result(Flux)
     integer, intent(in), value :: dim ! x:1, y:2
     real(8), intent(in), value :: rhol, rhor, pl, pr
@@ -68,13 +51,11 @@ contains
   end function flux_SLAU
 
   attributes(global) subroutine calc_E(nx, ny, k, b, rho, u, v, p, E)
-    use mod_globals, only : accuracy
     integer, intent(in), value :: nx, ny
     real(8), intent(in), value :: k, b
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
     real(8), intent(out), dimension(nx-1,ny-accuracy,4), device :: E
     integer i, j
-    integer :: offset = accuracy / 2
     real(8) rhol, rhor, pl, pr
     real(8), dimension(2) :: Vl, Vr
     real(8) :: Normal(4) = (/0.d0, 1.d0, 0.d0, 0.d0/)
@@ -112,13 +93,11 @@ contains
   end subroutine calc_E
 
   attributes(global) subroutine calc_F(nx, ny, k, b, rho, u, v, p, F)
-    use mod_globals, only : accuracy
     integer, intent(in), value :: nx, ny
     real(8), intent(in), value :: k, b
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
     real(8), intent(out), dimension(nx-accuracy,ny-1,4), device :: F
     integer i, j
-    integer :: offset = accuracy / 2
     real(8) rhol, rhor, pl, pr
     real(8), dimension(2) :: Vl, Vr
     real(8) :: Normal(4) = (/0.d0, 0.d0, 1.d0, 0.d0/)

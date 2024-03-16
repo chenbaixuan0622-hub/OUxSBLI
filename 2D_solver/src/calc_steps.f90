@@ -1,5 +1,5 @@
 module calc_steps
-  use mod_globals, only : accuracy, offset, dtdx, dtdy
+  use mod_globals, only : accuracy, offset, nx, ny, dtdx, dtdy
   implicit none
 contains
   attributes(device) subroutine calc_R(E1,E2,F1,F2,R)
@@ -8,8 +8,7 @@ contains
     R = dtdx * (-E1 + E2) + dtdy * (-F1 + F2)
   end subroutine calc_R
 
-  attributes(global) subroutine calc_step1(nx,ny,E,F,Q,Q2)
-    integer, intent(in), value :: nx, ny
+  attributes(global) subroutine calc_step1(E,F,Q,Q2)
     real(8), intent(in), dimension(nx-accuracy+1,ny-accuracy,4), device :: E
     real(8), intent(in), dimension(nx-accuracy,ny-accuracy+1,4), device :: F
     real(8), intent(in), dimension(nx,ny,4), device :: Q
@@ -25,8 +24,7 @@ contains
     enddo 
   end subroutine calc_step1
   
-  attributes(global) subroutine calc_step2(nx,ny,E,F,Q,Q2,Q3)
-    integer, intent(in), value :: nx, ny
+  attributes(global) subroutine calc_step2(E,F,Q,Q2,Q3)
     real(8), intent(in), dimension(nx-accuracy+1,ny-accuracy,4), device :: E
     real(8), intent(in), dimension(nx-accuracy,ny-accuracy+1,4), device :: F
     real(8), intent(in), dimension(nx,ny,4), device :: Q
@@ -43,8 +41,7 @@ contains
     enddo 
   end subroutine calc_step2
   
-  attributes(global) subroutine calc_step3(nx,ny,E,F,Q3,Q)
-    integer, intent(in), value :: nx, ny
+  attributes(global) subroutine calc_step3(E,F,Q3,Q)
     real(8), intent(in), dimension(nx-accuracy+1,ny-accuracy,4), device :: E
     real(8), intent(in), dimension(nx-accuracy,ny-accuracy+1,4), device :: F
     real(8), intent(in), dimension(nx,ny,4), device :: Q3
