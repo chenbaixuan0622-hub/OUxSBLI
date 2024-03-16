@@ -1,10 +1,10 @@
 module set
+  use mod_globals, only : gamma
   implicit none
 contains
-  subroutine set_init(nx,ny,gamma,Q)
+  subroutine set_init(nx,ny,Q)
     use mod_globals, only : rhol, rhor, pl, pr
     integer, intent(in) :: nx, ny
-    real(8), intent(in) :: gamma
     real(8), intent(out), dimension(nx,ny,4) :: Q
     ! left half
     Q(1:int(0.5*nx),:,1) = rhol
@@ -17,9 +17,8 @@ contains
     Q(:,:,3) = 0.d0
   end subroutine set_init
 
-  subroutine set_bc(nx,ny,gamma,Q)
+  subroutine set_bc(nx,ny,Q)
     integer, intent(in), value :: nx, ny
-    real(8), intent(in), value :: gamma
     real(8), intent(inout), device :: Q(nx,ny,4)
     real(8) p_bottom
     integer i, j, k
