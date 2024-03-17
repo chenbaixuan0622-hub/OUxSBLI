@@ -37,7 +37,7 @@ contains
     open(10,file=filename)
     call print_header(nx,ny,1,dx,dy,0.d0)
 
-    write(10,"(2(f9.4,1x))") ((u(i,j), v(i,j),i=1,nx),j=1,ny)
+    write(10,"(3(f9.4,1x))") ((u(i,j), v(i,j), 0.d0,i=1,nx),j=1,ny)
 
     write(10,"('SCALARS rho float')")
     write(10,"('LOOKUP_TABLE default')")
