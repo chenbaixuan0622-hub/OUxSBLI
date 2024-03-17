@@ -3,7 +3,7 @@ module calc_time_dev
 contains
   subroutine RungeKutta(T0,Q)
     use cudafor
-    use mod_globals, only : accuracy, id_visc, id_scheme, nx, ny, nt, np, dx, dy, &
+    use mod_globals, only : accuracy, id_visc, id_scheme, nx, ny, nt, np, &
             & blocksE, blocksF, blocks, threadsE, threadsF, threads
     use calc_physical_quantities
     use calc_steps
@@ -16,16 +16,13 @@ contains
     real(8), intent(in) :: T0(nx,ny)
     integer t1, t2, itr
     integer(kind=2**(accuracy/2)) :: id
-    real(8) k, b, dxi, dyi
+    real(8) k, b
     ! GPU
     integer stat
-    type(cudaDeviceProp) :: prop
     real(8), dimension(nx,ny,4), device :: Q_d, Q2, Q3
     real(8), dimension(nx,ny), device :: rho, u, v, p, T
     real(8), device :: E(nx-accuracy+1,ny-accuracy,4)
     real(8), device :: F(nx-accuracy,ny-accuracy+1,4)
-    dxi = 1.0d0 / dx
-    dyi = 1.0d0 / dy
 
     k = 0.d0
     b = (3.d0 - k) / (1.d0 - k)
@@ -42,19 +39,19 @@ contains
         endif
 
         if (id_scheme == 1) then
-          call calc_E_KEEP<<<blocksE,threadsE>>>(id,nx,ny,rho,u,v,p,E)
-          call calc_F_KEEP<<<blocksF,threadsF>>>(id,nx,ny,rho,u,v,p,F)
+          call calc_E_KEEP<<<blocksE,threadsE>>>(id,rho,u,v,p,E)
+          call calc_F_KEEP<<<blocksF,threadsF>>>(id,rho,u,v,p,F)
           !print *, trim(cudaGetErrorString(cudaGetLastError()))
         else
-          call calc_E_SLAU<<<blocksE,threadsE>>>(nx,ny,k,b,rho,u,v,p,E)
-          call calc_F_SLAU<<<blocksF,threadsF>>>(nx,ny,k,b,rho,u,v,p,F)
+          call calc_E_SLAU<<<blocksE,threadsE>>>(k,b,rho,u,v,p,E)
+          call calc_F_SLAU<<<blocksF,threadsF>>>(k,b,rho,u,v,p,F)
         endif
 
         stat = cudaDeviceSynchronize()
 
         if (id_visc == 1) then 
-          call calc_Ev<<<blocksE,threadsE>>>(nx,ny,dxi,dyi,u,v,T,E)
-          call calc_Fv<<<blocksF,threadsF>>>(nx,ny,dxi,dyi,u,v,T,F)
+          call calc_Ev<<<blocksE,threadsE>>>(u,v,T,E)
+          call calc_Fv<<<blocksF,threadsF>>>(u,v,T,F)
         endif
 
         stat = cudaDeviceSynchronize()
@@ -71,18 +68,18 @@ contains
         endif
         
         if (id_scheme == 1) then
-          call calc_E_KEEP<<<blocksE,threadsE>>>(id,nx,ny,rho,u,v,p,E)
-          call calc_F_KEEP<<<blocksF,threadsF>>>(id,nx,ny,rho,u,v,p,F)
+          call calc_E_KEEP<<<blocksE,threadsE>>>(id,rho,u,v,p,E)
+          call calc_F_KEEP<<<blocksF,threadsF>>>(id,rho,u,v,p,F)
         else
-          call calc_E_SLAU<<<blocksE,threadsE>>>(nx,ny,k,b,rho,u,v,p,E)
-          call calc_F_SLAU<<<blocksF,threadsF>>>(nx,ny,k,b,rho,u,v,p,F)
+          call calc_E_SLAU<<<blocksE,threadsE>>>(k,b,rho,u,v,p,E)
+          call calc_F_SLAU<<<blocksF,threadsF>>>(k,b,rho,u,v,p,F)
         endif
         
         stat = cudaDeviceSynchronize()
         
         if (id_visc == 1) then
-          call calc_Ev<<<blocksE,threadsE>>>(nx,ny,dxi,dyi,u,v,T,E)
-          call calc_Fv<<<blocksF,threadsF>>>(nx,ny,dxi,dyi,u,v,T,F)
+          call calc_Ev<<<blocksE,threadsE>>>(u,v,T,E)
+          call calc_Fv<<<blocksF,threadsF>>>(u,v,T,F)
         endif      
         
         stat = cudaDeviceSynchronize()
@@ -99,18 +96,18 @@ contains
         endif
 
         if (id_scheme == 1) then
-          call calc_E_KEEP<<<blocksE,threadsE>>>(id,nx,ny,rho,u,v,p,E)
-          call calc_F_KEEP<<<blocksF,threadsF>>>(id,nx,ny,rho,u,v,p,F)
+          call calc_E_KEEP<<<blocksE,threadsE>>>(id,rho,u,v,p,E)
+          call calc_F_KEEP<<<blocksF,threadsF>>>(id,rho,u,v,p,F)
         else
-          call calc_E_SLAU<<<blocksE,threadsE>>>(nx,ny,k,b,rho,u,v,p,E)
-          call calc_F_SLAU<<<blocksF,threadsF>>>(nx,ny,k,b,rho,u,v,p,F)
+          call calc_E_SLAU<<<blocksE,threadsE>>>(k,b,rho,u,v,p,E)
+          call calc_F_SLAU<<<blocksF,threadsF>>>(k,b,rho,u,v,p,F)
         endif
         
         stat = cudaDeviceSynchronize()
 
         if (id_visc == 1) then
-          call calc_Ev<<<blocksE,threadsE>>>(nx,ny,dxi,dyi,u,v,T,E)
-          call calc_Fv<<<blocksF,threadsF>>>(nx,ny,dxi,dyi,u,v,T,F)
+          call calc_Ev<<<blocksE,threadsE>>>(u,v,T,E)
+          call calc_Fv<<<blocksF,threadsF>>>(u,v,T,F)
         endif
         
         stat = cudaDeviceSynchronize()

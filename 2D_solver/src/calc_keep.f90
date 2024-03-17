@@ -1,5 +1,5 @@
 module calc_keep
-  use mod_globals, only : gamma
+  use mod_globals, only : nx, ny, gamma
   use calc_term
   implicit none
   interface calc_E
@@ -11,9 +11,8 @@ module calc_keep
   end interface
 
 contains
-  attributes(global) subroutine calc_E2(id, nx, ny, rho, u, v, p, E)
+  attributes(global) subroutine calc_E2(id, rho, u, v, p, E)
     integer(kind=2), intent(in), value :: id
-    integer, intent(in), value :: nx, ny
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
     real(8), intent(out), dimension(nx-1,ny-2,4), device :: E
     integer i, j
@@ -32,9 +31,8 @@ contains
     + 0.5d0 * (u(i,j) * p(i+1,j) + u(i+1,j) * p(i,j))
   end subroutine calc_E2
 
-  attributes(global) subroutine calc_E4(id, nx, ny, rho, u, v, p, E)
+  attributes(global) subroutine calc_E4(id, rho, u, v, p, E)
     integer(kind=4), intent(in), value :: id
-    integer, intent(in), value :: nx, ny
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
     real(8), intent(out), dimension(nx-3,ny-4,4), device :: E
     integer i, j
@@ -59,9 +57,8 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  attributes(global) subroutine calc_F2(id, nx, ny, rho, u, v, p, F)
+  attributes(global) subroutine calc_F2(id, rho, u, v, p, F)
     integer(kind=2), intent(in), value :: id
-    integer, intent(in), value :: nx, ny
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
     real(8), intent(out), device :: F(nx-2,ny-1,4)
     integer i, j
@@ -80,9 +77,8 @@ contains
     + 0.5d0 * (v(i,j) * p(i,j+1) + v(i,j+1) * p(i,j))
   end subroutine calc_F2
 
-  attributes(global) subroutine calc_F4(id, nx, ny, rho, u, v, p, F)
+  attributes(global) subroutine calc_F4(id, rho, u, v, p, F)
     integer(kind=4), intent(in), value :: id
-    integer, intent(in), value :: nx, ny
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
     real(8), intent(out), device :: F(nx-4,ny-3,5)
     integer i, j

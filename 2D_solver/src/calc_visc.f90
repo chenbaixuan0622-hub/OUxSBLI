@@ -1,5 +1,5 @@
 module calc_visc
-  use mod_globals, only : accuracy, id_turbulence
+  use mod_globals, only : accuracy, id_turbulence, nx, ny, dxi, dyi
   use calc_Sutherland
   implicit none
 contains
@@ -24,9 +24,7 @@ contains
             & + mu2 * (-u1 + u6 - u4 + u5)) 
   end function u_y
 
-  attributes(global) subroutine calc_Ev(nx, ny, dX, dY, u, v, T, E)
-    integer, intent(in), value :: nx, ny
-    real(8), intent(in), value :: dX, dY
+  attributes(global) subroutine calc_Ev(u, v, T, E)
     real(8), intent(in), dimension(nx,ny), device :: u, v, T
     real(8), intent(inout), dimension(nx-accuracy+1,ny-accuracy,4), device :: E
     integer i, j, offset
@@ -38,14 +36,14 @@ contains
 
     ! x direction
     call calc_mu(T(i,j),T(i+1,j),mux)
-    ux = u_x(dX,mux,u(i,j),u(i+1,j))
-    vx = u_x(dX,mux,v(i,j),v(i+1,j))
+    ux = u_x(dxi,mux,u(i,j),u(i+1,j))
+    vx = u_x(dxi,mux,v(i,j),v(i+1,j))
 
     ! y direction
     call calc_mu(T(i,j),T(i,j-1),T(i+1,j),T(i+1,j-1),muy1)
     call calc_mu(T(i,j),T(i,j+1),T(i+1,j),T(i+1,j+1),muy2)
-    uy = u_y(dY,muy1,muy2,u(i,j),u(i,j-1),u(i+1,j-1),u(i+1,j),u(i+1,j+1),u(i,j+1))
-    vy = u_y(dY,muy1,muy2,v(i,j),v(i,j-1),v(i+1,j-1),v(i+1,j),v(i+1,j+1),v(i,j+1))
+    uy = u_y(dyi,muy1,muy2,u(i,j),u(i,j-1),u(i+1,j-1),u(i+1,j),u(i+1,j+1),u(i,j+1))
+    vy = u_y(dyi,muy1,muy2,v(i,j),v(i,j-1),v(i+1,j-1),v(i+1,j),v(i+1,j+1),v(i,j+1))
 
     txx = 2.d0 * (2.d0 * ux - vy) / 3.d0
     txy = uy + vx
@@ -56,9 +54,7 @@ contains
     & + kappa * (-T(i,j) + T(i+1,j))
   end subroutine calc_Ev
   
-  attributes(global) subroutine calc_Fv(nx, ny, dX, dY, u, v, T, F)
-    integer, intent(in), value :: nx, ny
-    real(8), intent(in), value :: dX, dY
+  attributes(global) subroutine calc_Fv(u, v, T, F)
     real(8), intent(in), dimension(nx,ny), device :: u, v, T
     real(8), intent(inout), device :: F(nx-accuracy,ny-accuracy+1,4)
     integer i, j, offset
@@ -70,14 +66,14 @@ contains
 
     ! y direction
     call calc_mu(T(i,j),T(i,j+1),muy)
-    vy = u_x(dY,muy,v(i,j),v(i,j+1))
-    uy = u_x(dY,muy,u(i,j),u(i,j+1))
+    vy = u_x(dyi,muy,v(i,j),v(i,j+1))
+    uy = u_x(dyi,muy,u(i,j),u(i,j+1))
 
     ! x direction
     call calc_mu(T(i,j),T(i-1,j),T(i,j+1),T(i-1,j+1),mux1)
     call calc_mu(T(i,j),T(i+1,j),T(i,j+1),T(i+1,j+1),mux2)
-    ux = u_y(dX,mux1,mux2,u(i,j),u(i-1,j),u(i-1,j+1),u(i,j+1),u(i+1,j+1),u(i+1,j)) 
-    vx = u_y(dX,mux1,mux2,v(i,j),v(i-1,j),v(i-1,j+1),v(i,j+1),v(i+1,j+1),v(i+1,j)) 
+    ux = u_y(dxi,mux1,mux2,u(i,j),u(i-1,j),u(i-1,j+1),u(i,j+1),u(i+1,j+1),u(i+1,j)) 
+    vx = u_y(dxi,mux1,mux2,v(i,j),v(i-1,j),v(i-1,j+1),v(i,j+1),v(i+1,j+1),v(i+1,j)) 
 
     tyx = uy + vx
     tyy = 2.d0 * (2.d0 * vy - ux) / 3.d0

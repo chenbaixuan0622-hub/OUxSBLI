@@ -10,9 +10,6 @@ Cp    = 1006.3356[J/(kg K)]
 mesh info
 Lx =   1.0000 was devided by1024 dx =  0.9766E-03
 Ly =   0.3000 was devided by 256 dy =  0.1172E-02
+Lz =   0.0000 was devided by   2 dz =  0.0000E+00
 
 
-time info
-dt                       =  0.1000E-04
-end time                 =  0.1000E-02
-elapsed time             =         5[s]
