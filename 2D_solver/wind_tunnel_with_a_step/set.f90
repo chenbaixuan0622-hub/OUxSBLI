@@ -1,9 +1,8 @@
 module set
-  use mod_globals, only : gamma, rho0, p0, u0
+  use mod_globals, only : nx, ny, gamma, rho0, p0, u0
   implicit none
 contains
-  subroutine set_init(nx,ny,Q)
-    integer, intent(in) :: nx, ny
+  subroutine set_init(Q)
     real(8), intent(out), dimension(nx,ny,4) :: Q
     ! wind tunnel
     Q(:,:,1) = rho0
@@ -12,8 +11,7 @@ contains
     Q(:,:,4) = p0 / (gamma - 1.d0)
   end subroutine set_init
   
-  subroutine set_bc(nx,ny,Q)
-    integer, intent(in), value :: nx, ny
+  subroutine set_bc(Q)
     real(8), intent(inout), device :: Q(nx,ny,4)
     integer i, j, k, nxs, nys
     real(8) p_bottom, p_top, p_step_left, p_step_top

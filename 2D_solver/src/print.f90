@@ -23,7 +23,7 @@ contains
     write(10,"('POINTS',i9,' float')") nx * ny
     do j = 1, ny
       do i = 1, nx
-        write(10,"(2(f9.4,1x))") (i-1)*dx, (j-1)*dy
+        write(10,"(3(f9.4,1x))") (i-1)*dx, (j-1)*dy, 0.d0
       enddo
     enddo 
 

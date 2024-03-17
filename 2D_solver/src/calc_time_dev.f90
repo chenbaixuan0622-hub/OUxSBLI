@@ -36,9 +36,9 @@ contains
     do t2 = 1, np
       do t1 = 1, nt
         if (id_visc == 1) then
-          call calc_quantities_T(Q_d,rho,u,v,p,T)
+          call calc_quantities_2D(Q_d,rho,u,v,p,T)
         else
-          call calc_quantities(Q_d,rho,u,v,p)
+          call calc_quantities_2D(Q_d,rho,u,v,p)
         endif
 
         if (id_scheme == 1) then
@@ -60,14 +60,14 @@ contains
         stat = cudaDeviceSynchronize()
 
         call calc_step1<<<blocks,threads>>>(E,F,Q_d,Q2)
-        call set_bc(nx,ny,Q2)
+        call set_bc(Q2)
         
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
         if (id_visc == 1) then
-          call calc_quantities_T(Q2,rho,u,v,p,T)
+          call calc_quantities_2D(Q2,rho,u,v,p,T)
         else
-          call calc_quantities(Q2,rho,u,v,p)
+          call calc_quantities_2D(Q2,rho,u,v,p)
         endif
         
         if (id_scheme == 1) then
@@ -88,14 +88,14 @@ contains
         stat = cudaDeviceSynchronize()
 
         call calc_step2<<<blocks,threads>>>(E,F,Q_d,Q2,Q3)
-        call set_bc(nx,ny,Q3)
+        call set_bc(Q3)
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
         if (id_visc == 1) then
-          call calc_quantities_T(Q3,rho,u,v,p,T)
+          call calc_quantities_2D(Q3,rho,u,v,p,T)
         else
-          call calc_quantities(Q3,rho,u,v,p)
+          call calc_quantities_2D(Q3,rho,u,v,p)
         endif
 
         if (id_scheme == 1) then
@@ -116,7 +116,7 @@ contains
         stat = cudaDeviceSynchronize()
 
         call calc_step3<<<blocks,threads>>>(E,F,Q3,Q_d)
-        call set_bc(nx,ny,Q_d)
+        call set_bc(Q_d)
       enddo
       Q = Q_d
       call print_vtk(t2,Q)
