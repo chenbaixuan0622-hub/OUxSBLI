@@ -13,12 +13,15 @@ module mod_globals
   ! mesh
   real(8), parameter :: Lx = 1.d0
   real(8), parameter :: Ly = 0.3d0
+  real(8), parameter :: Lz = 0.d0
   integer, parameter :: nx = 1025
   integer, parameter :: ny = 257
   integer, parameter :: nz = accuracy+1
   real(8), parameter :: dx = Lx / (nx-1)
   real(8), parameter :: dy = Ly / (ny-1)
-  real(8), parameter :: dz = 0.d0
+  real(8), parameter :: dz = Lz / (nz-1)
+  real(8), parameter :: dxi = 1.d0 / dx
+  real(8), parameter :: dyi = 1.d0 / dy
 
   ! GPU
   type(dim3) :: blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/5,1)
@@ -29,7 +32,7 @@ module mod_globals
   type(dim3) :: threads = dim3(11,5,1)
 
   ! time
-  integer, parameter :: nt = 10
+  integer, parameter :: nt = 1
   integer, parameter :: np = 10
   real(8), parameter :: dt = 0.00001d0
 
@@ -46,5 +49,9 @@ module mod_globals
   real(8), parameter :: rhor = 0.125d0
   real(8), parameter :: pl = 1.d0
   real(8), parameter :: pr = 0.1d0
+
+  ! variables
+  real(8), save :: Q(nx,ny,4)
+  real(8), save :: T0(nx,ny)
 end module mod_globals
 

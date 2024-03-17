@@ -1,5 +1,5 @@
 module calc_slau
-  use mod_globals, only : accuracy, offset
+  use mod_globals, only : accuracy, offset, nx, ny
   use calc_common
   use calc_MUSCL
   implicit none
@@ -20,6 +20,7 @@ contains
     cl = speed_of_sound(pl,rhol)
     cr = speed_of_sound(pr,rhor)
     c = 0.5d0 * (cl + cr)
+    write(*,*) hr, hl, rhol, rhor
     ! What is vn?
     vn = 0.d0
     V_p = Vl(dim) - vn
@@ -50,8 +51,7 @@ contains
     Flux(:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:)) + Pressure * Normal(:)
   end function flux_SLAU
 
-  attributes(global) subroutine calc_E(nx, ny, k, b, rho, u, v, p, E)
-    integer, intent(in), value :: nx, ny
+  attributes(global) subroutine calc_E(k, b, rho, u, v, p, E)
     real(8), intent(in), value :: k, b
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
     real(8), intent(out), dimension(nx-1,ny-accuracy,4), device :: E
@@ -81,7 +81,7 @@ contains
 
     Q1(:) = (/rho(i,j), u(i,j), v(i,j), p(i,j)/)
     Q2(:) = (/rho(i+1,j), u(i+1,j), v(i+1,j), p(i+1,j)/)
-        
+    
     call MUSCL(4,k,b,Q1(:),Q2(:),d1(:),d2(:),d3(:),Ql(:),Qr(:))
     rhol = Ql(1)
     rhor = Qr(1)
@@ -92,8 +92,7 @@ contains
     E(i,j-offset,:) = flux_SLAU(1,rhol,rhor,pl,pr,Vl,Vr,Normal)
   end subroutine calc_E
 
-  attributes(global) subroutine calc_F(nx, ny, k, b, rho, u, v, p, F)
-    integer, intent(in), value :: nx, ny
+  attributes(global) subroutine calc_F(k, b, rho, u, v, p, F)
     real(8), intent(in), value :: k, b
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
     real(8), intent(out), dimension(nx-accuracy,ny-1,4), device :: F

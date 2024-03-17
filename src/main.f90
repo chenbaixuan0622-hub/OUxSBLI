@@ -1,13 +1,10 @@
 program main
   use, intrinsic :: iso_fortran_env
-  use mod_globals, only : id_visc, Lx, Ly, nx, ny, nt, np, dx, dy, dt, gamma, T
+  use mod_globals, only : id_visc, Lx, Ly, Lz, nx, ny, nz, nt, np, dx, dy, dz, dt, gamma, T, Q, T0
   use set
   use calc_time_dev
   implicit none
-  real(8) mu, kappa, Cv, Cp
-  real(8), allocatable :: Q(:,:,:)
-  real(8), allocatable :: T0(:,:)
-  real(8) t_start, t_end
+  real(8) mu, kappa, Cv, Cp, t_start, t_end
   
   ! calc physical properties
   mu = (1.4592d-6 * T ** (1.5d0)) / (109.1d0 + T)
@@ -31,12 +28,9 @@ program main
   write(1,"('mesh info')")
   write(1,"('Lx =', f9.4, ' was devided by', i4, ' dx =', e12.4)") Lx, (nx-1), dx
   write(1,"('Ly =', f9.4, ' was devided by', i4, ' dy =', e12.4)") Ly, (ny-1), dy
+  write(1,"('Lz =', f9.4, ' was devided by', i4, ' dz =', e12.4)") Lz, (nz-1), dz
   write(1,"('\n')")
   close(1)
-
-  ! parallel computing
-  allocate(Q(nx,ny,4))
-  allocate(T0(nx,ny))
   
   call set_init(Q)
   T0 = T
@@ -51,6 +45,5 @@ program main
   write(1,"('end time                 =', e12.4)") nt * np * dt
   write(1,"('elapsed time             =', i10, '[s]')") int(t_end-t_start)
   close(1)
-  deallocate(Q,T0)
 end program main
 

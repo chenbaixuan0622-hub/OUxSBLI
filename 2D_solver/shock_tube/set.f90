@@ -23,7 +23,7 @@ contains
     !$acc kernels deviceptr(Q)
     !$acc loop collapse(2)
     do k = 1, 4
-      do j = 1, ny
+      do j = 2, ny-1
         ! inlet
         Q(1,j,k) = Q(2,j,k)
         ! outlet
