@@ -1,10 +1,10 @@
 module print
-  use mod_globals, only : gamma
+  use mod_globals, only : nx, ny, nz, dx, dy, dz, gamma
   implicit none
 contains
-  subroutine print_vtk(step,nx,ny,dx,dy,Q)
-    integer, intent(in) :: step, nx, ny
-    real(8), intent(in) :: dx, dy, Q(nx,ny,4)
+  subroutine print_vtk(step,Q)
+    integer, intent(in) :: step
+    real(8), intent(in) :: Q(nx,ny,4)
     integer i, j
     real(8), dimension(nx,ny) :: rho, u, v, p
     character(len=40) filename
@@ -19,11 +19,11 @@ contains
     write(10,"('Q')")
     write(10,"('ASCII')")
     write(10,"('DATASET STRUCTURED_GRID')")
-    write(10,"('DIMENSIONS',2(1x,i4))") nx, ny
+    write(10,"('DIMENSIONS',3(1x,i4))") nx, ny, 1
     write(10,"('POINTS',i9,' float')") nx * ny
     do j = 1, ny
       do i = 1, nx
-        write(10,"(2(f9.4,1x))") (i-1)*dx, (j-1)*dy
+        write(10,"(3(f9.4,1x))") (i-1)*dx, (j-1)*dy, 0.d0
       enddo
     enddo 
 

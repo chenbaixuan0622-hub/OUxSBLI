@@ -14,5 +14,5 @@ Ly =   0.3000 was devided by 256 dy =  0.1172E-02
 
 time info
 dt                       =  0.1000E-04
-end time                 =  0.1000E+00
-elapsed time             =       153[s]
+end time                 =  0.1000E-02
+elapsed time             =         5[s]

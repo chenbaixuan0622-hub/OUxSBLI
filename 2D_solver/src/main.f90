@@ -38,7 +38,7 @@ program main
   allocate(Q(nx,ny,4))
   allocate(T0(nx,ny))
   
-  call set_init(nx,ny,Q)
+  call set_init(Q)
   T0 = T
 
   call cpu_time(t_start)
