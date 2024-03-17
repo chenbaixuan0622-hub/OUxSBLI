@@ -1,9 +1,8 @@
 module calc_physical_quantities
-  use mod_globals, only : gamma
+  use mod_globals, only : nx, ny, gamma
   implicit none
 contains
-  subroutine calc_quantities(nx,ny,Q,rho,u,v,p)
-    integer, intent(in), value :: nx, ny
+  subroutine calc_quantities(Q,rho,u,v,p)
     real(8), intent(in), dimension(nx,ny,4), device :: Q
     real(8), intent(out), dimension(nx,ny), device :: rho, u, v, p
     integer i, j
@@ -20,8 +19,7 @@ contains
     !$acc end kernels
   end subroutine calc_quantities
   
-  subroutine calc_quantities_T(nx,ny,Q,rho,u,v,p,T)
-    integer, intent(in), value :: nx, ny
+  subroutine calc_quantities_T(Q,rho,u,v,p,T)
     real(8), intent(in), dimension(nx,ny,4), device :: Q
     real(8), intent(out), dimension(nx,ny), device :: rho, u, v, p, T
     integer i, j

@@ -36,9 +36,9 @@ contains
     do t2 = 1, np
       do t1 = 1, nt
         if (id_visc == 1) then
-          call calc_quantities_T(nx,ny,Q_d,rho,u,v,p,T)
+          call calc_quantities_T(Q_d,rho,u,v,p,T)
         else
-          call calc_quantities(nx,ny,Q_d,rho,u,v,p)
+          call calc_quantities(Q_d,rho,u,v,p)
         endif
 
         if (id_scheme == 1) then
@@ -65,9 +65,9 @@ contains
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
         if (id_visc == 1) then
-          call calc_quantities_T(nx,ny,Q2,rho,u,v,p,T)
+          call calc_quantities_T(Q2,rho,u,v,p,T)
         else
-          call calc_quantities(nx,ny,Q2,rho,u,v,p)
+          call calc_quantities(Q2,rho,u,v,p)
         endif
         
         if (id_scheme == 1) then
@@ -93,9 +93,9 @@ contains
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
         if (id_visc == 1) then
-          call calc_quantities_T(nx,ny,Q3,rho,u,v,p,T)
+          call calc_quantities_T(Q3,rho,u,v,p,T)
         else
-          call calc_quantities(nx,ny,Q3,rho,u,v,p)
+          call calc_quantities(Q3,rho,u,v,p)
         endif
 
         if (id_scheme == 1) then
@@ -119,7 +119,7 @@ contains
         call set_bc(nx,ny,Q_d)
       enddo
       Q = Q_d
-      call print_vtk(t2,nx,ny,dx,dy,Q)
+      call print_vtk(t2,Q)
     enddo
   end subroutine RungeKutta
 end module calc_time_dev

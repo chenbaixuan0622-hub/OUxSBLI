@@ -15,8 +15,10 @@ module mod_globals
   real(8), parameter :: Ly = 0.3d0
   integer, parameter :: nx = 1025
   integer, parameter :: ny = 257
+  integer, parameter :: nz = accuracy+1
   real(8), parameter :: dx = Lx / (nx-1)
   real(8), parameter :: dy = Ly / (ny-1)
+  real(8), parameter :: dz = 0.d0
 
   ! GPU
   type(dim3) :: blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/5,1)
@@ -27,12 +29,13 @@ module mod_globals
   type(dim3) :: threads = dim3(11,5,1)
 
   ! time
-  integer, parameter :: nt = 1000
+  integer, parameter :: nt = 10
   integer, parameter :: np = 10
   real(8), parameter :: dt = 0.00001d0
 
   real(8), parameter :: dtdx = dt / dx
   real(8), parameter :: dtdy = dt / dy
+  real(8), parameter :: dtdz = 0.d0
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0

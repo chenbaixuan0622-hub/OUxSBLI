@@ -15,6 +15,7 @@ module mod_globals
   real(8), parameter :: Ly = 1.d0
   integer, parameter :: nx = 769
   integer, parameter :: ny = 257
+  integer, parameter :: nz = accuracy + 1
   real(8), parameter :: dx = Lx / (nx-1)
   real(8), parameter :: dy = Ly / (ny-1)
   
@@ -33,6 +34,7 @@ module mod_globals
 
   real(8), parameter :: dtdx = dt / dx
   real(8), parameter :: dtdy = dt / dy
+  real(8), parameter :: dtdz = 0.d0
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0

@@ -11,7 +11,7 @@ OUTPUT_OPTIN = -cuda -acc -fast -Minfo=accel
 		@:
 
 TARGET = shock_tube
-vpath %f90 ../src
+vpath %f90 ../src:../../src
 
 OBJ =	mod_globals.o \
 	set.o \
@@ -20,6 +20,7 @@ OBJ =	mod_globals.o \
 	calc_sutherland.o \
 	calc_visc.o \
 	calc_muscl.o \
+	calc_common.o \
 	calc_keep.o \
 	calc_slau.o \
 	calc_steps.o \
@@ -36,7 +37,7 @@ $(TARGET): $(OBJ)
 set.o: mod_globals.mod
 calc_KEEP.o: calc_term.mod
 calc_visc.o: calc_sutherland.mod
-calc_SLAU.o: calc_muscl.mod
+calc_SLAU.o: calc_muscl.mod calc_common.mod
 calc_time_dev.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_keep.mod calc_slau.mod calc_visc.mod calc_steps.mod print.mod
 main.o: main.f90 mod_globals.mod set.mod calc_time_dev.mod
 
