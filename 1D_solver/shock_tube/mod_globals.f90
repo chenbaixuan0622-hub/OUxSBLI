@@ -8,6 +8,6 @@ module mod_globals
   !           ! 2  SLAU !
   !           ! 3  Roe  !
   !!!!!!!!!!!!!!!!!!!!!!!
-  integer, parameter :: id_scheme = 3
+  integer, parameter :: id_scheme = 2
 end module mod_globals
 
