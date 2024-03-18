@@ -26,7 +26,15 @@ SLAU scheme
 <p>
 1 dimensional shock tube was calculated.
 </p>
-<img src="./visuals/shock_tube_SLAU.png" alt="shock-tube">
+<img src="./visuals/SLAU_500.png" alt="shock-tube">
+
+<h2>
+KEEP + Roe hybrid scheme
+</h2>
+<p>
+1 dimensional shock tube was calculated.
+</p>
+<img src="./visuals/Hybrid_500.png" alt="shock-tube">
 
 <h2>
 Dependency
@@ -35,17 +43,6 @@ Dependency
 <li>nvfortran</li>
 <li>ParaView</li>
 <li>gnuplot</li>
-</ul>
-
-<h2>
-Usage
-</h2>
-<ul>
-<li> Edit input.d file grid, physical properties, and simulation time etc. </li>
-<li> Edit mod_globals.f90 file to choose accuracy. 2nd-order accuracy and 4th-order accuracy are available. </li> 
-<li> Edit mod_globals.f90 file to choose Euler solver or Navier-Stokes solver. Moreover, turbulent model can be used. </li>
-<li> Edit calc_time_dev.f90 to choose appropriate gridDim and blockDim. The number of threads should be a multiple of 32 to make the most of GPU. </li>
-<li><pre>$ make</pre></li>
 </ul>
 
 <h2>
