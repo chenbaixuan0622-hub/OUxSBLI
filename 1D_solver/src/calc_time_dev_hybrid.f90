@@ -21,9 +21,8 @@ contains
     real(8) dxi, dtdx
     real(8) k, b
     real(8), dimension(nx,3) :: Q2, Q3
-    real(8), dimension(nx) :: rho, u, p, T
+    real(8), dimension(nx) :: rho, u, p, T, phi_hybrid
     real(8), dimension(nx-accuracy+1,3) :: E_keep, E_roe, E_tvd
-    real(8) :: Ev(nx-accuracy+1,3)
     dxi = 1.0d0 / dx
     dtdx = dt * dxi
 
@@ -41,7 +40,7 @@ contains
 
         call calc_E_KEEP(id,nx,gamma,rho,u,p,E_keep)
         call calc_E_Roe(nx,gamma,k,b,rho,u,p,E_roe)
-        call calc_E_tvd(nx,Q(:,3),E_keep,E_roe,E_tvd)
+        call calc_E_tvd(nx,rho,Q(:,3),E_keep,E_roe,E_tvd,phi_hybrid)
 
         if (id_visc == 1) then 
           call calc_Ev(nx,dxi,u,T,E_tvd)
@@ -61,7 +60,7 @@ contains
         
         call calc_E_KEEP(id,nx,gamma,rho,u,p,E_keep)
         call calc_E_Roe(nx,gamma,k,b,rho,u,p,E_roe)
-        call calc_E_tvd(nx,Q2(:,3),E_keep,E_roe,E_tvd)
+        call calc_E_tvd(nx,rho,Q2(:,3),E_keep,E_roe,E_tvd,phi_hybrid)
         
         if (id_visc == 1) then
           call calc_Ev(nx,dxi,u,T,E_tvd)
@@ -81,7 +80,7 @@ contains
 
         call calc_E_KEEP(id,nx,gamma,rho,u,p,E_keep)
         call calc_E_Roe(nx,gamma,k,b,rho,u,p,E_roe)
-        call calc_E_tvd(nx,Q3(:,3),E_keep,E_roe,E_tvd)
+        call calc_E_tvd(nx,rho,Q3(:,3),E_keep,E_roe,E_tvd,phi_hybrid)
         
         if (id_visc == 1) then
           call calc_Ev(nx,dxi,u,T,E_tvd)
@@ -91,7 +90,7 @@ contains
         
         call set_bc(id,nx,gamma,Q)
       enddo
-      call print_vtk(t2,nx,dx,gamma,Q)
+      call print_vtk(t2,nx,dx,gamma,Q,phi_hybrid)
     enddo
   end subroutine RungeKutta
 end module calc_time_dev_hybrid
