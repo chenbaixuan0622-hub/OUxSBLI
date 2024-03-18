@@ -44,10 +44,10 @@ contains
       Qr(2) = rhor * ur
       Ql(3) = energyl
       Qr(3) = energyr
-      El(1) = Ql(1) 
+      El(1) = Ql(2) 
       Er(1) = Qr(2)
-      El(2) = ul * Ql(1) + pl
-      Er(2) = ur * Qr(1) + pr
+      El(2) = ul * Ql(2) + pl
+      Er(2) = ur * Qr(2) + pr
       El(3) = (energyl + pl) * ul
       Er(3) = (energyr + pr) * ur
       ! calc Roe
