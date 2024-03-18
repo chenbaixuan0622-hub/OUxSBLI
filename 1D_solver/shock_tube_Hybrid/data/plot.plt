@@ -16,7 +16,7 @@ datafile = "Q00010.d"
 
 set multiplot layout 1, 4
 
-set ylabel "{/=12 {/Symbol:Italic r} (kg / m^3)}"
+set ylabel "{/=12 {/Symbol:Italic r}}"
 set size square
 set mxtics 10
 set mytics 10
@@ -24,7 +24,7 @@ set mytics 10
 # set yrange [0 : STATS_max * 1.1]
 plot datafile using 1:2 with points pt 2 lc rgb "blue"
 
-set ylabel "{/=12 {/Times-New-Roman:Italic u} (m/s)}"
+set ylabel "{/=12 {/Times-New-Roman:Italic u}}"
 set size square
 set mxtics 10
 set mytics 10
@@ -32,7 +32,7 @@ set mytics 10
 # set yrange [0 : STATS_max * 1.1]
 plot datafile using 1:3 with points pt 2 lc rgb "blue"
 
-set ylabel "{/=12 {/Times-New-Roman:Italic P} (Pa)}"
+set ylabel "{/=12 {/Times-New-Roman:Italic P}}"
 set size square
 set mxtics 10
 set mytics 10
