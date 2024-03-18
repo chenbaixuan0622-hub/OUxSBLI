@@ -1,25 +1,8 @@
 module calc_slau
-  use calc_MUSCL
+  use calc_Qlr
+  use calc_common
   implicit none
 contains
-  function energy(gamma,p,rho,u) result(e)
-    real(8), intent(in) :: gamma, p, rho, u 
-    real(8) :: e
-    e = p / (gamma - 1.d0) + 0.5d0 * rho * u ** 2
-  end function energy
-
-  function enthalpy(e,p,rho) result(h)
-    real(8), intent(in) :: e, p, rho
-    real(8) :: h
-    h = (e + p) / rho
-  end function enthalpy
-
-  function speed_of_sound(gamma,p,rho) result(c)
-    real(8), intent(in) :: gamma, p, rho
-    real(8) :: c
-    c = sqrt(gamma * p / rho)
-  end function speed_of_sound
-
   subroutine calc_E(nx, gamma, k, b, rho, u, p, F)
     integer, intent(in) :: nx
     real(8), intent(in) :: gamma, k, b
@@ -28,7 +11,7 @@ contains
     integer i
     real(8) rhol, rhor, pl, pr, el, er, hl, hr, mass, Pressure, dp, c, cl, cr
     real(8) vn, x, g, M_p, M_m, M, Vl, Vr, V_p, V_m, V_bar, V_bar_p, V_bar_m, beta_p, beta_m
-    real(8), dimension(3) :: d1, d2, d3, Ql, Qr, phil, phir, Normal
+    real(8), dimension(3) :: d1, d2, d3, phil, phir, Normal
     real(8), dimension(nx,3) :: Q
     Normal(1) = 0.d0
     Normal(2) = 1.d0
@@ -36,29 +19,14 @@ contains
     Q(:,1) = rho
     Q(:,2) = u
     Q(:,3) = p
-    ! Q(rho, u, p)
     do i = 1, nx-1
-      ! calc MUSCL
       if (2 <= i .and. i <= nx-2) then
-        d1(:) = -Q(i-1,:) + Q(i,:)
-        d2(:) = -Q(i,:) + Q(i+1,:)
-        d3(:) = -Q(i+1,:) + Q(i+2,:)
+        call Qlr(k,b,Q(i-1,:),Q(i,:),Q(i+1,:),Q(i+2,:),rhol,rhor,Vl,Vr,pl,pr)
       elseif (i == 1) then
-        d1(:) = 0.d0
-        d2(:) = -Q(i,:) + Q(i+1,:)
-        d3(:) = -Q(i+1,:) + Q(i+2,:)
+        call Qlr(k,b,0.d0,Q(i,:),Q(i+1,:),Q(i+2,:),rhol,rhor,Vl,Vr,pl,pr)
       else
-        d1(:) = -Q(i-1,:) + Q(i,:)
-        d2(:) = -Q(i,:) + Q(i+1,:)
-        d3(:) = 0.d0
+        call Qlr(k,b,Q(i-1,:),Q(i,:),Q(i+1,:),0.d0,rhol,rhor,Vl,Vr,pl,pr)
       endif
-      call MUSCL(3,k,b,Q(i,:),Q(i+1,:),d1(:),d2(:),d3(:),Ql(:),Qr(:))
-      rhol = Ql(1)
-      rhor = Qr(1)
-      Vl = Ql(2)
-      Vr = Qr(2)
-      pl = Ql(3)
-      pr = Qr(3)
 
       ! calc SLAU
       el = energy(gamma,pl,rhol,Vl)

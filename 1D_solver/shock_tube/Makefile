@@ -14,15 +14,18 @@ TARGET = shock_tube
 vpath %f90 ../src
 
 OBJ =	mod_globals.o \
-	set_bc.o \
-	set_init.o \
-	calc_physical_quantities.o \
+  set.o \
+	calc_common.o \
+  calc_physical_quantities.o \
 	calc_term.o \
 	calc_sutherland.o \
 	calc_visc.o \
 	calc_muscl.o \
-	calc_keep.o \
+	calc_qlr.o \
+  calc_keep.o \
 	calc_slau.o \
+  calc_mat.o \
+  calc_roe.o \
 	calc_steps.o \
 	print.o \
 	calc_time_dev.o \
@@ -36,8 +39,10 @@ $(TARGET): $(OBJ)
 
 set_init.o: mod_globals.mod
 calc_keep.o: calc_term.mod
-calc_slau.o: calc_muscl.mod
+calc_qlr.o: calc_muscl.mod
+calc_slau.o: calc_qlr.mod calc_common.mod
+calc_roe.o: calc_qlr.mod calc_mat.mod
 calc_visc.o: calc_sutherland.mod
-calc_time_dev.o: mod_globals.mod calc_physical_quantities.mod set_bc.mod calc_keep.mod calc_slau.mod calc_visc.mod calc_steps.mod
-main.o: main.f90 mod_globals.mod set_bc.mod set_init.mod calc_time_dev.mod
+calc_time_dev.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_keep.mod calc_slau.mod calc_roe.mod calc_visc.mod calc_steps.mod
+main.o: main.f90 mod_globals.mod set.mod set.mod calc_time_dev.mod
 
