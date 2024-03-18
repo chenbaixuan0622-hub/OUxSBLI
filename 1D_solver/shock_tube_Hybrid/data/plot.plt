@@ -14,7 +14,7 @@ set ytics nomirror
 
 datafile = "Q00010.d"
 
-set multiplot layout 1, 3
+set multiplot layout 1, 4
 
 set ylabel "{/=12 {/Symbol:Italic r} (kg / m^3)}"
 set size square
@@ -39,6 +39,14 @@ set mytics 10
 # stats datafile using 4 nooutput
 # set yrange [0 : STATS_max * 1.1]
 plot datafile using 1:4 with points pt 2 lc rgb "blue"
+
+set ylabel "{/=12 {/Symbol:Italic f}}"
+set size square
+set mxtics 10
+set mytics 10
+# stats datafile using 5 nooutput
+# set yrange [0 : STATS_max * 1.1]
+plot datafile using 1:5 with points pt 2 lc rgb "blue"
 
 unset multiplot
 
