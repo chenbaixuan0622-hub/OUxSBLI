@@ -42,3 +42,6 @@ plot datafile using 1:4 with points pt 2 lc rgb "blue"
 
 unset multiplot
 
+set term x11
+replot
+

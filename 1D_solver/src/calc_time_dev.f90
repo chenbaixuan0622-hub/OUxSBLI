@@ -7,8 +7,9 @@ contains
     use calc_steps
     use calc_KEEP, calc_E_KEEP => calc_E
     use calc_SLAU, calc_E_SLAU => calc_E
+    use calc_Roe, calc_E_Roe => calc_E
     use calc_visc
-    use set_bc
+    use set
     use print
     integer, intent(in) :: nx, nt, np
     real(8), intent(in) :: dx, dt, gamma
@@ -39,8 +40,10 @@ contains
 
         if (id_scheme == 1) then
           call calc_E_KEEP(id,nx,gamma,rho,u,p,E)
-        else
+        elseif (id_scheme == 2) then
           call calc_E_SLAU(nx,gamma,k,b,rho,u,p,E)
+        else
+          call calc_E_Roe(nx,gamma,k,b,rho,u,p,E)
         endif
 
 
@@ -54,7 +57,7 @@ contains
           call calc_step1(nx,dtdx,E,Q,Q2)
         endif
         
-        call set_tube_bc(id,nx,gamma,Q2)
+        call set_bc(id,nx,gamma,Q2)
         
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
@@ -66,8 +69,10 @@ contains
         
         if (id_scheme == 1) then
           call calc_E_KEEP(id,nx,gamma,rho,u,p,E)
-        else
+        elseif (id_scheme == 1) then
           call calc_E_SLAU(nx,gamma,k,b,rho,u,p,E)
+        else
+          call calc_E_Roe(nx,gamma,k,b,rho,u,p,E)
         endif
         
         if (id_visc == 1) then
@@ -80,7 +85,7 @@ contains
           call calc_step2(nx,dtdx,E,Q,Q2,Q3)
         endif
 
-        call set_tube_bc(id,nx,gamma,Q3)
+        call set_bc(id,nx,gamma,Q3)
 
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
@@ -92,8 +97,10 @@ contains
 
         if (id_scheme == 1) then
           call calc_E_KEEP(id,nx,gamma,rho,u,p,E)
-        else
+        elseif (id_scheme == 2) then
           call calc_E_SLAU(nx,gamma,k,b,rho,u,p,E)
+        else
+          call calc_E_Roe(nx,gamma,k,b,rho,u,p,E)
         endif
         
         if (id_visc == 1) then
@@ -106,7 +113,7 @@ contains
           call calc_step3(nx,dtdx,E,Q3,Q)
         endif
         
-        call set_tube_bc(id,nx,gamma,Q)
+        call set_bc(id,nx,gamma,Q)
       enddo
       call print_vtk(t2,nx,dx,gamma,Q)
     enddo
