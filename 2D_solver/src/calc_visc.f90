@@ -50,8 +50,8 @@ contains
     call calc_kappa(T(i,j),T(i+1,j),kappa)
     E(i-offset+1,j-offset,2) = E(i-offset+1,j-offset,2) - txx
     E(i-offset+1,j-offset,3) = E(i-offset+1,j-offset,3) - txy
-    E(i-offset+1,j-offset,4) = E(i-offset+1,j-offset,4) - txx * 0.5d0 *(u(i,j) + u(i+1,j)) + txy * 0.5d0 *(v(i,j) + v(i+1,j)) &
-    & + kappa * (-T(i,j) + T(i+1,j))
+    E(i-offset+1,j-offset,4) = E(i-offset+1,j-offset,4) - txx * 0.5d0 *(u(i,j) + u(i+1,j)) - txy * 0.5d0 *(v(i,j) + v(i+1,j)) &
+    & - kappa * (-T(i,j) + T(i+1,j))
   end subroutine calc_Ev
   
   attributes(global) subroutine calc_Fv(u, v, T, F)
@@ -80,8 +80,8 @@ contains
     call calc_kappa(T(i,j),T(i,j+1),kappa)
     F(i-offset,j-offset+1,2) = F(i-offset,j-offset+1,2) - tyx
     F(i-offset,j-offset+1,3) = F(i-offset,j-offset+1,3) - tyy
-    F(i-offset,j-offset+1,4) = F(i-offset,j-offset+1,4) - tyx * 0.5d0 * (u(i,j) + u(i,j+1)) + tyy * 0.5d0 * (v(i,j) + v(i,j+1)) &
-    & + kappa * (-T(i,j) + T(i,j+1))
+    F(i-offset,j-offset+1,4) = F(i-offset,j-offset+1,4) - tyx * 0.5d0 * (u(i,j) + u(i,j+1)) - tyy * 0.5d0 * (v(i,j) + v(i,j+1)) &
+    & - kappa * (-T(i,j) + T(i,j+1))
   end subroutine calc_Fv
 end module calc_visc
 
