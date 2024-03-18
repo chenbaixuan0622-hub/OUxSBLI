@@ -61,6 +61,8 @@ Christian T. Jacobs, Satya P. Jammy, Neil D. Sandham, OpenSBLI: A framework for 
 <li><a href="https://arc.aiaa.org/doi/abs/10.2514/6.2009-3797">
 Yves Allaneau, Antony Jameson, Direct Numerical Simulations of a Two-Dimensional Viscous Flow in a Shocktube Using Kinetic Energy Preserving Scheme, 2012</a>
 </li>
+<li><a href="https://arc.aiaa.org/doi/10.2514/6.2023-0429">Yoshiharu Tamaki, Soshi Kawai, Wall-modeled LES of transonic buffet over NASA-CRM using Cartesian-grid-based flow solver FFVHC-ACE, 2023</a>
+</li>
 <li><a href="https://docs.nvidia.com/hpc-sdk/pgi-compilers/2017/pgi17cudaforug.pdf">
 CUDA FORTRAN PROGRAMMING GUIDE AND REFERENCE, 2017</a>
 </li>
