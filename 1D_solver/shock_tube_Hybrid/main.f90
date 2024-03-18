@@ -2,7 +2,7 @@ program main
   use, intrinsic :: iso_fortran_env
   use mod_globals, only : id_visc
   use set
-  use calc_time_dev
+  use calc_time_dev_hybrid
   implicit none
   integer nx, nt, np
   real(8) gamma, T, mu, kappa, Cv, Cp, U_ref, rho, rhol, rhor, pl, pr, Lx, dx, dt, non_dt

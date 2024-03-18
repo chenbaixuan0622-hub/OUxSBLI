@@ -1,8 +1,8 @@
-module calc_time_dev
+module calc_time_dev_hybrid
   implicit none
 contains
   subroutine RungeKutta(nx,nt,np,dx,dt,gamma,T0,Q)
-    use mod_globals, only : accuracy, offset, id_visc, id_scheme
+    use mod_globals, only : accuracy, offset, id_visc
     use calc_physical_quantities
     use calc_steps
     use calc_KEEP, calc_E_KEEP => calc_E
@@ -94,5 +94,5 @@ contains
       call print_vtk(t2,nx,dx,gamma,Q)
     enddo
   end subroutine RungeKutta
-end module calc_time_dev
+end module calc_time_dev_hybrid
 

@@ -22,7 +22,6 @@ contains
     real(8), dimension(nx,3) :: Q2, Q3
     real(8), dimension(nx) :: rho, u, p, T
     real(8) :: E(nx-accuracy+1,3)
-    real(8) :: Ev(nx-accuracy+1,3)
     dxi = 1.0d0 / dx
     dtdx = dt * dxi
 
@@ -48,14 +47,10 @@ contains
 
 
         if (id_visc == 1) then 
-          call calc_Ev(nx,dxi,u,T,Ev)
+          call calc_Ev(nx,dxi,u,T,E)
         endif
 
-        if (id_visc == 1) then
-          call calc_step1(nx,dtdx,E,Ev,Q,Q2)
-        else
-          call calc_step1(nx,dtdx,E,Q,Q2)
-        endif
+        call calc_step1(nx,dtdx,E,Q,Q2)
         
         call set_bc(id,nx,gamma,Q2)
         
@@ -76,14 +71,10 @@ contains
         endif
         
         if (id_visc == 1) then
-          call calc_Ev(nx,dxi,u,T,Ev)
+          call calc_Ev(nx,dxi,u,T,E)
         endif      
 
-        if (id_visc == 1) then
-          call calc_step2(nx,dtdx,E,Ev,Q,Q2,Q3)
-        else
-          call calc_step2(nx,dtdx,E,Q,Q2,Q3)
-        endif
+        call calc_step2(nx,dtdx,E,Q,Q2,Q3)
 
         call set_bc(id,nx,gamma,Q3)
 
@@ -104,14 +95,10 @@ contains
         endif
         
         if (id_visc == 1) then
-          call calc_Ev(nx,dxi,u,T,Ev)
+          call calc_Ev(nx,dxi,u,T,E)
         endif
 
-        if (id_visc == 1) then
-          call calc_step3(nx,dtdx,E,Ev,Q3,Q)
-        else
-          call calc_step3(nx,dtdx,E,Q3,Q)
-        endif
+        call calc_step3(nx,dtdx,E,Q3,Q)
         
         call set_bc(id,nx,gamma,Q)
       enddo
