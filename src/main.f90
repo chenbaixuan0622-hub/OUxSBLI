@@ -11,7 +11,7 @@ program main
   kappa = (2.334d-3 * T ** (1.5d0)) / (164.54d0 + T)
   Cp = 1030.5d0 - 0.19975d0 * T + 3.9734d-4 * T ** 2
   Cv = Cp / gamma
-  open(1, file="output.d")
+  open(1, file="./data/output.d")
   write(1,"('physical properties')")
   write(1,"('gamma =', f7.4)") gamma
   if (id_visc == 1) then
@@ -39,7 +39,7 @@ program main
   call RungeKutta(T0,Q)
   call cpu_time(t_end)
   
-  open(1,file="output.d",position='append')
+  open(1,file="./data/output.d",position='append')
   write(1,"('time info')")
   write(1,"('dt                       =', e12.4)") dt
   write(1,"('end time                 =', e12.4)") nt * np * dt

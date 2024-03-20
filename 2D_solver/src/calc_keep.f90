@@ -1,104 +1,88 @@
 module calc_keep
-  use mod_globals, only : nx, ny, gamma
+  use mod_globals, only : accuracy, offset, nx, ny, gamma
   use calc_term
   implicit none
-  interface calc_E
-    module procedure calc_E2, calc_E4
+  interface KEEP
+    module procedure KEEP_2nd, KEEP_4th
   end interface
-
-  interface calc_F
-    module procedure calc_F2, calc_F4
-  end interface
-
 contains
-  attributes(global) subroutine calc_E2(id, rho, u, v, p, E)
-    integer(kind=2), intent(in), value :: id
+  attributes(device) function KEEP_2nd(id_accuracy,id,rho,p,V,Normal) result(F)
+    integer(kind=2), intent(in), value :: id_accuracy
+    integer, intent(in), value :: id
+    real(8), intent(in), dimension(2), device :: rho, p, Normal
+    real(8), intent(in), dimension(2,2), device :: V
+    real(8), dimension(4) :: F
+    real(8) Rho_m, P_m, PRho
+    real(8), dimension(2) :: V_m
+    Rho_m = 0.5d0 * sum(rho(:))
+    V_m(1) = 0.5d0 * sum(V(:,1))
+    V_m(2) = 0.5d0 * sum(V(:,2))
+    P_m = 0.5d0 * sum(p(:))
+    PRho = 0.5d0 * sum(p(:) / rho(:))
+    F(1) = Rho_m * V_m(id)
+    F(2) = F(1) * V_m(1) + P_m * Normal(1)
+    F(3) = F(1) * V_m(2) + P_m * Normal(2)
+    F(4) = F(1) * PRho / (gamma - 1.d0) &
+    & + 0.5d0 * F(1) * (V(1,1) * V(2,1) + V(1,2) * V(2,2)) &
+    & + 0.5d0 * (V(1,id) * p(2) + V(2,id) * p(1))
+  end function KEEP_2nd
+
+  attributes(device) function KEEP_4th(id_accuracy,id,rho,p,V,Normal) result(F)
+    integer(kind=4), intent(in), value :: id_accuracy
+    integer, intent(in), value :: id
+    real(8), intent(in), dimension(4), device :: rho, p
+    real(8), intent(in), dimension(4,2), device :: V
+    real(8), intent(in), dimension(2), device :: Normal
+    real(8), dimension(4) :: F, PRho
+    real(8), dimension(3) :: RhoV, RhoVU_P, RhoVV_P, IE, Energy
+    RhoV(:) = RhoPhi(rho(:), V(:,id))
+    RhoVU_P(:) = RhoPhiU(RhoV(:), V(:,1)) + Phi(p(:)) * Normal(1)
+    RhoVV_P(:) = RHoPhiU(RhoV(:), V(:,2)) + Phi(p(:)) * Normal(2)
+    PRho(:) = p(:) / rho(:)
+    IE(:) = Phi(PRho(:)) / (gamma - 1.d0)
+    Energy(:) = IE(:) + RhoUPhiPhi(RhoV(:), V(:,1), V(:,2)) + PhiPsi(V(:,id), p(:))
+    F(1) = Flux(RhoV(:))
+    F(2) = Flux(RhoVU_P(:))
+    F(3) = Flux(RhoVV_P(:))
+    F(4) = Flux(Energy(:))
+  end function KEEP_4th
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  attributes(global) subroutine calc_E(id_accuracy, rho, u, v, p, E)
+    integer(kind=2), intent(in), value :: id_accuracy
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
-    real(8), intent(out), dimension(nx-1,ny-2,4), device :: E
+    real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,4), device :: E
     integer i, j
-    real(8) Rho_m, U_m, P_m
+    real(8), dimension(accuracy) :: rho_keep, p_keep
+    real(8), dimension(2) :: Normal = (/1.d0, 0.d0/)
+    real(8), dimension(accuracy,2) :: V_keep
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     
-    Rho_m = 0.5d0 * (rho(i,j) + rho(i+1,j))
-    U_m = 0.5d0 * (u(i,j) + u(i+1,j))
-    P_m = 0.5d0 * (p(i,j) + p(i+1,j))
-    E(i,j-1,1) = Rho_m * U_m
-    E(i,j-1,2) = E(i,j-1,1) * U_m + P_m
-    E(i,j-1,3) = E(i,j-1,1) * 0.5d0 * (v(i,j) + v(i+1,j))
-    E(i,j-1,4) = E(i,j-1,1) * P_m / ((gamma - 1.d0) * Rho_m) &
-    + 0.5d0 * E(i,j-1,1) * (u(i,j) * u(i+1,j) + v(i,j) * v(i+1,j)) &
-    + 0.5d0 * (u(i,j) * p(i+1,j) + u(i+1,j) * p(i,j))
-  end subroutine calc_E2
+    rho_keep = rho(i:i+accuracy-1,j)
+    p_keep = p(i:i+accuracy-1,j)
+    V_keep(:,1) = u(i:i+accuracy-1,j)
+    V_keep(:,2) = v(i:i+accuracy-1,j)
+    E(i,j-offset,:) = KEEP(id_accuracy,1,rho_keep,p_keep,V_keep,Normal)
+  end subroutine calc_E
 
-  attributes(global) subroutine calc_E4(id, rho, u, v, p, E)
-    integer(kind=4), intent(in), value :: id
+  attributes(global) subroutine calc_F(id_accuracy, rho, u, v, p, F)
+    integer(kind=2), intent(in), value :: id_accuracy
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
-    real(8), intent(out), dimension(nx-3,ny-4,4), device :: E
+    real(8), intent(out), dimension(nx-accuracy,ny-accuracy+1,4), device :: F
     integer i, j
-    real(8), dimension(3) :: RhoU, RhoUU_P, IE, Energy
-    real(8), dimension(4) :: rhos, us, vs, ps
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 2
+    real(8), dimension(accuracy) :: rho_keep, p_keep
+    real(8), dimension(2) :: Normal = (/0.d0, 1.d0/)
+    real(8), dimension(accuracy,2) :: V_keep
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     
-    rhos(:) = rho(i:i+3,j)
-    us(:) = u(i:i+3,j)
-    vs(:) = v(i:i+3,j)
-    ps(:) = p(i:i+3,j)
-    RhoU(:)  = RhoPhi(rhos(:), us(:))
-    RhoUU_P(:) = RhoPhiU(RhoU(:), us(:)) + Phi(ps(:))
-    IE(:) = p(i:i+3,j) / ((gamma - 1.d0) * rho(i:i+3,j))
-    Energy(:) = IE(:) + RhoUPhiPhi(RhoU(:), us(:), vs(:)) + PhiPsi(us(:), ps(:))
-    E(i,j-2,1) = Flux(RhoU(:))
-    E(i,j-2,2) = Flux(RhoUU_P(:))
-    E(i,j-2,3) = Flux(RhoPhiU(RhoU(:), vs(:)))
-    E(i,j-2,4) = Flux(Energy(:))
-  end subroutine calc_E4
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-  attributes(global) subroutine calc_F2(id, rho, u, v, p, F)
-    integer(kind=2), intent(in), value :: id
-    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
-    real(8), intent(out), device :: F(nx-2,ny-1,4)
-    integer i, j
-    real(8) Rho_m, V_m, P_m
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y
-
-    Rho_m = 0.5d0 * (rho(i,j) + rho(i,j+1))
-    V_m = 0.5d0 * (v(i,j) + v(i,j+1))
-    P_m = 0.5d0 * (p(i,j) + p(i,j+1))
-    F(i-1,j,1) = Rho_m * V_m
-    F(i-1,j,2) = F(i-1,j,1) * 0.5d0 * (u(i,j) + u(i,j+1))
-    F(i-1,j,3) = F(i-1,j,1) * V_m + P_m
-    F(i-1,j,4) = F(i-1,j,1) * P_m / ((gamma - 1.d0) * Rho_m) &
-    + 0.5d0 * F(i-1,j,1) * (u(i,j) * u(i,j+1) + v(i,j) * v(i,j+1)) &
-    + 0.5d0 * (v(i,j) * p(i,j+1) + v(i,j+1) * p(i,j))
-  end subroutine calc_F2
-
-  attributes(global) subroutine calc_F4(id, rho, u, v, p, F)
-    integer(kind=4), intent(in), value :: id
-    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
-    real(8), intent(out), device :: F(nx-4,ny-3,5)
-    integer i, j
-    real(8), dimension(3) :: RhoV, RhoVV_P, IE, Energy
-    real(8), dimension(4) :: rhos, us, vs, ps
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 2
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y
-
-    rhos(:) = rho(i,j:j+3)
-    us(:) = u(i,j:j+3)
-    vs(:) = v(i,j:j+3)
-    ps(:) = p(i,j:j+3)
-    RhoV(:) = RhoPhi(rhos(:), vs(:))
-    RhoVV_P(:) = RhoPhiU(RhoV(:), vs(:)) + Phi(ps(:))
-    IE(:) = p(i,j:j+3) / ((gamma - 1.0d0) * rho(i,j:j+3))
-    Energy(:) = IE(:) + RhoUPhiPhi(RhoV(:), us(:), vs(:)) + PhiPsi(vs(:), ps(:))
-    F(i-2,j,1) = Flux(RhoV(:))
-    F(i-2,j,2) = Flux(RhoPhiU(RhoV(:), us(:)))
-    F(i-2,j,3) = Flux(RhoVV_P(:))
-    F(i-2,j,4) = Flux(Energy(:))
-  end subroutine calc_F4
+    rho_keep = rho(i,j:j+accuracy-1)
+    p_keep = p(i,j:j+accuracy-1)
+    V_keep(:,1) = u(i,j:j+accuracy-1)
+    V_keep(:,2) = v(i,j:j+accuracy-1)
+    F(i-offset,j,:) = KEEP(id_accuracy,2,rho_keep,p_keep,V_keep,Normal)
+  end subroutine calc_F
 end module calc_keep
 

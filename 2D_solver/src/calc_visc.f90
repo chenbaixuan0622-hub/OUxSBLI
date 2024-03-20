@@ -1,5 +1,5 @@
 module calc_visc
-  use mod_globals, only : accuracy, id_turbulence, nx, ny, dxi, dyi
+  use mod_globals, only : accuracy, offset, id_turbulence, nx, ny, dxi, dyi
   use calc_Sutherland
   implicit none
 contains
@@ -27,11 +27,10 @@ contains
   attributes(global) subroutine calc_Ev(u, v, T, E)
     real(8), intent(in), dimension(nx,ny), device :: u, v, T
     real(8), intent(inout), dimension(nx-accuracy+1,ny-accuracy,4), device :: E
-    integer i, j, offset
+    integer i, j
     real(8) mux, muy1, muy2, kappa
     real(8) ux, uy, vx, vy, txx, txy
-    offset = accuracy / 2
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset - 1
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
 
     ! x direction
@@ -48,21 +47,20 @@ contains
     txx = 2.d0 * (2.d0 * ux - vy) / 3.d0
     txy = uy + vx
     call calc_kappa(T(i,j),T(i+1,j),kappa)
-    E(i-offset+1,j-offset,2) = E(i-offset+1,j-offset,2) - txx
-    E(i-offset+1,j-offset,3) = E(i-offset+1,j-offset,3) - txy
-    E(i-offset+1,j-offset,4) = E(i-offset+1,j-offset,4) - txx * 0.5d0 *(u(i,j) + u(i+1,j)) - txy * 0.5d0 *(v(i,j) + v(i+1,j)) &
+    E(i-offset,j-offset,2) = E(i-offset,j-offset,2) - txx
+    E(i-offset,j-offset,3) = E(i-offset,j-offset,3) - txy
+    E(i-offset,j-offset,4) = E(i-offset,j-offset,4) - txx * 0.5d0 *(u(i,j) + u(i+1,j)) - txy * 0.5d0 *(v(i,j) + v(i+1,j)) &
     & - kappa * (-T(i,j) + T(i+1,j))
   end subroutine calc_Ev
   
   attributes(global) subroutine calc_Fv(u, v, T, F)
     real(8), intent(in), dimension(nx,ny), device :: u, v, T
     real(8), intent(inout), device :: F(nx-accuracy,ny-accuracy+1,4)
-    integer i, j, offset
+    integer i, j
     real(8) muy, mux1, mux2, kappa
     real(8) ux, uy, vx, vy, tyx, tyy
-    offset = accuracy / 2
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
 
     ! y direction
     call calc_mu(T(i,j),T(i,j+1),muy)
@@ -78,9 +76,9 @@ contains
     tyx = uy + vx
     tyy = 2.d0 * (2.d0 * vy - ux) / 3.d0
     call calc_kappa(T(i,j),T(i,j+1),kappa)
-    F(i-offset,j-offset+1,2) = F(i-offset,j-offset+1,2) - tyx
-    F(i-offset,j-offset+1,3) = F(i-offset,j-offset+1,3) - tyy
-    F(i-offset,j-offset+1,4) = F(i-offset,j-offset+1,4) - tyx * 0.5d0 * (u(i,j) + u(i,j+1)) - tyy * 0.5d0 * (v(i,j) + v(i,j+1)) &
+    F(i-offset,j-offset,2) = F(i-offset,j-offset,2) - tyx
+    F(i-offset,j-offset,3) = F(i-offset,j-offset,3) - tyy
+    F(i-offset,j-offset,4) = F(i-offset,j-offset,4) - tyx * 0.5d0 * (u(i,j) + u(i,j+1)) - tyy * 0.5d0 * (v(i,j) + v(i,j+1)) &
     & - kappa * (-T(i,j) + T(i,j+1))
   end subroutine calc_Fv
 end module calc_visc
