@@ -1,6 +1,7 @@
 module mod_globals
   use cudafor
   implicit none
+  integer, parameter :: dimension = 2
   integer, parameter :: accuracy = 2 ! only 2nd-order accuracy is available
   integer, parameter :: offset = accuracy / 2
   integer, parameter :: id_visc = 1
@@ -25,14 +26,12 @@ module mod_globals
 
   ! GPU
   type(dim3) :: blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/5,1)
-  type(dim3) :: blocksF = dim3((nx-accuracy)/5,(ny-accuracy+1)/32,1)
-  type(dim3) :: blocks = dim3((nx-accuracy)/5,(ny-accuracy)/5,1)
+  type(dim3) :: blocksF = dim3((nx-accuracy)/11,(ny-accuracy+1)/32,1)
   type(dim3) :: threadsE = dim3(32,5,1)
   type(dim3) :: threadsF = dim3(11,32,1)
-  type(dim3) :: threads = dim3(11,5,1)
 
   ! time
-  integer, parameter :: nt = 1
+  integer, parameter :: nt = 2000
   integer, parameter :: np = 10
   real(8), parameter :: dt = 0.00001d0
 
@@ -42,6 +41,10 @@ module mod_globals
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
+
+  ! MUSCL
+  real(8), parameter :: k = -1.d0
+  real(8), parameter :: b = (3.d0 - k) / (1.d0 - k)
 
   ! initial condition
   real(8), parameter :: T = 300.d0

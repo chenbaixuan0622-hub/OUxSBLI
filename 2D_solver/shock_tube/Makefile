@@ -22,7 +22,11 @@ OBJ =	mod_globals.o \
 	calc_muscl.o \
 	calc_common.o \
 	calc_keep.o \
-	calc_slau.o \
+  calc_qlr.o \
+  calc_mat.o \
+  calc_slau.o \
+  calc_roe.o \
+  calc_riemann_solver.o \
 	calc_steps.o \
 	print.o \
 	calc_time_dev.o \
@@ -35,9 +39,12 @@ $(TARGET): $(OBJ)
 		$(LINK.f) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 set.o: mod_globals.mod
-calc_KEEP.o: calc_term.mod
+calc_keep.o: calc_term.mod
 calc_visc.o: calc_sutherland.mod
-calc_SLAU.o: calc_muscl.mod calc_common.mod
+calc_qlr.o: mod_globals.mod calc_muscl.mod
+calc_slau.o: calc_common.mod
+calc_roe.o: mod_globals.mod calc_common.mod
+calc_riemann_solver.o: mod_globals.mod calc_qlr.mod calc_roe.mod calc_slau.mod calc_mat.mod
 calc_time_dev.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_keep.mod calc_slau.mod calc_visc.mod calc_steps.mod print.mod
 main.o: main.f90 mod_globals.mod set.mod calc_time_dev.mod
 

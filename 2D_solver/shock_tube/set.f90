@@ -1,4 +1,5 @@
 module set
+  use cudafor
   use mod_globals, only : nx, ny, gamma
   implicit none
 contains
@@ -18,10 +19,8 @@ contains
 
   subroutine set_bc(Q)
     real(8), intent(inout), device :: Q(nx,ny,4)
-    real(8) p_bottom
     integer i, j, k
-    !$acc kernels deviceptr(Q)
-    !$acc loop collapse(2)
+    !$cuf kernel do <<<*,*>>>
     do k = 1, 4
       do j = 2, ny-1
         ! inlet
@@ -31,18 +30,15 @@ contains
       enddo
     enddo
 
-    !$acc loop independent
-    do i = 1, nx
-      ! bottom-wall
-      Q(i,1,1) = Q(i,2,1)
-      Q(i,1,2) = 0.d0
-      Q(i,1,3) = 0.d0
-      p_bottom = (gamma - 1.d0) * (Q(i,2,4) - 0.5d0 * (Q(i,2,2)**2 + Q(i,2,3)**2) / Q(i,2,1))
-      Q(i,1,4) = p_bottom / (gamma - 1.d0)
-      ! top-wall (symmetry, ny-1 is the symmetry axis)
-      Q(i,ny,:) = Q(i,ny-2,:)
+    !$cuf kernel do <<<*,*>>>
+    do k = 1, 4
+      do i = 1, nx
+        ! bottom-wall
+        Q(i,1,k) = Q(i,2,k)
+        ! top-wall
+        Q(i,ny,k) = Q(i,ny-1,k)
+      enddo
     enddo
-    !$acc end kernels
   end subroutine set_bc
 end module set
 

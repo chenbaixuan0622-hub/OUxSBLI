@@ -20,11 +20,11 @@ contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  attributes(device) function enthalpy(e,p,rho) result(h)
+  attributes(device) function ENTHALPY(e,p,rho) result(H)
     real(8), intent(in), value :: e, p, rho
-    real(8) :: h
-    h = (e + p) / rho
-  end function enthalpy
+    real(8) :: H
+    H = (e + p) / rho
+  end function ENTHALPY
 
   attributes(device) function speed_of_sound(p,rho) result(c)
     real(8), intent(in), value :: p, rho
