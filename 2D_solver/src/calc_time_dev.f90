@@ -14,7 +14,7 @@ contains
     real(8), intent(inout) :: Q(nx,ny,4)
     real(8), intent(in) :: T0(nx,ny)
     integer t1, t2, itr, stat
-    integer(kind=2**(accuracy/2)) :: id
+    integer(kind=2**(accuracy/2)) :: id_accuracy
     real(8), dimension(nx,ny,4), device :: Q_d, Q2, Q3
     real(8), dimension(nx,ny), device :: rho, u, v, p, T
     real(8), device :: E(nx-accuracy+1,ny-accuracy,4)
@@ -29,11 +29,11 @@ contains
         !print *, trim(cudaGetErrorString(cudaGetLastError()))
 
         if (id_scheme == 1) then
-          call calc_E_KEEP<<<blocksE,threadsE>>>(id,rho,u,v,p,E)
-          call calc_F_KEEP<<<blocksF,threadsF>>>(id,rho,u,v,p,F)
+          call calc_E_KEEP<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
+          call calc_F_KEEP<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
         else
-          call calc_E_Riemann<<<blocksE,threadsE>>>(id,rho,u,v,p,E)
-          call calc_F_Riemann<<<blocksF,threadsF>>>(id,rho,u,v,p,F)
+          call calc_E_Riemann<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
+          call calc_F_Riemann<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
         endif
         stat = cudaDeviceSynchronize()
 
@@ -51,11 +51,11 @@ contains
         call calc_quantities(Q2,rho,u,v,p,T)
         
         if (id_scheme == 1) then
-          call calc_E_KEEP<<<blocksE,threadsE>>>(id,rho,u,v,p,E)
-          call calc_F_KEEP<<<blocksF,threadsF>>>(id,rho,u,v,p,F)
+          call calc_E_KEEP<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
+          call calc_F_KEEP<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
         else
-          call calc_E_Riemann<<<blocksE,threadsE>>>(id,rho,u,v,p,E)
-          call calc_F_Riemann<<<blocksF,threadsF>>>(id,rho,u,v,p,F)
+          call calc_E_Riemann<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
+          call calc_F_Riemann<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
         endif
         stat = cudaDeviceSynchronize()
         
@@ -73,11 +73,11 @@ contains
         call calc_quantities(Q3,rho,u,v,p,T)
 
         if (id_scheme == 1) then
-          call calc_E_KEEP<<<blocksE,threadsE>>>(id,rho,u,v,p,E)
-          call calc_F_KEEP<<<blocksF,threadsF>>>(id,rho,u,v,p,F)
+          call calc_E_KEEP<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
+          call calc_F_KEEP<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
         else
-          call calc_E_Riemann<<<blocksE,threadsE>>>(id,rho,u,v,p,E)
-          call calc_F_Riemann<<<blocksF,threadsF>>>(id,rho,u,v,p,F)
+          call calc_E_Riemann<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
+          call calc_F_Riemann<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
         endif
         stat = cudaDeviceSynchronize()
 
