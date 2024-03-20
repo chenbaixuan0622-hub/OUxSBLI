@@ -20,7 +20,7 @@ contains
     d1(:) = -Q1(:) + Q2(:)
     d2(:) = -Q2(:) + Q3(:)
     d3(:) = -Q3(:) + Q4(:)
-    call MUSCL(dim+2,k,b,Q1,Q2,d1,d2,d3,Ql,Qr)
+    call MUSCL(dim+2,k,b,Q2,Q3,d1,d2,d3,Ql,Qr)
   end subroutine Qlr_mid
   
   attributes(device) subroutine Qlr_right(Q1,Q2,Q3,Ql,Qr)
@@ -30,7 +30,7 @@ contains
     d1(:) = -Q1(:) + Q2(:)
     d2(:) = -Q2(:) + Q3(:)
     d3(:) = 0.d0
-    call MUSCL(dim+2,k,b,Q1,Q2,d1,d2,d3,Ql,Qr)
+    call MUSCL(dim+2,k,b,Q2,Q3,d1,d2,d3,Ql,Qr)
   end subroutine Qlr_right
 end module calc_qlr
 

@@ -3,8 +3,7 @@ module calc_time_dev
 contains
   subroutine RungeKutta(T0,Q)
     use cudafor
-    use mod_globals, only : accuracy, id_visc, id_scheme, nx, ny, nt, np, &
-            & blocksE, blocksF, threadsE, threadsF
+    use mod_globals, only : accuracy, id_visc, id_scheme, nx, ny, nt, np, blocksE, blocksF, threadsE, threadsF
     use calc_physical_quantities
     use calc_steps
     use calc_KEEP, calc_E_KEEP => calc_E, calc_F_KEEP => calc_F
@@ -36,14 +35,12 @@ contains
           call calc_E_Riemann<<<blocksE,threadsE>>>(id,rho,u,v,p,E)
           call calc_F_Riemann<<<blocksF,threadsF>>>(id,rho,u,v,p,F)
         endif
-
         stat = cudaDeviceSynchronize()
 
         if (id_visc == 1) then 
           call calc_Ev<<<blocksE,threadsE>>>(u,v,T,E)
           call calc_Fv<<<blocksF,threadsF>>>(u,v,T,F)
         endif
-
         stat = cudaDeviceSynchronize()
 
         call calc_step1(E,F,Q_d,Q2)
@@ -60,14 +57,12 @@ contains
           call calc_E_Riemann<<<blocksE,threadsE>>>(id,rho,u,v,p,E)
           call calc_F_Riemann<<<blocksF,threadsF>>>(id,rho,u,v,p,F)
         endif
-        
         stat = cudaDeviceSynchronize()
         
         if (id_visc == 1) then
           call calc_Ev<<<blocksE,threadsE>>>(u,v,T,E)
           call calc_Fv<<<blocksF,threadsF>>>(u,v,T,F)
         endif      
-        
         stat = cudaDeviceSynchronize()
 
         call calc_step2(E,F,Q_d,Q2,Q3)
@@ -84,14 +79,12 @@ contains
           call calc_E_Riemann<<<blocksE,threadsE>>>(id,rho,u,v,p,E)
           call calc_F_Riemann<<<blocksF,threadsF>>>(id,rho,u,v,p,F)
         endif
-        
         stat = cudaDeviceSynchronize()
 
         if (id_visc == 1) then
           call calc_Ev<<<blocksE,threadsE>>>(u,v,T,E)
           call calc_Fv<<<blocksF,threadsF>>>(u,v,T,F)
         endif
-        
         stat = cudaDeviceSynchronize()
 
         call calc_step3(E,F,Q3,Q_d)
