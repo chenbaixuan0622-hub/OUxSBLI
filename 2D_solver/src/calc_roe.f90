@@ -13,9 +13,7 @@ contains
     real(8) rhol, rhor, pl, pr, el, er, Hl, Hr, rho_ave, H_ave, c_ave
     real(8), dimension(2) :: Vl, Vr, V_ave
     real(8) mat(4,4)
-
     call set_q(Qsl,Qsr,rhol,rhor,pl,pr,Vl,Vr)
-
     el = energy(pl,rhol,Vl(1),Vl(2))
     er = energy(pr,rhor,Vr(1),Vr(2))
     Hl = ENTHALPY(el,pl,rhol)
@@ -32,17 +30,14 @@ contains
 
     Fl(1) = rhol * Vl(id_dim)
     Fr(1) = rhor * Vr(id_dim)
-    Fl(2) = Fl(1) * Vl(1)
-    Fr(2) = Fr(1) * Vr(1)
-    Fl(3) = Fl(1) * Vl(2)
-    Fr(3) = Fr(1) * Vr(2)
+    Fl(2:3) = (/Fl(1) * Vl(1), Fl(1) * Vl(2)/)
+    Fr(2:3) = (/Fr(1) * Vr(1), Fr(1) * Vr(2)/)
     Fl(4) = (el + pl) * Vl(id_dim)
     Fr(4) = (er + pr) * Vr(id_dim)
     Fl(:) = Fl(:) + pl * Normal(:)
     Fr(:) = Fr(:) + pr * Normal(:)
 
     mat = calc_AB(id_dim, rho_ave, H_ave, c_ave, V_ave)
-
     F(:) = 0.5d0 * (Fl(:) + Fr(:) - matmul(mat(:,:), Qr(:) - Ql(:)))
   end function Roe
 end module calc_roe

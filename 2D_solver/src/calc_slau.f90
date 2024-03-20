@@ -46,7 +46,7 @@ contains
       beta_m = 0.5d0 * (1.d0 + sign(1.d0, -M_m))
     endif
     Pressure = 0.5d0 * (pl + pr + (beta_p - beta_m) * (pl - pr) + (1.d0 - x) * (beta_p + beta_m - 1.d0) * (pl + pr))
-    phil(:) = (/1.d0, Vl(1), Vr(2), Hl/)
+    phil(:) = (/1.d0, Vl(1), Vl(2), Hl/)
     phir(:) = (/1.d0, Vr(1), Vr(2), Hr/)
     Flux(:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:)) + Pressure * Normal(:)
   end function SLAU
