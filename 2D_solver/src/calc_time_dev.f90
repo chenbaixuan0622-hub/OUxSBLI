@@ -3,11 +3,11 @@ module calc_time_dev
 contains
   subroutine RungeKutta(T0,Q)
     use cudafor
-    use mod_globals, only : accuracy, id_visc, id_scheme, nx, ny, nt, np, blocksE, blocksF, threadsE, threadsF
+    use mod_globals, only : accuracy, id_muscl, id_visc, nx, ny, nt, np, blocksE, blocksF, threadsE, threadsF
     use calc_physical_quantities
     use calc_steps
-    use calc_KEEP, calc_E_KEEP => calc_E, calc_F_KEEP => calc_F
-    use calc_riemann_solver, calc_E_Riemann => calc_E, calc_F_Riemann => calc_F
+    use calc_KEEP
+    use calc_riemann_solver
     use calc_visc
     use set
     use print
@@ -28,12 +28,12 @@ contains
         call calc_quantities(Q_d,rho,u,v,p,T)
         !print *, trim(cudaGetErrorString(cudaGetLastError()))
 
-        if (id_scheme == 1) then
-          call calc_E_KEEP<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
-          call calc_F_KEEP<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
+        if (id_muscl == 0) then
+          call calc_E_NoMUSCL<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
+          call calc_F_NoMUSCL<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
         else
-          call calc_E_Riemann<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
-          call calc_F_Riemann<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
+          call calc_E_MUSCL<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
+          call calc_F_MUSCL<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
         endif
         stat = cudaDeviceSynchronize()
 
@@ -50,12 +50,12 @@ contains
         
         call calc_quantities(Q2,rho,u,v,p,T)
         
-        if (id_scheme == 1) then
-          call calc_E_KEEP<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
-          call calc_F_KEEP<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
+        if (id_muscl == 0) then
+          call calc_E_NoMUSCL<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
+          call calc_F_NoMUSCL<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
         else
-          call calc_E_Riemann<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
-          call calc_F_Riemann<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
+          call calc_E_MUSCL<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
+          call calc_F_MUSCL<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
         endif
         stat = cudaDeviceSynchronize()
         
@@ -72,12 +72,12 @@ contains
         
         call calc_quantities(Q3,rho,u,v,p,T)
 
-        if (id_scheme == 1) then
-          call calc_E_KEEP<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
-          call calc_F_KEEP<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
+        if (id_muscl == 0) then
+          call calc_E_NoMUSCL<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
+          call calc_F_NoMUSCL<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
         else
-          call calc_E_Riemann<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
-          call calc_F_Riemann<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
+          call calc_E_MUSCL<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
+          call calc_F_MUSCL<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
         endif
         stat = cudaDeviceSynchronize()
 

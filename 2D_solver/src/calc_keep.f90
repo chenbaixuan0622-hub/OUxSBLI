@@ -49,40 +49,40 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  attributes(global) subroutine calc_E(id_accuracy, rho, u, v, p, E)
-    integer(kind=2), intent(in), value :: id_accuracy
+  attributes(global) subroutine calc_E_NoMUSCL(id_accuracy, rho, u, v, p, E)
+    integer(kind=accuracy), intent(in), value :: id_accuracy
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
     real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,4), device :: E
     integer i, j
-    real(8), dimension(accuracy) :: rho_keep, p_keep
+    real(8), dimension(accuracy) :: rhos, ps
     real(8), dimension(2) :: Normal = (/1.d0, 0.d0/)
-    real(8), dimension(accuracy,2) :: V_keep
+    real(8), dimension(accuracy,2) :: Vs
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     
-    rho_keep = rho(i:i+accuracy-1,j)
-    p_keep = p(i:i+accuracy-1,j)
-    V_keep(:,1) = u(i:i+accuracy-1,j)
-    V_keep(:,2) = v(i:i+accuracy-1,j)
-    E(i,j-offset,:) = KEEP(id_accuracy,1,rho_keep,p_keep,V_keep,Normal)
-  end subroutine calc_E
+    rhos = rho(i:i+accuracy-1,j)
+    ps = p(i:i+accuracy-1,j)
+    Vs(:,1) = u(i:i+accuracy-1,j)
+    Vs(:,2) = v(i:i+accuracy-1,j)
+    E(i,j-offset,:) = KEEP(id_accuracy,1,rhos,ps,Vs,Normal)
+  end subroutine calc_E_NoMUSCL
 
-  attributes(global) subroutine calc_F(id_accuracy, rho, u, v, p, F)
-    integer(kind=2), intent(in), value :: id_accuracy
+  attributes(global) subroutine calc_F_NoMUSCL(id_accuracy, rho, u, v, p, F)
+    integer(kind=accuracy), intent(in), value :: id_accuracy
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
     real(8), intent(out), dimension(nx-accuracy,ny-accuracy+1,4), device :: F
     integer i, j
-    real(8), dimension(accuracy) :: rho_keep, p_keep
+    real(8), dimension(accuracy) :: rhos, ps
     real(8), dimension(2) :: Normal = (/0.d0, 1.d0/)
-    real(8), dimension(accuracy,2) :: V_keep
+    real(8), dimension(accuracy,2) :: Vs
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     
-    rho_keep = rho(i,j:j+accuracy-1)
-    p_keep = p(i,j:j+accuracy-1)
-    V_keep(:,1) = u(i,j:j+accuracy-1)
-    V_keep(:,2) = v(i,j:j+accuracy-1)
-    F(i-offset,j,:) = KEEP(id_accuracy,2,rho_keep,p_keep,V_keep,Normal)
-  end subroutine calc_F
+    rhos = rho(i,j:j+accuracy-1)
+    ps = p(i,j:j+accuracy-1)
+    Vs(:,1) = u(i,j:j+accuracy-1)
+    Vs(:,2) = v(i,j:j+accuracy-1)
+    F(i-offset,j,:) = KEEP(id_accuracy,2,rhos,ps,Vs,Normal)
+  end subroutine calc_F_NoMUSCL
 end module calc_keep
 

@@ -5,7 +5,7 @@ module calc_riemann_solver
   use calc_roe
   implicit none
 contains
-  attributes(global) subroutine calc_E(id_accuracy, rho, u, v, p, E)
+  attributes(global) subroutine calc_E_MUSCL(id_accuracy, rho, u, v, p, E)
     integer(kind=accuracy), intent(in), value :: id_accuracy
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
     real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,4), device :: E
@@ -32,9 +32,9 @@ contains
 
     !E(i,j-offset,:) = SLAU(1,Ql,Qr,Normal)
     E(i,j-offset,:) = Roe(1,Ql,Qr,Normal)
-  end subroutine calc_E
+  end subroutine calc_E_MUSCL
 
-  attributes(global) subroutine calc_F(id_accuracy, rho, u, v, p, F)
+  attributes(global) subroutine calc_F_MUSCL(id_accuracy, rho, u, v, p, F)
     integer(kind=accuracy), intent(in), value :: id_accuracy
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
     real(8), intent(out), dimension(nx-accuracy,ny-accuracy+1,4), device :: F
@@ -61,6 +61,6 @@ contains
 
     !F(i-offset,j,:) = SLAU(2,Ql,Qr,Normal)
     F(i-offset,j,:) = Roe(2,Ql,Qr,Normal)
-  end subroutine calc_F
+  end subroutine calc_F_MUSCL
 end module calc_riemann_solver
 

@@ -9,6 +9,7 @@ module mod_globals
   ! id_scheme ! 1  KEEP !
   !           ! 2  SLAU !
   !!!!!!!!!!!!!!!!!!!!!!!
+  integer, parameter :: id_muscl = 1
   integer, parameter :: id_scheme = 2
 
   ! mesh
@@ -31,9 +32,9 @@ module mod_globals
   type(dim3) :: threadsF = dim3(11,32,1)
 
   ! time
-  integer, parameter :: nt = 2000
+  integer, parameter :: nt = 200
   integer, parameter :: np = 10
-  real(8), parameter :: dt = 0.00001d0
+  real(8), parameter :: dt = 0.0001d0
 
   real(8), parameter :: dtdx = dt / dx
   real(8), parameter :: dtdy = dt / dy
