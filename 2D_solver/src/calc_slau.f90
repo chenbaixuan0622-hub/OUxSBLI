@@ -3,14 +3,13 @@ module calc_slau
   use calc_physical_quantities
   implicit none
 contains
-  attributes(device) function SLAU(dim,Ql,Qr,Normal) result(Flux)
-    integer, intent(in), value :: dim ! x:1, y:2
+  attributes(device) function SLAU(id_dim,Ql,Qr,Normal) result(F)
+    integer, intent(in), value :: id_dim ! x:1, y:2
     real(8), intent(in), dimension(4), device :: Ql, Qr, Normal
-    real(8) :: Flux(4)
     real(8) rhol, rhor, pl, pr, el, er, Hl, Hr, cl, cr, c
     real(8) vn, V_p, V_m, V_bar, V_bar_p, V_bar_m, M_p, M_m, M, x, g, dp, mass, beta_p, beta_m, Pressure
     real(8), dimension(2) :: Vl, Vr
-    real(8), dimension(4) :: phil, phir
+    real(8), dimension(4) :: phil, phir, F
 
     call set_q(Ql,Qr,rhol,rhor,pl,pr,Vl,Vr)
 
@@ -23,8 +22,8 @@ contains
     c = 0.5d0 * (cl + cr)
     ! What is vn?
     vn = 0.d0
-    V_p = Vl(dim) - vn
-    V_m = Vr(dim) - vn
+    V_p = Vl(id_dim) - vn
+    V_m = Vr(id_dim) - vn
     M_p = V_p / c
     M_m = V_m / c
     M = min(1.d0, sqrt(0.5d0 * (M_p ** 2 + M_m ** 2)))
@@ -34,7 +33,7 @@ contains
     V_bar_p = abs((1.d0 - g) * V_bar + g * V_p)
     V_bar_m = abs((1.d0 - g) * V_bar + g * V_m)
     dp = pr - pl
-    mass = 0.5d0 * (rhol * (Vl(dim) + V_bar_p) + rhor * (Vr(dim) - V_bar_m) - x * dp / c)
+    mass = 0.5d0 * (rhol * (Vl(id_dim) + V_bar_p) + rhor * (Vr(id_dim) - V_bar_m) - x * dp / c)
     if (abs(M_p) < 1.d0) then
       beta_p = 0.25d0 * (2.d0 - M_p) * (M_p + 1.d0) ** 2
     else
@@ -48,7 +47,7 @@ contains
     Pressure = 0.5d0 * (pl + pr + (beta_p - beta_m) * (pl - pr) + (1.d0 - x) * (beta_p + beta_m - 1.d0) * (pl + pr))
     phil(:) = (/1.d0, Vl(1), Vl(2), Hl/)
     phir(:) = (/1.d0, Vr(1), Vr(2), Hr/)
-    Flux(:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:)) + Pressure * Normal(:)
+    F(:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:)) + Pressure * Normal(:)
   end function SLAU
 end module calc_slau
 
