@@ -3,6 +3,21 @@ module calc_slau
   use calc_physical_quantities
   implicit none
 contains
+  attributes(device) subroutine calc_beta(M_p,M_m,beta_p,beta_m)
+    real(8), intent(in), value :: M_p, M_m
+    real(8), intent(out) :: beta_p, beta_m
+    if (abs(M_p) < 1.d0) then
+      beta_p = 0.25d0 * (2.d0 - M_p) * (M_p + 1.d0) ** 2
+    else
+      beta_p = 0.5d0 * (1.d0 + sign(1.d0, M_p))
+    endif
+    if (abs(M_m) < 1.d0) then
+      beta_m = 0.25d0 * (2.d0 + M_m) * (M_m - 1.d0) ** 2
+    else
+      beta_m = 0.5d0 * (1.d0 + sign(1.d0, -M_m))
+    endif
+  end subroutine calc_beta
+
   attributes(device) function SLAU(id_dim,Ql,Qr,Normal) result(F)
     integer, intent(in), value :: id_dim ! x:1, y:2
     real(8), intent(in), dimension(4), device :: Ql, Qr, Normal
@@ -33,17 +48,8 @@ contains
     V_bar_p = abs((1.d0 - g) * V_bar + g * V_p)
     V_bar_m = abs((1.d0 - g) * V_bar + g * V_m)
     dp = pr - pl
+    call calc_beta(M_p,M_m,beta_p,beta_m)
     mass = 0.5d0 * (rhol * (Vl(id_dim) + V_bar_p) + rhor * (Vr(id_dim) - V_bar_m) - x * dp / c)
-    if (abs(M_p) < 1.d0) then
-      beta_p = 0.25d0 * (2.d0 - M_p) * (M_p + 1.d0) ** 2
-    else
-      beta_p = 0.5d0 * (1.d0 + sign(1.d0, M_p))
-    endif
-    if (abs(M_m) < 1.d0) then
-      beta_m = 0.25d0 * (2.d0 + M_m) * (M_m - 1.d0) ** 2
-    else
-      beta_m = 0.5d0 * (1.d0 + sign(1.d0, -M_m))
-    endif
     Pressure = 0.5d0 * (pl + pr + (beta_p - beta_m) * (pl - pr) + (1.d0 - x) * (beta_p + beta_m - 1.d0) * (pl + pr))
     phil(:) = (/1.d0, Vl(1), Vl(2), Hl/)
     phir(:) = (/1.d0, Vr(1), Vr(2), Hr/)
