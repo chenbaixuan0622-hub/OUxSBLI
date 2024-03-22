@@ -3,6 +3,18 @@ module calc_slau
   use calc_physical_quantities
   implicit none
 contains
+  attributes(device) subroutine calc_quantities_AUSM(pl,pr,rhol,rhor,Vl,Vr,el,er,Hl,Hr,cl,cr)
+    real(8), intent(in), value :: pl, pr, rhol, rhor
+    real(8), intent(in), dimension(2) :: Vl, Vr
+    real(8), intent(out) :: el, er, Hl, Hr, cl, cr
+    el = energy(pl,rhol,Vl(1),Vl(2))
+    er = energy(pr,rhor,Vr(1),Vr(2))
+    Hl = ENTHALPY(el,pl,rhol)
+    Hr = ENTHALPY(er,pr,rhor)
+    cl = speed_of_sound(pl,rhol)
+    cr = speed_of_sound(pr,rhor)
+  end subroutine calc_quantities_AUSM
+
   attributes(device) subroutine calc_beta(M_p,M_m,beta_p,beta_m)
     real(8), intent(in), value :: M_p, M_m
     real(8), intent(out) :: beta_p, beta_m
@@ -18,22 +30,27 @@ contains
     endif
   end subroutine calc_beta
 
+  attributes(device) function flux_AUSM(m,p,Hl,Hr,Vl,Vr,n) result(F)
+    real(8), intent(in) :: m, p, Hl, Hr
+    real(8), intent(in), dimension(2) :: Vl, Vr
+    real(8), intent(in), dimension(4) :: n
+    real(8), dimension(4) :: F, phil, phir
+    phil(:) = (/1.d0, Vl(1), Vl(2), Hl/)
+    phir(:) = (/1.d0, Vr(1), Vr(2), Hr/)
+    F(:) = 0.5d0 * ((m + abs(m)) * phil(:) + (m - abs(m)) * phir(:)) + p * n(:)
+  end function flux_AUSM
+
   attributes(device) function SLAU(id_dim,Ql,Qr,Normal) result(F)
     integer, intent(in), value :: id_dim ! x:1, y:2
     real(8), intent(in), dimension(4), device :: Ql, Qr, Normal
     real(8) rhol, rhor, pl, pr, el, er, Hl, Hr, cl, cr, c
     real(8) vn, V_p, V_m, V_bar, V_bar_p, V_bar_m, M_p, M_m, M, x, g, dp, mass, beta_p, beta_m, Pressure
     real(8), dimension(2) :: Vl, Vr
-    real(8), dimension(4) :: phil, phir, F
+    real(8), dimension(4) :: F
 
     call set_q(Ql,Qr,rhol,rhor,pl,pr,Vl,Vr)
+    call calc_quantities_AUSM(pl,pr,rhol,rhor,Vl,Vr,el,er,Hl,Hr,cl,cr)
 
-    el = energy(pl,rhol,Vl(1),Vl(2))
-    er = energy(pr,rhor,Vr(1),Vr(2))
-    Hl = ENTHALPY(el,pl,rhol)
-    Hr = ENTHALPY(er,pr,rhor)
-    cl = speed_of_sound(pl,rhol)
-    cr = speed_of_sound(pr,rhor)
     c = 0.5d0 * (cl + cr)
     ! What is vn?
     vn = 0.d0
@@ -51,9 +68,7 @@ contains
     call calc_beta(M_p,M_m,beta_p,beta_m)
     mass = 0.5d0 * (rhol * (Vl(id_dim) + V_bar_p) + rhor * (Vr(id_dim) - V_bar_m) - x * dp / c)
     Pressure = 0.5d0 * (pl + pr + (beta_p - beta_m) * (pl - pr) + (1.d0 - x) * (beta_p + beta_m - 1.d0) * (pl + pr))
-    phil(:) = (/1.d0, Vl(1), Vl(2), Hl/)
-    phir(:) = (/1.d0, Vr(1), Vr(2), Hr/)
-    F(:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:)) + Pressure * Normal(:)
+    F(:) = flux_AUSM(mass,Pressure,Hl,Hr,Vl,Vr,Normal)
   end function SLAU
 end module calc_slau
 
