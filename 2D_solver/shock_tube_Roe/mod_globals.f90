@@ -9,6 +9,7 @@ module mod_globals
   ! id_scheme ! 1  KEEP !
   !           ! 2  SLAU !
   !!!!!!!!!!!!!!!!!!!!!!!
+  integer, parameter :: id_hybrid = 0
   integer, parameter :: id_muscl = 1
   integer, parameter :: id_scheme = 2
 
