@@ -23,11 +23,6 @@ OBJ =	mod_globals.o \
       calc_common.o \
       calc_keep.o \
       calc_qlr.o \
-      calc_mat.o \
-      calc_slau.o \
-      calc_roe.o \
-      calc_riemann_solver.o \
-      calc_flux_hybrid.o \
       calc_steps.o \
       print.o \
       calc_time_dev.o \
@@ -46,11 +41,12 @@ calc_common.o: mod_globals.mod
 calc_keep.o: mod_globals.mod calc_term.mod
 calc_visc.o: mod_globals.mod calc_sutherland.mod
 calc_qlr.o: mod_globals.mod calc_muscl.mod
-calc_slau.o: calc_common.mod calc_physical_quantities.mod
-calc_roe.o: mod_globals.mod calc_common.mod calc_physical_quantities.mod calc_mat.mod
-calc_riemann_solver.o: mod_globals.mod calc_qlr.mod calc_roe.mod calc_slau.mod
-calc_flux_hybrid.o: mod_globals.mod
-calc_time_dev.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_keep.mod calc_riemann_solver.mod calc_visc.mod calc_steps.mod print.mod
-calc_time_dev_hybrid.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_keep.mod calc_riemann_solver.mod calc_flux_hybrid.mod calc_visc.mod calc_steps.mod print.mod
+#calc_slau.o: calc_common.mod calc_physical_quantities.mod
+#calc_roe.o: mod_globals.mod calc_common.mod calc_physical_quantities.mod calc_mat.mod
+#calc_riemann_solver.o: mod_globals.mod calc_qlr.mod calc_roe.mod calc_slau.mod
+#calc_flux_hybrid.o: mod_globals.mod
+calc_time_dev.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_keep.mod calc_visc.mod calc_steps.mod print.mod
+calc_time_dev_hybrid.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_keep.mod calc_visc.mod calc_steps.mod print.mod
+#calc_time_dev_hybrid.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_keep.mod calc_riemann_solver.mod calc_flux_hybrid.mod calc_visc.mod calc_steps.mod print.mod
 main.o: main.f90 mod_globals.mod set.mod calc_time_dev.mod
 
