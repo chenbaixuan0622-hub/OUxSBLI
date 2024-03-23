@@ -7,8 +7,6 @@ program main
   implicit none
   real(8) t_start, t_end
   
-  call set_print_pre(Lx,Ly,Lz,T)
-
   call set_init(Q)
   T0 = T
 
@@ -19,7 +17,5 @@ program main
     call RungeKutta_hybrid(T0,Q)
   endif
   call cpu_time(t_end)
- 
-  call set_print_post(t_start,t_end)
 end program main
 

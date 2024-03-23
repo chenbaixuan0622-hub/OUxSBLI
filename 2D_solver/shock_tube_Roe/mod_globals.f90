@@ -3,6 +3,7 @@ module mod_globals
   implicit none
   integer, parameter :: dimension = 2
   integer, parameter :: accuracy = 2 ! only 2nd-order accuracy is available
+  integer(kind=2**(accuracy/2)), parameter :: id_accuracy = 1
   integer, parameter :: offset = accuracy / 2
   integer, parameter :: id_visc = 1
   !!!!!!!!!!!!!!!!!!!!!!!
@@ -11,7 +12,7 @@ module mod_globals
   !           ! 3  SLAU !
   !!!!!!!!!!!!!!!!!!!!!!!
   integer, parameter :: id_hybrid = 0
-  integer, parameter :: id_muscl = 1
+  integer(kind=4), parameter :: id_muscl = 1
   integer, parameter :: id_scheme = 2
 
   ! mesh

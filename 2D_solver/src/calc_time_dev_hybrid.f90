@@ -3,11 +3,10 @@ module calc_time_dev_hybrid
 contains
   subroutine RungeKutta(T0,Q)
     use cudafor
-    use mod_globals, only : accuracy, id_muscl, id_visc, nx, ny, nt, np, blocksE, blocksF, threadsE, threadsF
+    use mod_globals, only : accuracy, id_visc, nx, ny, nt, np, blocksE, blocksF, threadsE, threadsF
     use calc_physical_quantities
     use calc_steps
-    use calc_KEEP, calc_E_KEEP => calc_E_NoMUSCL, calc_F_KEEP => calc_F_NoMUSCL
-    use calc_riemann_solver
+    use calc_flux
     use calc_flux_hybrid
     use calc_visc
     use set
@@ -15,7 +14,8 @@ contains
     real(8), intent(inout) :: Q(nx,ny,4)
     real(8), intent(in) :: T0(nx,ny)
     integer t1, t2, itr, stat
-    integer(kind=2**(accuracy/2)) :: id_accuracy
+    integer(kind=2) :: id_muscl1
+    integer(kind=4) :: id_muscl2
     real(8), dimension(nx,ny,4), device :: Q_d, Q2, Q3
     real(8), dimension(nx,ny), device :: rho, u, v, p, T
     real(8), dimension(nx-accuracy+1,ny-accuracy,4), device :: E_hybrid, E_tvd, E_keep, E_roe
@@ -29,10 +29,10 @@ contains
         call calc_quantities(Q_d,rho,u,v,p,T)
         !print *, trim(cudaGetErrorString(cudaGetLastError()))
 
-        call calc_E_KEEP<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E_keep)
-        call calc_F_KEEP<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F_keep)
-        call calc_E_MUSCL<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E_roe)
-        call calc_F_MUSCL<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F_roe)
+        call calc_E<<<blocksE,threadsE>>>(id_muscl1,rho,u,v,p,E_keep)
+        call calc_F<<<blocksF,threadsF>>>(id_muscl1,rho,u,v,p,F_keep)
+        call calc_E<<<blocksE,threadsE>>>(id_muscl2,rho,u,v,p,E_roe)
+        call calc_F<<<blocksF,threadsF>>>(id_muscl2,rho,u,v,p,F_roe)
         stat = cudaDeviceSynchronize()
         
         call calc_E_tvd<<<blocksE,threadsE>>>(Q_d,E_keep,E_roe,E_tvd)
@@ -53,10 +53,10 @@ contains
         
         call calc_quantities(Q2,rho,u,v,p,T)
         
-        call calc_E_KEEP<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E_keep)
-        call calc_F_KEEP<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F_keep)
-        call calc_E_MUSCL<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E_roe)
-        call calc_F_MUSCL<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F_roe)
+        call calc_E<<<blocksE,threadsE>>>(id_muscl1,rho,u,v,p,E_keep)
+        call calc_F<<<blocksF,threadsF>>>(id_muscl1,rho,u,v,p,F_keep)
+        call calc_E<<<blocksE,threadsE>>>(id_muscl2,rho,u,v,p,E_roe)
+        call calc_F<<<blocksF,threadsF>>>(id_muscl2,rho,u,v,p,F_roe)
         stat = cudaDeviceSynchronize()
         
         call calc_E_tvd<<<blocksE,threadsE>>>(Q2,E_keep,E_roe,E_tvd)
@@ -77,10 +77,10 @@ contains
         
         call calc_quantities(Q3,rho,u,v,p,T)
 
-        call calc_E_KEEP<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E_keep)
-        call calc_F_KEEP<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F_keep)
-        call calc_E_MUSCL<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E_roe)
-        call calc_F_MUSCL<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F_roe)
+        call calc_E<<<blocksE,threadsE>>>(id_muscl1,rho,u,v,p,E_keep)
+        call calc_F<<<blocksF,threadsF>>>(id_muscl1,rho,u,v,p,F_keep)
+        call calc_E<<<blocksE,threadsE>>>(id_muscl2,rho,u,v,p,E_roe)
+        call calc_F<<<blocksF,threadsF>>>(id_muscl2,rho,u,v,p,F_roe)
         stat = cudaDeviceSynchronize()
 
         call calc_E_tvd<<<blocksE,threadsE>>>(Q3,E_keep,E_roe,E_tvd)

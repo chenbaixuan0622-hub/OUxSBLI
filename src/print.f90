@@ -22,9 +22,10 @@ contains
     write(10,"('VECTORS Velocity float')")
   end subroutine print_header
 
-  subroutine print_vtk_2D(step,Q)
+  subroutine print_vtk_2D(step,Q,limiter)
     integer, intent(in) :: step
     real(8), intent(in) :: Q(nx,ny,4)
+    real(8), intent(in), optional :: limiter(nx,ny)
     integer i, j
     real(8), dimension(nx,ny) :: rho, u, v, p
     character(len=40) filename
@@ -46,12 +47,19 @@ contains
     write(10,"('SCALARS P float')")
     write(10,"('LOOKUP_TABLE default')")
     write(10,"(f9.4,1x)") ((p(i,j),i=1,nx),j=1,ny)
+
+    if (present(limiter)) then
+      write(10,"('SCALARS limiter float')")
+      write(10,"('LOOKUP_TABLE default')")
+      write(10,"(f9.4,1x)") ((limiter(i,j),i=1,nx),j=1,ny)
+    endif
     close(10)
   end subroutine print_vtk_2D
   
-  subroutine print_vtk_3D(step,Q)
+  subroutine print_vtk_3D(step,Q,limiter)
     integer, intent(in) :: step
     real(8), intent(in) :: Q(nx,ny,nz,5)
+    real(8), intent(in), optional :: limiter(nx,ny,nz)
     integer i, j, k
     real(8), dimension(nx,ny,nz) :: rho, u, v, w, p
     character(len=40) filename
@@ -74,6 +82,12 @@ contains
     write(10,"('SCALARS P float')")
     write(10,"('LOOKUP_TABLE default')")
     write(10,"(f9.4,1x)") (((p(i,j,k),i=1,nx),j=1,ny),k=1,nz)
+    
+    if (present(limiter)) then
+      write(10,"('SCALARS limiter float')")
+      write(10,"('LOOKUP_TABLE default')")
+      write(10,"(f9.4,1x)") (((limiter(i,j,k),i=1,nx),j=1,ny),k=1,nz)
+    endif
     close(10)
   end subroutine print_vtk_3D
 end module print

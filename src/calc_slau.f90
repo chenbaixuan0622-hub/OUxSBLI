@@ -1,14 +1,15 @@
 module calc_slau
+  use mod_globals, only : dimension
   use calc_common
   use calc_physical_quantities
   implicit none
 contains
   attributes(device) subroutine calc_quantities_AUSM(pl,pr,rhol,rhor,Vl,Vr,el,er,Hl,Hr,cl,cr)
     real(8), intent(in), value :: pl, pr, rhol, rhor
-    real(8), intent(in), dimension(2) :: Vl, Vr
+    real(8), intent(in), dimension(dimension), device :: Vl, Vr
     real(8), intent(out) :: el, er, Hl, Hr, cl, cr
-    el = energy(pl,rhol,Vl(1),Vl(2))
-    er = energy(pr,rhor,Vr(1),Vr(2))
+    el = energy(pl,rhol,Vl(:))
+    er = energy(pr,rhor,Vr(:))
     Hl = ENTHALPY(el,pl,rhol)
     Hr = ENTHALPY(er,pr,rhor)
     cl = speed_of_sound(pl,rhol)
@@ -30,23 +31,27 @@ contains
     endif
   end subroutine calc_beta
 
-  attributes(device) function flux_AUSM(m,p,Hl,Hr,Vl,Vr,n) result(F)
-    real(8), intent(in) :: m, p, Hl, Hr
-    real(8), intent(in), dimension(2) :: Vl, Vr
-    real(8), intent(in), dimension(4) :: n
-    real(8), dimension(4) :: F, phil, phir
-    phil(:) = (/1.d0, Vl(1), Vl(2), Hl/)
-    phir(:) = (/1.d0, Vr(1), Vr(2), Hr/)
-    F(:) = 0.5d0 * ((m + abs(m)) * phil(:) + (m - abs(m)) * phir(:)) + p * n(:)
+  attributes(device) function flux_AUSM(mass,pressure,Hl,Hr,Vl,Vr,Normal) result(F)
+    real(8), intent(in), value :: mass, pressure, Hl, Hr
+    real(8), intent(in), dimension(dimension), device :: Vl, Vr
+    real(8), intent(in), dimension(dimension+2), device :: Normal
+    real(8), dimension(dimension+2) :: F, phil, phir
+    phil(1) = 1.d0
+    phil(2:dimension+1) = Vl(:)
+    phil(dimension+2) = Hl
+    phir(1) = 1.d0
+    phir(2:dimension+1) = Vr(:)
+    phir(dimension+2) = Hr
+    F(:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:)) + pressure * Normal(:)
   end function flux_AUSM
 
   attributes(device) function SLAU(id_dim,Ql,Qr,Normal) result(F)
-    integer, intent(in), value :: id_dim ! x:1, y:2
-    real(8), intent(in), dimension(4), device :: Ql, Qr, Normal
+    integer, intent(in), value :: id_dim
+    real(8), intent(in), dimension(dimension+2), device :: Ql, Qr, Normal
     real(8) rhol, rhor, pl, pr, el, er, Hl, Hr, cl, cr, c
     real(8) vn, V_p, V_m, V_bar, V_bar_p, V_bar_m, M_p, M_m, M, x, g, dp, mass, beta_p, beta_m, Pressure
-    real(8), dimension(2) :: Vl, Vr
-    real(8), dimension(4) :: F
+    real(8), dimension(dimension) :: Vl, Vr
+    real(8), dimension(dimension+2) :: F
 
     call set_q(Ql,Qr,rhol,rhor,pl,pr,Vl,Vr)
     call calc_quantities_AUSM(pl,pr,rhol,rhor,Vl,Vr,el,er,Hl,Hr,cl,cr)
