@@ -1,24 +1,13 @@
 module calc_common
-  use mod_globals, only : gamma
+  use mod_globals, only : dimension, gamma
   implicit none
-  interface energy
-    module procedure energy_2D, energy_3D
-  end interface
-
 contains
-  attributes(device) function energy_2D(p,rho,u,v) result(e)
-    real(8), intent(in), value :: p, rho, u , v
+  attributes(device) function energy(p,rho,V) result(e)
+    real(8), intent(in), value :: p, rho
+    real(8), intent(in), device :: V(dimension)
     real(8) :: e
-    e = p / (gamma - 1.d0) + 0.5d0 * rho * (u ** 2 + v ** 2)
-  end function energy_2D
-  
-  attributes(device) function energy_3D(p,rho,u,v,w) result(e)
-    real(8), intent(in), value :: p, rho, u , v, w
-    real(8) :: e
-    e = p / (gamma - 1.d0) + 0.5d0 * rho * (u ** 2 + v ** 2 + w ** 2)
-  end function energy_3D
-
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    e = p / (gamma - 1.d0) + 0.5d0 * rho * sum(V**2)
+  end function energy
 
   attributes(device) function ENTHALPY(e,p,rho) result(H)
     real(8), intent(in), value :: e, p, rho

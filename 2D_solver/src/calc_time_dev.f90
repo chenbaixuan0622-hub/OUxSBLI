@@ -6,15 +6,13 @@ contains
     use mod_globals, only : accuracy, id_muscl, id_visc, nx, ny, nt, np, blocksE, blocksF, threadsE, threadsF
     use calc_physical_quantities
     use calc_steps
-    use calc_KEEP
-    use calc_riemann_solver
+    use calc_flux, only : calc_E, calc_F
     use calc_visc
     use set
     use print
     real(8), intent(inout) :: Q(nx,ny,4)
     real(8), intent(in) :: T0(nx,ny)
     integer t1, t2, itr, stat
-    integer(kind=2**(accuracy/2)) :: id_accuracy
     real(8), dimension(nx,ny,4), device :: Q_d, Q2, Q3
     real(8), dimension(nx,ny), device :: rho, u, v, p, T
     real(8), device :: E(nx-accuracy+1,ny-accuracy,4)
@@ -28,13 +26,8 @@ contains
         call calc_quantities(Q_d,rho,u,v,p,T)
         !print *, trim(cudaGetErrorString(cudaGetLastError()))
 
-        if (id_muscl == 0) then
-          call calc_E_NoMUSCL<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
-          call calc_F_NoMUSCL<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
-        else
-          call calc_E_MUSCL<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
-          call calc_F_MUSCL<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
-        endif
+        call calc_E<<<blocksE,threadsE>>>(id_muscl,rho,u,v,p,E)
+        call calc_F<<<blocksF,threadsF>>>(id_muscl,rho,u,v,p,F)
         stat = cudaDeviceSynchronize()
 
         if (id_visc == 1) then 
@@ -50,13 +43,8 @@ contains
         
         call calc_quantities(Q2,rho,u,v,p,T)
         
-        if (id_muscl == 0) then
-          call calc_E_NoMUSCL<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
-          call calc_F_NoMUSCL<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
-        else
-          call calc_E_MUSCL<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
-          call calc_F_MUSCL<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
-        endif
+        call calc_E<<<blocksE,threadsE>>>(id_muscl,rho,u,v,p,E)
+        call calc_F<<<blocksF,threadsF>>>(id_muscl,rho,u,v,p,F)
         stat = cudaDeviceSynchronize()
         
         if (id_visc == 1) then
@@ -72,13 +60,8 @@ contains
         
         call calc_quantities(Q3,rho,u,v,p,T)
 
-        if (id_muscl == 0) then
-          call calc_E_NoMUSCL<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
-          call calc_F_NoMUSCL<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
-        else
-          call calc_E_MUSCL<<<blocksE,threadsE>>>(id_accuracy,rho,u,v,p,E)
-          call calc_F_MUSCL<<<blocksF,threadsF>>>(id_accuracy,rho,u,v,p,F)
-        endif
+        call calc_E<<<blocksE,threadsE>>>(id_muscl,rho,u,v,p,E)
+        call calc_F<<<blocksF,threadsF>>>(id_muscl,rho,u,v,p,F)
         stat = cudaDeviceSynchronize()
 
         if (id_visc == 1) then
