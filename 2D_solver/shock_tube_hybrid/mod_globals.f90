@@ -7,7 +7,8 @@ module mod_globals
   integer, parameter :: id_visc = 1
   !!!!!!!!!!!!!!!!!!!!!!!
   ! id_scheme ! 1  KEEP !
-  !           ! 2  SLAU !
+  !           ! 2  Roe  !
+  !           ! 3  SLAU !
   !!!!!!!!!!!!!!!!!!!!!!!
   integer, parameter :: id_hybrid = 1
   integer, parameter :: id_muscl = 1

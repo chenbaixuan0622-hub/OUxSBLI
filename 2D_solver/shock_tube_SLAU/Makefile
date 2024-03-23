@@ -14,25 +14,25 @@ TARGET = shock_tube
 vpath %f90 ../src:../../src
 
 OBJ =	mod_globals.o \
-	set.o \
-	calc_physical_quantities.o \
-	calc_term.o \
-	calc_sutherland.o \
-	calc_visc.o \
-	calc_muscl.o \
-	calc_common.o \
-	calc_keep.o \
-  calc_qlr.o \
-  calc_mat.o \
-  calc_slau.o \
-  calc_roe.o \
-  calc_riemann_solver.o \
-  calc_flux_hybrid.o \
-	calc_steps.o \
-	print.o \
-	calc_time_dev.o \
-	calc_time_dev_hybrid.o \
-  main.o
+      set.o \
+      calc_physical_quantities.o \
+      calc_term.o \
+      calc_sutherland.o \
+      calc_visc.o \
+      calc_muscl.o \
+      calc_common.o \
+      calc_keep.o \
+      calc_qlr.o \
+      calc_mat.o \
+      calc_slau.o \
+      calc_roe.o \
+      calc_riemann_solver.o \
+      calc_flux_hybrid.o \
+      calc_steps.o \
+      print.o \
+      calc_time_dev.o \
+      calc_time_dev_hybrid.o \
+      main.o
 
 a.out: $(OBJ)
 		$(FC) -cuda -acc -fast -Minfo -I./ $^
