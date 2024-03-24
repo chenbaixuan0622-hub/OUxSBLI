@@ -1,8 +1,9 @@
 module calc_flux
-  use mod_globals, only : accuracy, offset, nx, ny, nz, gamma
+  use mod_globals, only : id_scheme, id_accuracy, accuracy, offset, nx, ny, nz, gamma
+  use calc_qlr
   use calc_keep
   use calc_slau
-  use calc_roe
+  !use calc_roe
   implicit none
   interface calc_E
     module procedure calc_E_NoMUSCL, calc_E_MUSCL
@@ -105,7 +106,7 @@ contains
     endif
 
     if (id_scheme == 2) then
-      E(i,j-offset,k-offset,:) = Roe(1,Ql,Qr,Normal)
+      !E(i,j-offset,k-offset,:) = Roe(1,Ql,Qr,Normal)
     else
       E(i,j-offset,k-offset,:) = SLAU(1,Ql,Qr,Normal)
     endif
@@ -138,7 +139,7 @@ contains
     endif
 
     if (id_scheme == 2) then
-      F(i-offset,j,k-offset,:) = Roe(2,Ql,Qr,Normal)
+      !F(i-offset,j,k-offset,:) = Roe(2,Ql,Qr,Normal)
     else
       F(i-offset,j,k-offset,:) = SLAU(2,Ql,Qr,Normal)
     endif
@@ -171,7 +172,7 @@ contains
     endif
 
     if (id_scheme == 2) then
-      G(i-offset,j-offset,k,:) = Roe(3,Ql,Qr,Normal)
+      !G(i-offset,j-offset,k,:) = Roe(3,Ql,Qr,Normal)
     else
       G(i-offset,j-offset,k,:) = SLAU(3,Ql,Qr,Normal)
     endif
