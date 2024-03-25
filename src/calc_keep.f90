@@ -11,15 +11,15 @@ contains
     integer(kind=2), intent(in), value :: id_accuracy
     integer, intent(in), value :: id
     real(8), intent(in), dimension(2), device :: rho, p
-    real(8), intent(in), dimension(dimension) :: Normal
     real(8), intent(in), dimension(2,dimension), device :: V
+    real(8), intent(in), dimension(dimension), device :: Normal
     real(8), dimension(dimension+2) :: F
     real(8) Rho_m, P_m, PRho
     real(8), dimension(dimension) :: V_m, V1, V2
-    V1 = V(1,:)
-    V2 = V(2,:)
+    V1(:) = V(1,:)
+    V2(:) = V(2,:)
     Rho_m = 0.5d0 * (rho(1) + rho(2))
-    V_m(:) = 0.5d0 * (V1 * V2)
+    V_m(:) = 0.5d0 * (V1(:) + V2(:))
     P_m = 0.5d0 * (p(1) + p(2))
     PRho = 0.5d0 * (p(1) / rho(1) + p(2) / rho(2))
     F(1) = Rho_m * V_m(id)

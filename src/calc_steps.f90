@@ -55,7 +55,7 @@ contains
           enddo
         enddo
       enddo
-    enddo 
+    enddo
   end subroutine calc_step1_3D
  
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -63,8 +63,7 @@ contains
   subroutine calc_step2_2D(E,F,Q,Q2,Q3)
     real(8), intent(in), dimension(nx-accuracy+1,ny-accuracy,4), device :: E
     real(8), intent(in), dimension(nx-accuracy,ny-accuracy+1,4), device :: F
-    real(8), intent(in), dimension(nx,ny,4), device :: Q
-    real(8), intent(in), dimension(nx,ny,4), device :: Q2
+    real(8), intent(in), dimension(nx,ny,4), device :: Q, Q2
     real(8), intent(out), dimension(nx,ny,4), device :: Q3
     integer i, j, k
     real(8) R
@@ -84,8 +83,7 @@ contains
     real(8), intent(in), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E
     real(8), intent(in), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F
     real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G
-    real(8), intent(in), dimension(nx,ny,nz,5), device :: Q
-    real(8), intent(in), dimension(nx,ny,nz,5), device :: Q2
+    real(8), intent(in), dimension(nx,ny,nz,5), device :: Q, Q2
     real(8), intent(out), dimension(nx,ny,nz,5), device :: Q3
     integer i, j, k, l
     real(8) R
