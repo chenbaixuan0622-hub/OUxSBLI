@@ -17,5 +17,6 @@ program main
     call RungeKutta_hybrid(T0,Q)
   endif
   call cpu_time(t_end)
+  print *, "elapsed time:", t_end - t_start
 end program main
 
