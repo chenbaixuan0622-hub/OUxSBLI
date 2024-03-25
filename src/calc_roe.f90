@@ -1,6 +1,8 @@
 module calc_roe
+  use cutensorex
   use mod_globals, only : dimension, gamma
   use calc_common
+  use calc_common_dim
   use calc_physical_quantities
   use calc_mat
   implicit none
@@ -9,7 +11,7 @@ contains
     integer, intent(in), value :: id_dim
     real(8), intent(in), dimension(dimension+2), device :: Qsl, Qsr
     real(8), intent(in), dimension(dimension+2), device :: Normal
-    real(8), dimension(dimension+2), device :: F, Fl, Fr, Ql, Qr
+    real(8), dimension(dimension+2), device :: F, Fl, Fr, Ql, Qr, dQ
     real(8) rhol, rhor, pl, pr, el, er, Hl, Hr, rho_ave, H_ave, c_ave
     real(8), dimension(dimension) :: Vl, Vr, V_ave
     real(8) mat(dimension+2,dimension+2)
@@ -40,8 +42,9 @@ contains
     Fl(:) = Fl(:) + pl * Normal(:)
     Fr(:) = Fr(:) + pr * Normal(:)
 
-    mat = calc_AB(id_dim, rho_ave, H_ave, c_ave, V_ave)
-    F(:) = 0.5d0 * (Fl(:) + Fr(:) - matmul(mat(:,:), Qr(:) - Ql(:)))
+    mat(:,:) = calc_AB(id_dim, rho_ave, H_ave, c_ave, V_ave)
+    dQ(:) = Qr(:) - Ql(:)
+    F(:) = 0.5d0 * (Fl(:) + Fr(:) - cumatmul(mat(:,:), dQ(:)))
   end function Roe
 end module calc_roe
 

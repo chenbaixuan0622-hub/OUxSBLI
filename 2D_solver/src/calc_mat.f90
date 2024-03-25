@@ -1,4 +1,5 @@
 module calc_mat
+  use calc_common_dim
   use mod_globals, only : gamma
   implicit none
 contains
@@ -6,7 +7,7 @@ contains
     integer, intent(in), value :: id
     real(8), intent(in), value :: rho, H, c
     real(8), intent(in), device :: V(2)
-    real(8), dimension(4,4) :: mat, lambda, R, Rinv
+    real(8), dimension(4,4) :: mat, lambda, R, Rinv, Rlambda
     real(8) q2, b1, b2
     real(8) :: vec(2) = 0.d0
     real(8), dimension(4) :: R2, R3
@@ -17,10 +18,10 @@ contains
     b2 = (gamma - 1.d0) / c**2
     b1 = 0.5d0 * q2 * b2
 
-    lambda(1,:) = (/abs(V(id)-c),       0.d0,         0.d0,       0.d0/)
-    lambda(2,:) = (/0.d0,         abs(V(id)),         0.d0,       0.d0/)
-    lambda(3,:) = (/0.d0,               0.d0, abs(V(id)+c),       0.d0/)
-    lambda(4,:) = (/0.d0,               0.d0,         0.d0, abs(V(id))/)
+    lambda(1,:) = (/abs(V(id)-c), 0.d0, 0.d0, 0.d0/)
+    lambda(2,:) = (/0.d0, abs(V(id)), 0.d0, 0.d0/)
+    lambda(3,:) = (/0.d0, 0.d0, abs(V(id)+c), 0.d0/)
+    lambda(4,:) = (/0.d0, 0.d0, 0.d0, abs(V(id))/)
     
     R(1,:) = (/1.d0,                    1.d0,              1.d0,   0.d0/)
     R(2,:) = (/V(1) - vec(1) * c,       V(1), V(1) + vec(1) * c, vec(2)/)
@@ -37,7 +38,8 @@ contains
     R3 = Rinv(:,1+idi)
     Rinv(:,2) = R2
     Rinv(:,3) = R3
-    mat = matmul(matmul(R,lambda),Rinv)
+    Rlambda(:,:) = cumatmul(R(:,:), lambda(:,:))
+    mat(:,:) = cumatmul(Rlambda(:,:),Rinv(:,:))
   end function calc_AB
 end module calc_mat
 

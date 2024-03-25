@@ -1,5 +1,6 @@
 module calc_keep
   use mod_globals, only : dimension, gamma
+  use calc_common_dim
   use calc_term
   implicit none
   interface KEEP
@@ -14,15 +15,17 @@ contains
     real(8), intent(in), dimension(2,dimension), device :: V
     real(8), dimension(dimension+2) :: F
     real(8) Rho_m, P_m, PRho
-    real(8), dimension(dimension) :: V_m
-    Rho_m = 0.5d0 * sum(rho(:))
-    V_m(:) = 0.5d0 * sum(V(:,:), dim=1)
-    P_m = 0.5d0 * sum(p(:))
-    PRho = 0.5d0 * sum(p(:) / rho(:))
+    real(8), dimension(dimension) :: V_m, V1, V2
+    V1 = V(1,:)
+    V2 = V(2,:)
+    Rho_m = 0.5d0 * (rho(1) + rho(2))
+    V_m(:) = 0.5d0 * (V1 * V2)
+    P_m = 0.5d0 * (p(1) + p(2))
+    PRho = 0.5d0 * (p(1) / rho(1) + p(2) / rho(2))
     F(1) = Rho_m * V_m(id)
     F(2:dimension+1) = F(1) * V_m(:) + P_m * Normal(:)
     F(dimension+2) = F(1) * PRho / (gamma - 1.d0) &
-    & + 0.5d0 * F(1) * sum(V(1,:) * V(2,:)) &
+    & + 0.5d0 * F(1) * vecsum(V1, V2) &
     & + 0.5d0 * (V(1,id) * p(2) + V(2,id) * p(1))
   end function KEEP_2nd
 
