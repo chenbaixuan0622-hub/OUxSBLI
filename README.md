@@ -16,7 +16,7 @@ Compressible solver
 KEEP scheme
 </h2>
 <p>
-Taylor-Green vortex was calculated. 
+Taylor-Green vortex 
 </p>
 <img src="./visuals/Vorticity.gif" alt="Taylor-Green vortex">
 
@@ -24,7 +24,15 @@ Taylor-Green vortex was calculated.
 SLAU scheme
 </h2>
 <p>
-1 dimensional shock tube was calculated.
+2 dimensional shock tube
+</p>
+<img src="./visuals/pressure_wave.gif" alt="pressure wave">
+
+<h2>
+SLAU scheme
+</h2>
+<p>
+1 dimensional shock tube
 </p>
 <img src="./visuals/SLAU_500.png" alt="shock-tube">
 
