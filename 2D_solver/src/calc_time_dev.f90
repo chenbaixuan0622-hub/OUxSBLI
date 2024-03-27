@@ -4,7 +4,7 @@ module calc_time_dev
   use calc_physical_quantities
   use calc_steps
   use calc_flux, only : calc_E, calc_F
-  use calc_flux_hybrid
+  use calc_hybrid
   use calc_visc
   use set
   use print
@@ -39,9 +39,9 @@ contains
     real(8), intent(inout), device :: T(nx,ny)
     real(8), intent(out), device :: E_hybrid(nx-accuracy+1,ny-accuracy,4)
     real(8), intent(out), device :: F_hybrid(nx-accuracy,ny-accuracy+1,4)
-    real(8), dimension(nx,ny), device :: rho, u, v, p
-    real(8), dimension(nx-accuracy+1,ny-accuracy,4), device :: E_keep, E_roe, E_tvd
-    real(8), dimension(nx-accuracy,ny-accuracy+1,4), device :: F_keep, F_roe, F_tvd
+    real(8), dimension(nx,ny), device :: rho, u, v, p, energy
+    real(8), dimension(nx-accuracy+1,ny-accuracy,4), device :: E_keep, E_roe
+    real(8), dimension(nx-accuracy,ny-accuracy+1,4), device :: F_keep, F_roe
     integer stat
     integer(kind=2) :: id_muscl1
     integer(kind=4) :: id_muscl2
@@ -52,10 +52,9 @@ contains
     call calc_F<<<blocksF,threadsF>>>(id_muscl2,rho,u,v,p,F_roe)
     stat = cudaDeviceSynchronize()
 
-    call calc_E_tvd<<<blocksE,threadsE>>>(Q,E_keep,E_roe,E_tvd)
-    call calc_F_tvd<<<blocksF,threadsF>>>(Q,F_keep,F_roe,F_tvd)
-    call calc_E_hybrid<<<blocksE,threadsE>>>(u,v,E_keep,E_tvd,E_hybrid)
-    call calc_E_hybrid<<<blocksF,threadsF>>>(u,v,E_keep,E_tvd,E_hybrid)
+    energy(:,:) = Q(:,:,4)
+    call calc_E_hybrid<<<blocksE,threadsE>>>(rho,u,v,energy,E_keep,E_roe,E_hybrid)
+    call calc_F_hybrid<<<blocksF,threadsF>>>(rho,u,v,energy,F_keep,F_roe,F_hybrid)
     stat = cudaDeviceSynchronize()
 
     if (id_visc == 1) then 

@@ -45,14 +45,15 @@ contains
     real(8), intent(out), device :: E_hybrid(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     real(8), intent(out), device :: F_hybrid(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device :: G_hybrid(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
-    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p
-    real(8), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E_keep, E_roe, E_tvd
-    real(8), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F_keep, F_roe, F_tvd
-    real(8), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G_keep, G_roe, G_tvd
+    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, energy
+    real(8), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E_keep, E_roe
+    real(8), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F_keep, F_roe
+    real(8), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G_keep, G_roe
     integer stat
     integer(kind=2) :: id_muscl1
     integer(kind=4) :: id_muscl2
     call calc_quantities(Q,rho,u,v,w,p,T)
+
     call calc_E<<<blocksE,threadsE>>>(id_muscl1,rho,u,v,w,p,E_keep)
     call calc_F<<<blocksF,threadsF>>>(id_muscl1,rho,u,v,w,p,F_keep)
     call calc_G<<<blocksG,threadsG>>>(id_muscl1,rho,u,v,w,p,G_keep)
@@ -61,12 +62,13 @@ contains
     call calc_G<<<blocksG,threadsG>>>(id_muscl2,rho,u,v,w,p,G_roe)
     stat = cudaDeviceSynchronize()
 
-    call calc_E_tvd<<<blocksE,threadsE>>>(Q,E_keep,E_roe,E_tvd)
-    call calc_F_tvd<<<blocksF,threadsF>>>(Q,F_keep,F_roe,F_tvd)
-    call calc_G_tvd<<<blocksG,threadsG>>>(Q,G_keep,G_roe,G_tvd)
-    call calc_E_hybrid<<<blocksE,threadsE>>>(u,v,w,E_keep,E_tvd,E_hybrid)
-    call calc_F_hybrid<<<blocksF,threadsF>>>(u,v,w,F_keep,F_tvd,F_hybrid)
-    call calc_G_hybrid<<<blocksG,threadsG>>>(u,v,w,G_keep,G_tvd,G_hybrid)
+    energy(:,:,:) = Q(:,:,:,5)
+    call calc_E_hybrid<<<blocksE,threadsE>>>(rho,u,v,w,energy,E_keep,E_roe,E_hybrid)
+    call calc_F_hybrid<<<blocksF,threadsF>>>(rho,u,v,w,energy,F_keep,F_roe,F_hybrid)
+    call calc_G_hybrid<<<blocksG,threadsG>>>(rho,u,v,w,energy,G_keep,G_roe,G_hybrid)
+    stat = cudaDeviceSynchronize()
+    !print *, trim(cudaGetErrorString(cudaGetLastError()))
+
     if (id_visc == 1) then
       call calc_Ev<<<blocksE,threadsE>>>(u,v,w,T,E_hybrid)
       call calc_Fv<<<blocksF,threadsF>>>(u,v,w,T,F_hybrid)
