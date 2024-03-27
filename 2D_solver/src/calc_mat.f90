@@ -32,12 +32,12 @@ contains
     Rinv(2,:) = (/1.d0 - b1,                                      b2 * V(id),          b2 * V(idi),        -b2/)
     Rinv(3,:) = (/0.5d0 * (b1 - V(id) / c),  0.5d0 * (1.d0 / c - b2 * V(id)), -0.5d0 * b2 * V(idi), 0.5d0 * b2/)
     Rinv(4,:) = (/-V(idi),                                              0.d0,                 1.d0,       0.d0/)
-    
-    ! swap columns of arrays
-    R2 = Rinv(:,1+id)
-    R3 = Rinv(:,1+idi)
-    Rinv(:,2) = R2
-    Rinv(:,3) = R3
+
+    Rinv(:,1) = (/0.5d0 * (b1 + V(id) / c), 1.d0 - b1, 0.5d0 * (b1 - V(id) / c), -V(idi)/)
+    Rinv(:,4) = (/0.5d0 * b2, - b2, 0.5d0 * b2, 0.d0/)
+    Rinv(:,1+id) = (/-0.5d0 * (1.d0 / c + b2 * V(id)), b2 * V(id), 0.5d0 * (1.d0 / c - b2 * V(id)), 0.d0/)
+    Rinv(:,1+idi) = (/-0.5d0 * b2 * V(idi), b2 * V(idi), -0.5d0 * b2 * V(idi), 1.d0/)
+
     Rlambda(:,:) = cumatmul(R(:,:), lambda(:,:))
     mat(:,:) = cumatmul(Rlambda(:,:),Rinv(:,:))
   end function calc_AB
