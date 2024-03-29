@@ -40,7 +40,7 @@ SLAU scheme
 KEEP + Roe hybrid scheme
 </h2>
 <p>
-1 dimensional shock tube was calculated.
+1 dimensional shock tube
 </p>
 <img src="./visuals/Hybrid_500.png" alt="shock-tube">
 
