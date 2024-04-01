@@ -24,13 +24,15 @@ Taylor-Green vortex
 SLAU scheme
 </h2>
 <p>
+boundary layer
+</p>
+<img src="./visuals/boundary_layer.gif" alt="boundary layer">
+
+<p>
 2 dimensional shock tube
 </p>
 <img src="./visuals/pressure_wave.gif" alt="pressure wave">
 
-<h2>
-SLAU scheme
-</h2>
 <p>
 1 dimensional shock tube
 </p>

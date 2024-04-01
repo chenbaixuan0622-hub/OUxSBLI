@@ -54,5 +54,6 @@ calc_flux.o: mod_globals.mod calc_qlr.mod calc_roe.mod calc_slau.mod calc_keep.m
 calc_hybrid.o: mod_globals.mod
 calc_steps.o: mod_globals.mod
 calc_time_dev.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_keep.mod calc_flux.mod calc_hybrid.mod calc_visc.mod calc_steps.mod print.mod
+print.o: mod_globals.mod
 main.o: main.f90 mod_globals.mod set.mod calc_time_dev.mod
 
