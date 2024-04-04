@@ -1,11 +1,39 @@
 module print
-  use mod_globals, only : nx, ny, nz, dx, dy, dz, gamma
+  use mod_globals, only : nt, nx, ny, nz, dx, dy, dz, dt, gamma
   implicit none
   interface print_vtk
     module procedure print_vtk_2D, print_vtk_3D
   end interface
 
 contains
+  subroutine print_entropy(rho0,p0,rho,p,T)
+    real(8), intent(in), dimension(nx,ny,nz) :: rho0, p0, rho, p, T
+    real(8) Cp, Cv
+    real(8) :: R = 287.d0
+    real(8) :: ds = 0.d0
+    integer i, j, k
+    do k = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          Cp = 1030.5d0 - 0.19975d0 * T(i,j,k) + 3.9734 * T(i,j,k)**2
+          Cv = Cp - R
+          ds = ds + Cv * log(p(i,j,k) / p0(i,j,k)) - Cp * log(rho(i,j,k)/ rho0(i,j,k))
+        enddo
+      enddo
+    enddo
+  end subroutine print_entropy
+
+  subroutine print_KE(step,rho,u,v,w)
+    integer, intent(in) :: step
+    real(8), intent(in), dimension(nx,ny,nz) :: rho, u, v, w
+    real(8) ke, t
+    ke = sum(rho * (u**2 + v**2 + w**2))
+    t = nt * step * dt
+    open(10,file="data/kinetic_energy.d", position="append")
+    write(10,"(2(f9.4,1x))") t, ke
+    close(10)
+  end subroutine print_KE
+
   subroutine print_header(ni,nj,nk,di,dj,dk)
     integer, intent(in) :: ni, nj, nk
     real(8), intent(in) :: di, dj, dk
@@ -22,10 +50,10 @@ contains
     write(10,"('VECTORS Velocity float')")
   end subroutine print_header
 
-  subroutine print_vtk_2D(step,Q,limiter)
+  subroutine print_vtk_2D(step,Q,T)
     integer, intent(in) :: step
     real(8), intent(in) :: Q(nx,ny,4)
-    real(8), intent(in), optional :: limiter(nx,ny)
+    real(8), intent(in), optional :: T(nx,ny)
     integer i, j
     real(8), dimension(nx,ny) :: rho, u, v, p
     character(len=40) filename
@@ -48,18 +76,16 @@ contains
     write(10,"('LOOKUP_TABLE default')")
     write(10,"(f9.4,1x)") ((p(i,j),i=1,nx),j=1,ny)
 
-    if (present(limiter)) then
-      write(10,"('SCALARS limiter float')")
-      write(10,"('LOOKUP_TABLE default')")
-      write(10,"(f9.4,1x)") ((limiter(i,j),i=1,nx),j=1,ny)
-    endif
+    write(10,"('SCALARS T float')")
+    write(10,"('LOOKUP_TABLE default')")
+    write(10,"(f9.4,1x)") ((T(i,j),i=1,nx),j=1,ny)
     close(10)
   end subroutine print_vtk_2D
   
-  subroutine print_vtk_3D(step,Q,limiter)
+  subroutine print_vtk_3D(step,Q,T)
     integer, intent(in) :: step
     real(8), intent(in) :: Q(nx,ny,nz,5)
-    real(8), intent(in), optional :: limiter(nx,ny,nz)
+    real(8), intent(in), optional :: T(nx,ny,nz)
     integer i, j, k
     real(8), dimension(nx,ny,nz) :: rho, u, v, w, p
     character(len=40) filename
@@ -83,12 +109,13 @@ contains
     write(10,"('LOOKUP_TABLE default')")
     write(10,"(f9.4,1x)") (((p(i,j,k),i=1,nx),j=1,ny),k=1,nz)
     
-    if (present(limiter)) then
-      write(10,"('SCALARS limiter float')")
-      write(10,"('LOOKUP_TABLE default')")
-      write(10,"(f9.4,1x)") (((limiter(i,j,k),i=1,nx),j=1,ny),k=1,nz)
-    endif
+    write(10,"('SCALARS T float')")
+    write(10,"('LOOKUP_TABLE default')")
+    write(10,"(f9.4,1x)") (((T(i,j,k),i=1,nx),j=1,ny),k=1,nz)
     close(10)
+
+    !call print_entropy(step,rho0,p0,rho,p,T)
+    call print_KE(step,rho,u,v,w)
   end subroutine print_vtk_3D
 end module print
 

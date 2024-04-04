@@ -4,10 +4,11 @@ module set
   real(8) :: M0 = 1.9d0
   real(8) :: u0 = 506.8d0
   real(8) :: p0 = 14.924d0
-  real(8) :: rho0 = gamma * p0 / M0**2
 contains
   subroutine set_init(Q)
     real(8), intent(out), dimension(nx,ny,nz,5) :: Q
+    real(8) rho0
+    rho0 = gamma * p0 / M0**2
     Q(:,:,:,1) = rho0
     Q(:,:,:,2) = rho0 * u0
     Q(:,:,:,3) = 0.d0
@@ -23,18 +24,20 @@ contains
     integer :: No = int(0.4 * nx)
     ! slip wall
     real(8) T_bottom, Cp, p_bottom, e_bottom
+    real(8) rho0, beta, a1, Ms, p1, p2, rho1, rho2, u1, u2, v1, v2
     ! oblique shock
-    real(8) :: beta = 37.2d0 / 180.d0
-    real(8) :: Ms = M0 * sin(beta)
-    real(8) :: p1 = p0
-    real(8) :: p2 = p1 * (1.d0 + 2.d0 * gamma * (Ms**2 - 1.d0) / (gamma + 1.d0)) 
-    real(8) :: rho1 = rho0
-    real(8) :: rho2 = rho1 * (gamma + 1.d0) * Ms**2 / ((gamma - 1.d0) * Ms**2 + 2.d0)
-    real(8) :: u1 = u0 * sin(beta)
-    real(8) :: a1 =
-    real(8) :: u2 = u1 - 2.d0  * a1 * (Ms**2 - 1.d0 / Ms**2) / (gamma + 1.d0)
-    real(8) :: v1 = u0 * cos(beta)
-    real(8) :: v2 = u0 * cos(beta) 
+    rho0 = gamma * p0 / M0**2
+    beta = 37.2d0 / 180.d0
+    a1 = u0 / M0
+    Ms = M0 * sin(beta)
+    p1 = p0
+    p2 = p1 * (1.d0 + 2.d0 * gamma * (Ms**2 - 1.d0) / (gamma + 1.d0)) 
+    rho1 = rho0
+    rho2 = rho1 * (gamma + 1.d0) * Ms**2 / ((gamma - 1.d0) * Ms**2 + 2.d0)
+    u1 = u0 * sin(beta)
+    u2 = u1 - 2.d0  * a1 * (Ms**2 - 1.d0 / Ms**2) / (gamma + 1.d0)
+    v1 = u0 * cos(beta)
+    v2 = u0 * cos(beta) 
     ! inlet
     !$cuf kernel do<<<*,*>>>
     do k = 1, nz
