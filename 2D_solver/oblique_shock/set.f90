@@ -21,9 +21,10 @@ contains
     real(8), intent(inout), device :: Q(nx,ny,4)
     integer i, j, k
     integer :: No = int(0.4 * nx)
-    real(8) beta, theta, Ms2, a1, rho0, rho2, p2, u1, u2, v1, v2,u_magnitude
+    real(8) beta, theta, Ms, Ms2, a1, rho0, rho2, p2, u1, u2, v1, v2,u_magnitude
     beta = dacos(-1.d0) * 37.2d0 / 180.d0
-    Ms2 = (M0 * dsin(beta))**2
+    Ms = M0 * dsin(beta)
+    Ms2 = Ms**2
     theta = datan(2.d0 * (1.d0 / dtan(beta)) * (Ms2 - 1.d0) / (M0**2 * (gamma + dcos(2.d0 * beta)) + 2.d0))
     rho0 = p0 / (R * T0)
     rho2 = rho0 * (gamma + 1.d0) * Ms2 / ((gamma - 1.d0) * Ms2 + 2.d0)
@@ -31,7 +32,7 @@ contains
     u1 = u0 * dsin(beta)
     v1 = u0 * dcos(beta)
     a1 = u0 / M0
-    u2 = u1 - 2.d0 * a1 * (Ms2 - 1.d0 / Ms2) / (gamma + 1.d0)
+    u2 = u1 - 2.d0 * a1 * (Ms - 1.d0 / Ms) / (gamma + 1.d0)
     v2 = u0 * dcos(beta)
     u_magnitude = sqrt(u2**2 + v2**2)
     write(*,"(a, f9.4)") "beta", beta  
