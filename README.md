@@ -25,6 +25,11 @@ SLAU scheme
 </h2>
 
 <p>
+Oblique shock
+</p>
+<img src="./visuals/oblique_shock.gif" alt="oblique shock">
+
+<p>
 2 dimensional shock tube
 </p>
 <img src="./visuals/pressure_wave.gif" alt="pressure wave">
