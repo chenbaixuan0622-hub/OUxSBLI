@@ -44,7 +44,7 @@ module mod_globals
   integer, parameter :: nt = 250
   integer, parameter :: np = 40
   real(8), parameter :: u0 = 506.d0
-  real(8), parameter :: dt = 0.1d0 * dx/ u0
+  real(8), parameter :: dt = 0.8d0 * dx/ u0
 
   real(8), parameter :: dtdx = dt / dx
   real(8), parameter :: dtdy = dt / dy
@@ -57,12 +57,26 @@ module mod_globals
   real(8), parameter :: k = -1.d0
   real(8), parameter :: b = (3.d0 - k) / (1.d0 - k)
 
-  ! initial condition
-  real(8), parameter :: T = 300.d0
-  real(8), parameter :: rhol = 1.d0
-  real(8), parameter :: rhor = 0.125d0
-  real(8), parameter :: pl = 1.d0
-  real(8), parameter :: pr = 0.1d0
+  ! oblique shock
+  real(8), parameter :: R = 287.03d0
+  real(8), parameter :: M0 = 1.9d0
+  real(8), parameter :: p0 = 14924.d0
+  real(8), parameter :: T = 171.31d0
+  real(8), parameter :: beta = dacos(-1.d0) * 37.2d0 / 180.d0
+  real(8), parameter :: Ms = M0 * dsin(beta)
+  real(8), parameter :: Ms2 = Ms**2
+  real(8), parameter :: theta = datan(2.d0 * (1.d0 / dtan(beta)) * (Ms2 - 1.d0) / (M0**2 * (gamma + dcos(2.d0 * beta)) + 2.d0))
+  real(8), parameter :: rho0 = p0 / (R * T)
+  real(8), parameter :: rho2 = rho0 * (gamma + 1.d0) * Ms2 / ((gamma - 1.d0) / (M0**2 * (gamma + dcos(2.d0 * beta)) + 2.d0))
+  real(8), parameter :: p2 = p0 * (1.d0 + 2.d0 * gamma * (Ms2 - 1.d0) / (gamma + 1.d0)) 
+  real(8), parameter :: u1 = u0 * dsin(beta)
+  real(8), parameter :: v1 = u0 * dcos(beta)
+  real(8), parameter :: a1 = u0 / M0
+  real(8), parameter :: u2 = u1 - 2.d0 * a1 * (Ms - 1.d0 / Ms) / (gamma + 1.d0)
+  real(8), parameter :: v2 = u0 * dcos(beta)
+  real(8), parameter :: u_magnitude = sqrt(u2**2 + v2**2)
+  real(8), parameter :: ux = u_magnitude * dcos(theta)
+  real(8), parameter :: uy = -u_magnitude * dsin(theta)
 
   ! variables
   real(8), save :: Q(nx,ny,4)
