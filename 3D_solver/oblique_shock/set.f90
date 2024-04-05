@@ -3,7 +3,7 @@ module set
   implicit none
   real(8) :: M0 = 1.9d0
   real(8) :: u0 = 506.8d0
-  real(8) :: p0 = 14.924d0
+  real(8) :: p0 = 14924.d0
 contains
   subroutine set_init(Q)
     real(8), intent(out), dimension(nx,ny,nz,5) :: Q

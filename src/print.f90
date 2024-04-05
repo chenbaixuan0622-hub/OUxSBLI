@@ -74,7 +74,7 @@ contains
     
     write(10,"('SCALARS P float')")
     write(10,"('LOOKUP_TABLE default')")
-    write(10,"(f9.4,1x)") ((p(i,j),i=1,nx),j=1,ny)
+    write(10,"(f11.4,1x)") ((p(i,j),i=1,nx),j=1,ny)
 
     write(10,"('SCALARS T float')")
     write(10,"('LOOKUP_TABLE default')")
@@ -107,7 +107,7 @@ contains
     
     write(10,"('SCALARS P float')")
     write(10,"('LOOKUP_TABLE default')")
-    write(10,"(f9.4,1x)") (((p(i,j,k),i=1,nx),j=1,ny),k=1,nz)
+    write(10,"(f11.4,1x)") (((p(i,j,k),i=1,nx),j=1,ny),k=1,nz)
     
     write(10,"('SCALARS T float')")
     write(10,"('LOOKUP_TABLE default')")
