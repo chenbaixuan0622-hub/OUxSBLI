@@ -21,19 +21,31 @@ contains
     real(8), intent(inout), device :: Q(nx,ny,4)
     integer i, j, k
     integer :: No = int(0.4 * nx)
-    real(8) beta, theta, Ms, a1, rho0, rho2, p2, u1, u2, v1, v2,u_magnitude
-    beta = acos(-1.d0) * 37.2d0 / 180.d0
-    Ms = M0 * sin(beta)
-    theta = atan(2.d0 * (1.d0 / tan(beta)) * (Ms**2 - 1.d0) / (M0**2 * (gamma + cos(2.d0 * beta) + 2.d0)))
-    a1 = u0 / M0
+    real(8) beta, theta, Ms2, a1, rho0, rho2, p2, u1, u2, v1, v2,u_magnitude
+    beta = dacos(-1.d0) * 37.2d0 / 180.d0
+    Ms2 = (M0 * dsin(beta))**2
+    theta = datan(2.d0 * (1.d0 / dtan(beta)) * (Ms2 - 1.d0) / (M0**2 * (gamma + dcos(2.d0 * beta)) + 2.d0))
     rho0 = p0 / (R * T0)
-    rho2 = rho0 * (gamma + 1.d0) * Ms**2 / ((gamma - 1.d0) * Ms**2 + 2.d0)
-    p2 = p0 * (1.d0 + 2.d0 * gamma * (Ms**2 - 1.d0) / (gamma + 1.d0))
-    u1 = u0 * sin(beta)
-    v1 = u0 * cos(beta)
-    u2 = u1 - 2.d0 * a1 * (Ms**2 - 1.d0 / Ms**2) / (gamma + 1.d0)
-    v2 = u0 * cos(beta)
+    rho2 = rho0 * (gamma + 1.d0) * Ms2 / ((gamma - 1.d0) * Ms2 + 2.d0)
+    p2 = p0 * (1.d0 + 2.d0 * gamma * (Ms2 - 1.d0) / (gamma + 1.d0))
+    u1 = u0 * dsin(beta)
+    v1 = u0 * dcos(beta)
+    a1 = u0 / M0
+    u2 = u1 - 2.d0 * a1 * (Ms2 - 1.d0 / Ms2) / (gamma + 1.d0)
+    v2 = u0 * dcos(beta)
     u_magnitude = sqrt(u2**2 + v2**2)
+    write(*,"(a, f9.4)") "beta", beta  
+    write(*,"(a, f9.4)") "Ms2", Ms2
+    write(*,"(a, f9.4)") "theta", theta  
+    write(*,"(a, f9.4)") "a1", a1
+    write(*,"(a, f9.4)") "rho2", rho2  
+    write(*,"(a, f11.4)") "p1", p0  
+    write(*,"(a, f11.4)") "p2", p2  
+    write(*,"(a, f9.4)") "u1", u1
+    write(*,"(a, f9.4)") "v1", v1  
+    write(*,"(a, f9.4)") "u2", u2  
+    write(*,"(a, f9.4)") "v2", v2  
+    write(*,"(a, f9.4)") "uuu2", u_magnitude
     !$cuf kernel do <<<*,*>>>
     do j = 2, ny-1
       ! inlet
@@ -62,8 +74,8 @@ contains
     !$cuf kernel do <<<*,*>>>
     do i = No+1, nx
       Q(i,ny,1) = rho2
-      Q(i,ny,2) = rho2 * u_magnitude * cos(theta) 
-      Q(i,ny,3) = rho2 * u_magnitude * sin(theta)
+      Q(i,ny,2) = rho2 * u_magnitude * dcos(theta) 
+      Q(i,ny,3) = - rho2 * u_magnitude * dsin(theta)
       Q(i,ny,4) = p2 / (gamma - 1.d0) + 0.5d0 * (Q(i,ny,2)**2 + Q(i,ny,3)**2) / rho2
     enddo
 
