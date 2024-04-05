@@ -23,10 +23,6 @@ Taylor-Green vortex
 <h2>
 SLAU scheme
 </h2>
-<p>
-boundary layer
-</p>
-<img src="./visuals/boundary_layer.gif" alt="boundary layer">
 
 <p>
 2 dimensional shock tube

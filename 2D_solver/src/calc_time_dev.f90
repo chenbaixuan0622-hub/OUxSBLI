@@ -66,13 +66,15 @@ contains
   
   subroutine RungeKutta(T0,Q)
     real(8), intent(inout) :: Q(nx,ny,4)
-    real(8), intent(in) :: T0(nx,ny)
+    real(8), intent(inout) :: T0(nx,ny)
     integer t1, t2, itr
     real(8), dimension(nx,ny,4), device :: Q_d, Q2, Q3
     real(8), dimension(nx,ny), device :: T
     real(8), device :: E(nx-accuracy+1,ny-accuracy,4)
     real(8), device :: F(nx-accuracy,ny-accuracy+1,4)
 
+    ! print initial condition
+    call print_vtk(0,Q,T0)
     ! copy on GPU
     Q_d = Q
     T = T0
@@ -91,7 +93,8 @@ contains
         call set_bc(Q_d)
       enddo
       Q = Q_d
-      call print_vtk(t2,Q)
+      T0 = T
+      call print_vtk(t2,Q,T0)
     enddo
   end subroutine RungeKutta
 end module calc_time_dev

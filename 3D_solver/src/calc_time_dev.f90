@@ -35,6 +35,7 @@ contains
       call calc_Fv<<<blocksF,threadsF>>>(u,v,w,T,F)
       call calc_Gv<<<blocksG,threadsG>>>(u,v,w,T,G)
     endif
+    !print *, trim(cudaGetErrorString(cudaGetLastError()))
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_basic
   
@@ -79,7 +80,7 @@ contains
 
   subroutine RungeKutta(T0,Q)
     real(8), intent(inout) :: Q(nx,ny,nz,5)
-    real(8), intent(in) :: T0(nx,ny,nz)
+    real(8), intent(inout) :: T0(nx,ny,nz)
     integer t1, t2, itr, stat
     integer(kind=2) :: id_muscl
     real(8), dimension(nx,ny,nz,5), device :: Q_d, Q2, Q3
@@ -88,6 +89,8 @@ contains
     real(8), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
 
+    ! print initial condition
+    call print_vtk(0,Q,T0)
     ! copy on GPU
     Q_d = Q
     T = T0
@@ -95,18 +98,19 @@ contains
       do t1 = 1, nt
         call calc_EFG(id_hybrid,Q_d,T,E,F,G)
         call calc_step1(E,F,G,Q_d,Q2)
-        call set_bc(id_accuracy,Q2)
+        call set_bc(id_accuracy,Q2,T)
 
         call calc_EFG(id_hybrid,Q2,T,E,F,G)
         call calc_step2(E,F,G,Q_d,Q2,Q3)
-        call set_bc(id_accuracy,Q3)
+        call set_bc(id_accuracy,Q3,T)
 
         call calc_EFG(id_hybrid,Q3,T,E,F,G)
         call calc_step3(E,F,G,Q3,Q_d)
-        call set_bc(id_accuracy,Q_d)
+        call set_bc(id_accuracy,Q_d,T)
       enddo
       Q = Q_d
-      call print_vtk(t2,Q)
+      T0 = T
+      call print_vtk(t2,Q,T0)
     enddo
   end subroutine RungeKutta
 end module calc_time_dev
