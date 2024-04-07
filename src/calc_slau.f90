@@ -1,6 +1,7 @@
 module calc_slau
   use mod_globals, only : dimension
   use calc_common
+  use calc_common_dim
   use calc_physical_quantities
   implicit none
 contains
@@ -16,18 +17,18 @@ contains
     cr = speed_of_sound(pr,rhor)
   end subroutine calc_quantities_AUSM
 
-  attributes(device) subroutine calc_beta(M_p,M_m,beta_p,beta_m)
-    real(8), intent(in), value :: M_p, M_m
-    real(8), intent(out) :: beta_p, beta_m
-    if (abs(M_p) < 1.d0) then
-      beta_p = 0.25d0 * (2.d0 - M_p) * (M_p + 1.d0) ** 2
+  attributes(device) subroutine calc_beta(Mp,Mm,bp,bm)
+    real(8), intent(in), value :: Mp, Mm
+    real(8), intent(out) :: bp, bm
+    if (abs(Mp) < 1.d0) then
+      bp = 0.25d0 * (2.d0 - Mp) * (Mp + 1.d0) ** 2
     else
-      beta_p = 0.5d0 * (1.d0 + sign(1.d0, M_p))
+      bp = 0.5d0 * (1.d0 + sign(1.d0, Mp))
     endif
-    if (abs(M_m) < 1.d0) then
-      beta_m = 0.25d0 * (2.d0 + M_m) * (M_m - 1.d0) ** 2
+    if (abs(Mm) < 1.d0) then
+      bm = 0.25d0 * (2.d0 + Mm) * (Mm - 1.d0) ** 2
     else
-      beta_m = 0.5d0 * (1.d0 + sign(1.d0, -M_m))
+      bm = 0.5d0 * (1.d0 + sign(1.d0, -Mm))
     endif
   end subroutine calc_beta
 
@@ -49,7 +50,7 @@ contains
     integer, intent(in), value :: id_dim
     real(8), intent(in), dimension(dimension+2), device :: Ql, Qr, Normal
     real(8) rhol, rhor, pl, pr, el, er, Hl, Hr, cl, cr, c
-    real(8) vn, V_p, V_m, V_bar, V_bar_p, V_bar_m, M_p, M_m, M, x, g, dp, mass, beta_p, beta_m, Pressure
+    real(8) Vp, Vm, Vt, Vtp, Vtm, Mp, Mm, M, x, g, dp, mass, bp, bm, Pressure
     real(8), dimension(dimension) :: Vl, Vr
     real(8), dimension(dimension+2) :: F
 
@@ -57,22 +58,23 @@ contains
     call calc_quantities_AUSM(pl,pr,rhol,rhor,Vl,Vr,el,er,Hl,Hr,cl,cr)
 
     c = 0.5d0 * (cl + cr)
-    ! What is vn?
-    vn = 0.d0
-    V_p = Vl(id_dim) - vn
-    V_m = Vr(id_dim) - vn
-    M_p = V_p / c
-    M_m = V_m / c
-    M = min(1.d0, sqrt(0.5d0 * (M_p ** 2 + M_m ** 2)))
+    ! contravariant velocity
+    Vp = Vl(id_dim)
+    Vm = Vr(id_dim)
+    Mp = Vp / c
+    Mm = Vm / c
+    M = min(1.d0, sqrt(0.5d0 * q2(Vl(:), Vr(:))) / c)
     x = (1.d0 - M) ** 2
-    g = -max(min(M_p, 0.d0), -1.d0) * min(max(M_m, 0.d0), 1.d0)
-    V_bar = (rhol * abs(V_p) + rhor * abs(V_m)) / (rhol + rhor)
-    V_bar_p = abs((1.d0 - g) * V_bar + g * V_p)
-    V_bar_m = abs((1.d0 - g) * V_bar + g * V_m)
+    g = -max(min(Mp, 0.d0), -1.d0) * min(max(Mm, 0.d0), 1.d0)
+    Vt = (rhol * abs(Vp) + rhor * abs(Vm)) / (rhol + rhor)
+    Vtp = (1.d0 - g) * Vt + g * abs(Vp)
+    Vtm = (1.d0 - g) * Vt + g * abs(Vm)
     dp = pr - pl
-    call calc_beta(M_p,M_m,beta_p,beta_m)
-    mass = 0.5d0 * (rhol * (Vl(id_dim) + V_bar_p) + rhor * (Vr(id_dim) - V_bar_m) - x * dp / c)
-    Pressure = 0.5d0 * (pl + pr + (beta_p - beta_m) * (pl - pr) + (1.d0 - x) * (beta_p + beta_m - 1.d0) * (pl + pr))
+    call calc_beta(Mp,Mm,bp,bm)
+    ! mass flux
+    mass = 0.5d0 * (rhol * (Vl(id_dim) + Vtp) + rhor * (Vr(id_dim) - Vtm) - x * dp / c)
+    ! pressure flux
+    Pressure = 0.5d0 * (pl + pr + (bp - bm) * (pl - pr) + (1.d0 - x) * (bp + bm - 1.d0) * (pl + pr))
     F(:) = flux_AUSM(mass,Pressure,Hl,Hr,Vl,Vr,Normal)
   end function SLAU
 end module calc_slau

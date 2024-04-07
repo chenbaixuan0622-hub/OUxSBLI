@@ -41,10 +41,10 @@ module mod_globals
   type(dim3) :: threadsF = dim3(7,32,1)
 
   ! time
-  integer, parameter :: nt = 250
+  integer, parameter :: nt = 50
   integer, parameter :: np = 40
-  real(8), parameter :: u0 = 506.d0
-  real(8), parameter :: dt = 0.8d0 * dx/ u0
+  real(8), parameter :: u0 = 506.8d0
+  real(8), parameter :: dt = 0.5d0 * dx/ u0
 
   real(8), parameter :: dtdx = dt / dx
   real(8), parameter :: dtdy = dt / dy
@@ -54,7 +54,7 @@ module mod_globals
   real(8), parameter :: gamma = 1.4d0
 
   ! MUSCL
-  real(8), parameter :: k = -1.d0
+  real(8), parameter :: k = 1.d0 / 3.d0
   real(8), parameter :: b = (3.d0 - k) / (1.d0 - k)
 
   ! oblique shock
