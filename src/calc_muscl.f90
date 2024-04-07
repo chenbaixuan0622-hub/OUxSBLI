@@ -4,8 +4,8 @@ contains
   attributes(device) function minmod(x,y) result(ans)
     real(8), intent(in), value :: x, y
     real(8) :: ans, sgn
-    sgn = sign(1.d0, x)
-    ans = sgn * max(min(abs(x), sgn * y), 0.d0)
+    sgn = dsign(1.d0, x)
+    ans = sgn * dmax(dmin(abs(x), sgn * y), 0.d0)
   end function minmod
 
   attributes(device) function al(a,k,b,d_p,d_m) result(ans)
