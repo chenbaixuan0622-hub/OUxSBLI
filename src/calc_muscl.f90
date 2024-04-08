@@ -92,15 +92,15 @@ contains
     enddo
   end subroutine MUSCL
 
-  attributes(device) subroutine MUSCL_4th(dim,eps_left,eps_right,w,sigma,Q1,Q2,d1,d2,d3,d4,d5,Ql,Qr)
+  attributes(device) subroutine MUSCL_4th(dim,eps_left,eps_right,omega,sigma,Q1,Q2,d1,d2,d3,d4,d5,Ql,Qr)
     integer, intent(in), value :: dim
-    real(8), intent(in), value :: eps_left, eps_right, w, sigma
+    real(8), intent(in), value :: eps_left, eps_right, omega, sigma
     real(8), intent(in), dimension(dim), device :: Q1, Q2, d1, d2, d3, d4, d5
     real(8), intent(out), dimension(dim), device :: Ql, Qr
     integer i
     do i = 1, dim
-      Ql(i) = al(Q1(i), eps_left, w, sigma, d4(i), d3(i), d2(i), d1(i))
-      Qr(i) = ar(Q2(i), eps_right, w, sigma, d5(i), d4(i), d3(i), d2(i))
+      Ql(i) = al(Q1(i), eps_left, omega, sigma, d1(i), d2(i), d3(i), d4(i))
+      Qr(i) = ar(Q2(i), eps_right, omega, sigma, d2(i), d3(i), d4(i), d5(i))
     enddo
   end subroutine MUSCL_4th
 end module calc_muscl
