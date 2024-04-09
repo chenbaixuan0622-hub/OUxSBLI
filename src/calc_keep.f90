@@ -35,18 +35,22 @@ contains
     real(8), intent(in), dimension(4), device :: rho, p
     real(8), intent(in), dimension(4,dimension), device :: V
     real(8), intent(in), dimension(dimension), device :: Normal
-    real(8), dimension(4) :: PRho
+    real(8), dimension(4) :: P_over_Rho
     real(8), dimension(dimension+2) :: F
-    real(8), dimension(3) :: RhoV, IE, Energy
+    real(8), dimension(3) :: RhoV, RhoVIE, RhoVKE, VP, Energy
     real(8), dimension(3,dimension) :: RhoVV_P
     integer i
     RhoV(:) = RhoPhi(rho(:), V(:,id))
     do i = 1, dimension
       RhoVV_P(:,i) = RhoPhiU(RhoV(:), V(:,i)) + Phi(p(:)) * Normal(i)
     enddo
-    PRho(:) = p(:) / rho(:)
-    IE(:) = Phi(PRho(:)) / (gamma - 1.d0)
-    Energy(:) = IE(:) + RhoUPhiPhi(RhoV(:), V(:,:)) + PhiPsi(V(:,id), p(:))
+    ! energy equation
+    P_over_Rho(:) = p(:) / rho(:)
+    RhoVIE(:) = RhoPhiU(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
+    RhoVKE(:) = RhoUPhiPhi(RhoV(:), V(:,:))
+    VP(:) = PhiPsi(V(:,id), p(:))
+
+    Energy(:) = RhoVIE(:) + RhoVKE(:) + VP(:)
     F(1) = Flux(RhoV(:))
     do i = 1, dimension
       F(i+1) = Flux(RhoVV_P(:,i))
