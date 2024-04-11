@@ -24,15 +24,13 @@ set ylabel "{/=12 {/Times-New-Roman:Italic ({/Symbol:Italic r}s - {/Symbol:Itali
 set size square
 set mxtics 10
 set mytics 10
-plot entropy_3 using 1:2 with points pt 2 lc rgb "blue" title "{/=10 {/Times-New-Roman 3rd-order}}"
-replot entropy_4 using 1:2 with points pt 2 lc rgb "red" title "{/=10 {/Times-New-Roman 4th-order}}"
+plot entropy_3 using 1:2 with points pt 2 lc rgb "blue", entropy_4 using 1:2 with points pt 2 lc rgb "red"
 
 set ylabel "{/=12 {/Times-New-Roman:Italic {/Symbol:Italic r}k / {/Symbol:Italic r_0}k_0}}"
 set size square
 set mxtics 10
 set mytics 10
-plot ke_3 using 1:2 with points pt 2 lc rgb "blue" title "{/=10 {/Times-New-Roman 3rd-order}}"
-replot ke_4 using 1:2 with points pt 2 lc rgb "red" title "{/=10 {/Times-New=Roman 4th-order}}"
+plot ke_3 using 1:2 with points pt 2 lc rgb "blue", ke_4 using 1:2 with points pt 2 lc rgb "red"
 
 unset multiplot
 
