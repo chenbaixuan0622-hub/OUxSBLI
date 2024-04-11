@@ -6,7 +6,7 @@ set key off
 
 set xlabel "{/=12 {/Times-New-Roman:Italic tM_0}}"
 
-set xrange [0:140]
+set xrange [0:160]
 
 set tics font "Times-New-Roman,10"
 set xtics nomirror
