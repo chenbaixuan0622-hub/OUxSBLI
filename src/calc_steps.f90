@@ -207,12 +207,11 @@ contains
  
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine calc_step4_2D(E,F,Rs,Q4,Q)
+  subroutine calc_step4_2D(E,F,Rs,Q)
     real(8), intent(in), dimension(nx-accuracy+1,ny-accuracy,4), device :: E
     real(8), intent(in), dimension(nx-accuracy,ny-accuracy+1,4), device :: F
     real(8), intent(inout), dimension(nx-accuracy,ny-accuracy,4), device :: Rs
-    real(8), intent(in), dimension(nx,ny,4), device :: Q4
-    real(8), intent(out), dimension(nx,ny,4), device :: Q
+    real(8), intent(inout), dimension(nx,ny,4), device :: Q
     integer i, j, k
     real(8) R
     !$cuf kernel do(3) <<<*,*>>>
@@ -222,20 +221,19 @@ contains
           R = dtdx * (-E(i-offset,j-offset,k) + E(i-offset+1,j-offset,k)) &
           & + dtdy * (-F(i-offset,j-offset,k) + F(i-offset,j-offset+1,k))
           Rs(i-offset,j-offset,k) = Rs(i-offset,j-offset,k) + R
-          Q(i,j,k) = Q4(i,j,k) - Rs(i-offset,j-offset,k) / 6.d0
+          Q(i,j,k) = Q(i,j,k) - Rs(i-offset,j-offset,k) / 6.d0
           Rs(i-offset,j-offset,k) = 0.d0
         enddo
       enddo
     enddo 
   end subroutine calc_step4_2D
 
-  subroutine calc_step4_3D(E,F,G,Rs,Q4,Q)
+  subroutine calc_step4_3D(E,F,G,Rs,Q)
     real(8), intent(in), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E
     real(8), intent(in), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F
     real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G
     real(8), intent(inout), dimension(nx-accuracy,ny-accuracy,nz-accuracy,5), device :: Rs
-    real(8), intent(in), dimension(nx,ny,nz,5), device :: Q4
-    real(8), intent(out), dimension(nx,ny,nz,5), device :: Q
+    real(8), intent(inout), dimension(nx,ny,nz,5), device :: Q
     integer i, j, k, l
     real(8) R
     !$cuf kernel do(4) <<<*,*>>>
@@ -247,7 +245,7 @@ contains
             & + dtdy * (-F(i-offset,j-offset,k-offset,l) + F(i-offset,j-offset+1,k-offset,l)) &
             & + dtdz * (-G(i-offset,j-offset,k-offset,l) + G(i-offset,j-offset,k-offset+1,l))
             Rs(i-offset,j-offset,k-offset,l) = Rs(i-offset,j-offset,k-offset,l) + R
-            Q(i,j,k,l) = Q4(i,j,k,l) - Rs(i-offset,j-offset,k-offset,l) / 6.d0
+            Q(i,j,k,l) = Q(i,j,k,l) - Rs(i-offset,j-offset,k-offset,l) / 6.d0
             Rs(i-offset,j-offset,k-offset,l) = 0.d0
           enddo
         enddo

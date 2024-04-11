@@ -125,7 +125,7 @@ contains
     real(8), intent(inout) :: T0(nx,ny,nz)
     integer t1, t2, itr, stat
     integer(kind=2) :: id_muscl
-    real(8), dimension(nx,ny,nz,5), device :: Q_d, Q2, Q3, Q4
+    real(8), dimension(nx,ny,nz,5), device :: Q_d, Qs
     real(8), dimension(nx,ny,nz), device :: T
     real(8), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     real(8), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
@@ -143,19 +143,19 @@ contains
     do t2 = 1, np
       do t1 = 1, nt
         call calc_EFG(id_hybrid,Q_d,T,E,F,G)
-        call calc_step(0.5d0,1.d0,E,F,G,Rs,Q_d,Q2)
-        call set_bc(id_accuracy,Q2,T)
+        call calc_step(0.5d0,1.d0,E,F,G,Rs,Q_d,Qs)
+        call set_bc(id_accuracy,Qs,T)
 
-        call calc_EFG(id_hybrid,Q2,T,E,F,G)
-        call calc_step(0.5d0,2.d0,E,F,G,Rs,Q2,Q3)
-        call set_bc(id_accuracy,Q3,T)
+        call calc_EFG(id_hybrid,Qs,T,E,F,G)
+        call calc_step(0.5d0,2.d0,E,F,G,Rs,Q_d,Qs)
+        call set_bc(id_accuracy,Qs,T)
 
-        call calc_EFG(id_hybrid,Q3,T,E,F,G)
-        call calc_step(1.d0,2.d0,E,F,G,Rs,Q3,Q4)
-        call set_bc(id_accuracy,Q4,T)
+        call calc_EFG(id_hybrid,Qs,T,E,F,G)
+        call calc_step(1.d0,2.d0,E,F,G,Rs,Q_d,Qs)
+        call set_bc(id_accuracy,Qs,T)
 
-        call calc_EFG(id_hybrid,Q4,T,E,F,G)
-        call calc_step4(E,F,G,Rs,Q4,Q_d)
+        call calc_EFG(id_hybrid,Qs,T,E,F,G)
+        call calc_step4(E,F,G,Rs,Q_d)
         call set_bc(id_accuracy,Q_d,T)
       enddo
       Q = Q_d
