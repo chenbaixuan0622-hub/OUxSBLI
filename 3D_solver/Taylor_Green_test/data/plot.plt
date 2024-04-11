@@ -20,12 +20,14 @@ ke_4 = "kinetic_energy_4.d"
 
 set multiplot layout 1, 2
 
-set ylabel "{/=12 {/Times-New-Roman:Italic ({/Symbol:Italic r}s - {/Symbol:Italic r_0}s_0)/{/Symbol:Italic}s_0}}"
+set yrange [-0.04:0.01]
+set ylabel "{/=12 {/Times-New-Roman:Italic ({/Symbol:Italic r}s - {/Symbol:Italic r_0}s_0) / |{/Symbol:Italic r_0}s_0|}}"
 set size square
 set mxtics 10
 set mytics 10
 plot entropy_3 using 1:2 with points pt 2 lc rgb "blue", entropy_4 using 1:2 with points pt 2 lc rgb "red"
 
+set yrange [0.6:2.4]
 set ylabel "{/=12 {/Times-New-Roman:Italic {/Symbol:Italic r}k / {/Symbol:Italic r_0}k_0}}"
 set size square
 set mxtics 10
