@@ -1,6 +1,6 @@
 program main
   use, intrinsic :: iso_fortran_env
-  use mod_globals, only : Lx, Ly, Lz, T, Q, T0
+  use mod_globals, only : id_RungeKutta, Lx, Ly, Lz, T, Q, T0
   use set
   use calc_time_dev
   implicit none
@@ -10,7 +10,7 @@ program main
   T0 = T
 
   call cpu_time(t_start)
-  call RungeKutta(T0,Q)
+  call RungeKutta(id_RungeKutta,T0,Q)
   call cpu_time(t_end)
   print *, "elapsed time:", t_end - t_start
 end program main
