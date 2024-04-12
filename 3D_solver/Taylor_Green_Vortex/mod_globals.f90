@@ -43,7 +43,7 @@ module mod_globals
   ! id_RungeKutta ! kind=2 ! 3rd_TVD !
   !               ! kind=4 ! 4th     !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=4), parameter :: id_RungeKutta = 0
+  integer(kind=2), parameter :: id_RungeKutta = 0
   integer, parameter :: nt = 200
   integer, parameter :: np = 200
   real(8), parameter :: dt = 0.01d0
