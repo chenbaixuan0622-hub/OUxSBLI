@@ -37,7 +37,7 @@ contains
           ! rho w
           Q(i,j,k,4) = 0.d0
           ! p / (gamma - 1) + 0.5 * (rhou ** 2 + rhov ** 2 ) / rho
-          Q(i,j,k,5) = (1.d0/gamma+RHO0*M0**2*(cos(2.d0*x(i-offset)/L0)+cos(2.d0*y(j-offset)/L0))*(cos(2.d0*z(k-offset)/L0)+2.d0)/16.d0)&
+          Q(i,j,k,5) = (1.d0/gamma+RHO0*(M0**2)*(cos(2.d0*x(i-offset)/L0)+cos(2.d0*y(j-offset)/L0))*(cos(2.d0*z(k-offset)/L0)+2.d0)/16.d0)&
           / (gamma - 1.d0) + 0.5d0 * (Q(i,j,k,2) ** 2 + Q(i,j,k,3) ** 2) / Q(i,j,k,1)
         enddo
       enddo
@@ -116,9 +116,10 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine set_bc2(id_accuracy,Q)
+  subroutine set_bc2(id_accuracy,Q,T)
     integer(kind=2), intent(in), value :: id_accuracy
     real(8), intent(inout), device :: Q(nx,ny,nz,5)
+    real(8), intent(inout), device :: T(nx,ny,nz)
     integer i, j, k, l
     !$cuf kernel do(3) <<<*,*>>>
     do l = 1, 5
@@ -161,9 +162,10 @@ contains
     enddo
   end subroutine set_bc2
 
-  subroutine set_bc4(id_accuracy,Q)
+  subroutine set_bc4(id_accuracy,Q,T)
     integer(kind=4), intent(in), value :: id_accuracy
     real(8), intent(inout), device :: Q(nx,ny,nz,5)
+    real(8), intent(inout), device :: T(nx,ny,nz)
     integer i, j, k, l
   
     !$cuf kernel do(3) <<<*,*>>>

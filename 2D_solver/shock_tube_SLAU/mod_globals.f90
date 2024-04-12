@@ -35,6 +35,7 @@ module mod_globals
   type(dim3) :: threadsF = dim3(11,32,1)
 
   ! time
+  integer(kind=4), parameter :: id_RungeKutta = 0
   integer, parameter :: nt = 200
   integer, parameter :: np = 10
   real(8), parameter :: dt = 0.0001d0
@@ -47,8 +48,11 @@ module mod_globals
   real(8), parameter :: gamma = 1.4d0
 
   ! MUSCL
-  real(8), parameter :: k = -1.d0
+  real(8), parameter :: k = 1.d0 / 3.d0
   real(8), parameter :: b = (3.d0 - k) / (1.d0 - k)
+  real(8), parameter :: omega = 4.d0
+  real(8), parameter :: sigma = 2.d0
+  real(8), parameter :: eps = 1.d0
 
   ! initial condition
   real(8), parameter :: T = 300.d0
