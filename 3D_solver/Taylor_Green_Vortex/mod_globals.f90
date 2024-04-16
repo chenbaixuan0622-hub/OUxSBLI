@@ -5,7 +5,13 @@ module mod_globals
   integer, parameter :: accuracy = 2 
   integer(kind=2**(accuracy/2)), parameter :: id_accuracy = 1
   integer, parameter :: offset = accuracy / 2
-  integer, parameter :: id_visc = 0 
+  integer, parameter :: id_visc = 0
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_turbulence ! 0 laminar               !
+  !               ! 1 Smagorinsky           !
+  !               ! 2 selective_mixed_scale !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  integer, parameter :: id_turbulence = 1
   !!!!!!!!!!!!!!!!!!!!!!!
   ! id_scheme ! 1  KEEP !
   !           ! 2  Roe  !
