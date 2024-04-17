@@ -2,9 +2,20 @@ module print
   use mod_globals, only : nt, nx, ny, nz, dx, dy, dz, dt, gamma
   implicit none
   interface print_vtk
-    module procedure print_vtk_2D, print_vtk_3D
-  end interface
+    subroutine print_vtk_2D(step,Q,T)
+      integer, intent(in) :: step
+      real(8), intent(in) :: Q(nx,ny,4)
+      real(8), intent(in), optional :: T(nx,ny)
+    end subroutine print_vtk_2D
 
+    subroutine print_vtk_3D(step,Q,T,ke0,entropy0,mut)
+      integer, intent(in) :: step
+      real(8), intent(in) :: Q(nx,ny,nz,5)
+      real(8), intent(in) :: T(nx,ny,nz)
+      real(8), intent(inout) :: ke0, entropy0
+      real(8), intent(in), optional :: mut(nx,ny,nz)
+    end subroutine print_vtk_3D
+  end interface
 contains
   subroutine print_entropy(step,rho,p,rhos0)
     integer, intent(in) :: step
@@ -84,13 +95,14 @@ contains
     close(10)
   end subroutine print_vtk_2D
   
-  subroutine print_vtk_3D(step,Q,T,ke0,rhos0)
+  subroutine print_vtk_3D(step,Q,T,ke0,rhos0,mut)
     integer, intent(in) :: step
     real(8), intent(in) :: Q(nx,ny,nz,5)
     real(8), intent(in) :: T(nx,ny,nz)
     real(8), intent(inout) :: ke0, rhos0
+    real(8), intent(in), optional :: mut(nx,ny,nz)
     integer i, j, k
-    real(8), dimension(nx,ny,nz) :: rho, u, v, w, p
+    real(8), dimension(nx,ny,nz) :: rho, u, v, w, p, nut
     character(len=40) filename
     rho = Q(:,:,:,1)
     u = Q(:,:,:,2) / rho
@@ -115,6 +127,13 @@ contains
     write(10,"('SCALARS T float')")
     write(10,"('LOOKUP_TABLE default')")
     write(10,"(f9.4,1x)") (((T(i,j,k),i=1,nx),j=1,ny),k=1,nz)
+
+    if (present(mut)) then
+      nut(:,:,:) = mut(:,:,:) / rho(:,:,:)
+      write(10,"('SCALARS nut float')")
+      write(10,"('LOOKUP_TABLE default')")
+      write(10,"(f12.10,1x)") (((nut(i,j,k),i=1,nx),j=1,ny),k=1,nz)
+    endif
     close(10)
 
     call print_entropy(step,rho,p,rhos0)
