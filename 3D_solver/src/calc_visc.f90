@@ -1,20 +1,8 @@
 module calc_visc
-  use mod_globals, only : accuracy, offset, id_turbulence, nx, ny, nz, dxi, dyi, dzi
+  use mod_globals, only : accuracy, offset, id_visc, id_turbulence, nx, ny, nz, dxi, dyi, dzi
   use calc_Sutherland
   implicit none
 contains
-  attributes(device) function Smagorinsky(Cs,delta,ux,uy,uz,vx,vy,vz,wx,wy,wz) result(ans)
-    real(8), intent(in), value :: Cs, delta, ux, uy, uz, vx, vy, vz, wx, wy, wz
-    real(8) :: Dxx, Dyy, Dzz, Dxy, Dyz, Dzx, ans
-    Dxx = ux
-    Dyy = vy
-    Dzz = wz
-    Dxy = 0.5d0 * (uy + vx)
-    Dyz = 0.5d0 * (vz + wy)
-    Dzx = 0.5d0 * (wx + uz)
-    ans = ((Cs * delta)**2) * sqrt(2.d0 * (Dxx**2 + Dyy**2 + Dzz**2) + 4.d0 * (Dxy**2 + Dyz**2 + Dzx**2))
-  end function Smagorinsky
-
   attributes(device) function u_x(d,mu,a1,a2) result(ans)
     real(8), intent(in), value :: d, mu, a1, a2  
     real(8) :: ans
@@ -36,124 +24,166 @@ contains
             & + mu2 * (-u1 + u6 - u4 + u5)) 
   end function u_y
 
-  attributes(global) subroutine calc_Ev(u, v, w, T, E)
-    real(8), intent(in), dimension(nx,ny,nz), device :: u, v, w, T
+  attributes(global) subroutine calc_Ev(u, v, w, T, mut, E)
+    real(8), intent(in), dimension(nx,ny,nz), device :: u, v, w, T, mut
     real(8), intent(inout), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E
     integer i, j, k
-    real(8) mux, muy1, muy2, muz1, muz2, kappa
+    real(8) :: mux = 0.d0
+    real(8) :: muy1 = 0.d0
+    real(8) :: muy2 = 0.d0
+    real(8) :: muz1 = 0.d0
+    real(8) :: muz2 = 0.d0
+    real(8) :: kappa = 0.d0
     real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, txx, txy, txz
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset - 1
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
 
+    ! calc viscosity
+    if (id_visc == 1) then
+      call calc_mu(T(i,j,k),T(i+1,j,k),mux)
+      call calc_mu(T(i,j,k),T(i,j-1,k),T(i+1,j,k),T(i+1,j-1,k),muy1)
+      call calc_mu(T(i,j,k),T(i,j+1,k),T(i+1,j,k),T(i+1,j+1,k),muy2)
+      call calc_mu(T(i,j,k),T(i,j,k-1),T(i+1,j,k),T(i+1,j,k-1),muz1)
+      call calc_mu(T(i,j,k),T(i,j,k+1),T(i+1,j,k),T(i+1,j,k+1),muz2)
+      call calc_kappa(T(i,j,k),T(i+1,j,k),kappa)
+    endif
+
     ! x direction
-    call calc_mu(T(i,j,k),T(i+1,j,k),mux)
+    mux = mux + 0.5d0 * (mut(i,j,k) + mut(i+1,j,k))
     ux = u_x(dxi,mux,u(i,j,k),u(i+1,j,k))
     vx = u_x(dxi,mux,v(i,j,k),v(i+1,j,k))
     wx = u_x(dxi,mux,w(i,j,k),w(i+1,j,k))
 
     ! y direction
-    call calc_mu(T(i,j,k),T(i,j-1,k),T(i+1,j,k),T(i+1,j-1,k),muy1)
-    call calc_mu(T(i,j,k),T(i,j+1,k),T(i+1,j,k),T(i+1,j+1,k),muy2)
+    muy1 = muy1 + 0.25d0 * (mut(i,j-1,k) + mut(i,j,k) + mut(i+1,j-1,k) + mut(i+1,j,k)) 
+    muy2 = muy2 + 0.25d0 * (mut(i,j,k) + mut(i,j+1,k) + mut(i+1,j,k) + mut(i+1,j+1,k))
     uy = u_y(dyi,muy1,muy2,u(i,j,k),u(i,j-1,k),u(i+1,j-1,k),u(i+1,j,k),u(i+1,j+1,k),u(i,j+1,k))
     vy = u_y(dyi,muy1,muy2,v(i,j,k),v(i,j-1,k),v(i+1,j-1,k),v(i+1,j,k),v(i+1,j+1,k),v(i,j+1,k))
 
     ! z direction
-    call calc_mu(T(i,j,k),T(i,j,k-1),T(i+1,j,k),T(i+1,j,k-1),muz1)
-    call calc_mu(T(i,j,k),T(i,j,k+1),T(i+1,j,k),T(i+1,j,k+1),muz2)
+    muz1 = muz1 + 0.25d0 * (mut(i,j,k-1) + mut(i,j,k) + mut(i+1,j,k-1) + mut(i+1,j,k))
+    muz2 = muz2 + 0.25d0 * (mut(i,j,k) + mut(i,j,k+1) + mut(i+1,j,k) + mut(i+1,j,k+1))
     uz = u_y(dzi,muz1,muz2,u(i,j,k),u(i,j,k-1),u(i+1,j,k-1),u(i+1,j,k),u(i+1,j,k+1),u(i,j,k+1))
     wz = u_y(dzi,muz1,muz2,w(i,j,k),w(i,j,k-1),w(i+1,j,k-1),w(i+1,j,k),w(i+1,j,k+1),w(i,j,k+1))
 
     txx = 2.d0 * (2.d0 * ux - vy - wz) / 3.d0
     txy = uy + vx
     txz = wx + uz
-    call calc_kappa(T(i,j,k),T(i+1,j,k),kappa)
-    E(i-offset,j-offset,k-offset,2) = E(i-offset,j-offset,k-offset,2) - txx
-    E(i-offset,j-offset,k-offset,3) = E(i-offset,j-offset,k-offset,3) - txy
-    E(i-offset,j-offset,k-offset,4) = E(i-offset,j-offset,k-offset,4) - txz
-    E(i-offset,j-offset,k-offset,5) = E(i-offset,j-offset,k-offset,5) & 
-    & - txx * 0.5d0 * (u(i,j,k) + u(i+1,j,k)) & 
+    E(i-offset+1,j-offset,k-offset,2) = E(i-offset+1,j-offset,k-offset,2) - txx
+    E(i-offset+1,j-offset,k-offset,3) = E(i-offset+1,j-offset,k-offset,3) - txy
+    E(i-offset+1,j-offset,k-offset,4) = E(i-offset+1,j-offset,k-offset,4) - txz
+    E(i-offset+1,j-offset,k-offset,5) = E(i-offset+1,j-offset,k-offset,5) & 
+    & - txx * 0.5d0 * (u(i,j,k) + u(i+1,j,k)) &
     & - txy * 0.5d0 * (v(i,j,k) + v(i+1,j,k)) &
     & - txz * 0.5d0 * (w(i,j,k) + w(i+1,j,k)) - kappa * (-T(i,j,k) + T(i+1,j,k))
   end subroutine calc_Ev
   
-  attributes(global) subroutine calc_Fv(u, v, w, T, F)
-    real(8), intent(in), dimension(nx,ny,nz), device :: u, v, w, T
+  attributes(global) subroutine calc_Fv(u, v, w, T, mut, F)
+    real(8), intent(in), dimension(nx,ny,nz), device :: u, v, w, T, mut
     real(8), intent(inout), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F
     integer i, j, k
-    real(8) muy, muz1, muz2, mux1, mux2, kappa
+    real(8) :: muy = 0.d0
+    real(8) :: muz1 = 0.d0
+    real(8) :: muz2 = 0.d0
+    real(8) :: mux1 = 0.d0
+    real(8) :: mux2 = 0.d0
+    real(8) :: kappa = 0.d0
     real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, tyx, tyy, tyz
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset - 1
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
 
+    ! calc viscosity
+    if (id_visc == 1) then
+      call calc_mu(T(i,j,k),T(i,j+1,k),muy)
+      call calc_mu(T(i,j,k),T(i,j,k-1),T(i,j+1,k),T(i,j+1,k-1),muz1)
+      call calc_mu(T(i,j,k),T(i,j,k+1),T(i,j+1,k),T(i,j+1,k+1),muz2)
+      call calc_mu(T(i,j,k),T(i-1,j,k),T(i,j+1,k),T(i-1,j+1,k),mux1)
+      call calc_mu(T(i,j,k),T(i+1,j,k),T(i,j+1,k),T(i+1,j+1,k),mux2)
+      call calc_kappa(T(i,j,k),T(i,j+1,k),kappa)
+    endif
+
     ! y direction
-    call calc_mu(T(i,j,k),T(i,j+1,k),muy)
+    muy = muy + 0.5d0 * (mut(i,j,k) + mut(i,j+1,k))
     vy = u_x(dyi,muy,v(i,j,k),v(i,j+1,k))
     wy = u_x(dyi,muy,w(i,j,k),w(i,j+1,k))
     uy = u_x(dyi,muy,u(i,j,k),u(i,j+1,k))
 
     ! z direction
-    call calc_mu(T(i,j,k),T(i,j,k-1),T(i,j+1,k),T(i,j+1,k-1),muz1)
-    call calc_mu(T(i,j,k),T(i,j,k+1),T(i,j+1,k),T(i,j+1,k+1),muz2)
+    muz1 = muz1 + 0.25d0 * (mut(i,j,k-1) + mut(i,j,k) + mut(i,j+1,k-1) + mut(i,j+1,k))
+    muz2 = muz2 + 0.25d0 * (mut(i,j,k) + mut(i,j,k+1) + mut(i,j+1,k) + mut(i,j+1,k+1))
     vz = u_y(dzi,muz1,muz2,v(i,j,k),v(i,j,k-1),v(i,j+1,k-1),v(i,j+1,k),v(i,j+1,k+1),v(i,j,k+1)) 
     wz = u_y(dzi,muz1,muz2,w(i,j,k),w(i,j,k-1),w(i,j+1,k-1),w(i,j+1,k),w(i,j+1,k+1),w(i,j,k+1)) 
 
     ! x direction
-    call calc_mu(T(i,j,k),T(i-1,j,k),T(i,j+1,k),T(i-1,j+1,k),mux1)
-    call calc_mu(T(i,j,k),T(i+1,j,k),T(i,j+1,k),T(i+1,j+1,k),mux2)
+    mux1 = mux1 + 0.25d0 * (mut(i-1,j,k) + mut(i,j,k) + mut(i-1,j+1,k) + mut(i,j+1,k))
+    mux2 = mux2 + 0.25d0 * (mut(i,j,k) + mut(i+1,j,k) + mut(i,j+1,k) + mut(i+1,j+1,k))
     ux = u_y(dxi,mux1,mux2,u(i,j,k),u(i-1,j,k),u(i-1,j+1,k),u(i,j+1,k),u(i+1,j+1,k),u(i+1,j,k)) 
     vx = u_y(dxi,mux1,mux2,v(i,j,k),v(i-1,j,k),v(i-1,j+1,k),v(i,j+1,k),v(i+1,j+1,k),v(i+1,j,k)) 
 
     tyx = uy + vx
     tyy = 2.d0 * (2.d0 * vy - wz - ux) / 3.d0
     tyz = vz + wy
-    call calc_kappa(T(i,j,k),T(i,j+1,k),kappa)
-    F(i-offset,j-offset,k-offset,2) = F(i-offset,j-offset,k-offset,2) - tyx
-    F(i-offset,j-offset,k-offset,3) = F(i-offset,j-offset,k-offset,3) - tyy
-    F(i-offset,j-offset,k-offset,4) = F(i-offset,j-offset,k-offset,4) - tyz
-    F(i-offset,j-offset,k-offset,5) = F(i-offset,j-offset,k-offset,5) &
+    F(i-offset,j-offset+1,k-offset,2) = F(i-offset,j-offset+1,k-offset,2) - tyx
+    F(i-offset,j-offset+1,k-offset,3) = F(i-offset,j-offset+1,k-offset,3) - tyy
+    F(i-offset,j-offset+1,k-offset,4) = F(i-offset,j-offset+1,k-offset,4) - tyz
+    F(i-offset,j-offset+1,k-offset,5) = F(i-offset,j-offset+1,k-offset,5) &
     & - tyx * 0.5d0 * (u(i,j,k) + u(i,j+1,k)) &
     & - tyy * 0.5d0 * (v(i,j,k) + v(i,j+1,k)) &
     & - tyz * 0.5d0 * (w(i,j,k) + w(i,j+1,k)) - kappa * (-T(i,j,k) + T(i,j+1,k))
   end subroutine calc_Fv
   
-  attributes(global) subroutine calc_Gv(u, v, w, T, G)
-    real(8), intent(in), dimension(nx,ny,nz), device :: u, v, w, T
+  attributes(global) subroutine calc_Gv(u, v, w, T, mut, G)
+    real(8), intent(in), dimension(nx,ny,nz), device :: u, v, w, T, mut
     real(8), intent(inout), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G
     integer i, j, k
-    real(8) muz, mux1, mux2, muy1, muy2, kappa
+    real(8) :: muz = 0.d0
+    real(8) :: mux1 = 0.d0
+    real(8) :: mux2 = 0.d0
+    real(8) :: muy1 = 0.d0
+    real(8) :: muy2 = 0.d0
+    real(8) :: kappa = 0.d0
     real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, tzx, tzy, tzz
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
+    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset - 1
     
+    ! calc viscosity
+    if (id_visc == 1) then
+      call calc_mu(T(i,j,k),T(i,j,k+1),muz)
+      call calc_mu(T(i,j,k),T(i-1,j,k),T(i,j,k+1),T(i-1,j,k+1),mux1)
+      call calc_mu(T(i,j,k),T(i+1,j,k),T(i,j,k+1),T(i+1,j,k+1),mux2)
+      call calc_mu(T(i,j,k),T(i,j-1,k),T(i,j,k+1),T(i,j-1,k+1),muy1)
+      call calc_mu(T(i,j,k),T(i,j+1,k),T(i,j,k+1),T(i,j+1,k+1),muy2)
+      call calc_kappa(T(i,j,k),T(i,j,k+1),kappa)
+    endif
+
     ! z direction
-    call calc_mu(T(i,j,k),T(i,j,k+1),muz)
+    muz = muz + 0.5d0 * (mut(i,j,k) + mut(i,j,k+1))
     wz = u_x(dzi,muz,w(i,j,k),w(i,j,k+1)) 
     uz = u_x(dzi,muz,u(i,j,k),u(i,j,k+1)) 
     vz = u_x(dzi,muz,v(i,j,k),v(i,j,k+1)) 
     
     ! x direction
-    call calc_mu(T(i,j,k),T(i-1,j,k),T(i,j,k+1),T(i-1,j,k+1),mux1)
-    call calc_mu(T(i,j,k),T(i+1,j,k),T(i,j,k+1),T(i+1,j,k+1),mux2)
+    mux1 = mux1 + 0.25d0 * (mut(i-1,j,k) + mut(i,j,k) + mut(i-1,j,k+1) + mut(i,j,k+1)) 
+    mux2 = mux2 + 0.25d0 * (mut(i,j,k) + mut(i+1,j,k) + mut(i,j,k+1) + mut(i+1,j,k+1))
     wx = u_y(dxi,mux1,mux2,w(i,j,k),w(i-1,j,k),w(i-1,j,k+1),w(i,j,k+1),w(i+1,j,k+1),w(i+1,j,k))
     ux = u_y(dxi,mux1,mux2,u(i,j,k),u(i-1,j,k),u(i-1,j,k+1),u(i,j,k+1),u(i+1,j,k+1),u(i+1,j,k))
     
     ! y direction
-    call calc_mu(T(i,j,k),T(i,j-1,k),T(i,j,k+1),T(i,j-1,k+1),muy1)
-    call calc_mu(T(i,j,k),T(i,j+1,k),T(i,j,k+1),T(i,j+1,k+1),muy2)
+    muy1 = muy1 + 0.25d0 * (mut(i,j-1,k) + mut(i,j,k) + mut(i,j-1,k+1) + mut(i,j,k+1))
+    muy2 = muy2 + 0.25d0 * (mut(i,j,k) + mut(i,j+1,k) + mut(i,j,k+1) + mut(i,j+1,k+1))
     vy = u_y(dyi,muy1,muy2,v(i,j,k),v(i,j-1,k),v(i,j-1,k+1),v(i,j,k+1),v(i,j+1,k+1),v(i,j+1,k)) 
     wy = u_y(dyi,muy1,muy2,w(i,j,k),w(i,j-1,k),w(i,j-1,k+1),w(i,j,k+1),w(i,j+1,k+1),w(i,j+1,k))  
 
     tzx = wx + uz
     tzy = vz + wy
     tzz = 2.d0 * (2.d0 * wz - ux - vy) / 3.d0
-    call calc_kappa(T(i,j,k),T(i,j,k+1),kappa)
-    G(i-offset,j-offset,k-offset,2) = G(i-offset,j-offset,k-offset,2) - tzx
-    G(i-offset,j-offset,k-offset,3) = G(i-offset,j-offset,k-offset,3) - tzy
-    G(i-offset,j-offset,k-offset,4) = G(i-offset,j-offset,k-offset,4) - tzz
-    G(i-offset,j-offset,k-offset,5) = G(i-offset,j-offset,k-offset,5) &
+    G(i-offset,j-offset,k-offset+1,2) = G(i-offset,j-offset,k-offset+1,2) - tzx
+    G(i-offset,j-offset,k-offset+1,3) = G(i-offset,j-offset,k-offset+1,3) - tzy
+    G(i-offset,j-offset,k-offset+1,4) = G(i-offset,j-offset,k-offset+1,4) - tzz
+    G(i-offset,j-offset,k-offset+1,5) = G(i-offset,j-offset,k-offset+1,5) &
     & - tzx * 0.5d0 * (u(i,j,k) + u(i,j,k+1)) &
     & - tzy * 0.5d0 * (v(i,j,k) + v(i,j,k+1)) &
     & - tzz * 0.5d0 * (w(i,j,k) + w(i,j,k+1)) - kappa * (-T(i,j,k) + T(i,j,k+1))
