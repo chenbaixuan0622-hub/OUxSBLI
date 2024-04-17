@@ -9,6 +9,12 @@ contains
     real(8) sum
     sum = V1(1) * V2(1) + V1(2) * V2(2)
   end function vecsum
+
+  attributes(device) function q2(Vl,Vr) result(ans)
+    real(8), intent(in), dimension(2), device :: Vl, Vr
+    real(8) ans
+    ans = Vl(1)**2 + Vl(2)**2 + Vr(1)**2 + Vr(2)**2
+  end function q2
   
   attributes(device) function Cij(A,B) result(ans)
     real(8), intent(in), dimension(4), device :: A, B

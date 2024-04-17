@@ -12,6 +12,9 @@ module calc_time_dev
   interface calc_EFG
     module procedure calc_EFG_basic, calc_EFG_hybrid
   end interface
+  interface RungeKutta
+    module procedure RungeKutta_3rd, RungeKutta_4th
+  end interface
 contains
   subroutine calc_EFG_basic(id_hybrid,Q,T,E,F,G)
     integer(kind=2), intent(in) :: id_hybrid
@@ -47,26 +50,25 @@ contains
     real(8), intent(out), device :: F_hybrid(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device :: G_hybrid(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, energy
-    real(8), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E_keep, E_roe
-    real(8), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F_keep, F_roe
-    real(8), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G_keep, G_roe
+    real(8), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E_keep, E_upwind
+    real(8), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F_keep, F_upwind
+    real(8), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G_keep, G_upwind
     integer stat
     integer(kind=2) :: id_muscl1
-    integer(kind=4) :: id_muscl2
     call calc_quantities(Q,rho,u,v,w,p,T)
 
     call calc_E<<<blocksE,threadsE>>>(id_muscl1,rho,u,v,w,p,E_keep)
     call calc_F<<<blocksF,threadsF>>>(id_muscl1,rho,u,v,w,p,F_keep)
     call calc_G<<<blocksG,threadsG>>>(id_muscl1,rho,u,v,w,p,G_keep)
-    call calc_E<<<blocksE,threadsE>>>(id_muscl2,rho,u,v,w,p,E_roe)
-    call calc_F<<<blocksF,threadsF>>>(id_muscl2,rho,u,v,w,p,F_roe)
-    call calc_G<<<blocksG,threadsG>>>(id_muscl2,rho,u,v,w,p,G_roe)
+    call calc_E<<<blocksE,threadsE>>>(id_muscl,rho,u,v,w,p,E_upwind)
+    call calc_F<<<blocksF,threadsF>>>(id_muscl,rho,u,v,w,p,F_upwind)
+    call calc_G<<<blocksG,threadsG>>>(id_muscl,rho,u,v,w,p,G_upwind)
     stat = cudaDeviceSynchronize()
 
     energy(:,:,:) = Q(:,:,:,5)
-    call calc_E_hybrid<<<blocksE,threadsE>>>(rho,u,v,w,energy,E_keep,E_roe,E_hybrid)
-    call calc_F_hybrid<<<blocksF,threadsF>>>(rho,u,v,w,energy,F_keep,F_roe,F_hybrid)
-    call calc_G_hybrid<<<blocksG,threadsG>>>(rho,u,v,w,energy,G_keep,G_roe,G_hybrid)
+    call calc_E_hybrid<<<blocksE,threadsE>>>(rho,u,v,w,energy,E_keep,E_upwind,E_hybrid)
+    call calc_F_hybrid<<<blocksF,threadsF>>>(rho,u,v,w,energy,F_keep,F_upwind,F_hybrid)
+    call calc_G_hybrid<<<blocksG,threadsG>>>(rho,u,v,w,energy,G_keep,G_upwind,G_hybrid)
     stat = cudaDeviceSynchronize()
     !print *, trim(cudaGetErrorString(cudaGetLastError()))
 
@@ -78,7 +80,8 @@ contains
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_hybrid
 
-  subroutine RungeKutta(T0,Q)
+  subroutine RungeKutta_3rd(id_RungeKutta,T0,Q)
+    integer(kind=2), intent(in) :: id_RungeKutta
     real(8), intent(inout) :: Q(nx,ny,nz,5)
     real(8), intent(inout) :: T0(nx,ny,nz)
     integer t1, t2, itr, stat
@@ -88,9 +91,11 @@ contains
     real(8), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     real(8), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    ! for plot
+    real(8) ke0, entropy0
 
     ! print initial condition
-    call print_vtk(0,Q,T0)
+    call print_vtk(0,Q,T0,ke0,entropy0)
     ! copy on GPU
     Q_d = Q
     T = T0
@@ -110,8 +115,53 @@ contains
       enddo
       Q = Q_d
       T0 = T
-      call print_vtk(t2,Q,T0)
+      call print_vtk(t2,Q,T0,ke0,entropy0)
     enddo
-  end subroutine RungeKutta
+  end subroutine RungeKutta_3rd
+
+  subroutine RungeKutta_4th(id_RungeKutta,T0,Q)
+    integer(kind=4), intent(in) :: id_RungeKutta
+    real(8), intent(inout) :: Q(nx,ny,nz,5)
+    real(8), intent(inout) :: T0(nx,ny,nz)
+    integer t1, t2, itr, stat
+    integer(kind=2) :: id_muscl
+    real(8), dimension(nx,ny,nz,5), device :: Q_d, Qs
+    real(8), dimension(nx,ny,nz), device :: T
+    real(8), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
+    real(8), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
+    real(8), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    real(8), device :: Rs(nx-accuracy,ny-accuracy,nz-accuracy,5)
+    ! for plot
+    real(8) ke0, entropy0
+
+    ! print initial condition
+    call print_vtk(0,Q,T0,ke0,entropy0)
+    ! copy on GPU
+    Q_d = Q
+    T = T0
+    Rs(:,:,:,:) = 0.d0
+    do t2 = 1, np
+      do t1 = 1, nt
+        call calc_EFG(id_hybrid,Q_d,T,E,F,G)
+        call calc_step(0.5d0,1.d0,E,F,G,Rs,Q_d,Qs)
+        call set_bc(id_accuracy,Qs,T)
+
+        call calc_EFG(id_hybrid,Qs,T,E,F,G)
+        call calc_step(0.5d0,2.d0,E,F,G,Rs,Q_d,Qs)
+        call set_bc(id_accuracy,Qs,T)
+
+        call calc_EFG(id_hybrid,Qs,T,E,F,G)
+        call calc_step(1.d0,2.d0,E,F,G,Rs,Q_d,Qs)
+        call set_bc(id_accuracy,Qs,T)
+
+        call calc_EFG(id_hybrid,Qs,T,E,F,G)
+        call calc_step4(E,F,G,Rs,Q_d)
+        call set_bc(id_accuracy,Q_d,T)
+      enddo
+      Q = Q_d
+      T0 = T
+      call print_vtk(t2,Q,T0,ke0,entropy0)
+    enddo
+  end subroutine RungeKutta_4th
 end module calc_time_dev
 

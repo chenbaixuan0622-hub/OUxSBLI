@@ -12,6 +12,9 @@ module calc_time_dev
   interface calc_EF
     module procedure calc_EF_basic, calc_EF_hybrid
   end interface
+  interface RungeKutta
+    module procedure RungeKutta_3rd, RungeKutta_4th
+  end interface
 contains
   subroutine calc_EF_basic(id_hybrid,Q,T,E,F)
     integer(kind=2), intent(in) :: id_hybrid
@@ -40,21 +43,20 @@ contains
     real(8), intent(out), device :: E_hybrid(nx-accuracy+1,ny-accuracy,4)
     real(8), intent(out), device :: F_hybrid(nx-accuracy,ny-accuracy+1,4)
     real(8), dimension(nx,ny), device :: rho, u, v, p, energy
-    real(8), dimension(nx-accuracy+1,ny-accuracy,4), device :: E_keep, E_roe
-    real(8), dimension(nx-accuracy,ny-accuracy+1,4), device :: F_keep, F_roe
+    real(8), dimension(nx-accuracy+1,ny-accuracy,4), device :: E_keep, E_upwind
+    real(8), dimension(nx-accuracy,ny-accuracy+1,4), device :: F_keep, F_upwind
     integer stat
     integer(kind=2) :: id_muscl1
-    integer(kind=4) :: id_muscl2
     call calc_quantities(Q,rho,u,v,p,T)
     call calc_E<<<blocksE,threadsE>>>(id_muscl1,rho,u,v,p,E_keep)
     call calc_F<<<blocksF,threadsF>>>(id_muscl1,rho,u,v,p,F_keep)
-    call calc_E<<<blocksE,threadsE>>>(id_muscl2,rho,u,v,p,E_roe)
-    call calc_F<<<blocksF,threadsF>>>(id_muscl2,rho,u,v,p,F_roe)
+    call calc_E<<<blocksE,threadsE>>>(id_muscl,rho,u,v,p,E_upwind)
+    call calc_F<<<blocksF,threadsF>>>(id_muscl,rho,u,v,p,F_upwind)
     stat = cudaDeviceSynchronize()
 
     energy(:,:) = Q(:,:,4)
-    call calc_E_hybrid<<<blocksE,threadsE>>>(rho,u,v,energy,E_keep,E_roe,E_hybrid)
-    call calc_F_hybrid<<<blocksF,threadsF>>>(rho,u,v,energy,F_keep,F_roe,F_hybrid)
+    call calc_E_hybrid<<<blocksE,threadsE>>>(rho,u,v,energy,E_keep,E_upwind,E_hybrid)
+    call calc_F_hybrid<<<blocksF,threadsF>>>(rho,u,v,energy,F_keep,F_upwind,F_hybrid)
     stat = cudaDeviceSynchronize()
 
     if (id_visc == 1) then 
@@ -64,7 +66,8 @@ contains
     stat = cudaDeviceSynchronize()
   end subroutine calc_EF_hybrid
   
-  subroutine RungeKutta(T0,Q)
+  subroutine RungeKutta_3rd(id_RungeKutta,T0,Q)
+    integer(kind=2), intent(in) :: id_RungeKutta
     real(8), intent(inout) :: Q(nx,ny,4)
     real(8), intent(inout) :: T0(nx,ny)
     integer t1, t2, itr
@@ -96,6 +99,47 @@ contains
       T0 = T
       call print_vtk(t2,Q,T0)
     enddo
-  end subroutine RungeKutta
+  end subroutine RungeKutta_3rd
+
+  subroutine RungeKutta_4th(id_RungeKutta,T0,Q)
+    integer(kind=4), intent(in) :: id_RungeKutta
+    real(8), intent(inout) :: Q(nx,ny,4)
+    real(8), intent(inout) :: T0(nx,ny)
+    integer t1, t2, itr
+    real(8), dimension(nx,ny,4), device :: Q_d, Qs
+    real(8), dimension(nx,ny), device :: T
+    real(8), device :: E(nx-accuracy+1,ny-accuracy,4)
+    real(8), device :: F(nx-accuracy,ny-accuracy+1,4)
+    real(8), device :: Rs(nx-accuracy,ny-accuracy,4)
+
+    ! print initial condition
+    call print_vtk(0,Q,T0)
+    ! copy on GPU
+    Q_d = Q
+    T = T0
+    Rs(:,:,:) = 0.d0
+    do t2 = 1, np
+      do t1 = 1, nt
+        call calc_EF(id_hybrid,Q_d,T,E,F)
+        call calc_step(0.5d0,1.d0,E,F,Rs,Q_d,Qs)
+        call set_bc(Qs)
+        
+        call calc_EF(id_hybrid,Qs,T,E,F)
+        call calc_step(0.5d0,2.d0,E,F,Rs,Q_d,Qs)
+        call set_bc(Qs)
+
+        call calc_EF(id_hybrid,Qs,T,E,F)
+        call calc_step(1.d0,2.d0,E,F,Rs,Q_d,Qs)
+        call set_bc(Qs)
+
+        call calc_EF(id_hybrid,Qs,T,E,F)
+        call calc_step4(E,F,Rs,Q_d)
+        call set_bc(Q_d)
+      enddo
+      Q = Q_d
+      T0 = T
+      call print_vtk(t2,Q,T0)
+    enddo
+  end subroutine RungeKutta_4th
 end module calc_time_dev
 

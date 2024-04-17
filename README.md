@@ -19,6 +19,7 @@ KEEP scheme
 Taylor-Green vortex 
 </p>
 <img src="./visuals/Vorticity.gif" alt="Taylor-Green vortex">
+<img src="./visuals/entropy_ke.png" alt="entropy and kinetic energy">
 
 <h2>
 SLAU scheme

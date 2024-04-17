@@ -35,7 +35,8 @@ contains
     rot(2) = 0.5d0 * dzi * (-u(i,j,k-1) + u(i,j,k+1)) - dxi * (-w(i,j,k) + w(i+1,j,k))
     rot(3) = dxi * (-v(i,j,k) + v(i+1,j,k)) - 0.5d0 * dyi * (-u(i,j-1,k) + u(i,j+1,k))
     
-    fd = div**2 / (div**2 + (rot(1)**2 + rot(2)**2 + rot(3)**2) + eps)
+    !fd = div**2 / (div**2 + (rot(1)**2 + rot(2)**2 + rot(3)**2) + eps)
+    fd = 1.d0
     E_hybrid(i-offset+1,j-offset,k-offset,:) = (1.d0 - fd) * E_keep(i-offset+1,j-offset,k-offset,:) + fd * E_tvd(:)
   end subroutine calc_E_hybrid
   
@@ -71,7 +72,8 @@ contains
     rot(2) = 0.5d0 * dzi * (-u(i,j,k-1) + u(i,j,k+1)) - 0.5d0 * dxi * (-w(i-1,j,k) + w(i+1,j,k))
     rot(3) = 0.5d0 * dxi * (-v(i-1,j,k) + v(i+1,j,k)) - dyi * (-u(i,j,k) + u(i,j+1,k))
     
-    fd = div**2 / (div**2 + (rot(1)**2 + rot(2)**2 + rot(3)**2) + eps)
+    !fd = div**2 / (div**2 + (rot(1)**2 + rot(2)**2 + rot(3)**2) + eps)
+    fd = 1.d0
     F_hybrid(i-offset,j-offset+1,k-offset,:) = (1.d0 - fd) * F_keep(i-offset,j-offset+1,k-offset,:) + fd * F_tvd(:)
   end subroutine calc_F_hybrid
 
@@ -107,7 +109,8 @@ contains
     rot(2) = dzi * (-u(i,j,k) + u(i,j,k+1)) - 0.5d0 * dxi * (-w(i-1,j,k) + w(i+1,j,k))
     rot(3) = 0.5d0 * dxi * (-v(i-1,j,k) + v(i+1,j,k)) - 0.5d0 * dyi * (-u(i,j-1,k) + u(i,j+1,k))
     
-    fd = div**2 / (div**2 + (rot(1)**2 + rot(2)**2 + rot(3)**2) + eps)
+    !fd = div**2 / (div**2 + (rot(1)**2 + rot(2)**2 + rot(3)**2) + eps)
+    fd = 1.d0
     G_hybrid(i-offset,j-offset,k-offset+1,:) = (1.d0 - fd) * G_keep(i-offset,j-offset,k-offset+1,:) + fd * G_tvd(:)
   end subroutine calc_G_hybrid
 end module calc_hybrid

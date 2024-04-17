@@ -6,6 +6,12 @@ module mod_globals
   integer(kind=2**(accuracy/2)), parameter :: id_accuracy = 1
   integer, parameter :: offset = accuracy / 2
   integer, parameter :: id_visc = 0 
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_turbulence ! 0 laminar               !
+  !               ! 1 Smagorinsky           !
+  !               ! 2 selective_mixed_scale !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  integer, parameter :: id_turbulence = 1
   !!!!!!!!!!!!!!!!!!!!!!!
   ! id_scheme ! 1  KEEP !
   !           ! 2  Roe  !
@@ -30,18 +36,19 @@ module mod_globals
   real(8), parameter :: dzi = 1.d0 / dz
 
   ! GPU
-  type(dim3) :: blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/3)
-  type(dim3) :: blocksF = dim3((nx-accuracy)/7,(ny-accuracy+1)/32,(nz-accuracy)/3)
-  type(dim3) :: blocksG = dim3((nx-accuracy)/7,(ny-accuracy)/1,(nz-accuracy+1)/32)
-  type(dim3) :: threadsE = dim3(32,1,3)
-  type(dim3) :: threadsF = dim3(7,32,3)
-  type(dim3) :: threadsG = dim3(7,1,32)
+  type(dim3) :: blocksE = dim3((nx-accuracy+1)/16,(ny-accuracy)/1,(nz-accuracy)/3)
+  type(dim3) :: blocksF = dim3((nx-accuracy)/7,(ny-accuracy+1)/16,(nz-accuracy)/3)
+  type(dim3) :: blocksG = dim3((nx-accuracy)/7,(ny-accuracy)/1,(nz-accuracy+1)/16)
+  type(dim3) :: threadsE = dim3(16,1,3)
+  type(dim3) :: threadsF = dim3(7,16,3)
+  type(dim3) :: threadsG = dim3(7,1,16)
 
   ! time
-  integer, parameter :: nt = 250
-  integer, parameter :: np = 5
+  integer(kind=4), parameter :: id_RungeKutta = 0
+  integer, parameter :: nt = 50
+  integer, parameter :: np = 40
   real(8), parameter :: u0 = 506.8d0
-  real(8), parameter :: dt = 0.8d0 * dx / u0
+  real(8), parameter :: dt = 0.5d0 * dx / u0
 
   real(8), parameter :: dtdx = dt / dx
   real(8), parameter :: dtdy = dt / dy
@@ -51,8 +58,11 @@ module mod_globals
   real(8), parameter :: gamma = 1.4d0
 
   ! MUSCL
-  real(8), parameter :: k = -1.d0
+  real(8), parameter :: k = 1.d0 / 3.d0
   real(8), parameter :: b = (3.d0 - k) / (1.d0 - k)
+  real(8), parameter :: omega = 4.d0
+  real(8), parameter :: sigma = 2.d0
+  real(8), parameter :: eps = 1.d0
 
   ! initial condition
   real(8), parameter :: R = 287.03d0

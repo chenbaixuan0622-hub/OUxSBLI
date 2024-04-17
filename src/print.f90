@@ -6,31 +6,33 @@ module print
   end interface
 
 contains
-  subroutine print_entropy(rho0,p0,rho,p,T)
-    real(8), intent(in), dimension(nx,ny,nz) :: rho0, p0, rho, p, T
-    real(8) Cp, Cv
-    real(8) :: R = 287.d0
-    real(8) :: ds = 0.d0
-    integer i, j, k
-    do k = 1, nz
-      do j = 1, ny
-        do i = 1, nx
-          Cp = 1030.5d0 - 0.19975d0 * T(i,j,k) + 3.9734 * T(i,j,k)**2
-          Cv = Cp - R
-          ds = ds + Cv * log(p(i,j,k) / p0(i,j,k)) - Cp * log(rho(i,j,k)/ rho0(i,j,k))
-        enddo
-      enddo
-    enddo
+  subroutine print_entropy(step,rho,p,rhos0)
+    integer, intent(in) :: step
+    real(8), intent(in), dimension(nx,ny,nz) :: rho, p
+    real(8), intent(inout) :: rhos0
+    real(8) rhos, t
+    rhos = sum(rho * log(p * rho ** (-gamma)))
+    if (step == 0) then
+      rhos0 = rhos
+    endif
+    t = nt * step * dt
+    open(10,file="data/entropy.d", position="append")
+    write(10,"(2(f9.4,1x))") t, (rhos0 - rhos) / rhos0
+    close(10)
   end subroutine print_entropy
 
-  subroutine print_KE(step,rho,u,v,w)
+  subroutine print_KE(step,rho,u,v,w,ke0)
     integer, intent(in) :: step
     real(8), intent(in), dimension(nx,ny,nz) :: rho, u, v, w
+    real(8), intent(inout) :: ke0
     real(8) ke, t
-    ke = sum(rho * (u**2 + v**2 + w**2))
+    ke = sum(0.5d0 * rho * (u**2 + v**2 + w**2))
+    if (step == 0) then
+      ke0 = ke
+    endif
     t = nt * step * dt
     open(10,file="data/kinetic_energy.d", position="append")
-    write(10,"(2(f9.4,1x))") t, ke
+    write(10,"(2(f9.4,1x))") t, ke / ke0
     close(10)
   end subroutine print_KE
 
@@ -82,10 +84,11 @@ contains
     close(10)
   end subroutine print_vtk_2D
   
-  subroutine print_vtk_3D(step,Q,T)
+  subroutine print_vtk_3D(step,Q,T,ke0,rhos0)
     integer, intent(in) :: step
     real(8), intent(in) :: Q(nx,ny,nz,5)
-    real(8), intent(in), optional :: T(nx,ny,nz)
+    real(8), intent(in) :: T(nx,ny,nz)
+    real(8), intent(inout) :: ke0, rhos0
     integer i, j, k
     real(8), dimension(nx,ny,nz) :: rho, u, v, w, p
     character(len=40) filename
@@ -114,8 +117,8 @@ contains
     write(10,"(f9.4,1x)") (((T(i,j,k),i=1,nx),j=1,ny),k=1,nz)
     close(10)
 
-    !call print_entropy(step,rho0,p0,rho,p,T)
-    call print_KE(step,rho,u,v,w)
+    call print_entropy(step,rho,p,rhos0)
+    call print_KE(step,rho,u,v,w,ke0)
   end subroutine print_vtk_3D
 end module print
 

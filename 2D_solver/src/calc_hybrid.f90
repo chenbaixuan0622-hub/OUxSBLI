@@ -26,11 +26,13 @@ contains
     phi_p = (d2 * d1 + d1**2) / (d2**2 + d1**2 + eps)
     phi_m = (d2 * d3 + d3**2) / (d2**2 + d3**2 + eps)
     phi = min(phi_p, phi_m)
+    !phi = 0.d0
     E_tvd(:) = phi * E_keep(i-offset+1,j-offset,:) + (1.d0 - phi) * E_upwind(i-offset+1,j-offset,:)
     
     div = dxi * (-u(i,j) + u(i+1,j)) + 0.5d0 * dyi * (-v(i,j-1) + v(i,j+1))
     rot = dxi * (-v(i,j) + v(i+1,j)) - 0.5d0 * dyi * (-u(i,j-1) + u(i,j+1))
-    fd = div**2 / (div**2 + rot**2 + eps)
+    !fd = div**2 / (div**2 + rot**2 + eps)
+    fd = 1.d0
     E_hybrid(i-offset+1,j-offset,:) = (1.d0 - fd) * E_keep(i-offset+1,j-offset,:) + fd * E_tvd(:)
   end subroutine calc_E_hybrid
   
@@ -57,11 +59,13 @@ contains
     phi_p = (d2 * d1 + d1**2) / (d2**2 + d1**2 + eps)
     phi_m = (d2 * d3 + d3**2) / (d2**2 + d3**2 + eps)
     phi = min(phi_p, phi_m)
+    !phi = 0.d0
     F_tvd(:) = phi * F_keep(i-offset,j-offset+1,:) + (1.d0 - phi) * F_upwind(i-offset,j-offset+1,:)
     
     div = 0.5d0 * dxi * (-u(i-1,j) + u(i+1,j)) + dyi * (-v(i,j) + v(i,j+1))
     rot = 0.5d0 * dxi * (-v(i-1,j) + v(i+1,j)) - dyi * (-u(i,j) + u(i,j+1))
-    fd = div**2 / (div**2 + rot**2 + eps)
+    !fd = div**2 / (div**2 + rot**2 + eps)
+    fd = 1.d0
     F_hybrid(i-offset,j-offset+1,:) = (1.d0 - fd) * F_keep(i-offset,j-offset+1,:) + fd * F_tvd(:)
   end subroutine calc_F_hybrid
 end module calc_hybrid
