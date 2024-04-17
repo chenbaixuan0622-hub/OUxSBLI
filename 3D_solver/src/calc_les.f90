@@ -27,14 +27,9 @@ contains
 
   attributes(device) function strain_velocity_tensor(dudx,dudy,dudz,dvdx,dvdy,dvdz,dwdx,dwdy,dwdz) result(S2)
     real(8), intent(in), value :: dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz
-    real(8) S2, S11, S22, S33, S12, S23, S31
-    S11 = dudx
-    S22 = dvdy
-    S33 = dwdz
-    S12 = 0.5d0 * (dvdx + dudy)
-    S23 = 0.5d0 * (dwdy + dvdz)
-    S31 = 0.5d0 * (dudz + dwdx)
-    S2 = 2.d0 * (S11**2 + S22**2 + S33**2) + 4.d0 * (S12**2 + S23**2 + S31**2)
+    real(8) S2
+    S2 = 2.d0 * (dudx**2 + dvdy**2 + dwdz**2) &
+    & + ((dvdx + dudy)**2 + (dwdy + dvdz)**2 + (dudz + dwdx)**2)
   end function strain_velocity_tensor
 
   attributes(device) function test_filter(x) result(xhat)
@@ -103,23 +98,26 @@ contains
   attributes(global) subroutine calc_mut(rho,u,v,w,mut)
     real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w
     real(8), intent(out), dimension(nx,ny,nz), device :: mut
-    integer i, j, k
+    integer i, j, k, l, m, n
     real(8), dimension(3,3,3), device :: us, vs, ws, uhat, vhat, what
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
-    !us = u(i-1:i+1,j-1:j+1,w-1:w+1)
-    !vs = v(i-1:i+1,j-1:j+1,w-1:w+1)
-    !ws = w(i-1:i+1,j-1:j+1,w-1:w+1)
-    us() = u()
-    us() = u()
-    us() = u()
+    do n = -1, 1
+      do m = -1, 1
+        do l = -1, 1
+          us(l+2,m+2,n+2) = u(i+l,j+m,k+n)
+          vs(l+2,m+2,n+2) = v(i+l,j+m,k+n)
+          ws(l+2,m+2,n+2) = w(i+l,j+m,k+n)
+        enddo
+      enddo
+    enddo
     if (id_turbulence == 1) then
       mut(i,j,k) = rho(i,j,k) * Smagorinsky(us,vs,ws) 
     else
-      uhat(:,:,:) = stride_filter(u(i-2:i+2,j-2:j+2,k-2:k+2))
-      vhat(:,:,:) = stride_filter(v(i-2:i+2,j-2:j+2,k-2:k+2))
-      what(:,:,:) = stride_filter(w(i-2:i+2,j-2:j+2,k-2:k+2))
+      !uhat(:,:,:) = stride_filter(u(i-2:i+2,j-2:j+2,k-2:k+2))
+      !vhat(:,:,:) = stride_filter(v(i-2:i+2,j-2:j+2,k-2:k+2))
+      !what(:,:,:) = stride_filter(w(i-2:i+2,j-2:j+2,k-2:k+2))
       mut(i,j,k) = rho(i,j,k) * selective_mixed_scale(us,vs,ws,uhat,vhat,what)
     endif
   end subroutine calc_mut
