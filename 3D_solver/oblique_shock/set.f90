@@ -1,18 +1,51 @@
 module set
-  use mod_globals, only : nx, ny, nz, dy, gamma
+  use mod_globals, only : nx, ny, nz, dy, gamma, u0, &
+  & beta, theta, Ms, Ms2, a1, rho0, rho2, p0, p2, u1, u2, v1, v2, u_magnitude, ux, uy
   implicit none
-  real(8) :: M0 = 1.9d0
-  real(8) :: u0 = 506.8d0
-  real(8) :: p0 = 14.924d0
-  real(8) :: rho0 = gamma * p0 / M0**2
 contains
   subroutine set_init(Q)
     real(8), intent(out), dimension(nx,ny,nz,5) :: Q
+    integer i, k
+    integer :: No = int(0.4 * nx)
     Q(:,:,:,1) = rho0
     Q(:,:,:,2) = rho0 * u0
     Q(:,:,:,3) = 0.d0
     Q(:,:,:,4) = 0.d0
     Q(:,:,:,5) = p0 / (gamma - 1.d0) + 0.5d0 * rho0 * u0**2
+
+    ! top
+    do k = 2, nz-1
+      do i = 1, No
+        Q(i,ny,k,1) = rho0
+        Q(i,ny,k,2) = rho0 * u0 
+        Q(i,ny,k,3) = 0.d0
+        Q(i,ny,k,4) = 0.d0
+        Q(i,ny,k,5) = p0 / (gamma - 1.d0) + 0.5d0 * rho0 * u0**2
+      enddo
+    enddo
+
+    do k = 2, nz-1
+      do i = No+1, nx
+        Q(i,ny,k,1) = rho2
+        Q(i,ny,k,2) = rho2 * ux
+        Q(i,ny,k,3) = rho2 * uy
+        Q(i,ny,k,4) = 0.d0
+        Q(i,ny,k,5) = p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)
+      enddo
+    enddo
+
+    ! bottom
+    Q(:,2,:,1) = Q(:,3,:,1)
+    Q(:,2,:,2) = Q(:,3,:,2)
+    Q(:,2,:,3) = 0.d0
+    Q(:,2,:,4) = Q(:,3,:,4)
+    Q(:,2,:,5) = Q(:,3,:,5)
+    ! imaginary
+    Q(:,1,:,1) = Q(:,3,:,1)
+    Q(:,1,:,2) = Q(:,3,:,2)
+    Q(:,1,:,3) = -Q(:,3,:,3)
+    Q(:,1,:,4) = Q(:,3,:,4)
+    Q(:,1,:,5) = Q(:,3,:,5)
   end subroutine set_init
   
   subroutine set_bc(id_accuracy,Q,T)
@@ -21,81 +54,76 @@ contains
     real(8), intent(inout), device :: T(nx,ny,nz)
     integer i, j, k, l
     integer :: No = int(0.4 * nx)
-    ! slip wall
-    real(8) T_bottom, Cp, p_bottom, e_bottom
-    ! oblique shock
-    real(8) :: beta = 37.2d0 / 180.d0
-    real(8) :: Ms = M0 * sin(beta)
-    real(8) :: p1 = p0
-    real(8) :: p2 = p1 * (1.d0 + 2.d0 * gamma * (Ms**2 - 1.d0) / (gamma + 1.d0)) 
-    real(8) :: rho1 = rho0
-    real(8) :: rho2 = rho1 * (gamma + 1.d0) * Ms**2 / ((gamma - 1.d0) * Ms**2 + 2.d0)
-    real(8) :: u1 = u0 * sin(beta)
-    real(8) :: a1 =
-    real(8) :: u2 = u1 - 2.d0  * a1 * (Ms**2 - 1.d0 / Ms**2) / (gamma + 1.d0)
-    real(8) :: v1 = u0 * cos(beta)
-    real(8) :: v2 = u0 * cos(beta) 
-    ! inlet
     !$cuf kernel do<<<*,*>>>
-    do k = 1, nz
-      do j = 1, ny
+    do k = 2, nz-1
+      do j = 3, ny-1
+        ! inlet
         Q(1,j,k,1) = rho0
         Q(1,j,k,2) = rho0 * u0
         Q(1,j,k,3) = 0.d0
         Q(1,j,k,4) = 0.d0
         Q(1,j,k,5) = p0 / (gamma - 1.d0) + 0.5d0 * rho0 * u0**2
-      enddo
-    enddo
-
-    ! outlet
-    !$cuf kernel do<<<*,*>>>
-    do l = 1, 5
-      do k = 1, nz
-        do j = 1, ny
-          Q(nx,j,k,l) = Q(nx-1,j,k,l)
-        enddo
+        ! outlet
+        Q(nx,j,k,1) = Q(nx-1,j,k,1)
+        Q(nx,j,k,2) = Q(nx-1,j,k,2)
+        Q(nx,j,k,3) = Q(nx-1,j,k,3)
+        Q(nx,j,k,4) = Q(nx-1,j,k,4)
+        Q(nx,j,k,5) = Q(nx-1,j,k,5)
       enddo
     enddo
 
     ! top
     !$cuf kernel do<<<*,*>>>
-    do k = 1, nz
+    do k = 2, nz-1
       do i = 1, No
-        Q(i,ny,k,1) = rho1
-        Q(i,ny,k,2) = rho1 * u0
+        Q(i,ny,k,1) = rho0
+        Q(i,ny,k,2) = rho0 * u0 
         Q(i,ny,k,3) = 0.d0
         Q(i,ny,k,4) = 0.d0
-        Q(i,ny,k,5) = p1 / (gamma - 1.d0) + 0.5d0 * (Q(i,ny,k,2)**2 + Q(i,ny,k,3)**2) / Q(i,ny,k,1)
+        Q(i,ny,k,5) = p0 / (gamma - 1.d0) + 0.5d0 * rho0 * u0**2
       enddo
     enddo
+
     !$cuf kernel do<<<*,*>>>
-    do k = 1, nz
-      do i = No + 1, nx
+    do k = 2, nz-1
+      do i = No+1, nx
         Q(i,ny,k,1) = rho2
-        Q(i,ny,k,2) = rho2 * (v2 * cos(beta) + u2 * sin(beta))
-        Q(i,ny,k,3) = rho2 * (-v2 * sin(beta) + u2 * cos(beta))
+        Q(i,ny,k,2) = rho2 * ux
+        Q(i,ny,k,3) = rho2 * uy
         Q(i,ny,k,4) = 0.d0
-        Q(i,ny,k,5) = p2 / (gamma - 1.d0) + 0.5d0 * (Q(i,ny,k,2)**2 + Q(i,ny,k,3)**2) / Q(i,ny,k,1)
+        Q(i,ny,k,5) = p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)
       enddo
     enddo
 
     ! bottom
     !$cuf kernel do<<<*,*>>>
-    do k = 1, nz
+    do k = 2, nz-1
       do i = 1, nx
-        ! dT/dy = 0
-        T_bottom = T(i,2,k)
-        T(i,1,k) = T_bottom
-        Cp = 1030.5d0 - 0.19975d0 * T_bottom + 3.9734 * T_bottom**2
-        ! dp/dy = 0
-        p_bottom = (gamma - 1.d0) * (Q(i,2,k,5) - 0.5d0 * (Q(i,2,k,2)**2 + Q(i,2,k,3)**2 + Q(i,2,k,4)**2) / Q(i,2,k,1))
         ! slip wall
-        e_bottom = p_bottom / (gamma - 1.d0) + 0.5d0 * (Q(i,2,k,2)**2) / Q(i,2,k,1) 
-        Q(i,1,k,1) = (e_bottom + p_bottom) / (Cp * T_bottom + 0.5d0 * (Q(i,2,k,2)/Q(i,2,k,1))**2)
-        Q(i,1,k,2) = Q(i,2,k,2)
-        Q(i,1,k,3) = 0.d0
-        Q(i,1,k,4) = 0.d0
-        Q(i,1,k,5) = e_bottom
+        Q(i,2,k,1) = Q(i,3,k,1)
+        Q(i,2,k,2) = Q(i,3,k,2)
+        Q(i,2,k,3) = 0.d0
+        Q(i,2,k,4) = Q(i,3,k,4)
+        Q(i,2,k,5) = Q(i,3,k,5)
+        ! imaginary
+        Q(i,1,k,1) = Q(i,3,k,1)
+        Q(i,1,k,2) = Q(i,3,k,2)
+        Q(i,1,k,3) = -Q(i,3,k,3)
+        Q(i,1,k,4) = Q(i,3,k,4)
+        Q(i,1,k,5) = Q(i,3,k,5)
+      enddo
+    enddo
+
+    ! cyclic
+    !$cuf kernel do<<<*,*>>>
+    do l = 1, 5
+      do j = 1, ny
+        do i = 1, nx
+          Q(i,j,1,l) = Q(i,j,nz-3,l)
+          Q(i,j,2,l) = Q(i,j,nz-2,l)
+          Q(i,j,nz-1,l) = Q(i,j,3,l)
+          Q(i,j,nz,l) = Q(i,j,4,l)
+        enddo
       enddo
     enddo
   end subroutine set_bc

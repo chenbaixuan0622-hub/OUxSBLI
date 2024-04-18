@@ -19,14 +19,16 @@ KEEP scheme
 Taylor-Green vortex 
 </p>
 <img src="./visuals/Vorticity.gif" alt="Taylor-Green vortex">
+<img src="./visuals/entropy_ke.png" alt="entropy and kinetic energy">
 
 <h2>
 SLAU scheme
 </h2>
+
 <p>
-boundary layer
+Oblique shock
 </p>
-<img src="./visuals/boundary_layer.gif" alt="boundary layer">
+<img src="./visuals/oblique_shock.gif" alt="oblique shock">
 
 <p>
 2 dimensional shock tube
