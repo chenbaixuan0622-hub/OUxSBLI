@@ -18,8 +18,8 @@ module mod_globals
   !           ! 2  Roe    !
   !           ! 3  SLAU   !
   !!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=2), parameter :: id_hybrid = 0.d0
-  integer(kind=4), parameter :: id_muscl = 0.d0
+  integer(kind=4), parameter :: id_hybrid = 0.d0
+  integer(kind=8), parameter :: id_muscl = 0.d0
   integer, parameter :: id_scheme = 3
 
   ! mesh
@@ -38,10 +38,17 @@ module mod_globals
   ! GPU
   type(dim3) :: blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/11,1)
   type(dim3) :: blocksF = dim3((nx-accuracy)/7,(ny-accuracy+1)/32,1)
+  type(dim3) :: blocks = dim3((nx-accuracy)/7,(ny-accuracy)/11,1)
   type(dim3) :: threadsE = dim3(32,11,1)
   type(dim3) :: threadsF = dim3(7,32,1)
+  type(dim3) :: threads = dim3(7,11,1)
 
   ! time
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_Rungekutta ! kind=2 ! 3rd-TVD !
+  !               ! kind=4 ! 4th     !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  integer(kind=4), parameter :: id_RungeKutta = 0
   integer, parameter :: nt = 50
   integer, parameter :: np = 40
   real(8), parameter :: u0 = 506.8d0
