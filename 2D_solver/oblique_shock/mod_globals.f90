@@ -6,18 +6,18 @@ module mod_globals
   integer(kind=2**(accuracy/2)), parameter :: id_accuracy = 1
   integer, parameter :: offset = accuracy / 2
   integer, parameter :: id_visc = 0
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_hybrid ! kind2 0 off !
-  !           ! kind4 1 on  !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_muscl  ! kind2 off   !
-  !           ! kind4 3rd   !
-  !           ! kind8 4th   !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_scheme ! 1  KEEP     !
-  !           ! 2  Roe      !
-  !           ! 3  SLAU     !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_hybrid ! kind2 off !
+  !           ! kind4 on  !
+  !!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_muscl  ! kind2 off !
+  !           ! kind4 3rd !
+  !           ! kind8 4th !
+  !!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_scheme ! 1  KEEP   !
+  !           ! 2  Roe    !
+  !           ! 3  SLAU   !
+  !!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=4), parameter :: id_hybrid = 1
   integer(kind=8), parameter :: id_muscl = 0
   integer, parameter :: id_scheme = 3
@@ -45,14 +45,14 @@ module mod_globals
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_RungeKutta ! kind=2 ! 3rd-TVD !
+  ! id_Rungekutta ! kind=2 ! 3rd-TVD !
   !               ! kind=4 ! 4th     !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=4), parameter :: id_RungeKutta = 0
   integer, parameter :: nt = 50
   integer, parameter :: np = 40
   real(8), parameter :: u0 = 506.8d0
-  real(8), parameter :: dt = 0.1d0 * dx/ u0
+  real(8), parameter :: dt = 0.5d0 * dx/ u0
 
   real(8), parameter :: dtdx = dt / dx
   real(8), parameter :: dtdy = dt / dy
