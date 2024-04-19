@@ -18,8 +18,8 @@ module mod_globals
   !           ! 2  Roe    !
   !           ! 3  SLAU   !
   !!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=4), parameter :: id_hybrid = 1
-  integer(kind=8), parameter :: id_muscl = 0
+  integer(kind=4), parameter :: id_hybrid = 0.d0
+  integer(kind=8), parameter :: id_muscl = 0.d0
   integer, parameter :: id_scheme = 3
 
   ! mesh
