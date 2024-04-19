@@ -1,6 +1,6 @@
 module calc_time_dev
   use cudafor
-  use mod_globals, only : accuracy, id_hybrid, id_muscl, id_visc, nx, ny, nt, np, blocksE, blocksF, threadsE, threadsF
+  use mod_globals, only : accuracy, id_hybrid, id_muscl, id_visc, nx, ny, nt, np, blocksE, blocksF, threadsE, threadsF, blocks, threads
   use calc_physical_quantities
   use calc_steps
   use calc_flux, only : calc_E, calc_F
@@ -42,7 +42,7 @@ contains
     real(8), intent(inout), device :: T(nx,ny)
     real(8), intent(out), device :: E_hybrid(nx-accuracy+1,ny-accuracy,4)
     real(8), intent(out), device :: F_hybrid(nx-accuracy,ny-accuracy+1,4)
-    real(8), dimension(nx,ny), device :: rho, u, v, p, energy
+    real(8), dimension(nx,ny), device :: rho, u, v, p, energy, fd
     real(8), dimension(nx-accuracy+1,ny-accuracy,4), device :: E_keep, E_upwind
     real(8), dimension(nx-accuracy,ny-accuracy+1,4), device :: F_keep, F_upwind
     integer stat
@@ -54,9 +54,11 @@ contains
     call calc_F<<<blocksF,threadsF>>>(id_muscl,rho,u,v,p,F_upwind)
     stat = cudaDeviceSynchronize()
 
+    call calc_Ducros<<<blocks,threads>>>(u,v,fd)
+    stat = cudaDeviceSynchronize()
     energy(:,:) = Q(:,:,4)
-    call calc_E_hybrid<<<blocksE,threadsE>>>(rho,u,v,energy,E_keep,E_upwind,E_hybrid)
-    call calc_F_hybrid<<<blocksF,threadsF>>>(rho,u,v,energy,F_keep,F_upwind,F_hybrid)
+    call calc_E_hybrid<<<blocksE,threadsE>>>(rho,energy,fd,E_keep,E_upwind,E_hybrid)
+    call calc_F_hybrid<<<blocksF,threadsF>>>(rho,energy,fd,F_keep,F_upwind,F_hybrid)
     stat = cudaDeviceSynchronize()
 
     if (id_visc == 1) then 
