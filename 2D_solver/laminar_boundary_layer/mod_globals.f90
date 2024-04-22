@@ -18,16 +18,16 @@ module mod_globals
   !           ! 2  Roe    !
   !           ! 3  SLAU   !
   !!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=4), parameter :: id_hybrid = 0.d0
-  integer(kind=8), parameter :: id_muscl = 0.d0
+  integer(kind=4), parameter :: id_hybrid = 0
+  integer(kind=8), parameter :: id_muscl = 0
   integer, parameter :: id_scheme = 3
 
   ! mesh
-  real(8), parameter :: Lx = 4.d0
-  real(8), parameter :: Ly = 0.05d0
+  real(8), parameter :: Lx = 16.d-3
+  real(8), parameter :: Ly = 0.8d-3 
   real(8), parameter :: Lz = 0.d0 
-  integer, parameter :: nx = 257 
-  integer, parameter :: ny = 65
+  integer, parameter :: nx = 513 
+  integer, parameter :: ny = 321 
   integer, parameter :: nz = accuracy+1
   real(8), parameter :: dx = Lx / (nx-1)
   real(8), parameter :: dy = Ly / (ny-1)
@@ -36,12 +36,12 @@ module mod_globals
   real(8), parameter :: dyi = 1.d0 / dy
 
   ! GPU
-  type(dim3) :: blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/3,1)
-  type(dim3) :: blocksF = dim3((nx-accuracy)/5,(ny-accuracy+1)/32,1)
-  type(dim3) :: blocks = dim3((nx-accuracy)/5,(ny-accuracy)/3,1)
-  type(dim3) :: threadsE = dim3(32,3,1)
-  type(dim3) :: threadsF = dim3(5,32,1)
-  type(dim3) :: threads = dim3(5,3,1)
+  type(dim3) :: blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/11,1)
+  type(dim3) :: blocksF = dim3((nx-accuracy)/7,(ny-accuracy+1)/32,1)
+  type(dim3) :: blocks = dim3((nx-accuracy)/7,(ny-accuracy)/11,1)
+  type(dim3) :: threadsE = dim3(32,11,1)
+  type(dim3) :: threadsF = dim3(7,32,1)
+  type(dim3) :: threads = dim3(7,11,1)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -51,8 +51,8 @@ module mod_globals
   integer(kind=4), parameter :: id_RungeKutta = 0
   integer, parameter :: nt = 10
   integer, parameter :: np = 10 
-  real(8), parameter :: u0 = 34.7d0
-  real(8), parameter :: dt = 0.01d0 * dx/ u0
+  real(8), parameter :: u0 = 506.8d0
+  real(8), parameter :: dt = 0.5d0 * dx/ u0
 
   real(8), parameter :: dtdx = dt / dx
   real(8), parameter :: dtdy = dt / dy
@@ -70,8 +70,8 @@ module mod_globals
 
   ! laminar boundary layer
   real(8), parameter :: R = 287.03d0
-  real(8), parameter :: p0 = 1013d2
-  real(8), parameter :: T = 300.d0
+  real(8), parameter :: p0 = 14924.d0
+  real(8), parameter :: T = 171.31d0
   real(8), parameter :: rho0 = p0 / (R * T)
 
   ! variables
