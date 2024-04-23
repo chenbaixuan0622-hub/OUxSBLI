@@ -18,13 +18,13 @@ module mod_globals
   !           ! 2  Roe    !
   !           ! 3  SLAU   !
   !!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=4), parameter :: id_hybrid = 0
+  integer(kind=2), parameter :: id_hybrid = 0
   integer(kind=8), parameter :: id_muscl = 0
   integer, parameter :: id_scheme = 3
 
   ! mesh
-  real(8), parameter :: Lx = 16.d-3
-  real(8), parameter :: Ly = 0.8d-3 
+  real(8), parameter :: Lx = 48.d-3
+  real(8), parameter :: Ly = 16.d-3 
   real(8), parameter :: Lz = 0.d0 
   integer, parameter :: nx = 513 
   integer, parameter :: ny = 321 
@@ -49,10 +49,10 @@ module mod_globals
   !               ! kind=4 ! 4th     !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=4), parameter :: id_RungeKutta = 0
-  integer, parameter :: nt = 10
-  integer, parameter :: np = 10 
+  integer, parameter :: nt = 1000
+  integer, parameter :: np = 10
   real(8), parameter :: u0 = 506.8d0
-  real(8), parameter :: dt = 0.5d0 * dx/ u0
+  real(8), parameter :: dt = 0.1d0 * dx/ u0
 
   real(8), parameter :: dtdx = dt / dx
   real(8), parameter :: dtdy = dt / dy
