@@ -102,7 +102,7 @@ contains
     do i = 1, nx
       ! wall
       Q(i,2,1) = Q(i,3,1)
-      Q(i,2,2) = Q(i,3,2)
+      Q(i,2,2) = 0.d0!Q(i,3,2)
       Q(i,2,3) = 0.d0
       p_wall = (gamma - 1.d0) * (Q(i,3,4) - 0.5d0 * (Q(i,3,2)**2 + Q(i,3,3)**2) / Q(i,3,1))
       Q(i,2,4) = p_wall / (gamma - 1.d0)
