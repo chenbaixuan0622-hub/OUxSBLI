@@ -6,21 +6,26 @@ module mod_globals
   integer(kind=2**(accuracy/2)), parameter :: id_accuracy = 1
   integer, parameter :: offset = accuracy / 2
   integer, parameter :: id_visc = 1
-  !!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_hybrid ! kind2 off !
-  !           ! kind4 on  !
-  !!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_muscl  ! kind2 off !
-  !           ! kind4 3rd !
-  !           ! kind8 4th !
-  !!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_scheme ! 1  KEEP   !
-  !           ! 2  Roe    !
-  !           ! 3  SLAU   !
-  !!!!!!!!!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_hybrid ! kind2 off  !
+  !           ! kind4 on   !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_muscl  ! kind2 off  !
+  !           ! kind4 3rd  !
+  !           ! kind8 4th  !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_scheme ! 1  KEEP    !
+  !           ! 2  Roe     !
+  !           ! 3  SLAU    !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_slau   ! kind2 slau !
+  !           ! kind4 sd   !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_hybrid = 0
   integer(kind=8), parameter :: id_muscl = 0
   integer, parameter :: id_scheme = 3
+  integer(kind=2), parameter :: id_slau = 0
+  real(8), parameter :: dp_max = 5d3
 
   ! mesh
   real(8), parameter :: Lx = 48.d-3

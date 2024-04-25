@@ -1,6 +1,6 @@
 module calc_time_dev
   use cudafor
-  use mod_globals, only : accuracy, id_hybrid, id_muscl, id_visc, nx, ny, nt, np, blocksE, blocksF, threadsE, threadsF, blocks, threads
+  use mod_globals, only : accuracy, id_hybrid, id_muscl, id_scheme, id_visc, nx, ny, nt, np, blocksE, blocksF, threadsE, threadsF, blocks, threads
   use calc_physical_quantities
   use calc_steps
   use calc_flux, only : calc_E, calc_F
@@ -25,10 +25,12 @@ contains
     real(8), dimension(nx,ny), device :: rho, u, v, p
     integer stat
     call calc_quantities(Q,rho,u,v,p,T)
-    call calc_E<<<blocksE,threadsE>>>(id_muscl,rho,u,v,p,E)
-    call calc_F<<<blocksF,threadsF>>>(id_muscl,rho,u,v,p,F)
+    if (id_scheme /= 4) then
+      call calc_E<<<blocksE,threadsE>>>(id_muscl,rho,u,v,p,E)
+      call calc_F<<<blocksF,threadsF>>>(id_muscl,rho,u,v,p,F)
+    endif
     stat = cudaDeviceSynchronize()
-        
+
     if (id_visc == 1) then 
       call calc_Ev<<<blocksE,threadsE>>>(u,v,T,E)
       call calc_Fv<<<blocksF,threadsF>>>(u,v,T,F)
@@ -50,8 +52,10 @@ contains
     call calc_quantities(Q,rho,u,v,p,T)
     call calc_E<<<blocksE,threadsE>>>(id_muscl1,rho,u,v,p,E_keep)
     call calc_F<<<blocksF,threadsF>>>(id_muscl1,rho,u,v,p,F_keep)
-    call calc_E<<<blocksE,threadsE>>>(id_muscl,rho,u,v,p,E_upwind)
-    call calc_F<<<blocksF,threadsF>>>(id_muscl,rho,u,v,p,F_upwind)
+    if (id_scheme /= 4) then
+      call calc_E<<<blocksE,threadsE>>>(id_muscl,rho,u,v,p,E_upwind)
+      call calc_F<<<blocksF,threadsF>>>(id_muscl,rho,u,v,p,F_upwind)
+    endif
     stat = cudaDeviceSynchronize()
 
     call calc_Ducros<<<blocks,threads>>>(u,v,fd)
@@ -68,15 +72,19 @@ contains
     stat = cudaDeviceSynchronize()
   end subroutine calc_EF_hybrid
   
-  subroutine RungeKutta_3rd(id_RungeKutta,T0,Q)
+  subroutine RungeKutta_3rd(id_RungeKutta,T0,Q,Vin_cpu)
     integer(kind=2), intent(in) :: id_RungeKutta
     real(8), intent(inout) :: Q(nx,ny,4)
     real(8), intent(inout) :: T0(nx,ny)
+    real(8), intent(in) :: Vin_cpu
     integer t1, t2, itr
     real(8), dimension(nx,ny,4), device :: Q_d, Q2, Q3
     real(8), dimension(nx,ny), device :: T
     real(8), device :: E(nx-accuracy+1,ny-accuracy,4)
     real(8), device :: F(nx-accuracy,ny-accuracy+1,4)
+
+    real(8), device :: Vin(ny,2)
+    Vin = Vin_cpu
 
     ! print initial condition
     call print_vtk(0,Q,T0)
@@ -87,15 +95,15 @@ contains
       do t1 = 1, nt
         call calc_EF(id_hybrid,Q_d,T,E,F)
         call calc_step1(E,F,Q_d,Q2)
-        call set_bc(Q2)
+        call set_bc(Q2,Vin)
         
         call calc_EF(id_hybrid,Q2,T,E,F)
         call calc_step2(E,F,Q_d,Q2,Q3)
-        call set_bc(Q3)
+        call set_bc(Q3,Vin)
 
         call calc_EF(id_hybrid,Q3,T,E,F)
         call calc_step3(E,F,Q3,Q_d)
-        call set_bc(Q_d)
+        call set_bc(Q_d,Vin)
       enddo
       Q = Q_d
       T0 = T
@@ -103,16 +111,20 @@ contains
     enddo
   end subroutine RungeKutta_3rd
 
-  subroutine RungeKutta_4th(id_RungeKutta,T0,Q)
+  subroutine RungeKutta_4th(id_RungeKutta,T0,Q,Vin_cpu)
     integer(kind=4), intent(in) :: id_RungeKutta
     real(8), intent(inout) :: Q(nx,ny,4)
     real(8), intent(inout) :: T0(nx,ny)
+    real(8), intent(in) :: Vin_cpu(ny,2)
     integer t1, t2, itr
     real(8), dimension(nx,ny,4), device :: Q_d, Qs
     real(8), dimension(nx,ny), device :: T
     real(8), device :: E(nx-accuracy+1,ny-accuracy,4)
     real(8), device :: F(nx-accuracy,ny-accuracy+1,4)
     real(8), device :: Rs(nx-accuracy,ny-accuracy,4)
+
+    real(8), device :: Vin(ny,2)
+    Vin = Vin_cpu
 
     ! print initial condition
     call print_vtk(0,Q,T0)
@@ -124,19 +136,19 @@ contains
       do t1 = 1, nt
         call calc_EF(id_hybrid,Q_d,T,E,F)
         call calc_step(0.5d0,1.d0,E,F,Rs,Q_d,Qs)
-        call set_bc(Qs)
+        call set_bc(Qs,Vin)
         
         call calc_EF(id_hybrid,Qs,T,E,F)
         call calc_step(0.5d0,2.d0,E,F,Rs,Q_d,Qs)
-        call set_bc(Qs)
+        call set_bc(Qs,Vin)
 
         call calc_EF(id_hybrid,Qs,T,E,F)
         call calc_step(1.d0,2.d0,E,F,Rs,Q_d,Qs)
-        call set_bc(Qs)
+        call set_bc(Qs,Vin)
 
         call calc_EF(id_hybrid,Qs,T,E,F)
         call calc_step4(E,F,Rs,Q_d)
-        call set_bc(Q_d)
+        call set_bc(Q_d,Vin)
       enddo
       Q = Q_d
       T0 = T

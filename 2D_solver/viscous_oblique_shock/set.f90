@@ -39,10 +39,11 @@ contains
     write(*,*) eta, f, df
   end subroutine calc_Blasius
 
-  subroutine set_init(Q)
+  subroutine set_init(Q,Vin)
     real(8), intent(out), dimension(nx,ny,4) :: Q
+    real(8), intent(out), dimension(ny,2) :: Vin
     real(8) y, eta, u, v, p_wall
-    real(8) :: d = 1.d-3
+    real(8) :: d = 0.5d-3
     real(8) :: nu0 = 3.8206d-5
     integer i, j
     integer :: No = int(0.4 * nx)
@@ -56,6 +57,9 @@ contains
       Q(:,j,3) = rho0 * v
       Q(:,j,4) = p0 / (gamma - 1.d0) + 0.5d0 * (Q(:,j,2)**2 + Q(:,j,3)**2) / Q(:,j,1) 
     enddo
+    ! set inlet value
+    Vin(:,1) = Q(1,:,2) / rho0
+    Vin(:,2) = Q(1,:,3) / rho0
 
     ! top
     do i = 1, No
@@ -76,28 +80,36 @@ contains
     do i = 1, nx
       ! wall
       Q(i,2,1) = Q(i,3,1)
-      Q(i,2,2) = Q(i,3,2)
+      Q(i,2,2) = 0.d0
       Q(i,2,3) = 0.d0
       p_wall = (gamma - 1.d0) * (Q(i,3,4) - 0.5d0 * (Q(i,3,2)**2 + Q(i,3,3)**2) / Q(i,3,1))
       Q(i,2,4) = p_wall / (gamma - 1.d0)
-      ! imaginray
+      ! ghost cell
       Q(i,1,1) = Q(i,3,1)
-      Q(i,1,2) = Q(i,3,2) 
+      Q(i,1,2) = -Q(i,3,2) 
       Q(i,1,3) = -Q(i,3,3) 
       Q(i,1,4) = Q(i,3,4) 
     enddo
   end subroutine set_init
 
-  subroutine set_bc(Q)
+  subroutine set_bc(Q,Vin)
     real(8), intent(inout), device :: Q(nx,ny,4)
+    real(8), intent(in), device :: Vin(ny,2)
     integer i, j, k
     integer :: No = int(0.4 * nx)
     real(8) p_wall
+    ! inlet
+    !$cuf kernel do <<<*,*>>>
+    do j = 3, ny-1
+      Q(1,j,1) = Q(2,j,1)
+      Q(1,j,2) = Q(1,j,1) * Vin(j,1)
+      Q(1,j,3) = Q(1,j,1) * Vin(j,2)
+      Q(1,j,4) = p0 / (gamma - 1.d0) + 0.5d0 * (Q(1,j,2)**2 + Q(1,j,3)**2) / Q(1,j,1)
+    enddo
+
     !$cuf kernel do <<<*,*>>>
     do k = 1, 4
       do j = 3, ny-1
-        ! inlet
-        Q(1,j,k) = Q(2,j,k)
         ! outlet
         Q(nx,j,k) = Q(nx-1,j,k)
       enddo
@@ -123,13 +135,13 @@ contains
     do i = 1, nx
       ! wall
       Q(i,2,1) = Q(i,3,1)
-      Q(i,2,2) = Q(i,3,2)
+      Q(i,2,2) = 0.d0!Q(i,3,2)
       Q(i,2,3) = 0.d0
       p_wall = (gamma - 1.d0) * (Q(i,3,4) - 0.5d0 * (Q(i,3,2)**2 + Q(i,3,3)**2) / Q(i,3,1))
       Q(i,2,4) = p_wall / (gamma - 1.d0)
-      ! imaginray
+      ! ghost cell
       Q(i,1,1) = Q(i,3,1)
-      Q(i,1,2) = Q(i,3,2) 
+      Q(i,1,2) = -Q(i,3,2) 
       Q(i,1,3) = -Q(i,3,3) 
       Q(i,1,4) = Q(i,3,4) 
     enddo
