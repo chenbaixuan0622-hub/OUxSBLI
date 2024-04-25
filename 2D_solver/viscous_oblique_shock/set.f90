@@ -6,19 +6,29 @@ contains
   subroutine calc_Blasius(eta,d,u,v)
     real(8), intent(in), value :: eta, d
     real(8), intent(out) :: u, v
-    real(8) f, df
-    real(8) fs(9), dfs(9)
+    real(8) f, df, x
+    real(8) fs(45), dfs(45)
     real(8) :: nu0 = 3.8206d-5
     integer i
-    fs(:) = (/0.d0, 0.165d0, 0.65d0, 1.397d0, 2.306d0, 3.283d0, 4.28d0, 5.279d0, 6.279d0/)
-    dfs(:) = (/0.d0, 0.3298d0, 0.6298d0, 0.8461d0, 0.9555d0, 0.9915d0, 0.999d0, 0.9999d0, 1.d0/)
-    do i = 1, 8
-      if (dble(i-1) <= eta .and. eta <= dble(i)) then
-        f = fs(i) + (fs(i+1) - fs(i)) * (eta - dble(i-1))
-        df = dfs(i) + (dfs(i+1) - dfs(i)) * (eta - dble(i-1))
-      elseif (8.d0 < eta .and. eta <= 8.8d0) then
-        f = fs(9) + 1.25d0 * (7.07923d0 - fs(9)) * (eta - 8.d0)
-        df = 1.d0
+    fs(:) = (/0.d0, 0.00664d0, 0.02656d0, 0.05974d0, 0.10611d0, 0.16557d0, 0.23795d0, &
+    & 0.32298d0, 0.42032d0, 0.52952d0, 0.65003d0, 0.78120d0, 0.92230d0, 1.07252d0, &
+    & 1.23099d0, 1.39682d0, 1.56911d0, 1.74696d0, 1.92954d0, 2.11605d0, 2.30576d0, &
+    & 2.49806d0, 2.69238d0, 2.88826d0, 3.08534d0, 3.28329d0, 3.48189d0, 3.68094d0, &
+    & 3.88031d0, 4.07990d0, 4.27964d0, 4.47948d0, 4.67938d0, 4.87931d0, 5.07928d0, &
+    & 5.27926d0, 5.47925d0, 5.67924d0, 5.87924d0, 6.07923d0, 6.27923d0, 6.47923d0, &
+    & 6.67923d0, 6.87923d0, 7.07923d0/)
+    dfs(:) = (/0.d0, 0.06641d0, 0.13277d0, 0.19894d0, 0.26471d0, 0.32979d0, 0.39378d0, &
+    & 0.45627d0, 0.51676d0, 0.57477d0, 0.62977d0, 0.68132d0, 0.72899d0, 0.77246d0, &
+    & 0.81152d0, 0.84605d0, 0.87609d0, 0.90177d0, 0.92333d0, 0.94112d0, 0.95552d0, &
+    & 0.96696d0, 0.97587d0, 0.98269d0, 0.98779d0, 0.99155d0, 0.99425d0, 0.99616d0, &
+    & 0.99748d0, 0.99838d0, 0.99898d0, 0.99937d0, 0.99961d0, 0.99977d0, 0.99987d0, &
+    & 0.99992d0, 0.99996d0, 0.99998d0, 0.99999d0, 1.00000d0, 1.00000d0, 1.00000d0, &
+    & 1.00000d0, 1.00000d0, 1.00000d0/)
+    do i = 1, 44
+      x = 0.2d0 * dble(i-1) 
+      if (x <= eta .and. eta <= x + 0.2d0) then
+        f = fs(i) + 5.d0 * (fs(i+1) - fs(i)) * (eta - x)
+        df = dfs(i) + 5.d0 * (dfs(i+1) - dfs(i)) * (eta - x)
       elseif (8.8d0 < eta) then
         f = 7.07923d0
         df = 1.d0
@@ -29,10 +39,11 @@ contains
     write(*,*) eta, f, df
   end subroutine calc_Blasius
 
-  subroutine set_init(Q)
+  subroutine set_init(Q,Vin)
     real(8), intent(out), dimension(nx,ny,4) :: Q
+    real(8), intent(out), dimension(ny,2) :: Vin
     real(8) y, eta, u, v, p_wall
-    real(8) :: d = 1.d-3
+    real(8) :: d = 0.5d-3
     real(8) :: nu0 = 3.8206d-5
     integer i, j
     integer :: No = int(0.4 * nx)
@@ -46,6 +57,9 @@ contains
       Q(:,j,3) = rho0 * v
       Q(:,j,4) = p0 / (gamma - 1.d0) + 0.5d0 * (Q(:,j,2)**2 + Q(:,j,3)**2) / Q(:,j,1) 
     enddo
+    ! set inlet value
+    Vin(:,1) = Q(1,:,2) / rho0
+    Vin(:,2) = Q(1,:,3) / rho0
 
     ! top
     do i = 1, No
@@ -66,28 +80,36 @@ contains
     do i = 1, nx
       ! wall
       Q(i,2,1) = Q(i,3,1)
-      Q(i,2,2) = Q(i,3,2)
+      Q(i,2,2) = 0.d0
       Q(i,2,3) = 0.d0
       p_wall = (gamma - 1.d0) * (Q(i,3,4) - 0.5d0 * (Q(i,3,2)**2 + Q(i,3,3)**2) / Q(i,3,1))
       Q(i,2,4) = p_wall / (gamma - 1.d0)
-      ! imaginray
+      ! ghost cell
       Q(i,1,1) = Q(i,3,1)
-      Q(i,1,2) = Q(i,3,2) 
+      Q(i,1,2) = -Q(i,3,2) 
       Q(i,1,3) = -Q(i,3,3) 
       Q(i,1,4) = Q(i,3,4) 
     enddo
   end subroutine set_init
 
-  subroutine set_bc(Q)
+  subroutine set_bc(Q,Vin)
     real(8), intent(inout), device :: Q(nx,ny,4)
+    real(8), intent(in), device :: Vin(ny,2)
     integer i, j, k
     integer :: No = int(0.4 * nx)
     real(8) p_wall
+    ! inlet
+    !$cuf kernel do <<<*,*>>>
+    do j = 3, ny-1
+      Q(1,j,1) = Q(2,j,1)
+      Q(1,j,2) = Q(1,j,1) * Vin(j,1)
+      Q(1,j,3) = Q(1,j,1) * Vin(j,2)
+      Q(1,j,4) = p0 / (gamma - 1.d0) + 0.5d0 * (Q(1,j,2)**2 + Q(1,j,3)**2) / Q(1,j,1)
+    enddo
+
     !$cuf kernel do <<<*,*>>>
     do k = 1, 4
       do j = 3, ny-1
-        ! inlet
-        Q(1,j,k) = Q(2,j,k)
         ! outlet
         Q(nx,j,k) = Q(nx-1,j,k)
       enddo
@@ -95,10 +117,10 @@ contains
 
     !$cuf kernel do <<<*,*>>>
     do i = 1, No
-      Q(i,ny,1) = rho0 
-      Q(i,ny,2) = rho0 * u0
-      Q(i,ny,3) = 0.d0
-      Q(i,ny,4) = p0 / (gamma - 1.d0) + 0.5d0 * rho0 * u0**2
+      Q(i,ny,1) = Q(i,ny-1,1) 
+      Q(i,ny,2) = Q(i,ny-1,2)
+      Q(i,ny,3) = Q(i,ny-1,3)
+      Q(i,ny,4) = p0 / (gamma - 1.d0) + 0.5d0 * (Q(i,ny,2)**2 + Q(i,ny,3)**2) / Q(i,ny,1)
     enddo
 
     !$cuf kernel do <<<*,*>>>
@@ -113,13 +135,13 @@ contains
     do i = 1, nx
       ! wall
       Q(i,2,1) = Q(i,3,1)
-      Q(i,2,2) = Q(i,3,2)
+      Q(i,2,2) = 0.d0!Q(i,3,2)
       Q(i,2,3) = 0.d0
       p_wall = (gamma - 1.d0) * (Q(i,3,4) - 0.5d0 * (Q(i,3,2)**2 + Q(i,3,3)**2) / Q(i,3,1))
       Q(i,2,4) = p_wall / (gamma - 1.d0)
-      ! imaginray
+      ! ghost cell
       Q(i,1,1) = Q(i,3,1)
-      Q(i,1,2) = Q(i,3,2) 
+      Q(i,1,2) = -Q(i,3,2) 
       Q(i,1,3) = -Q(i,3,3) 
       Q(i,1,4) = Q(i,3,4) 
     enddo
