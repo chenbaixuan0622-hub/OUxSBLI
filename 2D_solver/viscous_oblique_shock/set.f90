@@ -46,11 +46,11 @@ contains
     real(8) :: d = 0.5d-3
     real(8) :: nu0 = 3.8206d-5
     integer i, j
-    integer :: No = int(0.4 * nx)
+    integer :: No = int(0.1 * nx)
     Q(:,:,1) = rho0
     ! boundary layer
-    do j = 3, ny-1
-      y = dble(j-2) * dy
+    do j = 2, ny-1
+      y = dble(j-1) * dy
       eta = y / d
       call calc_Blasius(eta,d,u,v)
       Q(:,j,2) = rho0 * u
@@ -79,16 +79,16 @@ contains
     ! noSlip
     do i = 1, nx
       ! wall
-      Q(i,2,1) = Q(i,3,1)
-      Q(i,2,2) = 0.d0
-      Q(i,2,3) = 0.d0
-      p_wall = (gamma - 1.d0) * (Q(i,3,4) - 0.5d0 * (Q(i,3,2)**2 + Q(i,3,3)**2) / Q(i,3,1))
-      Q(i,2,4) = p_wall / (gamma - 1.d0)
+      Q(i,1,1) = Q(i,2,1)
+      Q(i,1,2) = 0.d0
+      Q(i,1,3) = 0.d0
+      p_wall = (gamma - 1.d0) * (Q(i,2,4) - 0.5d0 * (Q(i,2,2)**2 + Q(i,2,3)**2) / Q(i,2,1))
+      Q(i,1,4) = p_wall / (gamma - 1.d0)
       ! ghost cell
-      Q(i,1,1) = Q(i,3,1)
-      Q(i,1,2) = -Q(i,3,2) 
-      Q(i,1,3) = -Q(i,3,3) 
-      Q(i,1,4) = Q(i,3,4) 
+      !Q(i,1,1) = Q(i,3,1)
+      !Q(i,1,2) = -Q(i,3,2) 
+      !Q(i,1,3) = -Q(i,3,3) 
+      !Q(i,1,4) = Q(i,3,4) 
     enddo
   end subroutine set_init
 
@@ -96,11 +96,11 @@ contains
     real(8), intent(inout), device :: Q(nx,ny,4)
     real(8), intent(in), device :: Vin(ny,2)
     integer i, j, k
-    integer :: No = int(0.4 * nx)
+    integer :: No = int(0.1 * nx)
     real(8) p_wall
     ! inlet
     !$cuf kernel do <<<*,*>>>
-    do j = 3, ny-1
+    do j = 2, ny-1
       Q(1,j,1) = Q(2,j,1)
       Q(1,j,2) = Q(1,j,1) * Vin(j,1)
       Q(1,j,3) = Q(1,j,1) * Vin(j,2)
@@ -109,7 +109,7 @@ contains
 
     !$cuf kernel do <<<*,*>>>
     do k = 1, 4
-      do j = 3, ny-1
+      do j = 2, ny-1
         ! outlet
         Q(nx,j,k) = Q(nx-1,j,k)
       enddo
@@ -117,7 +117,7 @@ contains
 
     !$cuf kernel do <<<*,*>>>
     do i = 1, No
-      Q(i,ny,1) = Q(i,ny-1,1) 
+      Q(i,ny,1) = Q(i,ny-1,1)
       Q(i,ny,2) = Q(i,ny-1,2)
       Q(i,ny,3) = Q(i,ny-1,3)
       Q(i,ny,4) = p0 / (gamma - 1.d0) + 0.5d0 * (Q(i,ny,2)**2 + Q(i,ny,3)**2) / Q(i,ny,1)
@@ -134,16 +134,16 @@ contains
     !$cuf kernel do <<<*,*>>>
     do i = 1, nx
       ! wall
-      Q(i,2,1) = Q(i,3,1)
-      Q(i,2,2) = 0.d0!Q(i,3,2)
-      Q(i,2,3) = 0.d0
-      p_wall = (gamma - 1.d0) * (Q(i,3,4) - 0.5d0 * (Q(i,3,2)**2 + Q(i,3,3)**2) / Q(i,3,1))
-      Q(i,2,4) = p_wall / (gamma - 1.d0)
+      Q(i,1,1) = Q(i,2,1)
+      Q(i,1,2) = 0.d0!Q(i,3,2)
+      Q(i,1,3) = 0.d0
+      p_wall = (gamma - 1.d0) * (Q(i,2,4) - 0.5d0 * (Q(i,2,2)**2 + Q(i,2,3)**2) / Q(i,2,1))
+      Q(i,1,4) = p_wall / (gamma - 1.d0)
       ! ghost cell
-      Q(i,1,1) = Q(i,3,1)
-      Q(i,1,2) = -Q(i,3,2) 
-      Q(i,1,3) = -Q(i,3,3) 
-      Q(i,1,4) = Q(i,3,4) 
+      !Q(i,1,1) = Q(i,3,1)
+      !Q(i,1,2) = -Q(i,3,2) 
+      !Q(i,1,3) = -Q(i,3,3) 
+      !Q(i,1,4) = Q(i,3,4) 
     enddo
   end subroutine set_bc
 end module set

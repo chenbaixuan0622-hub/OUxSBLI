@@ -28,7 +28,7 @@ module mod_globals
   real(8), parameter :: dp_max = 5d3
 
   ! mesh
-  real(8), parameter :: Lx = 48.d-3
+  real(8), parameter :: Lx = 36.d-3
   real(8), parameter :: Ly = 16.d-3 
   real(8), parameter :: Lz = 0.d0 
   integer, parameter :: nx = 513 
