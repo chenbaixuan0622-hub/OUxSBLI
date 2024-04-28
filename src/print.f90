@@ -47,6 +47,16 @@ contains
     close(10)
   end subroutine print_KE
 
+  subroutine print_boundary_layer(u)
+    real(8), intent(in) :: u(ny)
+    integer j
+    open(10,file="data/boundary_layer.d",action="write")
+    do j = 2, ny
+      write(10,"(2(f12.7,1x))") dble(j-2)*dy, u(j)/u(ny)
+    enddo
+    close(10)
+  end subroutine print_boundary_layer
+
   subroutine print_header(ni,nj,nk,di,dj,dk)
     integer, intent(in) :: ni, nj, nk
     real(8), intent(in) :: di, dj, dk
@@ -57,7 +67,7 @@ contains
     write(10,"('DATASET STRUCTURED_GRID')")
     write(10,"('DIMENSIONS',3(1x,i4))") ni, nj, nk
     write(10,"('POINTS',i9,' float')") ni * nj * nk
-    write(10,"(3(f9.4,1x))") ((((i-1)*di, (j-1)*dj, (k-1)*dk,i=1,ni),j=1,nj),k=1,nk)
+    write(10,"(3(f12.7,1x))") (((dble(i-1)*di, dble(j-1)*dj, dble(k-1)*dk,i=1,ni),j=1,nj),k=1,nk)
 
     write(10,"('POINT_DATA',i9)") ni * nj * nk
     write(10,"('VECTORS Velocity float')")
@@ -79,7 +89,7 @@ contains
     open(10,file=filename)
     call print_header(nx,ny,1,dx,dy,0.d0)
 
-    write(10,"(3(f9.4,1x))") ((u(i,j), v(i,j), 0.d0,i=1,nx),j=1,ny)
+    write(10,"(3(f10.4,1x))") ((u(i,j), v(i,j), 0.d0,i=1,nx),j=1,ny)
 
     write(10,"('SCALARS rho float')")
     write(10,"('LOOKUP_TABLE default')")
@@ -93,6 +103,8 @@ contains
     write(10,"('LOOKUP_TABLE default')")
     write(10,"(f9.4,1x)") ((T(i,j),i=1,nx),j=1,ny)
     close(10)
+  
+    call print_boundary_layer(u(int(0.5*nx),:))
   end subroutine print_vtk_2D
   
   subroutine print_vtk_3D(step,Q,T,ke0,rhos0,mut)
@@ -114,7 +126,7 @@ contains
     open(10,file=filename)
     call print_header(nx,ny,nz,dx,dy,dz)
 
-    write(10,"(3(f9.4,1x))") (((u(i,j,k), v(i,j,k), w(i,j,k),i=1,nx),j=1,ny),k=1,nz)
+    write(10,"(3(f10.4,1x))") (((u(i,j,k), v(i,j,k), w(i,j,k),i=1,nx),j=1,ny),k=1,nz)
 
     write(10,"('SCALARS rho float')")
     write(10,"('LOOKUP_TABLE default')")

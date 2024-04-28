@@ -39,15 +39,16 @@ contains
     write(*,*) eta, f, df
   end subroutine calc_Blasius
 
-  subroutine set_init(Q)
+  subroutine set_init(Q,Vin)
     real(8), intent(out), dimension(nx,ny,4) :: Q
+    real(8), intent(in), dimension(ny,2) :: Vin
     real(8) y, eta, u, v, p_wall
     real(8) :: d = 1.d-3
     real(8) :: nu0 = 3.8206d-5
     integer i, j
     Q(:,:,1) = rho0
     ! boundary layer
-    do j = 3, ny
+    do j = 2, ny
       y = dble(j-2) * dy
       eta = y / d
       call calc_Blasius(eta,d,u,v)
@@ -59,26 +60,22 @@ contains
     ! noSlip
     do i = 1, nx
       ! wall
-      Q(i,2,1) = Q(i,3,1)
-      Q(i,2,2) = Q(i,3,2)
-      Q(i,2,3) = 0.d0
-      p_wall = (gamma - 1.d0) * (Q(i,3,4) - 0.5d0 * (Q(i,3,2)**2 + Q(i,3,3)**2) / Q(i,3,1))
-      Q(i,2,4) = p_wall / (gamma - 1.d0)
-      ! imaginray
-      Q(i,1,1) = Q(i,3,1)
-      Q(i,1,2) = Q(i,3,2) 
-      Q(i,1,3) = -Q(i,3,3) 
-      Q(i,1,4) = Q(i,3,4) 
+      Q(i,1,1) = Q(i,2,1)
+      Q(i,1,2) = 0.d0
+      Q(i,1,3) = 0.d0
+      p_wall = (gamma - 1.d0) * (Q(i,2,4) - 0.5d0 * (Q(i,2,2)**2 + Q(i,2,3)**2) / Q(i,2,1))
+      Q(i,1,4) = p_wall / (gamma - 1.d0)
     enddo
   end subroutine set_init
 
-  subroutine set_bc(Q)
+  subroutine set_bc(Q,Vin)
     real(8), intent(inout), device :: Q(nx,ny,4)
+    real(8), intent(in), device :: Vin(ny,2)
     integer i, j, k
     real(8) p_wall
     !$cuf kernel do <<<*,*>>>
     do k = 1, 4
-      do j = 3, ny-1
+      do j = 2, ny-1
         ! inlet
         Q(1,j,k) = Q(nx-3,j,k)
         Q(2,j,k) = Q(nx-2,j,k)
@@ -101,16 +98,11 @@ contains
     !$cuf kernel do <<<*,*>>>
     do i = 1, nx
       ! wall
-      Q(i,2,1) = Q(i,3,1)
-      Q(i,2,2) = 0.d0!Q(i,3,2)
-      Q(i,2,3) = 0.d0
-      p_wall = (gamma - 1.d0) * (Q(i,3,4) - 0.5d0 * (Q(i,3,2)**2 + Q(i,3,3)**2) / Q(i,3,1))
-      Q(i,2,4) = p_wall / (gamma - 1.d0)
-      ! imaginray
-      Q(i,1,1) = Q(i,3,1)
-      Q(i,1,2) = Q(i,3,2) 
-      Q(i,1,3) = -Q(i,3,3) 
-      Q(i,1,4) = Q(i,3,4) 
+      Q(i,1,1) = Q(i,2,1)
+      Q(i,1,2) = 0.d0
+      Q(i,1,3) = 0.d0
+      p_wall = (gamma - 1.d0) * (Q(i,2,4) - 0.5d0 * (Q(i,2,2)**2 + Q(i,2,3)**2) / Q(i,2,1))
+      Q(i,1,4) = p_wall / (gamma - 1.d0)
     enddo
   end subroutine set_bc
 end module set
