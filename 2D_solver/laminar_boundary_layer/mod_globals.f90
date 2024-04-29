@@ -39,6 +39,7 @@ module mod_globals
   real(8), parameter :: dz = Lz / (nz-1)
   real(8), parameter :: dxi = 1.d0 / dx
   real(8), parameter :: dyi = 1.d0 / dy
+  real(8), dimension(nx,ny) :: x, y, z, xix, etay, Jacobian
 
   ! GPU
   type(dim3) :: blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/11,1)

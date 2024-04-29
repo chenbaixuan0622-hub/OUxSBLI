@@ -69,12 +69,13 @@ contains
     F(:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:)) + pressure * Normal(:)
   end function flux_AUSM
 
-  attributes(device) function SLAU(id_dim,Ql,Qr,Normal) result(F)
+  attributes(device) function SLAU(id_dim,Ql,Qr,Normal,Jacobian) result(F)
     integer, intent(in), value :: id_dim
     real(8), intent(in), dimension(dimension+2), device :: Ql, Qr, Normal
+    real(8), intent(in), value :: Jacobian
     real(8) rhol, rhor, pl, pr, el, er, Hl, Hr, cl, cr, c
     real(8) Vp, Vm, Vt, Vtp, Vtm, Mp, Mm, M, x, fslau, g, p, dp, mass, bp, bm, Pressure
-    real(8), dimension(dimension) :: Vl, Vr
+    real(8), dimension(dimension) :: Vl, Vr, xy
     real(8), dimension(dimension+2) :: F
 
     call set_q(Ql,Qr,rhol,rhor,pl,pr,Vl,Vr)
@@ -82,8 +83,11 @@ contains
 
     c = 0.5d0 * (cl + cr)
     ! contravariant velocity
-    Vp = Vl(id_dim)
-    Vm = Vr(id_dim)
+    xy = Normal(2:dimension+1)
+    Vp = vecsum(Vl, xy)
+    Vm = vecsum(Vr, xy)
+    !Vp = Vl(id_dim)
+    !Vm = Vr(id_dim)
     Mp = Vp / c
     Mm = Vm / c
     M = min(1.d0, sqrt(0.5d0 * q2(Vl(:), Vr(:))) / c)
@@ -101,6 +105,7 @@ contains
     ! pressure flux
     Pressure = 0.5d0 * (pl + pr + (bp - bm) * (pl - pr) + (1.d0 - x) * (bp + bm - 1.d0) * (pl + pr))
     F(:) = flux_AUSM(mass,Pressure,Hl,Hr,Vl,Vr,Normal)
+    F(:) = F(:) / Jacobian
   end function SLAU
 end module calc_slau
 

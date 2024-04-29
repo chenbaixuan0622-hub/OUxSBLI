@@ -39,6 +39,18 @@ contains
     write(*,*) eta, f, df
   end subroutine calc_Blasius
 
+  subroutine set_grid(x,y,z)
+    real(8), intent(out), dimension(nx,ny) :: x, y, z
+    integer i, j
+    do j = 1, ny
+      do i = 1, nx
+        x(i,j) = dble(i-1) * dx
+        y(i,j) = dble(j-1) * dy
+        z(i,j) = 0.d0
+      enddo
+    enddo
+  end subroutine set_grid
+
   subroutine set_init(Q,Vin)
     real(8), intent(out), dimension(nx,ny,4) :: Q
     real(8), intent(in), dimension(ny,2) :: Vin
