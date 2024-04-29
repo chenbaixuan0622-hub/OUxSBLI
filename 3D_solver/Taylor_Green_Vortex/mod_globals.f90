@@ -11,15 +11,20 @@ module mod_globals
   !               ! 1 Smagorinsky           !
   !               ! 2 selective_mixed_scale !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer, parameter :: id_turbulence = 1
-  !!!!!!!!!!!!!!!!!!!!!!!
-  ! id_scheme ! 1  KEEP !
-  !           ! 2  Roe  !
-  !           ! 3  SLAU !
-  !!!!!!!!!!!!!!!!!!!!!!!
+  integer, parameter :: id_turbulence = 0
+  !!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_scheme ! 1  KEEP    !
+  !           ! 2  Roe     !
+  !           ! 3  SLAU    !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_slau   ! kind2 slau !
+  !           ! kind4 sd   !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_hybrid = 0
   integer(kind=2), parameter :: id_muscl = 0
   integer, parameter :: id_scheme = 1
+  integer(kind=2), parameter :: id_slau = 0
+  real(8), parameter :: dp_max = 0.d0
 
   ! mesh
   real(8), parameter :: pi = acos(-1.d0)
@@ -35,6 +40,7 @@ module mod_globals
   real(8), parameter :: dxi = 1.d0 / dx
   real(8), parameter :: dyi = 1.d0 / dy
   real(8), parameter :: dzi = 1.d0 / dz
+  real(8), dimension(nx,ny,nz) :: x, y, z, xix, etay, Jacobian
 
   ! GPU
   type(dim3) :: blocksE = dim3((nx-accuracy+1)/5,(ny-accuracy)/8,(nz-accuracy)/8)
@@ -49,7 +55,7 @@ module mod_globals
   ! id_RungeKutta ! kind=2 ! 3rd_TVD !
   !               ! kind=4 ! 4th     !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=2), parameter :: id_RungeKutta = 0
+  integer(kind=4), parameter :: id_RungeKutta = 0
   integer, parameter :: nt = 200
   integer, parameter :: np = 200
   real(8), parameter :: dt = 0.01d0
@@ -69,6 +75,7 @@ module mod_globals
   real(8), parameter :: sigma = 2.d0
 
   ! initial condition
+  real(8), parameter :: R = 287.03d0
   real(8), parameter :: T = 300.d0
   real(8), parameter :: RHO0 = 1.d0 
   real(8), parameter :: L0 = 1.d0
