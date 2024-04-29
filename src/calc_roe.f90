@@ -7,10 +7,11 @@ module calc_roe
   use calc_mat
   implicit none
 contains
-  attributes(device) function Roe(id_dim,Qsl,Qsr,Normal) result(F)
+  attributes(device) function Roe(id_dim,Qsl,Qsr,Normal,Jacobian) result(F)
     integer, intent(in), value :: id_dim
     real(8), intent(in), dimension(dimension+2), device :: Qsl, Qsr
     real(8), intent(in), dimension(dimension+2), device :: Normal
+    real(8), intent(in), value :: Jacobian
     real(8), dimension(dimension+2), device :: F, Fl, Fr, Ql, Qr, dQ
     real(8) rhol, rhor, pl, pr, el, er, Hl, Hr, rho_ave, H_ave, c_ave
     real(8), dimension(dimension) :: Vl, Vr, V_ave
@@ -45,6 +46,7 @@ contains
     mat(:,:) = calc_AB(id_dim, rho_ave, H_ave, c_ave, V_ave)
     dQ(:) = Qr(:) - Ql(:)
     F(:) = 0.5d0 * (Fl(:) + Fr(:) - cumatmul(mat(:,:), dQ(:)))
+    F(:) = F(:) / Jacobian
   end function Roe
 end module calc_roe
 
