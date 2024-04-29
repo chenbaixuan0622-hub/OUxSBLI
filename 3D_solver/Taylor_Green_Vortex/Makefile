@@ -14,6 +14,7 @@ TARGET = shock_tube
 vpath %f90 ../src:../../src
 
 OBJ =	mod_globals.o \
+      set_coordinate.o \
       set.o \
       calc_common_dim.o \
       calc_physical_quantities.o \
@@ -53,5 +54,5 @@ calc_hybrid.o: mod_globals.mod
 calc_steps.o: mod_globals.mod
 calc_time_dev.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_flux.mod calc_hybrid.mod calc_visc.mod calc_steps.mod print.mod
 print.o: mod_globals.mod
-main.o: main.f90 mod_globals.mod set.mod calc_time_dev.mod
+main.o: main.f90 mod_globals.mod set_coordinate.mod set.mod calc_time_dev.mod
 
