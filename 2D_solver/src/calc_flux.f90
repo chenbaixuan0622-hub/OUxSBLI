@@ -14,13 +14,13 @@ module calc_flux
 contains
 !NoMUSCL!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  attributes(global) subroutine calc_E_NoMUSCL(id_muscl, rho, u, v, p, E)
+  attributes(global) subroutine calc_E_NoMUSCL(id_muscl, rho, u, v, p, xix, Jacobian, E)
     integer(kind=2), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
+    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p, xix, Jacobian
     real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,4), device :: E
     integer i, j
     real(8), dimension(accuracy) :: rhos, ps
-    real(8), dimension(2) :: Normal = (/1.d0, 0.d0/)
+    real(8), dimension(2) :: Normal
     real(8), dimension(accuracy,2) :: Vs
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
@@ -29,16 +29,17 @@ contains
     ps = p(i:i+accuracy-1,j)
     Vs(:,1) = u(i:i+accuracy-1,j)
     Vs(:,2) = v(i:i+accuracy-1,j)
+    Normal(:) = (/0.5d0 * (xix(i,j) / Jacobian(i,j) + xix(i+1,j) / Jacobian(i+1,j)), 0.d0/)
     E(i,j-offset,:) = KEEP(id_accuracy,1,rhos,ps,Vs,Normal)
   end subroutine calc_E_NoMUSCL
 
-  attributes(global) subroutine calc_F_NoMUSCL(id_muscl, rho, u, v, p, F)
+  attributes(global) subroutine calc_F_NoMUSCL(id_muscl, rho, u, v, p, etay, Jacobian, F)
     integer(kind=2), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
+    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p, etay, Jacobian
     real(8), intent(out), dimension(nx-accuracy,ny-accuracy+1,4), device :: F
     integer i, j
     real(8), dimension(accuracy) :: rhos, ps
-    real(8), dimension(2) :: Normal = (/0.d0, 1.d0/)
+    real(8), dimension(2) :: Normal
     real(8), dimension(accuracy,2) :: Vs
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
@@ -47,18 +48,19 @@ contains
     ps = p(i,j:j+accuracy-1)
     Vs(:,1) = u(i,j:j+accuracy-1)
     Vs(:,2) = v(i,j:j+accuracy-1)
+    Normal(:) = (/0.d0, 0.5d0 * (etay(i,j) / Jacobian(i,j) + etay(i,j+1) / Jacobian(i,j+1))/)
     F(i-offset,j,:) = KEEP(id_accuracy,2,rhos,ps,Vs,Normal)
   end subroutine calc_F_NoMUSCL
 
 !MUSCL!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  attributes(global) subroutine calc_E_MUSCL(id_muscl, rho, u, v, p, E)
+  attributes(global) subroutine calc_E_MUSCL(id_muscl, rho, u, v, p, xix, Jacobians, E)
     integer(kind=4), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
+    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p, xix, Jacobians
     real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,4), device :: E
     integer i, j
-    real(8) :: Normal(4) = (/0.d0, 1.d0, 0.d0, 0.d0/)
-    real(8), dimension(4) :: Q1, Q2, Q3, Q4, Ql, Qr
+    real(8) Jacobian
+    real(8), dimension(4) :: Q1, Q2, Q3, Q4, Ql, Qr, Normal
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     
@@ -77,20 +79,22 @@ contains
       call Qlr_right(Q1,Q2,Q3,Ql,Qr)
     endif
 
+    Jacobian = 0.5d0 * (Jacobians(i,j) + Jacobians(i+1,j))
+    Normal(:) = (/0.d0, 0.5d0 * (xix(i,j) + xix(i+1,j)), 0.d0, 0.d0/)
     if (id_scheme == 2) then
-      E(i,j-offset,:) = Roe(1,Ql,Qr,Normal)
+      E(i,j-offset,:) = Roe(1,Ql,Qr,Normal,Jacobian)
     else
-      E(i,j-offset,:) = SLAU(1,Ql,Qr,Normal)
+      E(i,j-offset,:) = SLAU(1,Ql,Qr,Normal,Jacobian)
     endif
   end subroutine calc_E_MUSCL
 
-  attributes(global) subroutine calc_F_MUSCL(id_muscl, rho, u, v, p, F)
+  attributes(global) subroutine calc_F_MUSCL(id_muscl, rho, u, v, p, etay, Jacobians, F)
     integer(kind=4), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
+    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p, etay, Jacobians
     real(8), intent(out), dimension(nx-accuracy,ny-accuracy+1,4), device :: F
     integer i, j
-    real(8) :: Normal(4) = (/0.d0, 0.d0, 1.d0, 0.d0/)
-    real(8), dimension(4) :: Q1, Q2, Q3, Q4, Ql, Qr
+    real(8) Jacobian
+    real(8), dimension(4) :: Q1, Q2, Q3, Q4, Ql, Qr, Normal
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
 
@@ -109,22 +113,24 @@ contains
       call Qlr_right(Q1,Q2,Q3,Ql,Qr)
     endif
 
+    Jacobian = 0.5d0 * (Jacobians(i,j) + Jacobians(i,j+1))
+    Normal(:) = (/0.d0, 0.d0, 0.5d0 * (etay(i,j) + etay(i,j+1)), 0.d0/)
     if (id_scheme == 2) then
-      F(i-offset,j,:) = Roe(2,Ql,Qr,Normal)
+      F(i-offset,j,:) = Roe(2,Ql,Qr,Normal,Jacobian)
     else
-      F(i-offset,j,:) = SLAU(2,Ql,Qr,Normal)
+      F(i-offset,j,:) = SLAU(2,Ql,Qr,Normal,Jacobian)
     endif
   end subroutine calc_F_MUSCL
 
 !MUSCL4th!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  attributes(global) subroutine calc_E_MUSCL_4th(id_muscl, rho, u, v, p, E)
+  attributes(global) subroutine calc_E_MUSCL_4th(id_muscl, rho, u, v, p, xix, Jacobians, E)
     integer(kind=8), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
+    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p, xix, Jacobians
     real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,4), device :: E
     integer i, j
-    real(8) :: Normal(4) = (/0.d0, 1.d0, 0.d0, 0.d0/)
-    real(8), dimension(4) :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr
+    real(8) Jacobian
+    real(8), dimension(4) :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr, Normal
     real(8) :: zero(4) = (/0.d0, 0.d0, 0.d0, 0.d0/)
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
@@ -161,20 +167,22 @@ contains
       call Qlr_right(Q2,Q3,Q4,Ql,Qr)
     endif
 
+    Jacobian = 0.5d0 * (Jacobians(i,j) + Jacobians(i+1,j))
+    Normal(:) = (/0.d0, 0.5d0 * (xix(i,j) + xix(i+1,j)), 0.d0, 0.d0/)
     if (id_scheme == 2) then
-      E(i,j-offset,:) = Roe(1,Ql,Qr,Normal)
+      E(i,j-offset,:) = Roe(1,Ql,Qr,Normal,Jacobian)
     else
-      E(i,j-offset,:) = SLAU(1,Ql,Qr,Normal)
+      E(i,j-offset,:) = SLAU(1,Ql,Qr,Normal,Jacobian)
     endif
   end subroutine calc_E_MUSCL_4th
 
-  attributes(global) subroutine calc_F_MUSCL_4th(id_muscl, rho, u, v, p, F)
+  attributes(global) subroutine calc_F_MUSCL_4th(id_muscl, rho, u, v, p, etay, Jacobians, F)
     integer(kind=8), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
+    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p, etay, Jacobians
     real(8), intent(out), dimension(nx-accuracy,ny-accuracy+1,4), device :: F
     integer i, j
-    real(8) :: Normal(4) = (/0.d0, 0.d0, 1.d0, 0.d0/)
-    real(8), dimension(4) :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr
+    real(8) Jacobian
+    real(8), dimension(4) :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr, Normal
     real(8) :: zero(4) = (/0.d0, 0.d0, 0.d0, 0.d0/)
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
@@ -211,10 +219,12 @@ contains
       call Qlr_right(Q2,Q3,Q4,Ql,Qr)
     endif
 
+    Jacobian = 0.5d0 * (Jacobians(i,j) + Jacobians(i,j+1))
+    Normal(:) = (/0.d0, 0.d0, 0.5d0 * (etay(i,j) + etay(i,j+1)), 0.d0/)
     if (id_scheme == 2) then
-      F(i-offset,j,:) = Roe(2,Ql,Qr,Normal)
+      F(i-offset,j,:) = Roe(2,Ql,Qr,Normal,Jacobian)
     else
-      F(i-offset,j,:) = SLAU(2,Ql,Qr,Normal)
+      F(i-offset,j,:) = SLAU(2,Ql,Qr,Normal,Jacobian)
     endif
   end subroutine calc_F_MUSCL_4th
 end module calc_flux

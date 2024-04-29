@@ -2,14 +2,16 @@ module print
   use mod_globals, only : nt, nx, ny, nz, dx, dy, dz, dt, gamma
   implicit none
   interface print_vtk
-    subroutine print_vtk_2D(step,Q,T)
+    subroutine print_vtk_2D(step,x,y,Jacobian,Q,T)
       integer, intent(in) :: step
+      real(8), intent(in), dimension(nx,ny) :: x, y, Jacobian
       real(8), intent(in) :: Q(nx,ny,4)
       real(8), intent(in), optional :: T(nx,ny)
     end subroutine print_vtk_2D
 
-    subroutine print_vtk_3D(step,Q,T,ke0,entropy0,mut)
+    subroutine print_vtk_3D(step,x,y,z,Jacobian,Q,T,ke0,entropy0,mut)
       integer, intent(in) :: step
+      real(8), intent(in), dimension(nx,ny,nz) :: x, y, z, Jacobian
       real(8), intent(in) :: Q(nx,ny,nz,5)
       real(8), intent(in) :: T(nx,ny,nz)
       real(8), intent(inout) :: ke0, entropy0
@@ -57,9 +59,27 @@ contains
     close(10)
   end subroutine print_boundary_layer
 
-  subroutine print_header(ni,nj,nk,di,dj,dk)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  subroutine print_header_2D(ni,nj,x,y)
+    integer, intent(in) :: ni, nj
+    real(8), intent(in), dimension(nx,ny) :: x, y
+    integer i, j
+    write(10,"('# vtk DataFile Version 3.0')")
+    write(10,"('Q')")
+    write(10,"('ASCII')")
+    write(10,"('DATASET STRUCTURED_GRID')")
+    write(10,"('DIMENSIONS',3(1x,i4))") ni, nj, 1
+    write(10,"('POINTS',i9,' float')") ni * nj
+    write(10,"(3(f12.7,1x))") ((x(i,j), y(i,j), 0.d0,i=1,ni),j=1,nj)
+
+    write(10,"('POINT_DATA',i9)") ni * nj
+    write(10,"('VECTORS Velocity float')")
+  end subroutine print_header_2D
+
+  subroutine print_header_3D(ni,nj,nk,x,y,z)
     integer, intent(in) :: ni, nj, nk
-    real(8), intent(in) :: di, dj, dk
+    real(8), intent(in), dimension(nx,ny,nz) :: x, y, z
     integer i, j, k
     write(10,"('# vtk DataFile Version 3.0')")
     write(10,"('Q')")
@@ -67,19 +87,25 @@ contains
     write(10,"('DATASET STRUCTURED_GRID')")
     write(10,"('DIMENSIONS',3(1x,i4))") ni, nj, nk
     write(10,"('POINTS',i9,' float')") ni * nj * nk
-    write(10,"(3(f12.7,1x))") (((dble(i-1)*di, dble(j-1)*dj, dble(k-1)*dk,i=1,ni),j=1,nj),k=1,nk)
+    write(10,"(3(f12.7,1x))") (((x(i,j,k), y(i,j,k), z(i,j,k),i=1,ni),j=1,nj),k=1,nk)
 
     write(10,"('POINT_DATA',i9)") ni * nj * nk
     write(10,"('VECTORS Velocity float')")
-  end subroutine print_header
+  end subroutine print_header_3D
 
-  subroutine print_vtk_2D(step,Q,T)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  subroutine print_vtk_2D(step,x,y,Jacobian,Q,T)
     integer, intent(in) :: step
-    real(8), intent(in) :: Q(nx,ny,4)
+    real(8), intent(in), dimension(nx,ny) :: x, y, Jacobian
+    real(8), intent(inout) :: Q(nx,ny,4)
     real(8), intent(in), optional :: T(nx,ny)
     integer i, j
     real(8), dimension(nx,ny) :: rho, u, v, p
     character(len=40) filename
+    do i = 1, 4
+      Q(:,:,i) = Q(:,:,i) * Jacobian(:,:)
+    enddo
     rho = Q(:,:,1)
     u = Q(:,:,2) / rho
     v = Q(:,:,3) / rho
@@ -87,7 +113,7 @@ contains
     
     write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtk"
     open(10,file=filename)
-    call print_header(nx,ny,1,dx,dy,0.d0)
+    call print_header_2D(nx,ny,x,y)
 
     write(10,"(3(f10.4,1x))") ((u(i,j), v(i,j), 0.d0,i=1,nx),j=1,ny)
 
@@ -107,15 +133,19 @@ contains
     call print_boundary_layer(u(int(0.5*nx),:))
   end subroutine print_vtk_2D
   
-  subroutine print_vtk_3D(step,Q,T,ke0,rhos0,mut)
+  subroutine print_vtk_3D(step,x,y,z,Jacobian,Q,T,ke0,rhos0,mut)
     integer, intent(in) :: step
-    real(8), intent(in) :: Q(nx,ny,nz,5)
+    real(8), intent(in), dimension(nx,ny,nz) :: x, y, z, Jacobian
+    real(8), intent(inout) :: Q(nx,ny,nz,5)
     real(8), intent(in) :: T(nx,ny,nz)
     real(8), intent(inout) :: ke0, rhos0
     real(8), intent(in), optional :: mut(nx,ny,nz)
     integer i, j, k
     real(8), dimension(nx,ny,nz) :: rho, u, v, w, p, nut
     character(len=40) filename
+    do i = 1, 5
+      Q(:,:,:,i) = Q(:,:,:,i) * Jacobian(:,:,:)
+    enddo
     rho = Q(:,:,:,1)
     u = Q(:,:,:,2) / rho
     v = Q(:,:,:,3) / rho
@@ -124,7 +154,7 @@ contains
     
     write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtk"
     open(10,file=filename)
-    call print_header(nx,ny,nz,dx,dy,dz)
+    call print_header_3D(nx,ny,nz,x,y,z)
 
     write(10,"(3(f10.4,1x))") (((u(i,j,k), v(i,j,k), w(i,j,k),i=1,nx),j=1,ny),k=1,nz)
 
