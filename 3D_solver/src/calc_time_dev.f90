@@ -36,9 +36,9 @@ contains
     stat = cudaDeviceSynchronize()
 
     if (id_turbulence /= 0) then
-      !call calc_mut<<<blocks,threads>>>(rho,u,v,w,mut)
+      call calc_mut<<<blocks,threads>>>(rho,u,v,w,mut)
       stat = cudaDeviceSynchronize()
-      !call set_bc_mut(mut)
+      call set_bc_mut(mut)
     endif
 
     if (id_visc == 1 .or. id_turbulence /= 0) then
@@ -82,9 +82,9 @@ contains
     !print *, trim(cudaGetErrorString(cudaGetLastError()))
 
     if (id_turbulence /= 0) then
-      !call calc_mut<<<blocks,threads>>>(rho,u,v,w,mut)
+      call calc_mut<<<blocks,threads>>>(rho,u,v,w,mut)
       stat = cudaDeviceSynchronize()
-      !call set_bc_mut(mut)
+      call set_bc_mut(mut)
     endif
 
     if (id_visc == 1 .or. id_turbulence /= 0) then
