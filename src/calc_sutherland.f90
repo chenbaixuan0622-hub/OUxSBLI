@@ -1,5 +1,5 @@
 module calc_sutherland
-  use mod_globals, only : gamma, R
+  use mod_globals, only : gamma, R, Pr
   implicit none
   interface calc_mu
     module procedure calc_mu2, calc_mu4
@@ -33,7 +33,6 @@ contains
     real(8), intent(out) :: kappa
     real(8) kappa1, kappa2, mu1, mu2
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
-    real(8) :: Pr = 0.72d0
     mu1 = mu(T1)
     mu2 = mu(T2)
     kappa1 = mu1 * Cp / Pr 
