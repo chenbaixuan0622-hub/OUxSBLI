@@ -19,18 +19,18 @@ module print
     end subroutine print_vtk_3D
   end interface
 contains
-  subroutine print_entropy(step,rho,p,rhos0)
+  subroutine print_entropy(step,rho,p,entropy0)
     integer, intent(in) :: step
     real(8), intent(in), dimension(nx,ny,nz) :: rho, p
-    real(8), intent(inout) :: rhos0
-    real(8) rhos, t
-    rhos = sum(rho * log(p * rho ** (-gamma)))
+    real(8), intent(inout) :: entropy0
+    real(8) entropy, t
+    entropy = sum(rho * log(p * rho ** (-gamma)))
     if (step == 0) then
-      rhos0 = rhos
+      entropy0 = entropy
     endif
     t = nt * step * dt
     open(10,file="data/entropy.d", position="append")
-    write(10,"(2(f9.4,1x))") t, (rhos0 - rhos) / rhos0
+    write(10,"(2(f9.4,1x))") t, (entropy0 - entropy) / entropy0
     close(10)
   end subroutine print_entropy
 
@@ -133,12 +133,12 @@ contains
     call print_boundary_layer(u(int(0.5*nx),:))
   end subroutine print_vtk_2D
   
-  subroutine print_vtk_3D(step,x,y,z,Jacobian,Q,T,ke0,rhos0,mut)
+  subroutine print_vtk_3D(step,x,y,z,Jacobian,Q,T,ke0,entropy0,mut)
     integer, intent(in) :: step
     real(8), intent(in), dimension(nx,ny,nz) :: x, y, z, Jacobian
     real(8), intent(inout) :: Q(nx,ny,nz,5)
     real(8), intent(in) :: T(nx,ny,nz)
-    real(8), intent(inout) :: ke0, rhos0
+    real(8), intent(inout) :: ke0, entropy0
     real(8), intent(in), optional :: mut(nx,ny,nz)
     integer i, j, k
     real(8), dimension(nx,ny,nz) :: rho, u, v, w, p, nut
@@ -178,7 +178,7 @@ contains
     endif
     close(10)
 
-    call print_entropy(step,rho,p,rhos0)
+    call print_entropy(step,rho,p,entropy0)
     call print_KE(step,rho,u,v,w,ke0)
   end subroutine print_vtk_3D
 end module print
