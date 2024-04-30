@@ -99,26 +99,42 @@ contains
     real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w
     real(8), intent(out), dimension(nx,ny,nz), device :: mut
     integer i, j, k, l, m, n
-    real(8), dimension(3,3,3), device :: us, vs, ws, uhat, vhat, what
+    real(8), dimension(3,3,3), device :: u3, v3, w3, uhat, vhat, what
+    real(8), dimension(5,5,5), device :: u5, v5, w5
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
     do n = -1, 1
       do m = -1, 1
         do l = -1, 1
-          us(l+2,m+2,n+2) = u(i+l,j+m,k+n)
-          vs(l+2,m+2,n+2) = v(i+l,j+m,k+n)
-          ws(l+2,m+2,n+2) = w(i+l,j+m,k+n)
+          u3(l+2,m+2,n+2) = u(i+l,j+m,k+n)
+          v3(l+2,m+2,n+2) = v(i+l,j+m,k+n)
+          w3(l+2,m+2,n+2) = w(i+l,j+m,k+n)
         enddo
       enddo
     enddo
     if (id_turbulence == 1) then
-      mut(i,j,k) = rho(i,j,k) * Smagorinsky(us,vs,ws) 
+      mut(i,j,k) = rho(i,j,k) * Smagorinsky(u3,v3,w3) 
     else
-      !uhat(:,:,:) = stride_filter(u(i-2:i+2,j-2:j+2,k-2:k+2))
-      !vhat(:,:,:) = stride_filter(v(i-2:i+2,j-2:j+2,k-2:k+2))
-      !what(:,:,:) = stride_filter(w(i-2:i+2,j-2:j+2,k-2:k+2))
-      mut(i,j,k) = rho(i,j,k) * selective_mixed_scale(us,vs,ws,uhat,vhat,what)
+      if (3<=i .and. i<=nx-2 .and. 3<=j .and. j<=ny-2 .and. 3<=k .and. k <=nz-2) then
+        do n = -2, 2
+          do m = -2, 2
+            do l = -2, 2
+              u5(l+3,m+3,n+3) = u(i+l,j+m,k+n) 
+              v5(l+3,m+3,n+3) = v(i+l,j+m,k+n)
+              w5(l+3,m+3,n+3) = w(i+l,j+m,k+n)
+            enddo
+          enddo
+        enddo
+      uhat(:,:,:) = stride_filter(u5(:,:,:))
+      vhat(:,:,:) = stride_filter(v5(:,:,:))
+      what(:,:,:) = stride_filter(w5(:,:,:))
+      else
+        uhat(:,:,:) = u3(:,:,:)
+        vhat(:,:,:) = v3(:,:,:)
+        what(:,:,:) = w3(:,:,:)
+      endif
+      mut(i,j,k) = rho(i,j,k) * selective_mixed_scale(u3,v3,w3,uhat,vhat,what)
     endif
   end subroutine calc_mut
 end module calc_les
