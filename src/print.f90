@@ -19,6 +19,30 @@ module print
     end subroutine print_vtk_3D
   end interface
 contains
+  function mean(a) result(ans)
+    real(8), intent(in) :: a(:,:,:)
+    real(8) ans
+    ans = sum(a) / size(a)
+  end function mean
+
+  subroutine calc_vorticity(x,y,z,u,v,w,omegax,omegay,omegaz)
+    real(8), intent(in), dimension(nx,ny,nz) :: x, y, z, u, v, w
+    real(8), intent(out), dimension(nx-2,ny-2,nz-2) :: omegax, omegay, omegaz
+    integer i, j, k
+    do k = 2, nz-1
+      do j = 2, ny-1
+        do i = 2, nx-1
+          omegax(i-1,j-1,k-1) = (-w(i,j-1,k) + w(i,j+1,k)) / (-y(i,j-1,k) + y(i,j+1,k)) &
+          & - (-v(i,j,k-1) + v(i,j,k+1)) / (-z(i,j,k-1) + z(i,j,k+1))
+          omegay(i-1,j-1,k-1) = (-u(i,j,k-1) + u(i,j,k+1)) / (-z(i,j,k-1) + z(i,j,k+1)) &
+          & - (-w(i-1,j,k) + w(i+1,j,k)) / (-x(i-1,j,k) + x(i+1,j,k))
+          omegaz(i-1,j-1,k-1) = (-v(i-1,j,k) + v(i+1,j,k)) / (-x(i-1,j,k) + x(i+1,j,k)) &
+          & - (-u(i,j-1,k) + u(i,j+1,k)) / (-y(i,j-1,k) + y(i,j+1,k))
+        enddo
+      enddo
+    enddo
+  end subroutine calc_vorticity
+
   subroutine print_entropy(step,rho,p,entropy0)
     integer, intent(in) :: step
     real(8), intent(in), dimension(nx,ny,nz) :: rho, p
@@ -39,7 +63,7 @@ contains
     real(8), intent(in), dimension(nx,ny,nz) :: rho, u, v, w
     real(8), intent(inout) :: ke0
     real(8) ke, t
-    ke = sum(0.5d0 * rho * (u**2 + v**2 + w**2))
+    ke = mean(0.5d0 * rho * (u**2 + v**2 + w**2))
     if (step == 0) then
       ke0 = ke
     endif
@@ -48,6 +72,19 @@ contains
     write(10,"(2(f9.4,1x))") t, ke / ke0
     close(10)
   end subroutine print_KE
+
+  subroutine print_enstrophy(step,x,y,z,rho,u,v,w)
+    integer, intent(in) :: step
+    real(8), intent(in), dimension(nx,ny,nz) :: x, y, z, rho, u, v, w
+    real(8) enstrophy, t
+    real(8), dimension(nx-2,ny-2,nz-2) :: omegax, omegay, omegaz
+    t = nt * step * dt
+    call calc_vorticity(x,y,z,u,v,w,omegax,omegay,omegaz)
+    enstrophy = mean(0.5d0 * rho(2:nx-1,2:ny-1,2:nz-1) * (omegax**2 + omegay**2 + omegaz**2))
+    open(10,file="data/enstrophy.d", position="append")
+    write(10,"(2(f9.4,1x))") t, enstrophy
+    close(10)
+  end subroutine print_enstrophy
 
   subroutine print_boundary_layer(u)
     real(8), intent(in) :: u(ny)
@@ -180,6 +217,7 @@ contains
 
     call print_entropy(step,rho,p,entropy0)
     call print_KE(step,rho,u,v,w,ke0)
+    call print_enstrophy(step,x,y,z,rho,u,v,w)
   end subroutine print_vtk_3D
 end module print
 

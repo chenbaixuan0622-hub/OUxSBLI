@@ -46,9 +46,11 @@ module mod_globals
   type(dim3) :: blocksE = dim3((nx-accuracy+1)/5,(ny-accuracy)/8,(nz-accuracy)/8)
   type(dim3) :: blocksF = dim3((nx-accuracy)/8,(ny-accuracy+1)/5,(nz-accuracy)/8)
   type(dim3) :: blocksG = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy+1)/5)
+  type(dim3) :: blocks = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy)/8)
   type(dim3) :: threadsE = dim3(5,8,8)
   type(dim3) :: threadsF = dim3(8,5,8)
   type(dim3) :: threadsG = dim3(8,8,5)
+  type(dim3) :: threads = dim3(8,8,8)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
