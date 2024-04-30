@@ -1,5 +1,5 @@
 module calc_visc
-  use mod_globals, only : accuracy, offset, id_visc, id_turbulence, nx, ny, nz, dxi, dyi, dzi
+  use mod_globals, only : accuracy, offset, id_visc, id_turbulence, gamma, R, Pr, nx, ny, nz, dxi, dyi, dzi
   use calc_Sutherland
   implicit none
 contains
@@ -34,7 +34,8 @@ contains
     real(8) :: muz1 = 0.d0
     real(8) :: muz2 = 0.d0
     real(8) :: kappa = 0.d0
-    real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, txx, txy, txz, xixJ
+    real(8) :: Cp = gamma * R / (gamma - 1.d0)
+    real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, txx, txy, txz, kappal, kappat, xixJ
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset - 1
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
@@ -46,8 +47,10 @@ contains
       call calc_mu(T(i,j,k),T(i,j+1,k),T(i+1,j,k),T(i+1,j+1,k),muy2)
       call calc_mu(T(i,j,k),T(i,j,k-1),T(i+1,j,k),T(i+1,j,k-1),muz1)
       call calc_mu(T(i,j,k),T(i,j,k+1),T(i+1,j,k),T(i+1,j,k+1),muz2)
-      call calc_kappa(T(i,j,k),T(i+1,j,k),kappa)
+      call calc_kappa(T(i,j,k),T(i+1,j,k),kappal)
     endif
+    kappat = 0.5d0 * (mut(i,j,k) + mut(i+1,j,k)) * Cp / Pr
+    kappa = kappal + kappat
 
     ! x direction
     mux = mux + 0.5d0 * (mut(i,j,k) + mut(i+1,j,k))
@@ -90,7 +93,8 @@ contains
     real(8) :: mux1 = 0.d0
     real(8) :: mux2 = 0.d0
     real(8) :: kappa = 0.d0
-    real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, tyx, tyy, tyz, etayJ
+    real(8) :: Cp = gamma * R / (gamma - 1.d0)
+    real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, tyx, tyy, tyz, kappal, kappat, etayJ
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset - 1
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
@@ -102,8 +106,10 @@ contains
       call calc_mu(T(i,j,k),T(i,j,k+1),T(i,j+1,k),T(i,j+1,k+1),muz2)
       call calc_mu(T(i,j,k),T(i-1,j,k),T(i,j+1,k),T(i-1,j+1,k),mux1)
       call calc_mu(T(i,j,k),T(i+1,j,k),T(i,j+1,k),T(i+1,j+1,k),mux2)
-      call calc_kappa(T(i,j,k),T(i,j+1,k),kappa)
+      call calc_kappa(T(i,j,k),T(i,j+1,k),kappal)
     endif
+    kappat = 0.5d0 * (mut(i,j,k) + mut(i,j+1,k)) * Cp / Pr
+    kappa = kappal + kappat
 
     ! y direction
     muy = muy + 0.5d0 * (mut(i,j,k) + mut(i,j+1,k))
@@ -146,7 +152,8 @@ contains
     real(8) :: muy1 = 0.d0
     real(8) :: muy2 = 0.d0
     real(8) :: kappa = 0.d0
-    real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, tzx, tzy, tzz, zetaJ
+    real(8) :: Cp = gamma * R / (gamma - 1.d0)
+    real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, tzx, tzy, tzz, kappal, kappat, zetaJ
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset - 1
@@ -158,8 +165,10 @@ contains
       call calc_mu(T(i,j,k),T(i+1,j,k),T(i,j,k+1),T(i+1,j,k+1),mux2)
       call calc_mu(T(i,j,k),T(i,j-1,k),T(i,j,k+1),T(i,j-1,k+1),muy1)
       call calc_mu(T(i,j,k),T(i,j+1,k),T(i,j,k+1),T(i,j+1,k+1),muy2)
-      call calc_kappa(T(i,j,k),T(i,j,k+1),kappa)
+      call calc_kappa(T(i,j,k),T(i,j,k+1),kappal)
     endif
+    kappat = 0.5d0 * (mut(i,j,k) + mut(i,j,k+1)) * Cp / Pr
+    kappa = kappal + kappat
 
     ! z direction
     muz = muz + 0.5d0 * (mut(i,j,k) + mut(i,j,k+1))

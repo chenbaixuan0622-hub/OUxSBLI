@@ -34,9 +34,9 @@ module mod_globals
   integer, parameter :: nx = 66 
   integer, parameter :: ny = 66
   integer, parameter :: nz = 66
-  real(8), parameter :: dx = Lx / (nx-1)
-  real(8), parameter :: dy = Ly / (ny-1)
-  real(8), parameter :: dz = Lz / (nz-1)
+  real(8), parameter :: dx = Lx / dble(nx-1)
+  real(8), parameter :: dy = Ly / dble(ny-1)
+  real(8), parameter :: dz = Lz / dble(nz-1)
   real(8), parameter :: dxi = 1.d0 / dx
   real(8), parameter :: dyi = 1.d0 / dy
   real(8), parameter :: dzi = 1.d0 / dz
@@ -56,15 +56,9 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_RungeKutta ! kind=2 ! 3rd_TVD !
   !               ! kind=4 ! 4th     !
+  !               ! kind=8 ! 10step  !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=4), parameter :: id_RungeKutta = 0
-  integer, parameter :: nt = 200
-  integer, parameter :: np = 200
-  real(8), parameter :: dt = 0.01d0
-
-  real(8), parameter :: dtdx = dt / dx
-  real(8), parameter :: dtdy = dt / dy
-  real(8), parameter :: dtdz = dt / dz
+  integer(kind=8), parameter :: id_RungeKutta = 0
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
@@ -78,10 +72,28 @@ module mod_globals
 
   ! initial condition
   real(8), parameter :: R = 287.03d0
-  real(8), parameter :: T = 300.d0
-  real(8), parameter :: RHO0 = 1.d0 
+  real(8), parameter :: Pr = 0.72d0
+  real(8), parameter :: Re = 1600.d0
+  real(8), parameter :: M0 = 0.1d0
   real(8), parameter :: L0 = 1.d0
-  real(8), parameter :: M0 = 0.4d0
+  real(8), parameter :: Tr = 273.2d0
+  real(8), parameter :: S = 111.d0
+  real(8), parameter :: T = 200.d0
+  real(8), parameter :: mu0 = 1.716d-5 * ((Tr + S) / (T + S)) * (T / Tr) ** 1.5d0
+  real(8), parameter :: a = sqrt(gamma * R * T)
+  real(8), parameter :: V0 = M0 * a
+  real(8), parameter :: RHO0 = Re * mu0 / (V0 * L0)
+  real(8), parameter :: p0 = RHO0 * R * T
+
+  real(8), parameter :: CFL = 0.01d0
+  real(8), parameter :: dt = CFL * dx / V0
+  real(8), parameter :: dthat = V0 * dt / L0
+  integer, parameter :: np = 100
+  integer, parameter :: nt = int(20.d0 / (dble(np) * dthat))
+
+  real(8), parameter :: dtdx = dt / dx
+  real(8), parameter :: dtdy = dt / dy
+  real(8), parameter :: dtdz = dt / dz
 
   ! variables
   real(8), save :: Q(nx,ny,nz,5)

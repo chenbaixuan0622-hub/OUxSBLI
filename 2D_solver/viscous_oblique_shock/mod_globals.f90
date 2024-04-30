@@ -34,9 +34,9 @@ module mod_globals
   integer, parameter :: nx = 513 
   integer, parameter :: ny = 321 
   integer, parameter :: nz = accuracy+1
-  real(8), parameter :: dx = Lx / (nx-1)
-  real(8), parameter :: dy = Ly / (ny-1)
-  real(8), parameter :: dz = Lz / (nz-1)
+  real(8), parameter :: dx = Lx / dble(nx-1)
+  real(8), parameter :: dy = Ly / dble(ny-1)
+  real(8), parameter :: dz = Lz / dble(nz-1)
   real(8), parameter :: dxi = 1.d0 / dx
   real(8), parameter :: dyi = 1.d0 / dy
   real(8), dimension(nx,ny) :: x, y, z, xix, etay, Jacobian
@@ -53,8 +53,9 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_Rungekutta ! kind=2 ! 3rd-TVD !
   !               ! kind=4 ! 4th     !
+  !               ! kind=8 ! 10th    !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=4), parameter :: id_RungeKutta = 0
+  integer(kind=8), parameter :: id_RungeKutta = 0
   integer, parameter :: nt = 250
   integer, parameter :: np = 50
   real(8), parameter :: u0 = 506.8d0
@@ -76,6 +77,7 @@ module mod_globals
 
   ! laminar boundary layer
   real(8), parameter :: R = 287.03d0
+  real(8), parameter :: Pr = 0.72d0
   real(8), parameter :: p0 = 14924.d0
   real(8), parameter :: T = 171.31d0
   real(8), parameter :: rho0 = p0 / (R * T)
