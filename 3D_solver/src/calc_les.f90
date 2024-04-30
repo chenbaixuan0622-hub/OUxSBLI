@@ -118,7 +118,7 @@ contains
       !uhat(:,:,:) = stride_filter(u(i-2:i+2,j-2:j+2,k-2:k+2))
       !vhat(:,:,:) = stride_filter(v(i-2:i+2,j-2:j+2,k-2:k+2))
       !what(:,:,:) = stride_filter(w(i-2:i+2,j-2:j+2,k-2:k+2))
-      mut(i,j,k) = rho(i,j,k) * selective_mixed_scale(us,vs,ws,uhat,vhat,what)
+      !mut(i,j,k) = rho(i,j,k) * selective_mixed_scale(us,vs,ws,uhat,vhat,what)
     endif
   end subroutine calc_mut
 end module calc_les

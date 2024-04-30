@@ -1,5 +1,5 @@
 module set
-  use mod_globals, only : accuracy, offset, nx, ny, nz, gamma, RHO0, L0, M0
+  use mod_globals, only : accuracy, offset, nx, ny, nz, dx, dy, dz, gamma, RHO0, L0, M0
   implicit none
 
   interface set_bc
@@ -14,9 +14,24 @@ contains
     real(8) x(n)
     x = x1 + (x1 + x2) * (/ (dble(i - 1) / dble(n - 1), i = 1, n) /)
   end function linspace
+
+  subroutine set_grid(x,y,z)
+    real(8), intent(out), dimension(nx,ny,nz) :: x, y, z
+    integer i, j, k
+    do k = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          x(i,j,k) = dble(i-1) * dx
+          y(i,j,k) = dble(j-1) * dy
+          z(i,j,k) = dble(k-1) * dz
+        enddo
+      enddo
+    enddo
+  end subroutine set_grid
   
-  subroutine set_init(Q)
+  subroutine set_init(Q,Vin)
     real(8), intent(out), dimension(nx,ny,nz,5) :: Q
+    real(8), intent(in), dimension(ny,2) :: Vin
     integer i, j, k
     real(8) :: pi = 2.d0 * acos(0.d0)
     real(8) x(nx-accuracy), y(ny-accuracy), z(nz-accuracy)

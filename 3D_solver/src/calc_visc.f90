@@ -24,8 +24,8 @@ contains
             & + mu2 * (-u1 + u6 - u4 + u5)) 
   end function u_y
 
-  attributes(global) subroutine calc_Ev(u, v, w, T, mut, E)
-    real(8), intent(in), dimension(nx,ny,nz), device :: u, v, w, T, mut
+  attributes(global) subroutine calc_Ev(xix, Jacobian, u, v, w, T, mut, E)
+    real(8), intent(in), dimension(nx,ny,nz), device :: xix, Jacobian, u, v, w, T, mut
     real(8), intent(inout), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E
     integer i, j, k
     real(8) :: mux = 0.d0
@@ -34,7 +34,7 @@ contains
     real(8) :: muz1 = 0.d0
     real(8) :: muz2 = 0.d0
     real(8) :: kappa = 0.d0
-    real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, txx, txy, txz
+    real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, txx, txy, txz, xixJ
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset - 1
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
@@ -67,20 +67,21 @@ contains
     uz = u_y(dzi,muz1,muz2,u(i,j,k),u(i,j,k-1),u(i+1,j,k-1),u(i+1,j,k),u(i+1,j,k+1),u(i,j,k+1))
     wz = u_y(dzi,muz1,muz2,w(i,j,k),w(i,j,k-1),w(i+1,j,k-1),w(i+1,j,k),w(i+1,j,k+1),w(i,j,k+1))
 
-    txx = 2.d0 * (2.d0 * ux - vy - wz) / 3.d0
-    txy = uy + vx
-    txz = wx + uz
+    xixJ = (xix(i,j,k) + xix(i+1,j,k)) / (Jacobian(i,j,k) + Jacobian(i+1,j,k))
+    txx = (2.d0 * (2.d0 * ux - vy - wz) / 3.d0) * xixJ
+    txy = (uy + vx) * xixJ
+    txz = (wx + uz) * xixJ
     E(i-offset+1,j-offset,k-offset,2) = E(i-offset+1,j-offset,k-offset,2) - txx
     E(i-offset+1,j-offset,k-offset,3) = E(i-offset+1,j-offset,k-offset,3) - txy
     E(i-offset+1,j-offset,k-offset,4) = E(i-offset+1,j-offset,k-offset,4) - txz
     E(i-offset+1,j-offset,k-offset,5) = E(i-offset+1,j-offset,k-offset,5) & 
     & - txx * 0.5d0 * (u(i,j,k) + u(i+1,j,k)) &
     & - txy * 0.5d0 * (v(i,j,k) + v(i+1,j,k)) &
-    & - txz * 0.5d0 * (w(i,j,k) + w(i+1,j,k)) - kappa * (-T(i,j,k) + T(i+1,j,k))
+    & - txz * 0.5d0 * (w(i,j,k) + w(i+1,j,k)) - kappa * (-T(i,j,k) + T(i+1,j,k)) * xixJ
   end subroutine calc_Ev
   
-  attributes(global) subroutine calc_Fv(u, v, w, T, mut, F)
-    real(8), intent(in), dimension(nx,ny,nz), device :: u, v, w, T, mut
+  attributes(global) subroutine calc_Fv(etay, Jacobian, u, v, w, T, mut, F)
+    real(8), intent(in), dimension(nx,ny,nz), device :: etay, Jacobian, u, v, w, T, mut
     real(8), intent(inout), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F
     integer i, j, k
     real(8) :: muy = 0.d0
@@ -89,7 +90,7 @@ contains
     real(8) :: mux1 = 0.d0
     real(8) :: mux2 = 0.d0
     real(8) :: kappa = 0.d0
-    real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, tyx, tyy, tyz
+    real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, tyx, tyy, tyz, etayJ
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset - 1
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
@@ -122,20 +123,21 @@ contains
     ux = u_y(dxi,mux1,mux2,u(i,j,k),u(i-1,j,k),u(i-1,j+1,k),u(i,j+1,k),u(i+1,j+1,k),u(i+1,j,k)) 
     vx = u_y(dxi,mux1,mux2,v(i,j,k),v(i-1,j,k),v(i-1,j+1,k),v(i,j+1,k),v(i+1,j+1,k),v(i+1,j,k)) 
 
-    tyx = uy + vx
-    tyy = 2.d0 * (2.d0 * vy - wz - ux) / 3.d0
-    tyz = vz + wy
+    etayJ = (etay(i,j,k) + etay(i,j+1,k)) / (Jacobian(i,j,k) + Jacobian(i,j+1,k))
+    tyx = (uy + vx) * etayJ
+    tyy = (2.d0 * (2.d0 * vy - wz - ux) / 3.d0) * etayJ
+    tyz = (vz + wy) * etayJ
     F(i-offset,j-offset+1,k-offset,2) = F(i-offset,j-offset+1,k-offset,2) - tyx
     F(i-offset,j-offset+1,k-offset,3) = F(i-offset,j-offset+1,k-offset,3) - tyy
     F(i-offset,j-offset+1,k-offset,4) = F(i-offset,j-offset+1,k-offset,4) - tyz
     F(i-offset,j-offset+1,k-offset,5) = F(i-offset,j-offset+1,k-offset,5) &
     & - tyx * 0.5d0 * (u(i,j,k) + u(i,j+1,k)) &
     & - tyy * 0.5d0 * (v(i,j,k) + v(i,j+1,k)) &
-    & - tyz * 0.5d0 * (w(i,j,k) + w(i,j+1,k)) - kappa * (-T(i,j,k) + T(i,j+1,k))
+    & - tyz * 0.5d0 * (w(i,j,k) + w(i,j+1,k)) - kappa * (-T(i,j,k) + T(i,j+1,k)) * etayJ
   end subroutine calc_Fv
   
-  attributes(global) subroutine calc_Gv(u, v, w, T, mut, G)
-    real(8), intent(in), dimension(nx,ny,nz), device :: u, v, w, T, mut
+  attributes(global) subroutine calc_Gv(Jacobian, u, v, w, T, mut, G)
+    real(8), intent(in), dimension(nx,ny,nz), device :: Jacobian, u, v, w, T, mut
     real(8), intent(inout), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G
     integer i, j, k
     real(8) :: muz = 0.d0
@@ -144,7 +146,7 @@ contains
     real(8) :: muy1 = 0.d0
     real(8) :: muy2 = 0.d0
     real(8) :: kappa = 0.d0
-    real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, tzx, tzy, tzz
+    real(8) ux, uy, uz, vx, vy, vz, wx, wy, wz, tzx, tzy, tzz, zetaJ
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset - 1
@@ -177,16 +179,17 @@ contains
     vy = u_y(dyi,muy1,muy2,v(i,j,k),v(i,j-1,k),v(i,j-1,k+1),v(i,j,k+1),v(i,j+1,k+1),v(i,j+1,k)) 
     wy = u_y(dyi,muy1,muy2,w(i,j,k),w(i,j-1,k),w(i,j-1,k+1),w(i,j,k+1),w(i,j+1,k+1),w(i,j+1,k))  
 
-    tzx = wx + uz
-    tzy = vz + wy
-    tzz = 2.d0 * (2.d0 * wz - ux - vy) / 3.d0
+    zetaJ = 2.d0 / (Jacobian(i,j,k) + Jacobian(i,j,k+1))
+    tzx = (wx + uz) * zetaJ
+    tzy = (vz + wy) * zetaJ
+    tzz = (2.d0 * (2.d0 * wz - ux - vy) / 3.d0) * zetaJ 
     G(i-offset,j-offset,k-offset+1,2) = G(i-offset,j-offset,k-offset+1,2) - tzx
     G(i-offset,j-offset,k-offset+1,3) = G(i-offset,j-offset,k-offset+1,3) - tzy
     G(i-offset,j-offset,k-offset+1,4) = G(i-offset,j-offset,k-offset+1,4) - tzz
     G(i-offset,j-offset,k-offset+1,5) = G(i-offset,j-offset,k-offset+1,5) &
     & - tzx * 0.5d0 * (u(i,j,k) + u(i,j,k+1)) &
     & - tzy * 0.5d0 * (v(i,j,k) + v(i,j,k+1)) &
-    & - tzz * 0.5d0 * (w(i,j,k) + w(i,j,k+1)) - kappa * (-T(i,j,k) + T(i,j,k+1))
+    & - tzz * 0.5d0 * (w(i,j,k) + w(i,j,k+1)) - kappa * (-T(i,j,k) + T(i,j,k+1)) * zetaJ
   end subroutine calc_Gv
 end module calc_visc
 
