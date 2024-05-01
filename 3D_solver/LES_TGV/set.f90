@@ -1,5 +1,5 @@
 module set
-  use mod_globals, only : accuracy, offset, nx, ny, nz, dx, dy, dz, gamma, RHO0, L0, M0
+  use mod_globals, only : accuracy, offset, nx, ny, nz, dx, dy, dz, gamma, RHO0, L0, V0, p0
   implicit none
 
   interface set_bc
@@ -46,13 +46,13 @@ contains
           ! rho
           Q(i,j,k,1) = RHO0
           ! rho u
-          Q(i,j,k,2) = RHO0 * M0 * sin(x(i-offset)) * cos(y(j-offset)) * cos(z(k-offset))
+          Q(i,j,k,2) = RHO0 * V0 * sin(x(i-offset)) * cos(y(j-offset)) * cos(z(k-offset))
           ! rho v
-          Q(i,j,k,3) = - RHO0 * M0 * cos(x(i-offset)) * sin(y(j-offset)) * cos(z(k-offset))
+          Q(i,j,k,3) = - RHO0 * V0 * cos(x(i-offset)) * sin(y(j-offset)) * cos(z(k-offset))
           ! rho w
           Q(i,j,k,4) = 0.d0
           ! p / (gamma - 1) + 0.5 * (rhou ** 2 + rhov ** 2 ) / rho
-          Q(i,j,k,5) = (1.d0/gamma+RHO0*(M0**2)*(cos(2.d0*x(i-offset)/L0)+cos(2.d0*y(j-offset)/L0))*(cos(2.d0*z(k-offset)/L0)+2.d0)/16.d0)&
+          Q(i,j,k,5) = (p0+RHO0*(V0**2)*(cos(2.d0*x(i-offset)/L0)+cos(2.d0*y(j-offset)/L0))*(cos(2.d0*z(k-offset)/L0)+2.d0)/16.d0)&
           / (gamma - 1.d0) + 0.5d0 * (Q(i,j,k,2) ** 2 + Q(i,j,k,3) ** 2) / Q(i,j,k,1)
         enddo
       enddo

@@ -29,9 +29,9 @@ module mod_globals
   integer, parameter :: nx = 513
   integer, parameter :: ny = 321
   integer, parameter :: nz = accuracy+1
-  real(8), parameter :: dx = Lx / (nx-1)
-  real(8), parameter :: dy = Ly / (ny-1)
-  real(8), parameter :: dz = Lz / (nz-1)
+  real(8), parameter :: dx = Lx / dble(nx-1)
+  real(8), parameter :: dy = Ly / dble(ny-1)
+  real(8), parameter :: dz = Lz / dble(nz-1)
   real(8), parameter :: dxi = 1.d0 / dx
   real(8), parameter :: dyi = 1.d0 / dy
 

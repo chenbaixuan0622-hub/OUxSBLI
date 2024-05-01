@@ -34,9 +34,9 @@ module mod_globals
   integer, parameter :: nx = 66 
   integer, parameter :: ny = 66
   integer, parameter :: nz = 66
-  real(8), parameter :: dx = Lx / (nx-1)
-  real(8), parameter :: dy = Ly / (ny-1)
-  real(8), parameter :: dz = Lz / (nz-1)
+  real(8), parameter :: dx = Lx / dble(nx-1)
+  real(8), parameter :: dy = Ly / dble(ny-1)
+  real(8), parameter :: dz = Lz / dble(nz-1)
   real(8), parameter :: dxi = 1.d0 / dx
   real(8), parameter :: dyi = 1.d0 / dy
   real(8), parameter :: dzi = 1.d0 / dz
@@ -78,6 +78,7 @@ module mod_globals
 
   ! initial condition
   real(8), parameter :: R = 287.03d0
+  real(8), parameter :: Pr = 0.72d0
   real(8), parameter :: T = 300.d0
   real(8), parameter :: RHO0 = 1.d0 
   real(8), parameter :: L0 = 1.d0
