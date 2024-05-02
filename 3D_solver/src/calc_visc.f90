@@ -1,5 +1,5 @@
 module calc_visc
-  use mod_globals, only : accuracy, offset, id_visc, id_turbulence, gamma, R, Pr, nx, ny, nz, dxi, dyi, dzi
+  use mod_globals, only : accuracy, offset, id_visc, id_turbulence, id_dim, gamma, R, Re, Pr, nx, ny, nz, dxi, dyi, dzi
   use calc_Sutherland
   implicit none
 contains
@@ -54,19 +54,20 @@ contains
 
     ! x direction
     mux = mux + 0.5d0 * (mut(i,j,k) + mut(i+1,j,k))
-    ux = u_x(dxi,mux,u(i,j,k),u(i+1,j,k))
-    vx = u_x(dxi,mux,v(i,j,k),v(i+1,j,k))
-    wx = u_x(dxi,mux,w(i,j,k),w(i+1,j,k))
 
     ! y direction
     muy1 = muy1 + 0.25d0 * (mut(i,j-1,k) + mut(i,j,k) + mut(i+1,j-1,k) + mut(i+1,j,k)) 
     muy2 = muy2 + 0.25d0 * (mut(i,j,k) + mut(i,j+1,k) + mut(i+1,j,k) + mut(i+1,j+1,k))
-    uy = u_y(dyi,muy1,muy2,u(i,j,k),u(i,j-1,k),u(i+1,j-1,k),u(i+1,j,k),u(i+1,j+1,k),u(i,j+1,k))
-    vy = u_y(dyi,muy1,muy2,v(i,j,k),v(i,j-1,k),v(i+1,j-1,k),v(i+1,j,k),v(i+1,j+1,k),v(i,j+1,k))
 
     ! z direction
     muz1 = muz1 + 0.25d0 * (mut(i,j,k-1) + mut(i,j,k) + mut(i+1,j,k-1) + mut(i+1,j,k))
     muz2 = muz2 + 0.25d0 * (mut(i,j,k) + mut(i,j,k+1) + mut(i+1,j,k) + mut(i+1,j,k+1))
+
+    ux = u_x(dxi,mux,u(i,j,k),u(i+1,j,k))
+    vx = u_x(dxi,mux,v(i,j,k),v(i+1,j,k))
+    wx = u_x(dxi,mux,w(i,j,k),w(i+1,j,k))
+    uy = u_y(dyi,muy1,muy2,u(i,j,k),u(i,j-1,k),u(i+1,j-1,k),u(i+1,j,k),u(i+1,j+1,k),u(i,j+1,k))
+    vy = u_y(dyi,muy1,muy2,v(i,j,k),v(i,j-1,k),v(i+1,j-1,k),v(i+1,j,k),v(i+1,j+1,k),v(i,j+1,k))
     uz = u_y(dzi,muz1,muz2,u(i,j,k),u(i,j,k-1),u(i+1,j,k-1),u(i+1,j,k),u(i+1,j,k+1),u(i,j,k+1))
     wz = u_y(dzi,muz1,muz2,w(i,j,k),w(i,j,k-1),w(i+1,j,k-1),w(i+1,j,k),w(i+1,j,k+1),w(i,j,k+1))
 
@@ -74,13 +75,24 @@ contains
     txx = (2.d0 * (2.d0 * ux - vy - wz) / 3.d0) * xixJ
     txy = (uy + vx) * xixJ
     txz = (wx + uz) * xixJ
-    E(i-offset+1,j-offset,k-offset,2) = E(i-offset+1,j-offset,k-offset,2) - txx
-    E(i-offset+1,j-offset,k-offset,3) = E(i-offset+1,j-offset,k-offset,3) - txy
-    E(i-offset+1,j-offset,k-offset,4) = E(i-offset+1,j-offset,k-offset,4) - txz
-    E(i-offset+1,j-offset,k-offset,5) = E(i-offset+1,j-offset,k-offset,5) & 
-    & - txx * 0.5d0 * (u(i,j,k) + u(i+1,j,k)) &
-    & - txy * 0.5d0 * (v(i,j,k) + v(i+1,j,k)) &
-    & - txz * 0.5d0 * (w(i,j,k) + w(i+1,j,k)) - kappa * (-T(i,j,k) + T(i+1,j,k)) * xixJ
+
+    if (id_dim == 1) then
+      E(i-offset+1,j-offset,k-offset,2) = E(i-offset+1,j-offset,k-offset,2) - txx
+      E(i-offset+1,j-offset,k-offset,3) = E(i-offset+1,j-offset,k-offset,3) - txy
+      E(i-offset+1,j-offset,k-offset,4) = E(i-offset+1,j-offset,k-offset,4) - txz
+      E(i-offset+1,j-offset,k-offset,5) = E(i-offset+1,j-offset,k-offset,5) & 
+      & - txx * 0.5d0 * (u(i,j,k) + u(i+1,j,k)) &
+      & - txy * 0.5d0 * (v(i,j,k) + v(i+1,j,k)) &
+      & - txz * 0.5d0 * (w(i,j,k) + w(i+1,j,k)) - kappa * (-T(i,j,k) + T(i+1,j,k)) * xixJ
+    else
+      E(i-offset+1,j-offset,k-offset,2) = E(i-offset+1,j-offset,k-offset,2) - txx / Re
+      E(i-offset+1,j-offset,k-offset,3) = E(i-offset+1,j-offset,k-offset,3) - txy / Re
+      E(i-offset+1,j-offset,k-offset,4) = E(i-offset+1,j-offset,k-offset,4) - txz / Re
+      E(i-offset+1,j-offset,k-offset,5) = E(i-offset+1,j-offset,k-offset,5) &
+      & -(txx * 0.5d0 * (u(i,j,k) + u(i+1,j,k)) &
+      & + txy * 0.5d0 * (v(i,j,k) + v(i+1,j,k)) &
+      & + txz * 0.5d0 * (w(i,j,k) + w(i+1,j,k)) + (-T(i,j,k) + T(i+1,j,k)) * xixJ / Pr) / Re
+    endif
   end subroutine calc_Ev
   
   attributes(global) subroutine calc_Fv(etay, Jacobian, u, v, w, T, mut, F)
@@ -113,19 +125,20 @@ contains
 
     ! y direction
     muy = muy + 0.5d0 * (mut(i,j,k) + mut(i,j+1,k))
-    vy = u_x(dyi,muy,v(i,j,k),v(i,j+1,k))
-    wy = u_x(dyi,muy,w(i,j,k),w(i,j+1,k))
-    uy = u_x(dyi,muy,u(i,j,k),u(i,j+1,k))
 
     ! z direction
     muz1 = muz1 + 0.25d0 * (mut(i,j,k-1) + mut(i,j,k) + mut(i,j+1,k-1) + mut(i,j+1,k))
     muz2 = muz2 + 0.25d0 * (mut(i,j,k) + mut(i,j,k+1) + mut(i,j+1,k) + mut(i,j+1,k+1))
-    vz = u_y(dzi,muz1,muz2,v(i,j,k),v(i,j,k-1),v(i,j+1,k-1),v(i,j+1,k),v(i,j+1,k+1),v(i,j,k+1)) 
-    wz = u_y(dzi,muz1,muz2,w(i,j,k),w(i,j,k-1),w(i,j+1,k-1),w(i,j+1,k),w(i,j+1,k+1),w(i,j,k+1)) 
 
     ! x direction
     mux1 = mux1 + 0.25d0 * (mut(i-1,j,k) + mut(i,j,k) + mut(i-1,j+1,k) + mut(i,j+1,k))
     mux2 = mux2 + 0.25d0 * (mut(i,j,k) + mut(i+1,j,k) + mut(i,j+1,k) + mut(i+1,j+1,k))
+
+    vy = u_x(dyi,muy,v(i,j,k),v(i,j+1,k))
+    wy = u_x(dyi,muy,w(i,j,k),w(i,j+1,k))
+    uy = u_x(dyi,muy,u(i,j,k),u(i,j+1,k))
+    vz = u_y(dzi,muz1,muz2,v(i,j,k),v(i,j,k-1),v(i,j+1,k-1),v(i,j+1,k),v(i,j+1,k+1),v(i,j,k+1)) 
+    wz = u_y(dzi,muz1,muz2,w(i,j,k),w(i,j,k-1),w(i,j+1,k-1),w(i,j+1,k),w(i,j+1,k+1),w(i,j,k+1)) 
     ux = u_y(dxi,mux1,mux2,u(i,j,k),u(i-1,j,k),u(i-1,j+1,k),u(i,j+1,k),u(i+1,j+1,k),u(i+1,j,k)) 
     vx = u_y(dxi,mux1,mux2,v(i,j,k),v(i-1,j,k),v(i-1,j+1,k),v(i,j+1,k),v(i+1,j+1,k),v(i+1,j,k)) 
 
@@ -133,13 +146,23 @@ contains
     tyx = (uy + vx) * etayJ
     tyy = (2.d0 * (2.d0 * vy - wz - ux) / 3.d0) * etayJ
     tyz = (vz + wy) * etayJ
-    F(i-offset,j-offset+1,k-offset,2) = F(i-offset,j-offset+1,k-offset,2) - tyx
-    F(i-offset,j-offset+1,k-offset,3) = F(i-offset,j-offset+1,k-offset,3) - tyy
-    F(i-offset,j-offset+1,k-offset,4) = F(i-offset,j-offset+1,k-offset,4) - tyz
-    F(i-offset,j-offset+1,k-offset,5) = F(i-offset,j-offset+1,k-offset,5) &
-    & - tyx * 0.5d0 * (u(i,j,k) + u(i,j+1,k)) &
-    & - tyy * 0.5d0 * (v(i,j,k) + v(i,j+1,k)) &
-    & - tyz * 0.5d0 * (w(i,j,k) + w(i,j+1,k)) - kappa * (-T(i,j,k) + T(i,j+1,k)) * etayJ
+    if (id_dim == 1) then
+      F(i-offset,j-offset+1,k-offset,2) = F(i-offset,j-offset+1,k-offset,2) - tyx
+      F(i-offset,j-offset+1,k-offset,3) = F(i-offset,j-offset+1,k-offset,3) - tyy
+      F(i-offset,j-offset+1,k-offset,4) = F(i-offset,j-offset+1,k-offset,4) - tyz
+      F(i-offset,j-offset+1,k-offset,5) = F(i-offset,j-offset+1,k-offset,5) &
+      & - tyx * 0.5d0 * (u(i,j,k) + u(i,j+1,k)) &
+      & - tyy * 0.5d0 * (v(i,j,k) + v(i,j+1,k)) &
+      & - tyz * 0.5d0 * (w(i,j,k) + w(i,j+1,k)) - kappa * (-T(i,j,k) + T(i,j+1,k)) * etayJ
+    else
+      F(i-offset,j-offset+1,k-offset,2) = F(i-offset,j-offset+1,k-offset,2) - tyx / Re
+      F(i-offset,j-offset+1,k-offset,3) = F(i-offset,j-offset+1,k-offset,3) - tyy / Re
+      F(i-offset,j-offset+1,k-offset,4) = F(i-offset,j-offset+1,k-offset,4) - tyz / Re
+      F(i-offset,j-offset+1,k-offset,5) = F(i-offset,j-offset+1,k-offset,5) &
+      & -(tyx * 0.5d0 * (u(i,j,k) + u(i,j+1,k)) &
+      & + tyy * 0.5d0 * (v(i,j,k) + v(i,j+1,k)) &
+      & + tyz * 0.5d0 * (w(i,j,k) + w(i,j+1,k)) + (-T(i,j,k) + T(i,j+1,k)) * etayJ / Pr) / Re
+    endif
   end subroutine calc_Fv
   
   attributes(global) subroutine calc_Gv(Jacobian, u, v, w, T, mut, G)
@@ -172,19 +195,20 @@ contains
 
     ! z direction
     muz = muz + 0.5d0 * (mut(i,j,k) + mut(i,j,k+1))
-    wz = u_x(dzi,muz,w(i,j,k),w(i,j,k+1)) 
-    uz = u_x(dzi,muz,u(i,j,k),u(i,j,k+1)) 
-    vz = u_x(dzi,muz,v(i,j,k),v(i,j,k+1)) 
     
     ! x direction
     mux1 = mux1 + 0.25d0 * (mut(i-1,j,k) + mut(i,j,k) + mut(i-1,j,k+1) + mut(i,j,k+1)) 
     mux2 = mux2 + 0.25d0 * (mut(i,j,k) + mut(i+1,j,k) + mut(i,j,k+1) + mut(i+1,j,k+1))
-    wx = u_y(dxi,mux1,mux2,w(i,j,k),w(i-1,j,k),w(i-1,j,k+1),w(i,j,k+1),w(i+1,j,k+1),w(i+1,j,k))
-    ux = u_y(dxi,mux1,mux2,u(i,j,k),u(i-1,j,k),u(i-1,j,k+1),u(i,j,k+1),u(i+1,j,k+1),u(i+1,j,k))
     
     ! y direction
     muy1 = muy1 + 0.25d0 * (mut(i,j-1,k) + mut(i,j,k) + mut(i,j-1,k+1) + mut(i,j,k+1))
     muy2 = muy2 + 0.25d0 * (mut(i,j,k) + mut(i,j+1,k) + mut(i,j,k+1) + mut(i,j+1,k+1))
+
+    wz = u_x(dzi,muz,w(i,j,k),w(i,j,k+1)) 
+    uz = u_x(dzi,muz,u(i,j,k),u(i,j,k+1)) 
+    vz = u_x(dzi,muz,v(i,j,k),v(i,j,k+1)) 
+    wx = u_y(dxi,mux1,mux2,w(i,j,k),w(i-1,j,k),w(i-1,j,k+1),w(i,j,k+1),w(i+1,j,k+1),w(i+1,j,k))
+    ux = u_y(dxi,mux1,mux2,u(i,j,k),u(i-1,j,k),u(i-1,j,k+1),u(i,j,k+1),u(i+1,j,k+1),u(i+1,j,k))
     vy = u_y(dyi,muy1,muy2,v(i,j,k),v(i,j-1,k),v(i,j-1,k+1),v(i,j,k+1),v(i,j+1,k+1),v(i,j+1,k)) 
     wy = u_y(dyi,muy1,muy2,w(i,j,k),w(i,j-1,k),w(i,j-1,k+1),w(i,j,k+1),w(i,j+1,k+1),w(i,j+1,k))  
 
@@ -192,13 +216,23 @@ contains
     tzx = (wx + uz) * zetaJ
     tzy = (vz + wy) * zetaJ
     tzz = (2.d0 * (2.d0 * wz - ux - vy) / 3.d0) * zetaJ 
-    G(i-offset,j-offset,k-offset+1,2) = G(i-offset,j-offset,k-offset+1,2) - tzx
-    G(i-offset,j-offset,k-offset+1,3) = G(i-offset,j-offset,k-offset+1,3) - tzy
-    G(i-offset,j-offset,k-offset+1,4) = G(i-offset,j-offset,k-offset+1,4) - tzz
-    G(i-offset,j-offset,k-offset+1,5) = G(i-offset,j-offset,k-offset+1,5) &
-    & - tzx * 0.5d0 * (u(i,j,k) + u(i,j,k+1)) &
-    & - tzy * 0.5d0 * (v(i,j,k) + v(i,j,k+1)) &
-    & - tzz * 0.5d0 * (w(i,j,k) + w(i,j,k+1)) - kappa * (-T(i,j,k) + T(i,j,k+1)) * zetaJ
+    if (id_dim == 1) then
+      G(i-offset,j-offset,k-offset+1,2) = G(i-offset,j-offset,k-offset+1,2) - tzx
+      G(i-offset,j-offset,k-offset+1,3) = G(i-offset,j-offset,k-offset+1,3) - tzy
+      G(i-offset,j-offset,k-offset+1,4) = G(i-offset,j-offset,k-offset+1,4) - tzz
+      G(i-offset,j-offset,k-offset+1,5) = G(i-offset,j-offset,k-offset+1,5) &
+      & - tzx * 0.5d0 * (u(i,j,k) + u(i,j,k+1)) &
+      & - tzy * 0.5d0 * (v(i,j,k) + v(i,j,k+1)) &
+      & - tzz * 0.5d0 * (w(i,j,k) + w(i,j,k+1)) - kappa * (-T(i,j,k) + T(i,j,k+1)) * zetaJ
+    else
+      G(i-offset,j-offset,k-offset+1,2) = G(i-offset,j-offset,k-offset+1,2) - tzx / Re
+      G(i-offset,j-offset,k-offset+1,3) = G(i-offset,j-offset,k-offset+1,3) - tzy / Re
+      G(i-offset,j-offset,k-offset+1,4) = G(i-offset,j-offset,k-offset+1,4) - tzz / Re
+      G(i-offset,j-offset,k-offset+1,5) = G(i-offset,j-offset,k-offset+1,5) &
+      & -(tzx * 0.5d0 * (u(i,j,k) + u(i,j,k+1)) &
+      & + tzy * 0.5d0 * (v(i,j,k) + v(i,j,k+1)) &
+      & + tzz * 0.5d0 * (w(i,j,k) + w(i,j,k+1)) + (-T(i,j,k) + T(i,j,k+1)) * zetaJ / Pr) / Re
+    endif
   end subroutine calc_Gv
 end module calc_visc
 
