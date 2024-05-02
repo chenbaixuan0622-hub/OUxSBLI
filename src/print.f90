@@ -69,7 +69,8 @@ contains
     endif
     t = nt * step * dt
     open(10,file="data/kinetic_energy.d", position="append")
-    write(10,"(2(f9.4,1x))") t, ke / ke0
+    !write(10,"(2(f9.4,1x))") t, ke
+    write(10,"(2e12.4)") t, ke
     close(10)
   end subroutine print_KE
 
@@ -82,7 +83,8 @@ contains
     call calc_vorticity(x,y,z,u,v,w,omegax,omegay,omegaz)
     enstrophy = mean(0.5d0 * rho(2:nx-1,2:ny-1,2:nz-1) * (omegax**2 + omegay**2 + omegaz**2))
     open(10,file="data/enstrophy.d", position="append")
-    write(10,"(2(f9.4,1x))") t, enstrophy
+    !write(10,"(2(f9.4,1x))") t, enstrophy
+    write(10,"(2e12.4)") t, enstrophy
     close(10)
   end subroutine print_enstrophy
 

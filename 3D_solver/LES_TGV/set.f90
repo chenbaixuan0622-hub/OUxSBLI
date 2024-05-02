@@ -1,5 +1,5 @@
 module set
-  use mod_globals, only : accuracy, offset, nx, ny, nz, dx, dy, dz, gamma, RHO0, L0, V0, p0
+  use mod_globals, only : accuracy, offset, nx, ny, nz, dx, dy, dz, gamma, R, RHO0, L0, M0, V0, p0, T, dtn
   implicit none
 
   interface set_bc
@@ -35,25 +35,29 @@ contains
     integer i, j, k
     real(8) :: pi = 2.d0 * acos(0.d0)
     real(8) x(nx-accuracy), y(ny-accuracy), z(nz-accuracy)
-    x = linspace(0.d0, 2.d0 * pi, nx-accuracy)
-    y = linspace(0.d0, 2.d0 * pi, ny-accuracy)
-    z = linspace(0.d0, 2.d0 * pi, nz-accuracy)
+    real(8) RHO, p
+    x = linspace(0.d0, 2.d0 * pi * L0, nx-accuracy)
+    y = linspace(0.d0, 2.d0 * pi * L0, ny-accuracy)
+    z = linspace(0.d0, 2.d0 * pi * L0, nz-accuracy)
     ! 2nd-order accuracy : offset = 1
     ! 4th-order accuracy : offset = 2
+    write(*,*) V0, RHO0, p0
+    write(*,*) dtn
     do k = 1+offset, nz-offset
       do j = 1+offset, ny-offset
         do i = 1+offset, nx-offset
+          p = p0+RHO0*(V0**2)*(cos(2.d0*x(i-offset)/L0)+cos(2.d0*y(j-offset)/L0))*(cos(2.d0*z(k-offset)/L0)+2.d0)/16.d0
+          RHO = p / (R * T)
           ! rho
-          Q(i,j,k,1) = RHO0
+          Q(i,j,k,1) = RHO
           ! rho u
-          Q(i,j,k,2) = RHO0 * V0 * sin(x(i-offset)) * cos(y(j-offset)) * cos(z(k-offset))
+          Q(i,j,k,2) = RHO * V0 * sin(x(i-offset)/L0) * cos(y(j-offset)/L0) * cos(z(k-offset)/L0)
           ! rho v
-          Q(i,j,k,3) = - RHO0 * V0 * cos(x(i-offset)) * sin(y(j-offset)) * cos(z(k-offset))
+          Q(i,j,k,3) = - RHO * V0 * cos(x(i-offset)/L0) * sin(y(j-offset)/L0) * cos(z(k-offset)/L0)
           ! rho w
           Q(i,j,k,4) = 0.d0
           ! p / (gamma - 1) + 0.5 * (rhou ** 2 + rhov ** 2 ) / rho
-          Q(i,j,k,5) = (p0+RHO0*(V0**2)*(cos(2.d0*x(i-offset)/L0)+cos(2.d0*y(j-offset)/L0))*(cos(2.d0*z(k-offset)/L0)+2.d0)/16.d0)&
-          / (gamma - 1.d0) + 0.5d0 * (Q(i,j,k,2) ** 2 + Q(i,j,k,3) ** 2) / Q(i,j,k,1)
+          Q(i,j,k,5) = p / (gamma - 1.d0) + 0.5d0 * (Q(i,j,k,2) ** 2 + Q(i,j,k,3) ** 2) / Q(i,j,k,1)
         enddo
       enddo
     enddo
@@ -130,44 +134,6 @@ contains
   end subroutine set_bc_init4
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-  subroutine set_bc_mut(mut)
-    real(8), intent(inout), device :: mut(nx,ny,nz)
-    integer i, j, k
-    !$cuf kernel do(2) <<<*,*>>>
-    do k = 2, nz-1
-      do j = 2, ny-1
-        mut(1,j,k) = mut(nx-1,j,k)
-        mut(nx,j,k) = mut(2,j,k)
-      enddo
-    enddo
-
-    !$cuf kernel do(2) <<<*,*>>>
-    do k = 2, nz-1
-      do i = 2, nx-1
-        mut(i,1,k) = mut(i,ny-1,k)
-        mut(i,ny,k) = mut(i,2,k)
-      enddo
-    enddo
-
-    !$cuf kernel do(1) <<<*,*>>>
-    do k = 2, nz-1
-      mut(1,1,k) = mut(nx-1,ny-1,k)
-      mut(nx,1,k) = mut(2,ny-1,k)
-      mut(1,ny,k) = mut(nx-1,2,k)
-      mut(nx,ny,k) = mut(2,2,k)
-    enddo
-
-    !$cuf kernel do(2) <<<*,*>>>
-    do j = 1, ny
-      do i = 1, nx
-        mut(i,j,1) = mut(i,j,nz-1)
-        mut(i,j,nz) = mut(i,j,2)
-      enddo
-    enddo
-  end subroutine set_bc_mut
-
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   subroutine set_bc2(id_accuracy,Q,T)
     integer(kind=2), intent(in), value :: id_accuracy
@@ -261,5 +227,41 @@ contains
       enddo
     enddo
   end subroutine set_bc4
+
+  subroutine set_bc_mut(mut)
+    real(8), intent(inout), device :: mut(nx,ny,nz)
+    integer i, j, k
+    !$cuf kernel do(2) <<<*,*>>>
+    do k = 2, nz-1
+      do j = 2, ny-1
+        mut(1,j,k) = mut(nx-1,j,k)
+        mut(nx,j,k) = mut(2,j,k)
+      enddo
+    enddo
+
+    !$cuf kernel do(2) <<<*,*>>>
+    do k = 2, nz-1
+      do i = 2, nx-1
+        mut(i,1,k) = mut(i,ny-1,k)
+        mut(i,ny,k) = mut(i,2,k)
+      enddo
+    enddo
+
+    !$cuf kernel do(1) <<<*,*>>>
+    do k = 2, nz-1
+      mut(1,1,k) = mut(nx-1,ny-1,k)
+      mut(nx,1,k) = mut(2,ny-1,k)
+      mut(1,ny,k) = mut(nx-1,2,k)
+      mut(nx,ny,k) = mut(2,2,k)
+    enddo
+
+    !$cuf kernel do(2) <<<*,*>>>
+    do j = 1, ny
+      do i = 1, nx
+        mut(i,j,1) = mut(i,j,nz-1)
+        mut(i,j,nz) = mut(i,j,2)
+      enddo
+    enddo
+  end subroutine set_bc_mut
 end module set
 
