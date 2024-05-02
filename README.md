@@ -16,17 +16,37 @@ Compressible solver
 KEEP scheme
 </h2>
 <p>
-Taylor-Green vortex was calculated. 
+Taylor-Green vortex 
 </p>
 <img src="./visuals/Vorticity.gif" alt="Taylor-Green vortex">
+<img src="./visuals/entropy_ke.png" alt="entropy and kinetic energy">
 
 <h2>
 SLAU scheme
 </h2>
+
 <p>
-1 dimensional shock tube was calculated.
+Oblique shock
 </p>
-<img src="./visuals/shock_tube_SLAU.png" alt="shock-tube">
+<img src="./visuals/oblique_shock.gif" alt="oblique shock">
+
+<p>
+2 dimensional shock tube
+</p>
+<img src="./visuals/pressure_wave.gif" alt="pressure wave">
+
+<p>
+1 dimensional shock tube
+</p>
+<img src="./visuals/SLAU_500.png" alt="shock-tube">
+
+<h2>
+KEEP + Roe hybrid scheme
+</h2>
+<p>
+1 dimensional shock tube
+</p>
+<img src="./visuals/Hybrid_500.png" alt="shock-tube">
 
 <h2>
 Dependency
@@ -35,17 +55,6 @@ Dependency
 <li>nvfortran</li>
 <li>ParaView</li>
 <li>gnuplot</li>
-</ul>
-
-<h2>
-Usage
-</h2>
-<ul>
-<li> Edit input.d file grid, physical properties, and simulation time etc. </li>
-<li> Edit mod_globals.f90 file to choose accuracy. 2nd-order accuracy and 4th-order accuracy are available. </li> 
-<li> Edit mod_globals.f90 file to choose Euler solver or Navier-Stokes solver. Moreover, turbulent model can be used. </li>
-<li> Edit calc_time_dev.f90 to choose appropriate gridDim and blockDim. The number of threads should be a multiple of 32 to make the most of GPU. </li>
-<li><pre>$ make</pre></li>
 </ul>
 
 <h2>
@@ -63,6 +72,8 @@ Christian T. Jacobs, Satya P. Jammy, Neil D. Sandham, OpenSBLI: A framework for 
 </li>
 <li><a href="https://arc.aiaa.org/doi/abs/10.2514/6.2009-3797">
 Yves Allaneau, Antony Jameson, Direct Numerical Simulations of a Two-Dimensional Viscous Flow in a Shocktube Using Kinetic Energy Preserving Scheme, 2012</a>
+</li>
+<li><a href="https://arc.aiaa.org/doi/10.2514/6.2023-0429">Yoshiharu Tamaki, Soshi Kawai, Wall-modeled LES of transonic buffet over NASA-CRM using Cartesian-grid-based flow solver FFVHC-ACE, 2023</a>
 </li>
 <li><a href="https://docs.nvidia.com/hpc-sdk/pgi-compilers/2017/pgi17cudaforug.pdf">
 CUDA FORTRAN PROGRAMMING GUIDE AND REFERENCE, 2017</a>

@@ -1,0 +1,49 @@
+FC = nvfortran
+
+OUTPUT_OPTIN = -fast
+
+.SUFFIXES : .f90
+
+%.o: %.f90
+		$(COMPILE.f) $(OUTPUT_OPTIN) $<
+
+%.mod: %.f90 %.o
+		@:
+
+TARGET = shock_tube
+vpath %f90 ../src
+
+OBJ =	mod_globals.o \
+  set.o \
+	calc_common.o \
+  calc_physical_quantities.o \
+	calc_term.o \
+	calc_sutherland.o \
+	calc_visc.o \
+	calc_muscl.o \
+	calc_qlr.o \
+  calc_keep.o \
+	calc_slau.o \
+  calc_mat.o \
+  calc_roe.o \
+  calc_hybrid_flux.o \
+	calc_steps.o \
+	print.o \
+	calc_time_dev_hybrid.o \
+	main.o
+
+a.out: $(OBJ)
+		$(FC) -fast -I./ $^
+
+$(TARGET): $(OBJ)
+		$(LINK.f) $^ $(LOADLIBES) $(LDLIBS) -o $@
+
+set_init.o: mod_globals.mod
+calc_keep.o: calc_term.mod
+calc_qlr.o: calc_muscl.mod
+calc_slau.o: calc_qlr.mod calc_common.mod
+calc_roe.o: calc_qlr.mod calc_mat.mod
+calc_visc.o: calc_sutherland.mod
+calc_time_dev_hybrid.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_keep.mod calc_slau.mod calc_roe.mod calc_hybrid_flux.mod calc_visc.mod calc_steps.mod
+main.o: main.f90 mod_globals.mod set.mod set.mod calc_time_dev_hybrid.mod
+
