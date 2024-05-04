@@ -100,37 +100,31 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine print_header_2D(ni,nj,x,y)
-    integer, intent(in) :: ni, nj
-    real(8), intent(in), dimension(nx,ny) :: x, y
-    integer i, j
-    write(10,"('# vtk DataFile Version 3.0')")
-    write(10,"('Q')")
-    write(10,"('ASCII')")
-    write(10,"('DATASET STRUCTURED_GRID')")
-    write(10,"('DIMENSIONS',3(1x,i4))") ni, nj, 1
-    write(10,"('POINTS',i9,' float')") ni * nj
-    write(10,"(3(f12.7,1x))") ((x(i,j), y(i,j), 0.d0,i=1,ni),j=1,nj)
-
-    write(10,"('POINT_DATA',i9)") ni * nj
-    write(10,"('VECTORS Velocity float')")
-  end subroutine print_header_2D
-
-  subroutine print_header_3D(ni,nj,nk,x,y,z)
+  subroutine print_header(ni,nj,nk,x,y,z)
     integer, intent(in) :: ni, nj, nk
-    real(8), intent(in), dimension(nx,ny,nz) :: x, y, z
+    real(8), intent(in) :: x(ni), y(nj), z(nk)
     integer i, j, k
-    write(10,"('# vtk DataFile Version 3.0')")
-    write(10,"('Q')")
-    write(10,"('ASCII')")
-    write(10,"('DATASET STRUCTURED_GRID')")
-    write(10,"('DIMENSIONS',3(1x,i4))") ni, nj, nk
-    write(10,"('POINTS',i9,' float')") ni * nj * nk
-    write(10,"(3(f12.7,1x))") (((x(i,j,k), y(i,j,k), z(i,j,k),i=1,ni),j=1,nj),k=1,nk)
+    character :: lf*1, str1*8, str2*8, str3*8, str4*8
+    lf = char(10)
+    write(str1(1:8),'(i8)') size(x)
+    write(str2(1:8),'(i8)') size(y)
+    write(str3(1:8),'(i8)') size(z)
+    write(str4(1:8),'(i8)') size(x) * size(y) * size(z)
 
-    write(10,"('POINT_DATA',i9)") ni * nj * nk
-    write(10,"('VECTORS Velocity float')")
-  end subroutine print_header_3D
+    write(10) '# vtk DataFile Version 3.0'//lf
+    write(10) 'Q'//lf
+    write(10) 'BINARY'//lf
+    write(10) 'DATASET RECTILINEAR_GRID'//lf
+    write(10) 'DIMENSIONS'//str1//str2//str3//lf
+    write(10) 'X_COORDINATES'//str1//'  float'//lf
+    write(10) real(x), lf
+    write(10) lf//'Y_COORDINATES'//str2//'  float'//lf
+    write(10) real(y), lf
+    write(10) lf//'Z_COORDINATES'//str3//'  float'//lf
+    write(10) real(z), lf
+
+    write(10) lf//'POINT_DATA'//str4//lf
+  end subroutine print_header
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -141,7 +135,10 @@ contains
     real(8), intent(in), optional :: T(nx,ny)
     integer i, j
     real(8), dimension(nx,ny) :: rho, u, v, p
+    real(8) :: z(1) = 0.d0
     character(len=40) filename
+    character :: lf*1
+    lf = char(10)
     do i = 1, 4
       Q(:,:,i) = Q(:,:,i) * Jacobian(:,:)
     enddo
@@ -151,22 +148,27 @@ contains
     p = (gamma - 1.d0) * (Q(:,:,4) - 0.5d0 * rho * (u**2 + v**2))
     
     write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtk"
-    open(10,file=filename)
-    call print_header_2D(nx,ny,x,y)
+    open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="BIG_ENDIAN")
+    call print_header(nx,ny,1,x(:,1),y(1,:),z)
 
-    write(10,"(3(f10.4,1x))") ((u(i,j), v(i,j), 0.d0,i=1,nx),j=1,ny)
+    write(10) 'VECTORS Velocity float'//lf
+    do j = 1, ny
+      do i = 1, nx
+        write(10) real(u(i,j)), real(v(i,j)), 0.e0
+      enddo
+    enddo
 
-    write(10,"('SCALARS rho float')")
-    write(10,"('LOOKUP_TABLE default')")
-    write(10,"(f9.4,1x)") ((rho(i,j),i=1,nx),j=1,ny)
+    write(10) lf//'SCALARS rho float'//lf
+    write(10) 'LOOKUP_TABLE default'//lf
+    write(10) real(rho), lf
     
-    write(10,"('SCALARS P float')")
-    write(10,"('LOOKUP_TABLE default')")
-    write(10,"(f11.4,1x)") ((p(i,j),i=1,nx),j=1,ny)
+    write(10) lf//'SCALARS P float'//lf
+    write(10) 'LOOKUP_TABLE default'//lf
+    write(10) real(p), lf
 
-    write(10,"('SCALARS T float')")
-    write(10,"('LOOKUP_TABLE default')")
-    write(10,"(f9.4,1x)") ((T(i,j),i=1,nx),j=1,ny)
+    write(10) lf//'SCALARS T float'//lf
+    write(10) 'LOOKUP_TABLE default'//lf
+    write(10) real(T), lf
     close(10)
   
     call print_boundary_layer(u(int(0.5*nx),:))
@@ -182,6 +184,8 @@ contains
     integer i, j, k
     real(8), dimension(nx,ny,nz) :: rho, u, v, w, p, nut
     character(len=40) filename
+    character :: lf*1
+    lf = char(10)
     do i = 1, 5
       Q(:,:,:,i) = Q(:,:,:,i) * Jacobian(:,:,:)
     enddo
@@ -192,28 +196,35 @@ contains
     p = (gamma - 1.d0) * (Q(:,:,:,5) - 0.5d0 * rho * (u**2 + v**2 + w**2))
     
     write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtk"
-    open(10,file=filename)
-    call print_header_3D(nx,ny,nz,x,y,z)
+    open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="BIG_ENDIAN")
+    call print_header(nx,ny,nz,x(:,1,1),y(1,:,1),z(1,1,:))
 
-    write(10,"(3(f10.4,1x))") (((u(i,j,k), v(i,j,k), w(i,j,k),i=1,nx),j=1,ny),k=1,nz)
+    write(10) 'VECTORS Velocity float'//lf
+    do k = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          write(10) real(u(i,j,k)), real(v(i,j,k)), real(w(i,j,k))
+        enddo
+      enddo
+    enddo
 
-    write(10,"('SCALARS rho float')")
-    write(10,"('LOOKUP_TABLE default')")
-    write(10,"(f9.4,1x)") (((rho(i,j,k),i=1,nx),j=1,ny),k=1,nz)
+    write(10) lf//'SCALARS rho float'//lf
+    write(10) 'LOOKUP_TABLE default'//lf
+    write(10) real(rho), lf
     
-    write(10,"('SCALARS P float')")
-    write(10,"('LOOKUP_TABLE default')")
-    write(10,"(f11.4,1x)") (((p(i,j,k),i=1,nx),j=1,ny),k=1,nz)
-    
-    write(10,"('SCALARS T float')")
-    write(10,"('LOOKUP_TABLE default')")
-    write(10,"(f9.4,1x)") (((T(i,j,k),i=1,nx),j=1,ny),k=1,nz)
+    write(10) lf//'SCALARS P float'//lf
+    write(10) 'LOOKUP_TABLE default'//lf
+    write(10) real(p), lf
+
+    write(10) lf//'SCALARS T float'//lf
+    write(10) 'LOOKUP_TABLE default'//lf
+    write(10) real(T), lf
 
     if (present(mut)) then
       nut(:,:,:) = mut(:,:,:) / rho(:,:,:)
-      write(10,"('SCALARS nut float')")
-      write(10,"('LOOKUP_TABLE default')")
-      write(10,"(f12.10,1x)") (((nut(i,j,k),i=1,nx),j=1,ny),k=1,nz)
+      write(10) lf//'SCALARS nut float'//lf
+      write(10) 'LOOKUP_TABLE default'//lf
+      write(10) real(nut), lf
     endif
     close(10)
 
