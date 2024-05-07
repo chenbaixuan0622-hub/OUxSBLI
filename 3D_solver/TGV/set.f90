@@ -15,17 +15,22 @@ contains
     x = x1 + (x1 + x2) * (/ (dble(i - 1) / dble(n - 1), i = 1, n) /)
   end function linspace
 
-  subroutine set_grid(x,y,z)
-    real(8), intent(out), dimension(nx,ny,nz) :: x, y, z
+  subroutine set_grid(x,y,z,dx,dy)
+    real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx), dy(ny)
     integer i, j, k
+    real(8) :: dx1 = Lx / dble(nx-1)
+    real(8) :: dy1 = Ly / dble(ny-1)
+    real(8) :: dz1 = Lz / dble(nz-1)
+    do i = 1, nx
+      x(i) = dble(i-1) * dx1
+      dx(i) = dx1
+    enddo
+    do j = 1, ny
+      y(j) = dble(j-1) * dy1
+      dy(j) = dy1
+    enddo
     do k = 1, nz
-      do j = 1, ny
-        do i = 1, nx
-          x(i,j,k) = dble(i-1) * dx
-          y(i,j,k) = dble(j-1) * dy
-          z(i,j,k) = dble(k-1) * dz
-        enddo
-      enddo
+      z(k) = dble(k-1) * dz1
     enddo
   end subroutine set_grid
   

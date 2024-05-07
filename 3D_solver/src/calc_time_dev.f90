@@ -19,7 +19,7 @@ module calc_time_dev
 contains
   subroutine calc_EFG_basic(id_hybrid,xix,etay,Jacobian,Q,T,mut,E,F,G)
     integer(kind=2), intent(in) :: id_hybrid
-    real(8), intent(in), dimension(nx,ny,nz), device :: xix, etay, Jacobian
+    real(8), intent(in), device :: xix(nx), etay(ny), Jacobian(nx,ny)
     real(8), intent(in), device :: Q(nx,ny,nz,5)
     real(8), intent(inout), dimension(nx,ny,nz), device :: T, mut
     real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
@@ -52,7 +52,7 @@ contains
   
   subroutine calc_EFG_hybrid(id_hybrid,xix,etay,Jacobian,Q,T,mut,E_hybrid,F_hybrid,G_hybrid)
     integer(kind=4), intent(in) :: id_hybrid
-    real(8), intent(in), dimension(nx,ny,nz), device :: xix, etay, Jacobian
+    real(8), intent(in), device :: xix(nx), etay(ny), Jacobian(nx,ny)
     real(8), intent(in), device :: Q(nx,ny,nz,5)
     real(8), intent(inout), dimension(nx,ny,nz), device :: T, mut
     real(8), intent(out), device :: E_hybrid(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
@@ -97,7 +97,7 @@ contains
 
   subroutine RungeKutta_3rd(id_RungeKutta,x,y,z,xix_cpu,etay_cpu,Jacobian_cpu,T0,Q,Vin)
     integer(kind=2), intent(in) :: id_RungeKutta
-    real(8), intent(in), dimension(nx,ny,nz) :: x, y, z, xix_cpu, etay_cpu, Jacobian_cpu
+    real(8), intent(in) :: x(nx), y(ny), z(nz), xix_cpu(nx), etay_cpu(ny), Jacobian_cpu(nx,ny)
     real(8), intent(inout) :: Q(nx,ny,nz,5)
     real(8), intent(inout) :: T0(nx,ny,nz)
     real(8), intent(in) :: Vin(ny,2)
@@ -108,7 +108,7 @@ contains
     real(8), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     real(8), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
-    real(8), dimension(nx,ny,nz), device :: xix, etay, Jacobian
+    real(8), device :: xix(nx), etay(ny), Jacobian(nx,ny)
     ! for plot
     real(8) ke0, entropy0
 
@@ -152,7 +152,7 @@ contains
 
   subroutine RungeKutta_4th(id_RungeKutta,x,y,z,xix_cpu,etay_cpu,Jacobian_cpu,T0,Q,Vin)
     integer(kind=4), intent(in) :: id_RungeKutta
-    real(8), intent(in), dimension(nx,ny,nz) :: x, y, z, xix_cpu, etay_cpu, Jacobian_cpu
+    real(8), intent(in) :: x(nx), y(ny), z(nz), xix_cpu(nx), etay_cpu(ny), Jacobian_cpu(nx,ny)
     real(8), intent(inout) :: Q(nx,ny,nz,5)
     real(8), intent(inout) :: T0(nx,ny,nz)
     real(8), intent(in) :: Vin(ny,2)
@@ -164,7 +164,7 @@ contains
     real(8), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     real(8), device :: Rs(nx-accuracy,ny-accuracy,nz-accuracy,5)
-    real(8), dimension(nx,ny,nz), device :: xix, etay, Jacobian
+    real(8), device :: xix(nx), etay(ny), Jacobian(nx,ny)
     ! for plot
     real(8) ke0, entropy0
 
@@ -212,8 +212,8 @@ contains
   end subroutine RungeKutta_4th
 
   subroutine RungeKutta_10th(id_RungeKutta,x,y,z,xix_cpu,etay_cpu,Jacobian_cpu,T0,Q,Vin)
-    integer(kind=8), intent(in) :: id_RungeKutta
-    real(8), intent(in), dimension(nx,ny,nz) :: x, y, z, xix_cpu, etay_cpu, Jacobian_cpu
+    integer(kind=8), intent(in) :: id_RungeKutta  
+    real(8), intent(in) :: x(nx), y(ny), z(nz), xix_cpu(nx), etay_cpu(ny), Jacobian_cpu(nx,ny)
     real(8), intent(inout) :: Q(nx,ny,nz,5)
     real(8), intent(inout) :: T0(nx,ny,nz)
     real(8), intent(in) :: Vin(ny,2)
@@ -225,7 +225,7 @@ contains
     real(8), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     real(8), device :: R4(nx-accuracy,ny-accuracy,nz-accuracy,5)
-    real(8), dimension(nx,ny,nz), device :: xix, etay, Jacobian
+    real(8), device :: xix(nx), etay(ny), Jacobian(nx,ny)
     ! for plot
     real(8) ke0, entropy0
 

@@ -25,7 +25,8 @@ contains
   end function u_y
 
   attributes(global) subroutine calc_Ev(xix, Jacobian, u, v, w, T, mut, E)
-    real(8), intent(in), dimension(nx,ny,nz), device :: xix, Jacobian, u, v, w, T, mut
+    real(8), intent(in), device :: xix(nx), Jacobian(nx,ny)
+    real(8), intent(in), dimension(nx,ny,nz), device :: u, v, w, T, mut
     real(8), intent(inout), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E
     integer i, j, k
     real(8) :: mux = 0.d0
@@ -71,7 +72,7 @@ contains
     uz = u_y(dzi,muz1,muz2,u(i,j,k),u(i,j,k-1),u(i+1,j,k-1),u(i+1,j,k),u(i+1,j,k+1),u(i,j,k+1))
     wz = u_y(dzi,muz1,muz2,w(i,j,k),w(i,j,k-1),w(i+1,j,k-1),w(i+1,j,k),w(i+1,j,k+1),w(i,j,k+1))
 
-    xixJ = (xix(i,j,k) + xix(i+1,j,k)) / (Jacobian(i,j,k) + Jacobian(i+1,j,k))
+    xixJ = (xix(i) + xix(i+1)) / (Jacobian(i,j) + Jacobian(i+1,j))
     txx = (2.d0 * (2.d0 * ux - vy - wz) / 3.d0) * xixJ
     txy = (uy + vx) * xixJ
     txz = (wx + uz) * xixJ
@@ -96,7 +97,8 @@ contains
   end subroutine calc_Ev
   
   attributes(global) subroutine calc_Fv(etay, Jacobian, u, v, w, T, mut, F)
-    real(8), intent(in), dimension(nx,ny,nz), device :: etay, Jacobian, u, v, w, T, mut
+    real(8), intent(in), device :: etay(ny), Jacobian(nx,ny)
+    real(8), intent(in), dimension(nx,ny,nz), device :: u, v, w, T, mut
     real(8), intent(inout), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F
     integer i, j, k
     real(8) :: muy = 0.d0
@@ -142,7 +144,7 @@ contains
     ux = u_y(dxi,mux1,mux2,u(i,j,k),u(i-1,j,k),u(i-1,j+1,k),u(i,j+1,k),u(i+1,j+1,k),u(i+1,j,k)) 
     vx = u_y(dxi,mux1,mux2,v(i,j,k),v(i-1,j,k),v(i-1,j+1,k),v(i,j+1,k),v(i+1,j+1,k),v(i+1,j,k)) 
 
-    etayJ = (etay(i,j,k) + etay(i,j+1,k)) / (Jacobian(i,j,k) + Jacobian(i,j+1,k))
+    etayJ = (etay(j) + etay(j+1)) / (Jacobian(i,j) + Jacobian(i,j+1))
     tyx = (uy + vx) * etayJ
     tyy = (2.d0 * (2.d0 * vy - wz - ux) / 3.d0) * etayJ
     tyz = (vz + wy) * etayJ
@@ -166,7 +168,8 @@ contains
   end subroutine calc_Fv
   
   attributes(global) subroutine calc_Gv(Jacobian, u, v, w, T, mut, G)
-    real(8), intent(in), dimension(nx,ny,nz), device :: Jacobian, u, v, w, T, mut
+    real(8), intent(in), device :: Jacobian(nx,ny)
+    real(8), intent(in), dimension(nx,ny,nz), device :: u, v, w, T, mut
     real(8), intent(inout), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G
     integer i, j, k
     real(8) :: muz = 0.d0
@@ -212,7 +215,7 @@ contains
     vy = u_y(dyi,muy1,muy2,v(i,j,k),v(i,j-1,k),v(i,j-1,k+1),v(i,j,k+1),v(i,j+1,k+1),v(i,j+1,k)) 
     wy = u_y(dyi,muy1,muy2,w(i,j,k),w(i,j-1,k),w(i,j-1,k+1),w(i,j,k+1),w(i,j+1,k+1),w(i,j+1,k))  
 
-    zetaJ = 2.d0 / (Jacobian(i,j,k) + Jacobian(i,j,k+1))
+    zetaJ = 2.d0 / (Jacobian(i,j) + Jacobian(i,j))
     tzx = (wx + uz) * zetaJ
     tzy = (vz + wy) * zetaJ
     tzz = (2.d0 * (2.d0 * wz - ux - vy) / 3.d0) * zetaJ 
