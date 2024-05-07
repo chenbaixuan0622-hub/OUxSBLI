@@ -18,7 +18,8 @@ module calc_time_dev
 contains
   subroutine calc_EF_basic(id_hybrid,xix,etay,Jacobian,Q,T,E,F)
     integer(kind=2), intent(in) :: id_hybrid
-    real(8), intent(in), dimension(nx,ny), device :: xix, etay, Jacobian
+    real(8), intent(in), device :: xix(nx), etay(ny)
+    real(8), intent(in), dimension(nx,ny), device :: Jacobian
     real(8), intent(in), device :: Q(nx,ny,4)
     real(8), intent(inout), device :: T(nx,ny)
     real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,4)
@@ -41,7 +42,8 @@ contains
 
   subroutine calc_EF_hybrid(id_hybrid,xix,etay,Jacobian,Q,T,E_hybrid,F_hybrid)
     integer(kind=4), intent(in) :: id_hybrid
-    real(8), intent(in), dimension(nx,ny), device :: xix, etay, Jacobian
+    real(8), intent(in), device :: xix(nx), etay(ny)
+    real(8), intent(in), dimension(nx,ny), device :: Jacobian
     real(8), intent(in), device :: Q(nx,ny,4)
     real(8), intent(inout), device :: T(nx,ny)
     real(8), intent(out), device :: E_hybrid(nx-accuracy+1,ny-accuracy,4)
@@ -74,7 +76,7 @@ contains
   
   subroutine RungeKutta_3rd(id_RungeKutta,x,y,z,xix_cpu,etay_cpu,Jacobian_cpu,T0,Q,Vin_cpu)
     integer(kind=2), intent(in) :: id_RungeKutta
-    real(8), intent(in), dimension(nx,ny) :: x, y, z, xix_cpu, etay_cpu, Jacobian_cpu
+    real(8), intent(in) :: x(nx), y(ny), z(1), xix_cpu(nx), etay_cpu(ny), Jacobian_cpu(nx,ny)
     real(8), intent(inout) :: Q(nx,ny,4)
     real(8), intent(inout) :: T0(nx,ny)
     real(8), intent(in) :: Vin_cpu
@@ -83,7 +85,7 @@ contains
     real(8), dimension(nx,ny), device :: T
     real(8), device :: E(nx-accuracy+1,ny-accuracy,4)
     real(8), device :: F(nx-accuracy,ny-accuracy+1,4)
-    real(8), dimension(nx,ny), device :: xix, etay, Jacobian
+    real(8), device :: xix(nx), etay(ny), Jacobian(nx,ny)
     real(8), device :: Vin(ny,2)
     Vin = Vin_cpu
 
@@ -117,7 +119,7 @@ contains
 
   subroutine RungeKutta_4th(id_RungeKutta,x,y,z,xix_cpu,etay_cpu,Jacobian_cpu,T0,Q,Vin_cpu)
     integer(kind=4), intent(in) :: id_RungeKutta
-    real(8), intent(in), dimension(nx,ny) :: x, y, z, xix_cpu, etay_cpu, Jacobian_cpu
+    real(8), intent(in) :: x(nx), y(ny), z(1), xix_cpu(nx), etay_cpu(ny), Jacobian_cpu(nx,ny)
     real(8), intent(inout) :: Q(nx,ny,4)
     real(8), intent(inout) :: T0(nx,ny)
     real(8), intent(in) :: Vin_cpu(ny,2)
@@ -127,7 +129,7 @@ contains
     real(8), device :: E(nx-accuracy+1,ny-accuracy,4)
     real(8), device :: F(nx-accuracy,ny-accuracy+1,4)
     real(8), device :: Rs(nx-accuracy,ny-accuracy,4)
-    real(8), dimension(nx,ny), device :: xix, etay, Jacobian
+    real(8), device :: xix(nx), etay(ny), Jacobian(nx,ny)
     real(8), device :: Vin(ny,2)
     Vin = Vin_cpu
 
