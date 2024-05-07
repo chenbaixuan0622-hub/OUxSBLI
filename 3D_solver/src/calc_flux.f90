@@ -19,7 +19,8 @@ contains
 
   attributes(global) subroutine calc_E_NoMUSCL(id_muscl, rho, u, v, w, p, xix, Jacobian, E)
     integer(kind=2), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p, xix, Jacobian
+    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), intent(in), device :: xix(nx), Jacobian(nx,ny)
     real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E
     integer i, j, k
     real(8), dimension(accuracy) :: rhos, ps
@@ -34,13 +35,14 @@ contains
     Vs(:,1) = u(i:i+accuracy-1,j,k)
     Vs(:,2) = v(i:i+accuracy-1,j,k)
     Vs(:,3) = w(i:i+accuracy-1,j,k)
-    Normal(:) = (/0.5d0 * (xix(i,j,k) / Jacobian(i,j,k) + xix(i+1,j,k) / Jacobian(i+1,j,k)), 0.d0, 0.d0/)
+    Normal(:) = (/0.5d0 * (xix(i) / Jacobian(i,j) + xix(i+1) / Jacobian(i+1,j)), 0.d0, 0.d0/)
     E(i,j-offset,k-offset,:) = KEEP(id_accuracy,1,rhos,ps,Vs,Normal)
   end subroutine calc_E_NoMUSCL
 
   attributes(global) subroutine calc_F_NoMUSCL(id_muscl, rho, u, v, w, p, etay, Jacobian, F)
     integer(kind=2), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p, etay, Jacobian
+    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), intent(in), device :: etay(ny), Jacobian(nx,ny)
     real(8), intent(out), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F
     integer i, j, k
     real(8), dimension(accuracy) :: rhos, ps
@@ -55,13 +57,14 @@ contains
     Vs(:,1) = u(i,j:j+accuracy-1,k)
     Vs(:,2) = v(i,j:j+accuracy-1,k)
     Vs(:,3) = w(i,j:j+accuracy-1,k)
-    Normal(:) = (/0.d0, 0.5d0 * (etay(i,j,k) / Jacobian(i,j,k) + etay(i,j+1,k) / Jacobian(i,j+1,k)), 0.d0/)
+    Normal(:) = (/0.d0, 0.5d0 * (etay(j) / Jacobian(i,j) + etay(j+1) / Jacobian(i,j+1)), 0.d0/)
     F(i-offset,j,k-offset,:) = KEEP(id_accuracy,2,rhos,ps,Vs,Normal)
   end subroutine calc_F_NoMUSCL
 
   attributes(global) subroutine calc_G_NoMUSCL(id_muscl, rho, u, v, w, p, Jacobian, G)
     integer(kind=2), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p, Jacobian
+    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p 
+    real(8), intent(in), device :: Jacobian(nx,ny)
     real(8), intent(out), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G
     integer i, j, k
     real(8), dimension(accuracy) :: rhos, ps
@@ -76,7 +79,7 @@ contains
     Vs(:,1) = u(i,j,k:k+accuracy-1)
     Vs(:,2) = v(i,j,k:k+accuracy-1)
     Vs(:,3) = w(i,j,k:k+accuracy-1)
-    Normal(:) = (/0.d0, 0.d0, 0.5d0 * (1.d0 / Jacobian(i,j,k) + 1.d0 / Jacobian(i,j,k+1))/)
+    Normal(:) = (/0.d0, 0.d0, 0.5d0 * (1.d0 / Jacobian(i,j) + 1.d0 / Jacobian(i,j))/)
     G(i-offset,j-offset,k,:) = KEEP(id_accuracy,3,rhos,ps,Vs,Normal)
   end subroutine calc_G_NoMUSCL
 
@@ -84,7 +87,8 @@ contains
 
   attributes(global) subroutine calc_E_MUSCL(id_muscl, rho, u, v, w, p, xix, Jacobians, E)
     integer(kind=4), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p, xix, Jacobians
+    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), intent(in), device :: xix(nx), Jacobians(nx,ny)
     real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E
     integer i, j, k
     real(8) Jacobian
@@ -108,8 +112,8 @@ contains
       call Qlr_right(Q1,Q2,Q3,Ql,Qr)
     endif
 
-    Jacobian = 0.5d0 * (Jacobians(i,j,k) + Jacobians(i+1,j,k))
-    Normal(:) = (/0.d0, 0.5d0 * (xix(i,j,k) + xix(i+1,j,k)), 0.d0, 0.d0, 0.d0/)
+    Jacobian = 0.5d0 * (Jacobians(i,j) + Jacobians(i+1,j))
+    Normal(:) = (/0.d0, 0.5d0 * (xix(i) + xix(i+1)), 0.d0, 0.d0, 0.d0/)
     if (id_scheme == 2) then
       E(i,j-offset,k-offset,:) = Roe(1,Ql,Qr,Normal,Jacobian)
     else
@@ -119,7 +123,8 @@ contains
 
   attributes(global) subroutine calc_F_MUSCL(id_muscl, rho, u, v, w, p, etay, Jacobians, F)
     integer(kind=4), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p, etay, Jacobians
+    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), intent(in), device :: etay(ny), Jacobians(nx,ny)
     real(8), intent(out), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F
     integer i, j, k
     real(8) Jacobian
@@ -143,8 +148,8 @@ contains
       call Qlr_right(Q1,Q2,Q3,Ql,Qr)
     endif
 
-    Jacobian = 0.5d0 * (Jacobians(i,j,k) + Jacobians(i,j+1,k))
-    Normal(:) = (/0.d0, 0.d0, 0.5d0 * (etay(i,j,k) + etay(i,j+1,k)), 0.d0, 0.d0/)
+    Jacobian = 0.5d0 * (Jacobians(i,j) + Jacobians(i,j+1))
+    Normal(:) = (/0.d0, 0.d0, 0.5d0 * (etay(j) + etay(j+1)), 0.d0, 0.d0/)
     if (id_scheme == 2) then
       F(i-offset,j,k-offset,:) = Roe(2,Ql,Qr,Normal,Jacobian)
     else
@@ -154,7 +159,8 @@ contains
   
   attributes(global) subroutine calc_G_MUSCL(id_muscl, rho, u, v, w, p, Jacobians, G)
     integer(kind=4), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p, Jacobians
+    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), intent(in), device :: Jacobians(nx,ny)
     real(8), intent(out), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G
     integer i, j, k
     real(8) Jacobian
@@ -178,7 +184,7 @@ contains
       call Qlr_right(Q1,Q2,Q3,Ql,Qr)
     endif
 
-    Jacobian = 0.5d0 * (Jacobians(i,j,k) + Jacobians(i,j,k+1))
+    Jacobian = 0.5d0 * (Jacobians(i,j) + Jacobians(i,j))
     Normal(:) = (/0.d0, 0.d0, 0.d0, 1.d0, 0.d0/)
     if (id_scheme == 2) then
       G(i-offset,j-offset,k,:) = Roe(3,Ql,Qr,Normal,Jacobian)
@@ -191,7 +197,8 @@ contains
  
   attributes(global) subroutine calc_E_MUSCL_4th(id_muscl, rho, u, v, w, p, xix, Jacobians, E)
     integer(kind=8), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p, xix, Jacobians
+    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), intent(in), device :: xix(nx), Jacobians(nx,ny)
     real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E
     integer i, j, k
     real(8) Jacobian
@@ -233,8 +240,8 @@ contains
       call Qlr_right(Q2,Q3,Q4,Ql,Qr)
     endif
 
-    Jacobian = 0.5d0 * (Jacobians(i,j,k) + Jacobians(i+1,j,k))
-    Normal(:) = (/0.d0, 0.5d0 * (xix(i,j,k) + xix(i+1,j,k)), 0.d0, 0.d0, 0.d0/)
+    Jacobian = 0.5d0 * (Jacobians(i,j) + Jacobians(i+1,j))
+    Normal(:) = (/0.d0, 0.5d0 * (xix(i) + xix(i+1)), 0.d0, 0.d0, 0.d0/)
     if (id_scheme == 2) then
       E(i,j-offset,k-offset,:) = Roe(1,Ql,Qr,Normal,Jacobian)
     else
@@ -244,7 +251,8 @@ contains
 
   attributes(global) subroutine calc_F_MUSCL_4th(id_muscl, rho, u, v, w, p, etay, Jacobians, F)
     integer(kind=8), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p, etay, Jacobians
+    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), intent(in), device :: etay(ny), Jacobians(nx,ny)
     real(8), intent(out), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F
     integer i, j, k
     real(8) Jacobian
@@ -286,8 +294,8 @@ contains
       call Qlr_right(Q2,Q3,Q4,Ql,Qr)
     endif
 
-    Jacobian = 0.5d0 * (Jacobians(i,j,k) + Jacobians(i,j+1,k))
-    Normal(:) = (/0.d0, 0.d0, 0.5d0 * (etay(i,j,k) + etay(i,j+1,k)), 0.d0, 0.d0/)
+    Jacobian = 0.5d0 * (Jacobians(i,j) + Jacobians(i,j+1))
+    Normal(:) = (/0.d0, 0.d0, 0.5d0 * (etay(j) + etay(j+1)), 0.d0, 0.d0/)
     if (id_scheme == 2) then
       F(i-offset,j,k-offset,:) = Roe(2,Ql,Qr,Normal,Jacobian)
     else
@@ -297,7 +305,8 @@ contains
   
   attributes(global) subroutine calc_G_MUSCL_4th(id_muscl, rho, u, v, w, p, Jacobians, G)
     integer(kind=8), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p, Jacobians
+    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), intent(in), device :: Jacobians(nx,ny)
     real(8), intent(out), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G
     integer i, j, k
     real(8) Jacobian
@@ -339,7 +348,7 @@ contains
       call Qlr_right(Q2,Q3,Q4,Ql,Qr)
     endif
 
-    Jacobian = 0.5d0 * (Jacobians(i,j,k) + Jacobians(i,j,k+1))
+    Jacobian = 0.5d0 * (Jacobians(i,j) + Jacobians(i,j))
     Normal(:) = (/0.d0, 0.d0, 0.d0, 1.d0, 0.d0/)
     if (id_scheme == 2) then
       G(i-offset,j-offset,k,:) = Roe(3,Ql,Qr,Normal,Jacobian)

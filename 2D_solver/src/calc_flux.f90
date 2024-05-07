@@ -16,7 +16,8 @@ contains
 
   attributes(global) subroutine calc_E_NoMUSCL(id_muscl, rho, u, v, p, xix, Jacobian, E)
     integer(kind=2), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p, xix, Jacobian
+    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
+    real(8), intent(in), device :: xix(nx), Jacobian(nx,ny)
     real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,4), device :: E
     integer i, j
     real(8), dimension(accuracy) :: rhos, ps
@@ -29,13 +30,14 @@ contains
     ps = p(i:i+accuracy-1,j)
     Vs(:,1) = u(i:i+accuracy-1,j)
     Vs(:,2) = v(i:i+accuracy-1,j)
-    Normal(:) = (/0.5d0 * (xix(i,j) / Jacobian(i,j) + xix(i+1,j) / Jacobian(i+1,j)), 0.d0/)
+    Normal(:) = (/0.5d0 * (xix(i) / Jacobian(i,j) + xix(i+1) / Jacobian(i+1,j)), 0.d0/)
     E(i,j-offset,:) = KEEP(id_accuracy,1,rhos,ps,Vs,Normal)
   end subroutine calc_E_NoMUSCL
 
   attributes(global) subroutine calc_F_NoMUSCL(id_muscl, rho, u, v, p, etay, Jacobian, F)
     integer(kind=2), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p, etay, Jacobian
+    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
+    real(8), intent(in), device :: etay(ny), Jacobian(nx,ny)
     real(8), intent(out), dimension(nx-accuracy,ny-accuracy+1,4), device :: F
     integer i, j
     real(8), dimension(accuracy) :: rhos, ps
@@ -48,7 +50,7 @@ contains
     ps = p(i,j:j+accuracy-1)
     Vs(:,1) = u(i,j:j+accuracy-1)
     Vs(:,2) = v(i,j:j+accuracy-1)
-    Normal(:) = (/0.d0, 0.5d0 * (etay(i,j) / Jacobian(i,j) + etay(i,j+1) / Jacobian(i,j+1))/)
+    Normal(:) = (/0.d0, 0.5d0 * (etay(j) / Jacobian(i,j) + etay(j+1) / Jacobian(i,j+1))/)
     F(i-offset,j,:) = KEEP(id_accuracy,2,rhos,ps,Vs,Normal)
   end subroutine calc_F_NoMUSCL
 
@@ -56,7 +58,8 @@ contains
 
   attributes(global) subroutine calc_E_MUSCL(id_muscl, rho, u, v, p, xix, Jacobians, E)
     integer(kind=4), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p, xix, Jacobians
+    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
+    real(8), intent(in), device :: xix(nx), Jacobians(nx,ny)
     real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,4), device :: E
     integer i, j
     real(8) Jacobian
@@ -80,7 +83,7 @@ contains
     endif
 
     Jacobian = 0.5d0 * (Jacobians(i,j) + Jacobians(i+1,j))
-    Normal(:) = (/0.d0, 0.5d0 * (xix(i,j) + xix(i+1,j)), 0.d0, 0.d0/)
+    Normal(:) = (/0.d0, 0.5d0 * (xix(i) + xix(i+1)), 0.d0, 0.d0/)
     if (id_scheme == 2) then
       E(i,j-offset,:) = Roe(1,Ql,Qr,Normal,Jacobian)
     else
@@ -90,7 +93,8 @@ contains
 
   attributes(global) subroutine calc_F_MUSCL(id_muscl, rho, u, v, p, etay, Jacobians, F)
     integer(kind=4), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p, etay, Jacobians
+    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
+    real(8), intent(in), device :: etay(ny), Jacobians(nx,ny)
     real(8), intent(out), dimension(nx-accuracy,ny-accuracy+1,4), device :: F
     integer i, j
     real(8) Jacobian
@@ -114,7 +118,7 @@ contains
     endif
 
     Jacobian = 0.5d0 * (Jacobians(i,j) + Jacobians(i,j+1))
-    Normal(:) = (/0.d0, 0.d0, 0.5d0 * (etay(i,j) + etay(i,j+1)), 0.d0/)
+    Normal(:) = (/0.d0, 0.d0, 0.5d0 * (etay(j) + etay(j+1)), 0.d0/)
     if (id_scheme == 2) then
       F(i-offset,j,:) = Roe(2,Ql,Qr,Normal,Jacobian)
     else
@@ -126,7 +130,8 @@ contains
 
   attributes(global) subroutine calc_E_MUSCL_4th(id_muscl, rho, u, v, p, xix, Jacobians, E)
     integer(kind=8), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p, xix, Jacobians
+    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
+    real(8), intent(in), device :: xix(nx), Jacobians(nx,ny)
     real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,4), device :: E
     integer i, j
     real(8) Jacobian
@@ -168,7 +173,7 @@ contains
     endif
 
     Jacobian = 0.5d0 * (Jacobians(i,j) + Jacobians(i+1,j))
-    Normal(:) = (/0.d0, 0.5d0 * (xix(i,j) + xix(i+1,j)), 0.d0, 0.d0/)
+    Normal(:) = (/0.d0, 0.5d0 * (xix(i) + xix(i+1)), 0.d0, 0.d0/)
     if (id_scheme == 2) then
       E(i,j-offset,:) = Roe(1,Ql,Qr,Normal,Jacobian)
     else
@@ -178,7 +183,8 @@ contains
 
   attributes(global) subroutine calc_F_MUSCL_4th(id_muscl, rho, u, v, p, etay, Jacobians, F)
     integer(kind=8), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p, etay, Jacobians
+    real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
+    real(8), intent(in), device :: etay(ny), Jacobians(nx,ny)
     real(8), intent(out), dimension(nx-accuracy,ny-accuracy+1,4), device :: F
     integer i, j
     real(8) Jacobian
@@ -220,7 +226,7 @@ contains
     endif
 
     Jacobian = 0.5d0 * (Jacobians(i,j) + Jacobians(i,j+1))
-    Normal(:) = (/0.d0, 0.d0, 0.5d0 * (etay(i,j) + etay(i,j+1)), 0.d0/)
+    Normal(:) = (/0.d0, 0.d0, 0.5d0 * (etay(j) + etay(j+1)), 0.d0/)
     if (id_scheme == 2) then
       F(i-offset,j,:) = Roe(2,Ql,Qr,Normal,Jacobian)
     else

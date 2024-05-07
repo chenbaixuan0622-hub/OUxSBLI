@@ -4,14 +4,14 @@ module print
   interface print_vtk
     subroutine print_vtk_2D(step,x,y,Jacobian,Q,T)
       integer, intent(in) :: step
-      real(8), intent(in), dimension(nx,ny) :: x, y, Jacobian
+      real(8), intent(in) :: x(nx), y(ny), Jacobian(nx,ny)
       real(8), intent(in) :: Q(nx,ny,4)
       real(8), intent(in), optional :: T(nx,ny)
     end subroutine print_vtk_2D
 
     subroutine print_vtk_3D(step,x,y,z,Jacobian,Q,T,ke0,entropy0,mut)
       integer, intent(in) :: step
-      real(8), intent(in), dimension(nx,ny,nz) :: x, y, z, Jacobian
+      real(8), intent(in) :: x(nx), y(ny), z(nz), Jacobian(nx,ny)
       real(8), intent(in) :: Q(nx,ny,nz,5)
       real(8), intent(in) :: T(nx,ny,nz)
       real(8), intent(inout) :: ke0, entropy0
@@ -26,18 +26,19 @@ contains
   end function mean
 
   subroutine calc_vorticity(x,y,z,u,v,w,omegax,omegay,omegaz)
-    real(8), intent(in), dimension(nx,ny,nz) :: x, y, z, u, v, w
+    real(8), intent(in) :: x(nx), y(ny), z(nz)
+    real(8), intent(in), dimension(nx,ny,nz) :: u, v, w
     real(8), intent(out), dimension(nx-2,ny-2,nz-2) :: omegax, omegay, omegaz
     integer i, j, k
     do k = 2, nz-1
       do j = 2, ny-1
         do i = 2, nx-1
-          omegax(i-1,j-1,k-1) = (-w(i,j-1,k) + w(i,j+1,k)) / (-y(i,j-1,k) + y(i,j+1,k)) &
-          & - (-v(i,j,k-1) + v(i,j,k+1)) / (-z(i,j,k-1) + z(i,j,k+1))
-          omegay(i-1,j-1,k-1) = (-u(i,j,k-1) + u(i,j,k+1)) / (-z(i,j,k-1) + z(i,j,k+1)) &
-          & - (-w(i-1,j,k) + w(i+1,j,k)) / (-x(i-1,j,k) + x(i+1,j,k))
-          omegaz(i-1,j-1,k-1) = (-v(i-1,j,k) + v(i+1,j,k)) / (-x(i-1,j,k) + x(i+1,j,k)) &
-          & - (-u(i,j-1,k) + u(i,j+1,k)) / (-y(i,j-1,k) + y(i,j+1,k))
+          omegax(i-1,j-1,k-1) = (-w(i,j-1,k) + w(i,j+1,k)) / (-y(j-1) + y(j+1)) &
+          & - (-v(i,j,k-1) + v(i,j,k+1)) / (-z(k-1) + z(k+1))
+          omegay(i-1,j-1,k-1) = (-u(i,j,k-1) + u(i,j,k+1)) / (-z(k-1) + z(k+1)) &
+          & - (-w(i-1,j,k) + w(i+1,j,k)) / (-x(i-1) + x(i+1))
+          omegaz(i-1,j-1,k-1) = (-v(i-1,j,k) + v(i+1,j,k)) / (-x(i-1) + x(i+1)) &
+          & - (-u(i,j-1,k) + u(i,j+1,k)) / (-y(j-1) + y(j+1))
         enddo
       enddo
     enddo
@@ -76,7 +77,8 @@ contains
 
   subroutine print_enstrophy(step,x,y,z,rho,u,v,w)
     integer, intent(in) :: step
-    real(8), intent(in), dimension(nx,ny,nz) :: x, y, z, rho, u, v, w
+    real(8), intent(in) :: x(nx), y(ny), z(nz)
+    real(8), intent(in), dimension(nx,ny,nz) :: rho, u, v, w
     real(8) enstrophy, t
     real(8), dimension(nx-2,ny-2,nz-2) :: omegax, omegay, omegaz
     t = nt * step * dt
@@ -106,10 +108,10 @@ contains
     integer i, j, k
     character :: lf*1, str1*8, str2*8, str3*8, str4*8
     lf = char(10)
-    write(str1(1:8),'(i8)') size(x)
-    write(str2(1:8),'(i8)') size(y)
-    write(str3(1:8),'(i8)') size(z)
-    write(str4(1:8),'(i8)') size(x) * size(y) * size(z)
+    write(str1(1:8),'(i8)') ni
+    write(str2(1:8),'(i8)') nj
+    write(str3(1:8),'(i8)') nk
+    write(str4(1:8),'(i8)') ni * nj * nk
 
     write(10) '# vtk DataFile Version 3.0'//lf
     write(10) 'Q'//lf
@@ -130,7 +132,8 @@ contains
 
   subroutine print_vtk_2D(step,x,y,Jacobian,Q,T)
     integer, intent(in) :: step
-    real(8), intent(in), dimension(nx,ny) :: x, y, Jacobian
+    real(8), intent(in) :: x(nx), y(ny)
+    real(8), intent(in), dimension(nx,ny) :: Jacobian
     real(8), intent(inout) :: Q(nx,ny,4)
     real(8), intent(in), optional :: T(nx,ny)
     integer i, j
@@ -149,7 +152,7 @@ contains
     
     write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtk"
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="BIG_ENDIAN")
-    call print_header(nx,ny,1,x(:,1),y(1,:),z)
+    call print_header(nx,ny,1,x,y,z)
 
     write(10) 'VECTORS Velocity float'//lf
     do j = 1, ny
@@ -176,19 +179,23 @@ contains
   
   subroutine print_vtk_3D(step,x,y,z,Jacobian,Q,T,ke0,entropy0,mut)
     integer, intent(in) :: step
-    real(8), intent(in), dimension(nx,ny,nz) :: x, y, z, Jacobian
+    real(8), intent(in) :: x(nx), y(ny), z(nz)
+    real(8), intent(in), dimension(nx,ny) :: Jacobian
     real(8), intent(inout) :: Q(nx,ny,nz,5)
     real(8), intent(in) :: T(nx,ny,nz)
     real(8), intent(inout) :: ke0, entropy0
     real(8), intent(in), optional :: mut(nx,ny,nz)
-    integer i, j, k
+    integer i, j, k, l
     real(8), dimension(nx,ny,nz) :: rho, u, v, w, p, nut
     character(len=40) filename
     character :: lf*1
     lf = char(10)
-    do i = 1, 5
-      Q(:,:,:,i) = Q(:,:,:,i) * Jacobian(:,:,:)
-    enddo
+    do l = 1, 5
+      do k = 1, nz
+        do j = 1, ny
+          do i = 1, nx
+            Q(i,j,k,l) = Q(i,j,k,l) * Jacobian(i,j)
+    enddo;enddo;enddo;enddo
     rho = Q(:,:,:,1)
     u = Q(:,:,:,2) / rho
     v = Q(:,:,:,3) / rho
@@ -197,7 +204,7 @@ contains
     
     write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtk"
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="BIG_ENDIAN")
-    call print_header(nx,ny,nz,x(:,1,1),y(1,:,1),z(1,1,:))
+    call print_header(nx,ny,nz,x,y,z)
 
     write(10) 'VECTORS Velocity float'//lf
     do k = 1, nz
