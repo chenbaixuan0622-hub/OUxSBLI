@@ -15,7 +15,7 @@ program main
   call set_xix(dxs,xix)
   call set_etay(dys,etay)
   call set_Jacobian(dxs,dys,Jacobian)
-  call set_init(Q,Vin)
+  call set_init(x,y,z,Q,Vin)
   T0 = T
 
   deallocate(dxs,dys)
