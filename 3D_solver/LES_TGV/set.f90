@@ -34,7 +34,8 @@ contains
     enddo
   end subroutine set_grid
   
-  subroutine set_init(Q,Vin)
+  subroutine set_init(xs,ys,zs,Q,Vin)
+    real(8), intent(in) :: xs(nx), ys(ny), zs(nz)
     real(8), intent(out), dimension(nx,ny,nz,5) :: Q
     real(8), intent(in), dimension(ny,2) :: Vin
     integer i, j, k

@@ -18,7 +18,7 @@ module mod_globals
   !               ! 1 Smagorinsky           !
   !               ! 2 selective_mixed_scale !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer, parameter :: id_turbulence = 0!1
+  integer, parameter :: id_turbulence = 1
   !!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_scheme ! 1  KEEP    !
   !           ! 2  Roe     !
@@ -39,25 +39,25 @@ module mod_globals
   real(8), parameter :: Lx = 2.d0 * pi * L0
   real(8), parameter :: Ly = 2.d0 * pi * L0
   real(8), parameter :: Lz = 2.d0 * pi * L0
-  integer, parameter :: nx = 66
-  integer, parameter :: ny = 66
-  integer, parameter :: nz = 66
+  integer, parameter :: nx = 130!66
+  integer, parameter :: ny = 130!66
+  integer, parameter :: nz = 130!66
   real(8), parameter :: dx = Lx / dble(nx-1)
   real(8), parameter :: dy = Ly / dble(ny-1)
   real(8), parameter :: dz = Lz / dble(nz-1)
   real(8), parameter :: dxi = 1.d0 / dx
   real(8), parameter :: dyi = 1.d0 / dy
   real(8), parameter :: dzi = 1.d0 / dz
-  real(8), dimension(nx,ny,nz) :: x, y, z, xix, etay, Jacobian
+  real(8) x(nx), y(ny), z(nz), xix(nx), etay(ny), Jacobian(nx,ny)
 
   ! GPU
-  type(dim3) :: blocksE = dim3((nx-accuracy+1)/5,(ny-accuracy)/8,(nz-accuracy)/8)
-  type(dim3) :: blocksF = dim3((nx-accuracy)/8,(ny-accuracy+1)/5,(nz-accuracy)/8)
-  type(dim3) :: blocksG = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy+1)/5)
+  type(dim3) :: blocksE = dim3((nx-accuracy+1)/3,(ny-accuracy)/8,(nz-accuracy)/8)
+  type(dim3) :: blocksF = dim3((nx-accuracy)/8,(ny-accuracy+1)/3,(nz-accuracy)/8)
+  type(dim3) :: blocksG = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy+1)/3)
   type(dim3) :: blocks = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy)/8)
-  type(dim3) :: threadsE = dim3(5,8,8)
-  type(dim3) :: threadsF = dim3(8,5,8)
-  type(dim3) :: threadsG = dim3(8,8,5)
+  type(dim3) :: threadsE = dim3(3,8,8)
+  type(dim3) :: threadsF = dim3(8,3,8)
+  type(dim3) :: threadsG = dim3(8,8,3)
   type(dim3) :: threads = dim3(8,8,8)
 
   ! time
