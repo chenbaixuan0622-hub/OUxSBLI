@@ -25,9 +25,9 @@ contains
     real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     real(8), intent(out), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
-    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, energy
     integer stat
-    call calc_quantities(Q,rho,u,v,w,p,T)
+    call calc_quantities(Jacobian,Q,rho,u,v,w,p,T)
 
     call calc_E<<<blocksE,threadsE>>>(id_muscl,rho,u,v,w,p,xix,Jacobian,E)
     call calc_F<<<blocksF,threadsF>>>(id_muscl,rho,u,v,w,p,etay,Jacobian,F)
@@ -42,9 +42,9 @@ contains
     endif
 
     if (id_visc == 1 .or. id_turbulence /= 0) then
-      call calc_Ev<<<blocksE,threadsE>>>(xix,Jacobian,u,v,w,T,mut,E)
-      call calc_Fv<<<blocksF,threadsF>>>(etay,Jacobian,u,v,w,T,mut,F)
-      call calc_Gv<<<blocksG,threadsG>>>(Jacobian,u,v,w,T,mut,G)
+      call calc_Ev<<<blocksE,threadsE>>>(xix,Jacobian,rho,u,v,w,T,energy,p,mut,E)
+      call calc_Fv<<<blocksF,threadsF>>>(etay,Jacobian,rho,u,v,w,T,energy,p,mut,F)
+      call calc_Gv<<<blocksG,threadsG>>>(Jacobian,rho,u,v,w,T,energy,p,mut,G)
     endif
     !print *, trim(cudaGetErrorString(cudaGetLastError()))
     stat = cudaDeviceSynchronize()
@@ -64,7 +64,7 @@ contains
     real(8), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G_keep, G_upwind
     integer stat
     integer(kind=2) :: id_muscl1
-    call calc_quantities(Q,rho,u,v,w,p,T)
+    call calc_quantities(Jacobian,Q,rho,u,v,w,p,T)
 
     call calc_E<<<blocksE,threadsE>>>(id_muscl1,rho,u,v,w,p,xix,Jacobian,E_keep)
     call calc_F<<<blocksF,threadsF>>>(id_muscl1,rho,u,v,w,p,etay,Jacobian,F_keep)
@@ -88,9 +88,9 @@ contains
     endif
 
     if (id_visc == 1 .or. id_turbulence /= 0) then
-      call calc_Ev<<<blocksE,threadsE>>>(xix,Jacobian,u,v,w,T,mut,E_hybrid)
-      call calc_Fv<<<blocksF,threadsF>>>(etay,Jacobian,u,v,w,T,mut,F_hybrid)
-      call calc_Gv<<<blocksG,threadsG>>>(Jacobian,u,v,w,T,mut,G_hybrid)
+      call calc_Ev<<<blocksE,threadsE>>>(xix,Jacobian,rho,u,v,w,T,energy,p,mut,E_hybrid)
+      call calc_Fv<<<blocksF,threadsF>>>(etay,Jacobian,rho,u,v,w,T,energy,p,mut,F_hybrid)
+      call calc_Gv<<<blocksG,threadsG>>>(Jacobian,rho,u,v,w,T,energy,p,mut,G_hybrid)
     endif
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_hybrid

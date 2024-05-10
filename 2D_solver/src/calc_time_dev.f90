@@ -26,7 +26,7 @@ contains
     real(8), intent(out), device :: F(nx-accuracy,ny-accuracy+1,4)
     real(8), dimension(nx,ny), device :: rho, u, v, p
     integer stat
-    call calc_quantities(Q,rho,u,v,p,T)
+    call calc_quantities(Jacobian,Q,rho,u,v,p,T)
     if (id_scheme /= 4) then
       call calc_E<<<blocksE,threadsE>>>(id_muscl,rho,u,v,p,xix,Jacobian,E)
       call calc_F<<<blocksF,threadsF>>>(id_muscl,rho,u,v,p,etay,Jacobian,F)
@@ -53,7 +53,7 @@ contains
     real(8), dimension(nx-accuracy,ny-accuracy+1,4), device :: F_keep, F_upwind
     integer stat
     integer(kind=2) :: id_muscl1
-    call calc_quantities(Q,rho,u,v,p,T)
+    call calc_quantities(Jacobian,Q,rho,u,v,p,T)
     call calc_E<<<blocksE,threadsE>>>(id_muscl1,rho,u,v,p,xix,Jacobian,E_keep)
     call calc_F<<<blocksF,threadsF>>>(id_muscl1,rho,u,v,p,etay,Jacobian,F_keep)
     call calc_E<<<blocksE,threadsE>>>(id_muscl,rho,u,v,p,xix,Jacobian,E_upwind)
