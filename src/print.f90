@@ -1,20 +1,20 @@
 module print
-  use mod_globals, only : nt, nx, ny, nz, dx, dy, dz, dt, gamma
+  use mod_globals, only : nt, nx, ny, nz, dt, gamma
   implicit none
   interface print_vtk
     subroutine print_vtk_2D(step,x,y,Jacobian,Q,T)
-      integer, intent(in) :: step
-      real(8), intent(in) :: x(nx), y(ny), Jacobian(nx,ny)
-      real(8), intent(in) :: Q(nx,ny,4)
+      integer, intent(in)           :: step
+      real(8), intent(in)           :: x(nx), y(ny), Jacobian(nx,ny)
+      real(8), intent(in)           :: Q(nx,ny,4)
       real(8), intent(in), optional :: T(nx,ny)
     end subroutine print_vtk_2D
 
     subroutine print_vtk_3D(step,x,y,z,Jacobian,Q,T,ke0,entropy0,mut)
-      integer, intent(in) :: step
-      real(8), intent(in) :: x(nx), y(ny), z(nz), Jacobian(nx,ny)
-      real(8), intent(in) :: Q(nx,ny,nz,5)
-      real(8), intent(in) :: T(nx,ny,nz)
-      real(8), intent(inout) :: ke0, entropy0
+      integer, intent(in)           :: step
+      real(8), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny)
+      real(8), intent(in)           :: Q(nx,ny,nz,5)
+      real(8), intent(in)           :: T(nx,ny,nz)
+      real(8), intent(inout)        :: ke0, entropy0
       real(8), intent(in), optional :: mut(nx,ny,nz)
     end subroutine print_vtk_3D
   end interface
@@ -26,8 +26,8 @@ contains
   end function mean
 
   subroutine calc_vorticity(x,y,z,u,v,w,omegax,omegay,omegaz)
-    real(8), intent(in) :: x(nx), y(ny), z(nz)
-    real(8), intent(in), dimension(nx,ny,nz) :: u, v, w
+    real(8), intent(in)                             :: x(nx), y(ny), z(nz)
+    real(8), intent(in), dimension(nx,ny,nz)        :: u, v, w
     real(8), intent(out), dimension(nx-2,ny-2,nz-2) :: omegax, omegay, omegaz
     integer i, j, k
     do k = 2, nz-1
@@ -39,15 +39,13 @@ contains
           & - (-w(i-1,j,k) + w(i+1,j,k)) / (-x(i-1) + x(i+1))
           omegaz(i-1,j-1,k-1) = (-v(i-1,j,k) + v(i+1,j,k)) / (-x(i-1) + x(i+1)) &
           & - (-u(i,j-1,k) + u(i,j+1,k)) / (-y(j-1) + y(j+1))
-        enddo
-      enddo
-    enddo
+    enddo;enddo;enddo
   end subroutine calc_vorticity
 
   subroutine print_entropy(step,rho,p,entropy0)
-    integer, intent(in) :: step
-    real(8), intent(in), dimension(nx,ny,nz) :: rho, p
-    real(8), intent(inout) :: entropy0
+    integer, intent(in)                       :: step
+    real(8), intent(in), dimension(nx,ny,nz)  :: rho, p
+    real(8), intent(inout)                    :: entropy0
     real(8) entropy, t
     entropy = sum(rho * log(p * rho ** (-gamma)))
     if (step == 0) then
@@ -60,9 +58,9 @@ contains
   end subroutine print_entropy
 
   subroutine print_KE(step,rho,u,v,w,ke0)
-    integer, intent(in) :: step
-    real(8), intent(in), dimension(nx,ny,nz) :: rho, u, v, w
-    real(8), intent(inout) :: ke0
+    integer, intent(in)                       :: step
+    real(8), intent(in), dimension(nx,ny,nz)  :: rho, u, v, w
+    real(8), intent(inout)                    :: ke0
     real(8) ke, t
     ke = mean(0.5d0 * rho * (u**2 + v**2 + w**2))
     if (step == 0) then
@@ -76,9 +74,9 @@ contains
   end subroutine print_KE
 
   subroutine print_enstrophy(step,x,y,z,rho,u,v,w)
-    integer, intent(in) :: step
-    real(8), intent(in) :: x(nx), y(ny), z(nz)
-    real(8), intent(in), dimension(nx,ny,nz) :: rho, u, v, w
+    integer, intent(in)                       :: step
+    real(8), intent(in)                       :: x(nx), y(ny), z(nz)
+    real(8), intent(in), dimension(nx,ny,nz)  :: rho, u, v, w
     real(8) enstrophy, t
     real(8), dimension(nx-2,ny-2,nz-2) :: omegax, omegay, omegaz
     t = nt * step * dt
@@ -90,12 +88,12 @@ contains
     close(10)
   end subroutine print_enstrophy
 
-  subroutine print_boundary_layer(u)
-    real(8), intent(in) :: u(ny)
+  subroutine print_boundary_layer(y,u)
+    real(8), intent(in), dimension(ny) :: y, u
     integer j
     open(10,file="data/boundary_layer.d",action="write")
-    do j = 2, ny
-      write(10,"(2(f12.7,1x))") dble(j-2)*dy, u(j)/u(ny)
+    do j = 1, ny
+      write(10,"(2(f12.7,1x))") y(j), u(j)/u(ny)
     enddo
     close(10)
   end subroutine print_boundary_layer
@@ -131,25 +129,25 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   subroutine print_vtk_2D(step,x,y,Jacobian,Q,T)
-    integer, intent(in) :: step
-    real(8), intent(in) :: x(nx), y(ny)
+    integer, intent(in)                   :: step
+    real(8), intent(in)                   :: x(nx), y(ny)
     real(8), intent(in), dimension(nx,ny) :: Jacobian
-    real(8), intent(inout) :: Q(nx,ny,4)
-    real(8), intent(in), optional :: T(nx,ny)
+    real(8), intent(in)                   :: Q(nx,ny,4)
+    real(8), intent(in), optional         :: T(nx,ny)
     integer i, j
     real(8), dimension(nx,ny) :: rho, u, v, p
     real(8) :: z(1) = 0.d0
     character(len=40) filename
     character :: lf*1
     lf = char(10)
-    do i = 1, 4
-      Q(:,:,i) = Q(:,:,i) * Jacobian(:,:)
-    enddo
-    rho = Q(:,:,1)
-    u = Q(:,:,2) / rho
-    v = Q(:,:,3) / rho
-    p = (gamma - 1.d0) * (Q(:,:,4) - 0.5d0 * rho * (u**2 + v**2))
-    
+    do j = 1, ny
+      do i = 1, nx
+        rho(i,j) = Jacobian(i,j) * Q(i,j,1)
+        u(i,j) = Jacobian(i,j) * Q(i,j,2) / rho(i,j)
+        v(i,j) = Jacobian(i,j) * Q(i,j,3) / rho(i,j)
+        p(i,j) = (gamma - 1.d0) * (Jacobian(i,j) * Q(i,j,4) - 0.5d0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
+    enddo;enddo
+
     write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtk"
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="BIG_ENDIAN")
     call print_header(nx,ny,1,x,y,z)
@@ -158,8 +156,7 @@ contains
     do j = 1, ny
       do i = 1, nx
         write(10) real(u(i,j)), real(v(i,j)), 0.e0
-      enddo
-    enddo
+    enddo;enddo
 
     write(10) lf//'SCALARS rho float'//lf
     write(10) 'LOOKUP_TABLE default'//lf
@@ -174,33 +171,31 @@ contains
     write(10) real(T), lf
     close(10)
   
-    call print_boundary_layer(u(int(0.5*nx),:))
+    call print_boundary_layer(y,u(int(0.5*nx),:))
   end subroutine print_vtk_2D
   
   subroutine print_vtk_3D(step,x,y,z,Jacobian,Q,T,ke0,entropy0,mut)
-    integer, intent(in) :: step
-    real(8), intent(in) :: x(nx), y(ny), z(nz)
+    integer, intent(in)                   :: step
+    real(8), intent(in)                   :: x(nx), y(ny), z(nz)
     real(8), intent(in), dimension(nx,ny) :: Jacobian
-    real(8), intent(inout) :: Q(nx,ny,nz,5)
-    real(8), intent(in) :: T(nx,ny,nz)
-    real(8), intent(inout) :: ke0, entropy0
-    real(8), intent(in), optional :: mut(nx,ny,nz)
+    real(8), intent(in)                   :: Q(nx,ny,nz,5)
+    real(8), intent(in)                   :: T(nx,ny,nz)
+    real(8), intent(inout)                :: ke0, entropy0
+    real(8), intent(in), optional         :: mut(nx,ny,nz)
     integer i, j, k, l
     real(8), dimension(nx,ny,nz) :: rho, u, v, w, p, nut
     character(len=40) filename
     character :: lf*1
     lf = char(10)
-    do l = 1, 5
-      do k = 1, nz
-        do j = 1, ny
-          do i = 1, nx
-            Q(i,j,k,l) = Q(i,j,k,l) * Jacobian(i,j)
-    enddo;enddo;enddo;enddo
-    rho = Q(:,:,:,1)
-    u = Q(:,:,:,2) / rho
-    v = Q(:,:,:,3) / rho
-    w = Q(:,:,:,4) / rho
-    p = (gamma - 1.d0) * (Q(:,:,:,5) - 0.5d0 * rho * (u**2 + v**2 + w**2))
+    do k = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          rho(i,j,k) = Jacobian(i,j) * Q(i,j,k,1)
+          u(i,j,k) = Jacobian(i,j) * Q(i,j,k,2) / rho(i,j,k)
+          v(i,j,k) = Jacobian(i,j) * Q(i,j,k,3) / rho(i,j,k)
+          w(i,j,k) = Jacobian(i,j) * Q(i,j,k,4) / rho(i,j,k)
+          p(i,j,k) = (gamma - 1.d0) * (Jacobian(i,j) * Q(i,j,k,5) - 0.5d0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
+    enddo;enddo;enddo
     
     write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtk"
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="BIG_ENDIAN")
@@ -211,9 +206,7 @@ contains
       do j = 1, ny
         do i = 1, nx
           write(10) real(u(i,j,k)), real(v(i,j,k)), real(w(i,j,k))
-        enddo
-      enddo
-    enddo
+    enddo;enddo;enddo
 
     write(10) lf//'SCALARS rho float'//lf
     write(10) 'LOOKUP_TABLE default'//lf

@@ -16,14 +16,15 @@ module calc_time_dev
     module procedure RungeKutta_3rd, RungeKutta_4th
   end interface
 contains
-  subroutine calc_EF_basic(id_hybrid,xix,etay,Jacobian,Q,T,E,F)
-    integer(kind=2), intent(in) :: id_hybrid
-    real(8), intent(in), device :: xix(nx), etay(ny)
+  subroutine calc_EF_basic(id_hybrid,dx,xix,dy,etay,Jacobian,Q,T,E,F)
+    integer(kind=2), intent(in)                   :: id_hybrid
+    real(8), intent(in), dimension(nx), device    :: dx(nx), xix(nx)
+    real(8), intent(in), dimension(ny), device    :: dy(ny), etay(ny)
     real(8), intent(in), dimension(nx,ny), device :: Jacobian
-    real(8), intent(in), device :: Q(nx,ny,4)
-    real(8), intent(inout), device :: T(nx,ny)
-    real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,4)
-    real(8), intent(out), device :: F(nx-accuracy,ny-accuracy+1,4)
+    real(8), intent(in), device                   :: Q(nx,ny,4)
+    real(8), intent(inout), device                :: T(nx,ny)
+    real(8), intent(out), device                  :: E(nx-accuracy+1,ny-accuracy,4)
+    real(8), intent(out), device                  :: F(nx-accuracy,ny-accuracy+1,4)
     real(8), dimension(nx,ny), device :: rho, u, v, p
     integer stat
     call calc_quantities(Jacobian,Q,rho,u,v,p,T)
@@ -34,21 +35,22 @@ contains
     stat = cudaDeviceSynchronize()
 
     if (id_visc == 1) then 
-      call calc_Ev<<<blocksE,threadsE>>>(xix,Jacobian,u,v,T,E)
-      call calc_Fv<<<blocksF,threadsF>>>(etay,Jacobian,u,v,T,F)
+      call calc_Ev<<<blocksE,threadsE>>>(dx,xix,dy,Jacobian,u,v,T,E)
+      call calc_Fv<<<blocksF,threadsF>>>(dy,etay,dx,Jacobian,u,v,T,F)
     endif
     stat = cudaDeviceSynchronize()
   end subroutine calc_EF_basic
 
-  subroutine calc_EF_hybrid(id_hybrid,xix,etay,Jacobian,Q,T,E_hybrid,F_hybrid)
+  subroutine calc_EF_hybrid(id_hybrid,dx,xix,dy,etay,Jacobian,Q,T,E_hybrid,F_hybrid)
     integer(kind=4), intent(in) :: id_hybrid
-    real(8), intent(in), device :: xix(nx), etay(ny)
+    real(8), intent(in), dimension(nx), device    :: dx, xix
+    real(8), intent(in), dimension(ny), device    :: dy, etay
     real(8), intent(in), dimension(nx,ny), device :: Jacobian
-    real(8), intent(in), device :: Q(nx,ny,4)
-    real(8), intent(inout), device :: T(nx,ny)
-    real(8), intent(out), device :: E_hybrid(nx-accuracy+1,ny-accuracy,4)
-    real(8), intent(out), device :: F_hybrid(nx-accuracy,ny-accuracy+1,4)
-    real(8), dimension(nx,ny), device :: rho, u, v, p, energy, fd
+    real(8), intent(in), device                   :: Q(nx,ny,4)
+    real(8), intent(inout), device                :: T(nx,ny)
+    real(8), intent(out), device                  :: E_hybrid(nx-accuracy+1,ny-accuracy,4)
+    real(8), intent(out), device                  :: F_hybrid(nx-accuracy,ny-accuracy+1,4)
+    real(8), dimension(nx,ny), device                       :: rho, u, v, p, energy, fd
     real(8), dimension(nx-accuracy+1,ny-accuracy,4), device :: E_keep, E_upwind
     real(8), dimension(nx-accuracy,ny-accuracy+1,4), device :: F_keep, F_upwind
     integer stat
@@ -68,25 +70,29 @@ contains
     stat = cudaDeviceSynchronize()
 
     if (id_visc == 1) then 
-      call calc_Ev<<<blocksE,threadsE>>>(xix,Jacobian,u,v,T,E_hybrid)
-      call calc_Fv<<<blocksF,threadsF>>>(etay,Jacobian,u,v,T,F_hybrid)
+      call calc_Ev<<<blocksE,threadsE>>>(dx,xix,dy,Jacobian,u,v,T,E_hybrid)
+      call calc_Fv<<<blocksF,threadsF>>>(dy,etay,dx,Jacobian,u,v,T,F_hybrid)
     endif
     stat = cudaDeviceSynchronize()
   end subroutine calc_EF_hybrid
   
-  subroutine RungeKutta_3rd(id_RungeKutta,x,y,z,xix_cpu,etay_cpu,Jacobian_cpu,T0,Q,Vin_cpu)
-    integer(kind=2), intent(in) :: id_RungeKutta
-    real(8), intent(in) :: x(nx), y(ny), z(1), xix_cpu(nx), etay_cpu(ny), Jacobian_cpu(nx,ny)
-    real(8), intent(inout) :: Q(nx,ny,4)
-    real(8), intent(inout) :: T0(nx,ny)
-    real(8), intent(in) :: Vin_cpu
+  subroutine RungeKutta_3rd(id_RungeKutta,x,dx_cpu,xix_cpu,y,dy_cpu,etay_cpu,z,Jacobian_cpu,T0,Q,Vin_cpu)
+    integer(kind=2), intent(in)         :: id_RungeKutta
+    real(8), intent(in), dimension(nx)  :: x, dx_cpu, xix_cpu
+    real(8), intent(in), dimension(ny)  :: y, dy_cpu, etay_cpu
+    real(8), intent(in)                 :: z(1), Jacobian_cpu(nx,ny)
+    real(8), intent(inout)              :: Q(nx,ny,4)
+    real(8), intent(inout)              :: T0(nx,ny)
+    real(8), intent(in)                 :: Vin_cpu
     integer t1, t2, itr
+    ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     real(8), dimension(nx,ny,4), device :: Q_d, Q2, Q3
-    real(8), dimension(nx,ny), device :: T
-    real(8), device :: E(nx-accuracy+1,ny-accuracy,4)
-    real(8), device :: F(nx-accuracy,ny-accuracy+1,4)
-    real(8), device :: xix(nx), etay(ny), Jacobian(nx,ny)
-    real(8), device :: Vin(ny,2)
+    real(8), dimension(nx,ny), device   :: T
+    real(8), device                     :: E(nx-accuracy+1,ny-accuracy,4)
+    real(8), device                     :: F(nx-accuracy,ny-accuracy+1,4)
+    real(8), dimension(nx), device      :: dx, xix
+    real(8), dimension(ny), device      :: dy, etay
+    real(8), device                     :: Jacobian(nx,ny), Vin(ny,2)
     Vin = Vin_cpu
 
     ! print initial condition
@@ -94,20 +100,22 @@ contains
     ! copy on GPU
     Q_d = Q
     T = T0
+    dx = 1.d0 / dx_cpu
+    dy = 1.d0 / dy_cpu
     xix = xix_cpu
     etay = etay_cpu
     Jacobian = Jacobian_cpu
     do t2 = 1, np
       do t1 = 1, nt
-        call calc_EF(id_hybrid,xix,etay,Jacobian,Q_d,T,E,F)
+        call calc_EF(id_hybrid,dx,xix,dy,etay,Jacobian,Q_d,T,E,F)
         call calc_step1(E,F,Q_d,Q2)
         call set_bc(Q2,Vin)
         
-        call calc_EF(id_hybrid,xix,etay,Jacobian,Q2,T,E,F)
+        call calc_EF(id_hybrid,dx,xix,dy,etay,Jacobian,Q2,T,E,F)
         call calc_step2(E,F,Q_d,Q2,Q3)
         call set_bc(Q3,Vin)
 
-        call calc_EF(id_hybrid,xix,etay,Jacobian,Q3,T,E,F)
+        call calc_EF(id_hybrid,dx,xix,dy,etay,Jacobian,Q3,T,E,F)
         call calc_step3(E,F,Q3,Q_d)
         call set_bc(Q_d,Vin)
       enddo
@@ -117,20 +125,24 @@ contains
     enddo
   end subroutine RungeKutta_3rd
 
-  subroutine RungeKutta_4th(id_RungeKutta,x,y,z,xix_cpu,etay_cpu,Jacobian_cpu,T0,Q,Vin_cpu)
-    integer(kind=4), intent(in) :: id_RungeKutta
-    real(8), intent(in) :: x(nx), y(ny), z(1), xix_cpu(nx), etay_cpu(ny), Jacobian_cpu(nx,ny)
-    real(8), intent(inout) :: Q(nx,ny,4)
-    real(8), intent(inout) :: T0(nx,ny)
-    real(8), intent(in) :: Vin_cpu(ny,2)
+  subroutine RungeKutta_4th(id_RungeKutta,x,dx_cpu,xix_cpu,y,dy_cpu,etay_cpu,z,Jacobian_cpu,T0,Q,Vin_cpu)
+    integer(kind=4), intent(in)         :: id_RungeKutta
+    real(8), intent(in), dimension(nx)  :: x, dx_cpu, xix_cpu
+    real(8), intent(in), dimension(ny)  :: y, dy_cpu, etay_cpu
+    real(8), intent(in)                 :: z(1), Jacobian_cpu(nx,ny)
+    real(8), intent(inout)              :: Q(nx,ny,4)
+    real(8), intent(inout)              :: T0(nx,ny)
+    real(8), intent(in)                 :: Vin_cpu(ny,2)
     integer t1, t2, itr
+    ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     real(8), dimension(nx,ny,4), device :: Q_d, Qs
-    real(8), dimension(nx,ny), device :: T
-    real(8), device :: E(nx-accuracy+1,ny-accuracy,4)
-    real(8), device :: F(nx-accuracy,ny-accuracy+1,4)
-    real(8), device :: Rs(nx-accuracy,ny-accuracy,4)
-    real(8), device :: xix(nx), etay(ny), Jacobian(nx,ny)
-    real(8), device :: Vin(ny,2)
+    real(8), dimension(nx,ny), device   :: T
+    real(8), device                     :: E(nx-accuracy+1,ny-accuracy,4)
+    real(8), device                     :: F(nx-accuracy,ny-accuracy+1,4)
+    real(8), device                     :: Rs(nx-accuracy,ny-accuracy,4)
+    real(8), dimension(nx), device      :: dx, xix
+    real(8), dimension(ny), device      :: dy, etay
+    real(8), device                     :: Jacobian(nx,ny), Vin(ny,2)
     Vin = Vin_cpu
 
     ! print initial condition
@@ -139,24 +151,26 @@ contains
     Q_d = Q
     T = T0
     Rs(:,:,:) = 0.d0
+    dx = 1.d0 / dx_cpu
+    dy = 1.d0 / dy_cpu
     xix = xix_cpu
     etay = etay_cpu
     Jacobian = Jacobian_cpu
     do t2 = 1, np
       do t1 = 1, nt
-        call calc_EF(id_hybrid,xix,etay,Jacobian,Q_d,T,E,F)
+        call calc_EF(id_hybrid,dx,xix,dy,etay,Jacobian,Q_d,T,E,F)
         call calc_step(0.5d0,1.d0,E,F,Rs,Q_d,Qs)
         call set_bc(Qs,Vin)
         
-        call calc_EF(id_hybrid,xix,etay,Jacobian,Qs,T,E,F)
+        call calc_EF(id_hybrid,dx,xix,dy,etay,Jacobian,Qs,T,E,F)
         call calc_step(0.5d0,2.d0,E,F,Rs,Q_d,Qs)
         call set_bc(Qs,Vin)
 
-        call calc_EF(id_hybrid,xix,etay,Jacobian,Qs,T,E,F)
+        call calc_EF(id_hybrid,dx,xix,dy,etay,Jacobian,Qs,T,E,F)
         call calc_step(1.d0,2.d0,E,F,Rs,Q_d,Qs)
         call set_bc(Qs,Vin)
 
-        call calc_EF(id_hybrid,xix,etay,Jacobian,Qs,T,E,F)
+        call calc_EF(id_hybrid,dx,xix,dy,etay,Jacobian,Qs,T,E,F)
         call calc_step4(E,F,Rs,Q_d)
         call set_bc(Q_d,Vin)
       enddo
