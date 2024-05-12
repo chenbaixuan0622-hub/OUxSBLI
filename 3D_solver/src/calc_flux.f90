@@ -18,10 +18,10 @@ contains
 !NoMUSCL!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   attributes(global) subroutine calc_E_NoMUSCL(id_muscl, rho, u, v, w, p, xix, Jacobian, E)
-    integer(kind=2), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
-    real(8), intent(in), device :: xix(nx), Jacobian(nx,ny)
-    real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E
+    integer(kind=2), intent(in), value                :: id_muscl
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
+    real(8), intent(in), device                       :: xix(nx), Jacobian(nx,ny)
+    real(8), intent(out), device                      :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
     real(8), dimension(accuracy) :: rhos, ps
     real(8), dimension(3) :: Normal
@@ -40,10 +40,10 @@ contains
   end subroutine calc_E_NoMUSCL
 
   attributes(global) subroutine calc_F_NoMUSCL(id_muscl, rho, u, v, w, p, etay, Jacobian, F)
-    integer(kind=2), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
-    real(8), intent(in), device :: etay(ny), Jacobian(nx,ny)
-    real(8), intent(out), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F
+    integer(kind=2), intent(in), value                :: id_muscl
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
+    real(8), intent(in), device                       :: etay(ny), Jacobian(nx,ny)
+    real(8), intent(out), device                      :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
     real(8), dimension(accuracy) :: rhos, ps
     real(8), dimension(3) :: Normal
@@ -62,10 +62,10 @@ contains
   end subroutine calc_F_NoMUSCL
 
   attributes(global) subroutine calc_G_NoMUSCL(id_muscl, rho, u, v, w, p, Jacobian, G)
-    integer(kind=2), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p 
-    real(8), intent(in), device :: Jacobian(nx,ny)
-    real(8), intent(out), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G
+    integer(kind=2), intent(in), value                :: id_muscl
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p 
+    real(8), intent(in), device                       :: Jacobian(nx,ny)
+    real(8), intent(out), device                      :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
     real(8), dimension(accuracy) :: rhos, ps
     real(8), dimension(3) :: Normal
@@ -86,10 +86,10 @@ contains
 !MUSCL!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   attributes(global) subroutine calc_E_MUSCL(id_muscl, rho, u, v, w, p, xix, Jacobians, E)
-    integer(kind=4), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
-    real(8), intent(in), device :: xix(nx), Jacobians(nx,ny)
-    real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E
+    integer(kind=4), intent(in), value                :: id_muscl
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
+    real(8), intent(in), device                       :: xix(nx), Jacobians(nx,ny)
+    real(8), intent(out), device                      :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
     real(8) Jacobian
     real(8), dimension(5) :: Q1, Q2, Q3, Q4, Ql, Qr, Normal
@@ -122,10 +122,10 @@ contains
   end subroutine calc_E_MUSCL
 
   attributes(global) subroutine calc_F_MUSCL(id_muscl, rho, u, v, w, p, etay, Jacobians, F)
-    integer(kind=4), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
-    real(8), intent(in), device :: etay(ny), Jacobians(nx,ny)
-    real(8), intent(out), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F
+    integer(kind=4), intent(in), value                :: id_muscl
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
+    real(8), intent(in), device                       :: etay(ny), Jacobians(nx,ny)
+    real(8), intent(out), device                      :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
     real(8) Jacobian
     real(8), dimension(5) :: Q1, Q2, Q3, Q4, Ql, Qr, Normal
@@ -158,10 +158,10 @@ contains
   end subroutine calc_F_MUSCL
   
   attributes(global) subroutine calc_G_MUSCL(id_muscl, rho, u, v, w, p, Jacobians, G)
-    integer(kind=4), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
-    real(8), intent(in), device :: Jacobians(nx,ny)
-    real(8), intent(out), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G
+    integer(kind=4), intent(in), value                :: id_muscl
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
+    real(8), intent(in), device                       :: Jacobians(nx,ny)
+    real(8), intent(out), device                      :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
     real(8) Jacobian
     real(8), dimension(5) :: Q1, Q2, Q3, Q4, Ql, Qr, Normal
@@ -196,10 +196,10 @@ contains
 !MUSCL4th!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  
   attributes(global) subroutine calc_E_MUSCL_4th(id_muscl, rho, u, v, w, p, xix, Jacobians, E)
-    integer(kind=8), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
-    real(8), intent(in), device :: xix(nx), Jacobians(nx,ny)
-    real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E
+    integer(kind=8), intent(in), value                :: id_muscl
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
+    real(8), intent(in), device                       :: xix(nx), Jacobians(nx,ny)
+    real(8), intent(out), device                      :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
     real(8) Jacobian
     real(8), dimension(5) :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr, Normal
@@ -250,10 +250,10 @@ contains
   end subroutine calc_E_MUSCL_4th
 
   attributes(global) subroutine calc_F_MUSCL_4th(id_muscl, rho, u, v, w, p, etay, Jacobians, F)
-    integer(kind=8), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
-    real(8), intent(in), device :: etay(ny), Jacobians(nx,ny)
-    real(8), intent(out), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F
+    integer(kind=8), intent(in), value                :: id_muscl
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
+    real(8), intent(in), device                       :: etay(ny), Jacobians(nx,ny)
+    real(8), intent(out), device                      :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
     real(8) Jacobian
     real(8), dimension(5) :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr, Normal
@@ -304,10 +304,10 @@ contains
   end subroutine calc_F_MUSCL_4th
   
   attributes(global) subroutine calc_G_MUSCL_4th(id_muscl, rho, u, v, w, p, Jacobians, G)
-    integer(kind=8), intent(in), value :: id_muscl
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
-    real(8), intent(in), device :: Jacobians(nx,ny)
-    real(8), intent(out), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G
+    integer(kind=8), intent(in), value                :: id_muscl
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
+    real(8), intent(in), device                       :: Jacobians(nx,ny)
+    real(8), intent(out), device                      :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
     real(8) Jacobian
     real(8), dimension(5) :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr, Normal
