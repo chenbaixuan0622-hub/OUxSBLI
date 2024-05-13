@@ -1,12 +1,12 @@
 module mod_globals
   use cudafor
   implicit none
-  integer, parameter :: dimension = 3
-  integer, parameter :: accuracy = 2 
-  integer(kind=2**(accuracy/2)), parameter :: id_accuracy = 1
-  integer, parameter :: offset = accuracy / 2
-  integer, parameter :: id_visc = 1
-  integer, parameter :: id_dim = 1
+  integer, parameter                        :: dimension = 3
+  integer, parameter                        :: accuracy = 2 
+  integer(kind=2**(accuracy/2)), parameter  :: id_accuracy = 1
+  integer, parameter                        :: offset = accuracy / 2
+  integer, parameter                        :: id_visc = 1
+  integer, parameter                        :: id_dim = 1
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! 0 no-visc               !
   !               ! 1 visc                  !
@@ -18,7 +18,7 @@ module mod_globals
   !               ! 1 Smagorinsky           !
   !               ! 2 selective_mixed_scale !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer, parameter :: id_turbulence = 1
+  integer, parameter :: id_turbulence = 0
   !!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_scheme ! 1  KEEP    !
   !           ! 2  Roe     !
@@ -27,11 +27,11 @@ module mod_globals
   ! id_slau   ! kind2 slau !
   !           ! kind4 sd   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=2), parameter :: id_hybrid = 0
-  integer(kind=2), parameter :: id_muscl = 0
-  integer, parameter :: id_scheme = 1
-  integer(kind=2), parameter :: id_slau = 0
-  real(8), parameter :: dp_max = 0.d0
+  integer(kind=2), parameter  :: id_hybrid = 0
+  integer(kind=2), parameter  :: id_muscl = 0
+  integer, parameter          :: id_scheme = 1
+  integer(kind=2), parameter  :: id_slau = 0
+  real(8), parameter          :: dp_max = 0.d0
 
   ! mesh
   real(8), parameter :: L0 = 1.524d-3
@@ -42,11 +42,9 @@ module mod_globals
   integer, parameter :: nx = 130!66
   integer, parameter :: ny = 130!66
   integer, parameter :: nz = 130!66
-  real(8), parameter :: dx = Lx / dble(nx-1)
-  real(8), parameter :: dy = Ly / dble(ny-1)
+  real(8), parameter :: dxi = Lx / dble(nx-1)
+  real(8), parameter :: deta = Ly / dble(ny-1)
   real(8), parameter :: dz = Lz / dble(nz-1)
-  real(8), parameter :: dxi = 1.d0 / dx
-  real(8), parameter :: dyi = 1.d0 / dy
   real(8), parameter :: dzi = 1.d0 / dz
   real(8) x(nx), y(ny), z(nz), xix(nx), etay(ny), Jacobian(nx,ny)
 
@@ -91,12 +89,12 @@ module mod_globals
   real(8), parameter :: p0 = RHO0 * R * T
 
   real(8), parameter :: CFL = 0.03d0
-  real(8), parameter :: dt = CFL * dx / V0
+  real(8), parameter :: dt = CFL * dxi / V0
   real(8), parameter :: dtn= V0 * dt / L0
   integer, parameter :: np = 100
   integer, parameter :: nt = int(20.d0 / (dble(np) * dtn))
-  real(8), parameter :: dtdx = dt / dx
-  real(8), parameter :: dtdy = dt / dy
+  real(8), parameter :: dtdx = dt / dxi
+  real(8), parameter :: dtdy = dt / deta
   real(8), parameter :: dtdz = dt / dz
 
   ! variables
