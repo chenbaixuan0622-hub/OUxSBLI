@@ -64,9 +64,7 @@ contains
           Q(i,j,k,4) = 0.d0
           ! p / (gamma - 1) + 0.5 * (rhou ** 2 + rhov ** 2 ) / rho
           Q(i,j,k,5) = p / (gamma - 1.d0) + 0.5d0 * (Q(i,j,k,2) ** 2 + Q(i,j,k,3) ** 2) / Q(i,j,k,1)
-        enddo
-      enddo
-    enddo
+    enddo;enddo;enddo
     if (accuracy == 2) then
       call set_bc_init2(Q)
     else
@@ -81,15 +79,13 @@ contains
       do j = 2, ny-1
         Q(1,j,k,:) = Q(nx-1,j,k,:)
         Q(nx,j,k,:) = Q(2,j,k,:)
-      enddo
-    enddo
+    enddo;enddo
 
     do k = 2, nz-1
       do i = 2, nx-1
         Q(i,1,k,:) = Q(i,ny-1,k,:)
         Q(i,ny,k,:) = Q(i,2,k,:)
-      enddo
-    enddo
+    enddo;enddo
 
     do k = 2, nz-1
       Q(1,1,k,:) = Q(nx-1,ny-1,k,:)
@@ -102,8 +98,7 @@ contains
       do i = 1, nx
         Q(i,j,1,:) = Q(i,j,nz-1,:)
         Q(i,j,nz,:) = Q(i,j,2,:)
-      enddo
-    enddo
+    enddo;enddo
   end subroutine set_bc_init2
 
   subroutine set_bc_init4(Q)
@@ -114,15 +109,13 @@ contains
       do j = 3, ny-2
         Q(1:2,j,k,:) = Q(nx-3:nx-2,j,k,:)
         Q(nx-1:nx,j,k,:) = Q(3:4,j,k,:)
-      enddo
-    enddo
+    enddo;enddo
 
     do k = 3, nz-2
       do i = 3, nx-2
         Q(i,1:2,k,:) = Q(i,ny-3:ny-2,k,:)
         Q(i,ny-1:ny,k,:) = Q(i,3:4,k,:)
-      enddo
-    enddo
+    enddo;enddo
 
     do k = 3, nz-2
       Q(1:2,1:2,k,:) = Q(nx-3:nx-2,ny-3:ny-2,k,:)
@@ -135,8 +128,7 @@ contains
       do i = 1, nx
         Q(i,j,1:2,:) = Q(i,j,nz-3:nz-2,:)
         Q(i,j,nz-1:nz,:) = Q(i,j,3:4,:)
-      enddo
-    enddo
+    enddo;enddo
   end subroutine set_bc_init4
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -152,9 +144,7 @@ contains
         do j = 2, ny-1
           Q(1,j,k,l) = Q(nx-1,j,k,l)
           Q(nx,j,k,l) = Q(2,j,k,l)
-        enddo
-      enddo
-    enddo
+    enddo;enddo;enddo
 
     !$cuf kernel do(3) <<<*,*>>>
     do l = 1, 5
@@ -162,9 +152,7 @@ contains
         do i = 2, nx-1
           Q(i,1,k,l) = Q(i,ny-1,k,l)
           Q(i,ny,k,l) = Q(i,2,k,l)
-        enddo
-      enddo
-    enddo
+    enddo;enddo;enddo
 
     !$cuf kernel do(2) <<<*,*>>>
     do l = 1, 5
@@ -173,8 +161,7 @@ contains
         Q(nx,1,k,l) = Q(2,ny-1,k,l)
         Q(1,ny,k,l) = Q(nx-1,2,k,l)
         Q(nx,ny,k,l) = Q(2,2,k,l)
-      enddo
-    enddo
+    enddo;enddo
 
     !$cuf kernel do(3) <<<*,*>>>
     do l = 1, 5
@@ -182,9 +169,7 @@ contains
         do i = 1, nx
           Q(i,j,1,l) = Q(i,j,nz-1,l)
           Q(i,j,nz,l) = Q(i,j,2,l)
-        enddo
-      enddo
-    enddo
+    enddo;enddo;enddo
   end subroutine set_bc2
 
   subroutine set_bc4(id_accuracy,Q,T)
@@ -199,9 +184,7 @@ contains
         do j = 3, ny-2
           Q(1:2,j,k,l) = Q(nx-3:nx-2,j,k,l)
           Q(nx-1:nx,j,k,l) = Q(3:4,j,k,l)
-        enddo
-      enddo
-    enddo
+    enddo;enddo;enddo
   
     !$cuf kernel do(3) <<<*,*>>>
     do l = 1, 5
@@ -209,9 +192,7 @@ contains
         do i = 3, nx-2
           Q(i,1:2,k,l) = Q(i,ny-3:ny-2,k,l)
           Q(i,ny-1:ny,k,l) = Q(i,3:4,k,l)
-        enddo
-      enddo
-    enddo
+    enddo;enddo;enddo
   
     !$cuf kernel do(2) <<<*,*>>>
     do l = 1, 5
@@ -220,8 +201,7 @@ contains
         Q(nx-1:nx,1:2,k,l) = Q(3:4,ny-3:ny-2,k,l)
         Q(1:2,ny-1:ny,k,l) = Q(nx-3:nx-2,3:4,k,l)
         Q(nx-1:nx,ny-1:ny,k,l) = Q(3:4,3:4,k,l)
-      enddo
-    enddo
+    enddo;enddo
   
     !$cuf kernel do(3) <<<*,*>>>
     do l = 1, 5
@@ -229,9 +209,7 @@ contains
         do i = 1, nx
           Q(i,j,1:2,l) = Q(i,j,nz-3:nz-2,l)
           Q(i,j,nz-1:nz,l) = Q(i,j,3:4,l)
-        enddo
-      enddo
-    enddo
+    enddo;enddo;enddo
   end subroutine set_bc4
 
   subroutine set_bc_mut(mut)
@@ -242,16 +220,14 @@ contains
       do j = 2, ny-1
         mut(1,j,k) = mut(nx-1,j,k)
         mut(nx,j,k) = mut(2,j,k)
-      enddo
-    enddo
+    enddo;enddo
 
     !$cuf kernel do(2) <<<*,*>>>
     do k = 2, nz-1
       do i = 2, nx-1
         mut(i,1,k) = mut(i,ny-1,k)
         mut(i,ny,k) = mut(i,2,k)
-      enddo
-    enddo
+    enddo;enddo
 
     !$cuf kernel do(1) <<<*,*>>>
     do k = 2, nz-1
@@ -266,8 +242,7 @@ contains
       do i = 1, nx
         mut(i,j,1) = mut(i,j,nz-1)
         mut(i,j,nz) = mut(i,j,2)
-      enddo
-    enddo
+    enddo;enddo
   end subroutine set_bc_mut
 end module set
 
