@@ -8,7 +8,7 @@ contains
     integer i
     real(8) :: dxi = Lx / dble(nx-1)
     do i = 1, nx
-      xix(i) = 1.d0!dxi / dx(i)
+      xix(i) = dxi / dx(i)
     enddo
   end subroutine set_xix
 
@@ -18,7 +18,7 @@ contains
     integer j
     real(8) :: deta = Ly / dble(ny-1)
     do j = 1, ny
-      etay(j) = 1.d0!deta / dy(j)
+      etay(j) = deta / dy(j)
     enddo
   end subroutine set_etay
 
@@ -30,7 +30,7 @@ contains
     real(8) :: deta = Ly / dble(ny-1)
     do j = 1, ny
       do i = 1, nx
-        Jacobian(i,j) = 1.d0!dx(i) * dy(j) / (dxi * deta)
+        Jacobian(i,j) = dx(i) * dy(j) / (dxi * deta)
     enddo;enddo
   end subroutine set_Jacobian
 end module set_coordinate
