@@ -21,13 +21,15 @@ contains
     real(8) :: dx1 = Lx / dble(nx-1)
     real(8) :: dy1 = Ly / dble(ny-1)
     real(8) :: dz1 = Lz / dble(nz-1)
-    do i = 1, nx
-      x(i) = dble(i-1) * dx1
+    x(1) = 0.d0
+    do i = 1, nx-1
       dx(i) = dx1
+      x(i+1) = x(i) + dx(i)
     enddo
-    do j = 1, ny
-      y(j) = dble(j-1) * dy1
+    y(1) = 0.d0
+    do j = 1, ny-1
       dy(j) = dy1
+      y(j+1) = y(j) + dy(j)
     enddo
     do k = 1, nz
       z(k) = dble(k-1) * dz1
@@ -133,10 +135,10 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine set_bc2(id_accuracy,Q,T)
-    integer(kind=2), intent(in), value :: id_accuracy
-    real(8), intent(inout), device :: Q(nx,ny,nz,5)
-    real(8), intent(inout), device :: T(nx,ny,nz)
+  subroutine set_bc2(id_accuracy,Jacobian,Q)
+    integer(kind=2), intent(in), value  :: id_accuracy
+    real(8), intent(in), device         :: Jacobian(nx,ny)
+    real(8), intent(inout), device      :: Q(nx,ny,nz,5)
     integer i, j, k, l
     !$cuf kernel do(3) <<<*,*>>>
     do l = 1, 5
@@ -172,10 +174,10 @@ contains
     enddo;enddo;enddo
   end subroutine set_bc2
 
-  subroutine set_bc4(id_accuracy,Q,T)
-    integer(kind=4), intent(in), value :: id_accuracy
-    real(8), intent(inout), device :: Q(nx,ny,nz,5)
-    real(8), intent(inout), device :: T(nx,ny,nz)
+  subroutine set_bc4(id_accuracy,Jacobian,Q)
+    integer(kind=4), intent(in), value  :: id_accuracy
+    real(8), intent(in), device         :: Jacobian(nx,ny)
+    real(8), intent(inout), device      :: Q(nx,ny,nz,5)
     integer i, j, k, l
   
     !$cuf kernel do(3) <<<*,*>>>

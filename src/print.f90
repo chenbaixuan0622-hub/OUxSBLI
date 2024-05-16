@@ -1,19 +1,18 @@
 module print
-  use mod_globals, only : nt, nx, ny, nz, dt, gamma
+  use mod_globals, only : nt, nx, ny, nz, dt, gamma, R
   implicit none
   interface print_vtk
-    subroutine print_vtk_2D(step,x,y,Jacobian,Q,T)
+    subroutine print_vtk_2D(step,x,y,Q,T)
       integer, intent(in)           :: step
-      real(8), intent(in)           :: x(nx), y(ny), Jacobian(nx,ny)
+      real(8), intent(in)           :: x(nx), y(ny)
       real(8), intent(in)           :: Q(nx,ny,4)
       real(8), intent(in), optional :: T(nx,ny)
     end subroutine print_vtk_2D
 
-    subroutine print_vtk_3D(step,x,y,z,Jacobian,Q,T,ke0,entropy0,mut)
+    subroutine print_vtk_3D(step,x,y,z,Jacobian,QJ,ke0,entropy0,mut)
       integer, intent(in)           :: step
       real(8), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny)
-      real(8), intent(in)           :: Q(nx,ny,nz,5)
-      real(8), intent(in)           :: T(nx,ny,nz)
+      real(8), intent(in)           :: QJ(nx,ny,nz,5)
       real(8), intent(inout)        :: ke0, entropy0
       real(8), intent(in), optional :: mut(nx,ny,nz)
     end subroutine print_vtk_3D
@@ -128,10 +127,9 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine print_vtk_2D(step,x,y,Jacobian,Q,T)
+  subroutine print_vtk_2D(step,x,y,Q,T)
     integer, intent(in)                   :: step
     real(8), intent(in)                   :: x(nx), y(ny)
-    real(8), intent(in), dimension(nx,ny) :: Jacobian
     real(8), intent(in)                   :: Q(nx,ny,4)
     real(8), intent(in), optional         :: T(nx,ny)
     integer i, j
@@ -142,10 +140,10 @@ contains
     lf = char(10)
     do j = 1, ny
       do i = 1, nx
-        rho(i,j) = Jacobian(i,j) * Q(i,j,1)
-        u(i,j) = Jacobian(i,j) * Q(i,j,2) / rho(i,j)
-        v(i,j) = Jacobian(i,j) * Q(i,j,3) / rho(i,j)
-        p(i,j) = (gamma - 1.d0) * (Jacobian(i,j) * Q(i,j,4) - 0.5d0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
+        rho(i,j) = Q(i,j,1)
+        u(i,j) = Q(i,j,2) / rho(i,j)
+        v(i,j) = Q(i,j,3) / rho(i,j)
+        p(i,j) = (gamma - 1.d0) * (Q(i,j,4) - 0.5d0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
     enddo;enddo
 
     write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtk"
@@ -174,27 +172,26 @@ contains
     call print_boundary_layer(y,u(int(0.5*nx),:))
   end subroutine print_vtk_2D
   
-  subroutine print_vtk_3D(step,x,y,z,Jacobian,Q,T,ke0,entropy0,mut)
+  subroutine print_vtk_3D(step,x,y,z,Jacobian,QJ,ke0,entropy0,mut)
     integer, intent(in)                   :: step
-    real(8), intent(in)                   :: x(nx), y(ny), z(nz)
-    real(8), intent(in), dimension(nx,ny) :: Jacobian
-    real(8), intent(in)                   :: Q(nx,ny,nz,5)
-    real(8), intent(in)                   :: T(nx,ny,nz)
+    real(8), intent(in)                   :: x(nx), y(ny), z(nz), Jacobian(nx,ny)
+    real(8), intent(in)                   :: QJ(nx,ny,nz,5) ! Q / Jacobian
     real(8), intent(inout)                :: ke0, entropy0
     real(8), intent(in), optional         :: mut(nx,ny,nz)
     integer i, j, k, l
-    real(8), dimension(nx,ny,nz) :: rho, u, v, w, p, nut
+    real(8), allocatable :: rho(:,:,:), u(:,:,:), v(:,:,:), w(:,:,:), p(:,:,:), nut(:,:,:)
     character(len=40) filename
     character :: lf*1
     lf = char(10)
+    allocate(rho(nx,ny,nz),u(nx,ny,nz),v(nx,ny,nz),w(nx,ny,nz),p(nx,ny,nz))
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
-          rho(i,j,k) = Jacobian(i,j) * Q(i,j,k,1)
-          u(i,j,k) = Jacobian(i,j) * Q(i,j,k,2) / rho(i,j,k)
-          v(i,j,k) = Jacobian(i,j) * Q(i,j,k,3) / rho(i,j,k)
-          w(i,j,k) = Jacobian(i,j) * Q(i,j,k,4) / rho(i,j,k)
-          p(i,j,k) = (gamma - 1.d0) * (Jacobian(i,j) * Q(i,j,k,5) - 0.5d0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
+          rho(i,j,k) = Jacobian(i,j) * QJ(i,j,k,1)
+          u(i,j,k) = Jacobian(i,j) * QJ(i,j,k,2) / rho(i,j,k)
+          v(i,j,k) = Jacobian(i,j) * QJ(i,j,k,3) / rho(i,j,k)
+          w(i,j,k) = Jacobian(i,j) * QJ(i,j,k,4) / rho(i,j,k)
+          p(i,j,k) = (gamma - 1.d0) * (Jacobian(i,j) * QJ(i,j,k,5) - 0.5d0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
     enddo;enddo;enddo
     
     write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtk"
@@ -218,19 +215,23 @@ contains
 
     write(10) lf//'SCALARS T float'//lf
     write(10) 'LOOKUP_TABLE default'//lf
-    write(10) real(T), lf
+    write(10) real(p / (R * rho)), lf
 
     if (present(mut)) then
+      allocate(nut(nx,ny,nz))
       nut(:,:,:) = mut(:,:,:) / rho(:,:,:)
       write(10) lf//'SCALARS nut float'//lf
       write(10) 'LOOKUP_TABLE default'//lf
       write(10) real(nut), lf
+      deallocate(nut)
     endif
     close(10)
 
     call print_entropy(step,rho,p,entropy0)
     call print_KE(step,rho,u,v,w,ke0)
     call print_enstrophy(step,x,y,z,rho,u,v,w)
+    call print_boundary_layer(y,u(int(0.5*nx),:,int(0.5*nz)))
+    deallocate(rho,u,v,w,p)
   end subroutine print_vtk_3D
 end module print
 
