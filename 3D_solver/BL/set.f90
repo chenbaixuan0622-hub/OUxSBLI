@@ -1,6 +1,5 @@
 module set
-  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, u0, &
-  & beta, theta, Ms, Ms2, a1, rho0, rho2, p0, p2, u1, u2, v1, v2, u_magnitude, ux, uy
+  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, rho0, u0, p0, T0
   implicit none
 contains
   subroutine calc_Blasius(eta,d,u,v)
@@ -8,8 +7,9 @@ contains
     real(8), intent(out) :: u, v
     real(8) f, df, x
     real(8) fs(45), dfs(45)
-    real(8) :: nu0 = 3.8206d-5
+    real(8) :: nu0
     integer i
+    nu0 = (1.716d-5 * ((273.2d0 + 111.d0) / (T0 + 111.d0)) * (T0 / 273.2d0)**1.5d0) / rho0 
     fs(:) = (/0.d0, 0.00664d0, 0.02656d0, 0.05974d0, 0.10611d0, 0.16557d0, 0.23795d0, &
     & 0.32298d0, 0.42032d0, 0.52952d0, 0.65003d0, 0.78120d0, 0.92230d0, 1.07252d0, &
     & 1.23099d0, 1.39682d0, 1.56911d0, 1.74696d0, 1.92954d0, 2.11605d0, 2.30576d0, &
@@ -35,24 +35,29 @@ contains
       endif
     enddo
     u = u0 * df
-    v = 0.5d0 * (nu0 / d) * (min(eta,8.8d0) * df - f)
+    v = 0.d0!0.5d0 * (nu0 / d) * (min(eta,8.8d0) * df - f)
     !write(*,*) eta, f, df
   end subroutine calc_Blasius
 
   subroutine set_grid(x,y,z,dx,dy)
-    real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx), dy(ny)
+    real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1)
     integer i, j, k
     real(8) :: dx1 = Lx / dble(nx-1)
     real(8) :: dy1 = Ly / dble(ny-1)
     real(8) :: dz1 = Lz / dble(nz-1)
-    do i = 1, nx
-      x(i) = dble(i-1) * dx1
+    x(1) = 0.d0
+    do i = 1, nx-1
       dx(i) = dx1
+      x(i+1) = x(i) + dx(i)
     enddo
-    do j = 1, ny
-      y(j) = dble(j-1) * dy1
-      dy(j) = dy1
+
+    y(1) = 0.d0
+    do j = 1, ny-1
+      dy(j) = max(0.25d0, 2.d0 * dble(j)/dble(ny)) * dy1
+      !dy(j) = dy1
+      y(j+1) = y(j) + dy(j)
     enddo
+
     do k = 1, nz
       z(k) = dble(k-1) * dz1
     enddo
@@ -78,25 +83,6 @@ contains
           Q(i,j,k,5) = p0 / (gamma - 1.d0) + 0.5d0 * (Q(i,j,k,2)**2 + Q(i,j,k,3)**2 + Q(i,j,k,4)**2) / Q(i,j,k,1)
     enddo;enddo;enddo
 
-    !! top
-    !do k = 2, nz-1
-    !  do i = 1, No
-    !    Q(i,ny,k,1) = rho0
-    !    Q(i,ny,k,2) = rho0 * u0 
-    !    Q(i,ny,k,3) = 0.d0
-    !    Q(i,ny,k,4) = 0.d0
-    !    Q(i,ny,k,5) = p0 / (gamma - 1.d0) + 0.5d0 * rho0 * u0**2
-    !enddo;enddo
-
-    !do k = 2, nz-1
-    !  do i = No+1, nx
-    !    Q(i,ny,k,1) = rho2
-    !    Q(i,ny,k,2) = rho2 * ux
-    !    Q(i,ny,k,3) = rho2 * uy
-    !    Q(i,ny,k,4) = 0.d0
-    !    Q(i,ny,k,5) = p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)
-    !enddo;enddo
-
     ! bottom
     Q(:,1,:,1) = Q(:,2,:,1)
     Q(:,1,:,2) = 0.d0
@@ -104,17 +90,12 @@ contains
     Q(:,1,:,4) = 0.d0
     p_wall = (gamma - 1.d0) * (Q(2,2,2,5) - 0.5d0 * (Q(2,2,2,2)**2 + Q(2,2,2,3)**2 + Q(2,2,2,4)**2) / Q(2,2,2,1))
     Q(:,1,:,5) = p_wall / (gamma - 1.d0)
-    ! imaginary
-    !Q(:,1,:,1) = Q(:,3,:,1)
-    !Q(:,1,:,2) = -Q(:,3,:,2)
-    !Q(:,1,:,3) = -Q(:,3,:,3)
-    !Q(:,1,:,4) = -Q(:,3,:,4)
-    !Q(:,1,:,5) = Q(:,3,:,5)
   end subroutine set_init
   
-  subroutine set_bc(id_accuracy,Q)
+  subroutine set_bc(id_accuracy,Jacobian,QJ)
     integer(kind=2), intent(in), value  :: id_accuracy
-    real(8), intent(inout), device      :: Q(nx,ny,nz,5)
+    real(8), intent(in), device         :: Jacobian(nx,ny)
+    real(8), intent(inout), device      :: QJ(nx,ny,nz,5) ! Q / Jacobian
     integer i, j, k, l
     integer :: No = int(0.25 * nx)
     real(8) :: p_wall
@@ -127,50 +108,47 @@ contains
       do i = 2, nx-1
         ! top
         ! Riemann invariants
-        pin = (gamma - 1.d0) * (Q(i,ny-1,k,5) - 0.5d0 * (Q(i,ny-1,k,2)**2 + Q(i,ny-1,k,3)**2 + Q(i,ny-1,k,4)**2) / Q(i,ny-1,k,1))
-        cin = sqrt(gamma * pin / Q(i,ny-1,k,1))
-        vin = Q(i,ny-1,k,3) / Q(i,ny-1,k,1)
-        Rp = vin + 2.d0 * cin / (gamma - 1.d0)
-        Rm = v0  - 2.d0 * c0  / (gamma - 1.d0)
-        vb = v0 + (0.5d0 * (Rp + Rm) - v0)
+        !pin = (gamma - 1.d0) * (Q(i,ny-1,k,5) - 0.5d0 * (Q(i,ny-1,k,2)**2 + Q(i,ny-1,k,3)**2 + Q(i,ny-1,k,4)**2) / Q(i,ny-1,k,1))
+        !cin = sqrt(gamma * pin / Q(i,ny-1,k,1))
+        !vin = Q(i,ny-1,k,3) / Q(i,ny-1,k,1)
+        !Rp = vin + 2.d0 * cin / (gamma - 1.d0)
+        !Rm = v0  - 2.d0 * c0  / (gamma - 1.d0)
+        !vb = v0 + (0.5d0 * (Rp + Rm) - v0)
 
-        rhob = Q(i,ny-1,k,1)
-        Q(i,ny,k,1) = rhob
-        Q(i,ny,k,2) = Q(i,ny-1,k,1) * u0 
-        Q(i,ny,k,3) = Q(i,ny-1,k,1) * vb
-        Q(i,ny,k,4) = 0.d0
-        cb = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
-        pb = (rhob * cb**2) / gamma
-        Q(i,ny,k,5) = pb / (gamma - 1.d0) + 0.5d0 * (Q(i,ny,k,2)**2 + Q(i,ny,k,3)**2 + Q(i,ny,k,4)**2) / Q(i,ny,k,1)
+        rhob = QJ(i,ny-1,k,1)
+        !Q(i,ny,k,1) = rhob
+        !Q(i,ny,k,2) = Q(i,ny-1,k,1) * u0 
+        !Q(i,ny,k,3) = Q(i,ny-1,k,1) * vb
+        !Q(i,ny,k,4) = 0.d0
+        !cb = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
+        !pb = (rhob * cb**2) / gamma
+        !Q(i,ny,k,5) = pb / (gamma - 1.d0) + 0.5d0 * (Q(i,ny,k,2)**2 + Q(i,ny,k,3)**2 + Q(i,ny,k,4)**2) / Q(i,ny,k,1)
+
+        ! Neumann boundary condition
+        QJ(i,ny,k,1) = rhob
+        QJ(i,ny,k,2) = QJ(i,ny-1,k,2)
+        QJ(i,ny,k,3) = QJ(i,ny-1,k,3)
+        QJ(i,ny,k,4) = QJ(i,ny-1,k,4)
+        QJ(i,ny,k,5) = QJ(i,ny-1,k,5)
         ! NoSlip
-        Q(i,1,k,1) = Q(i,2,k,1)
-        Q(i,1,k,2) = 0.d0
-        Q(i,1,k,3) = 0.d0
-        Q(i,1,k,4) = 0.d0
-        p_wall = (gamma - 1.d0) * (Q(i,2,k,5) - 0.5d0 * (Q(i,2,k,2)**2 + Q(i,2,k,3)**2 + Q(i,2,k,4)**2) / Q(i,2,k,1))
-        Q(i,1,k,5) = p_wall / (gamma - 1.d0)
+        QJ(i,1,k,1) = QJ(i,2,k,1)
+        QJ(i,1,k,2) = 0.d0
+        QJ(i,1,k,3) = 0.d0
+        QJ(i,1,k,4) = 0.d0
+        p_wall = (gamma - 1.d0) * (QJ(i,2,k,5) - 0.5d0 * (QJ(i,2,k,2)**2 + QJ(i,2,k,3)**2 + QJ(i,2,k,4)**2) / QJ(i,2,k,1))
+        QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
     enddo;enddo
-
-    !!$cuf kernel do<<<*,*>>>
-    !do k = 2, nz-1
-    !  do i = No+1, nx
-    !    Q(i,ny,k,1) = rho2
-    !    Q(i,ny,k,2) = rho2 * ux
-    !    Q(i,ny,k,3) = rho2 * uy
-    !    Q(i,ny,k,4) = 0.d0
-    !    Q(i,ny,k,5) = p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)
-    !enddo;enddo
 
     !$cuf kernel do(3)<<<*,*>>>
     do l = 1, 5
       do k = 2, nz-1
         do j = 1, ny
           ! inlet
-          Q(1,j,k,l) = Q(nx-3,j,k,l)
-          Q(2,j,k,l) = Q(nx-2,j,k,l)
+          QJ(1,j,k,l) = QJ(nx-3,j,k,l)
+          QJ(2,j,k,l) = QJ(nx-2,j,k,l)
           ! outlet
-          Q(nx-1,j,k,l) = Q(3,j,k,l)
-          Q(nx,j,k,l) = Q(4,j,k,l)
+          QJ(nx-1,j,k,l) = QJ(3,j,k,l)
+          QJ(nx,j,k,l) = QJ(4,j,k,l)
     enddo;enddo;enddo
 
     ! cyclic
@@ -178,10 +156,10 @@ contains
     do l = 1, 5
       do j = 1, ny
         do i = 1, nx
-          Q(i,j,1,l) = Q(i,j,nz-3,l)
-          Q(i,j,2,l) = Q(i,j,nz-2,l)
-          Q(i,j,nz-1,l) = Q(i,j,3,l)
-          Q(i,j,nz,l) = Q(i,j,4,l)
+          QJ(i,j,1,l) = QJ(i,j,nz-3,l)
+          QJ(i,j,2,l) = QJ(i,j,nz-2,l)
+          QJ(i,j,nz-1,l) = QJ(i,j,3,l)
+          QJ(i,j,nz,l) = QJ(i,j,4,l)
     enddo;enddo;enddo
   end subroutine set_bc
 

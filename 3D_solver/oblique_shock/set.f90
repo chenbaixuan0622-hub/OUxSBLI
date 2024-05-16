@@ -4,28 +4,32 @@ module set
   implicit none
 contains
   subroutine set_grid(x,y,z,dx,dy)
-    real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx), dy(ny)
+    real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1)
     integer i, j, k
     real(8) :: dx1 = Lx / dble(nx-1)
     real(8) :: dy1 = Ly / dble(ny-1)
     real(8) :: dz1 = Lz / dble(nz-1)
-    do i = 1, nx
-      x(i) = dble(i-1) * dx1
+    x(1) = 0.d0
+    do i = 1, nx-1
       dx(i) = dx1
+      x(i+1) = x(i) + dx(i)
     enddo
-    do j = 1, ny
-      y(j) = dble(j-1) * dy1
+
+    y(1) = 0.d0
+    do j = 1, ny-1
       dy(j) = dy1
+      y(j+1) = y(j) + dy(j)
     enddo
+    
     do k = 1, nz
       z(k) = dble(k-1) * dz1
     enddo
   end subroutine set_grid
 
   subroutine set_init(xs,ys,zs,Q,Vin)
-    real(8), intent(in) :: xs(nx), ys(ny), zs(nz)
+    real(8), intent(in)                         :: xs(nx), ys(ny), zs(nz)
     real(8), intent(out), dimension(nx,ny,nz,5) :: Q
-    real(8), intent(in), dimension(ny,2) :: Vin
+    real(8), intent(in), dimension(ny,2)        :: Vin
     integer i, k
     integer :: No = int(0.25 * nx)
     Q(:,:,:,1) = rho0
@@ -67,20 +71,21 @@ contains
     Q(:,1,:,5) = Q(:,3,:,5)
   end subroutine set_init
   
-  subroutine set_bc(id_accuracy,Q)
-    integer(kind=2), intent(in), value :: id_accuracy
-    real(8), intent(inout), device :: Q(nx,ny,nz,5)
+  subroutine set_bc(id_accuracy,Jacobian,Q)
+    integer(kind=2), intent(in), value  :: id_accuracy
+    real(8), intent(in), device         :: Jacobian(nx,ny)
+    real(8), intent(inout), device      :: Q(nx,ny,nz,5)
     integer i, j, k, l
     integer :: No = int(0.25 * nx)
-    !$cuf kernel do(2)<<<*,*>>>
+    !$cuf kernel do<<<*,*>>>
     do k = 2, nz-1
       do j = 3, ny-1
         ! inlet
-        Q(1,j,k,1) = rho0
-        Q(1,j,k,2) = rho0 * u0
+        Q(1,j,k,1) = rho0 / Jacobian(1,j)
+        Q(1,j,k,2) = rho0 * u0 / Jacobian(1,j)
         Q(1,j,k,3) = 0.d0
         Q(1,j,k,4) = 0.d0
-        Q(1,j,k,5) = p0 / (gamma - 1.d0) + 0.5d0 * rho0 * u0**2
+        Q(1,j,k,5) = (p0 / (gamma - 1.d0) + 0.5d0 * rho0 * u0**2) / Jacobian(1,j)
         ! outlet
         Q(nx,j,k,1) = Q(nx-1,j,k,1)
         Q(nx,j,k,2) = Q(nx-1,j,k,2)
@@ -93,21 +98,21 @@ contains
     !$cuf kernel do(2)<<<*,*>>>
     do k = 2, nz-1
       do i = 1, No
-        Q(i,ny,k,1) = rho0
-        Q(i,ny,k,2) = rho0 * u0 
+        Q(i,ny,k,1) = rho0 / Jacobian(i,ny)
+        Q(i,ny,k,2) = rho0 * u0 / Jacobian(i,ny)
         Q(i,ny,k,3) = 0.d0
         Q(i,ny,k,4) = 0.d0
-        Q(i,ny,k,5) = p0 / (gamma - 1.d0) + 0.5d0 * rho0 * u0**2
+        Q(i,ny,k,5) = (p0 / (gamma - 1.d0) + 0.5d0 * rho0 * u0**2) / Jacobian(i,ny)
     enddo;enddo
 
     !$cuf kernel do(2)<<<*,*>>>
     do k = 2, nz-1
       do i = No+1, nx
-        Q(i,ny,k,1) = rho2
-        Q(i,ny,k,2) = rho2 * ux
-        Q(i,ny,k,3) = rho2 * uy
+        Q(i,ny,k,1) = rho2 / Jacobian(i,ny)
+        Q(i,ny,k,2) = rho2 * ux / Jacobian(i,ny)
+        Q(i,ny,k,3) = rho2 * uy / Jacobian(i,ny)
         Q(i,ny,k,4) = 0.d0
-        Q(i,ny,k,5) = p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)
+        Q(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(i,ny)
     enddo;enddo
 
     ! bottom

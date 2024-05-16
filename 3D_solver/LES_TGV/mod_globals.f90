@@ -6,7 +6,6 @@ module mod_globals
   integer(kind=2**(accuracy/2)), parameter  :: id_accuracy = 1
   integer, parameter                        :: offset = accuracy / 2
   integer, parameter                        :: id_visc = 1
-  integer, parameter                        :: id_dim = 1
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! 0 no-visc               !
   !               ! 1 visc                  !
@@ -42,11 +41,8 @@ module mod_globals
   integer, parameter :: nx = 130!66
   integer, parameter :: ny = 130!66
   integer, parameter :: nz = 130!66
-  real(8), parameter :: dxi = Lx / dble(nx-1)
-  real(8), parameter :: deta = Ly / dble(ny-1)
   real(8), parameter :: dz = Lz / dble(nz-1)
   real(8), parameter :: dzi = 1.d0 / dz
-  real(8) x(nx), y(ny), z(nz), xix(nx), etay(ny), Jacobian(nx,ny)
 
   ! GPU
   type(dim3) :: blocksE = dim3((nx-accuracy+1)/3,(ny-accuracy)/8,(nz-accuracy)/8)
@@ -68,6 +64,9 @@ module mod_globals
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
+  real(8), parameter :: Pr = 0.71d0
+  real(8), parameter :: Prt = 0.9d0
+  real(8), parameter :: R = 287.03d0
 
   ! MUSCL
   real(8), parameter :: k = 1.d0 / 3.d0
@@ -77,9 +76,7 @@ module mod_globals
   real(8), parameter :: sigma = 2.d0
 
   ! initial condition
-  real(8), parameter :: R = 287.03d0
   real(8), parameter :: Re = 1600.d0
-  real(8), parameter :: Pr = 0.71d0
   real(8), parameter :: M0 = 0.1d0
   real(8), parameter :: T = 530.d0 * 5.d0 / 9.d0 
   real(8), parameter :: S = 111.d0
@@ -89,16 +86,13 @@ module mod_globals
   real(8), parameter :: p0 = RHO0 * R * T
 
   real(8), parameter :: CFL = 0.03d0
-  real(8), parameter :: dt = CFL * dxi / V0
+  real(8), parameter :: dt = CFL * (Lx / dble(nx-1)) / V0
   real(8), parameter :: dtn= V0 * dt / L0
   integer, parameter :: np = 100
   integer, parameter :: nt = int(20.d0 / (dble(np) * dtn))
-  real(8), parameter :: dtdx = dt / dxi
-  real(8), parameter :: dtdy = dt / deta
   real(8), parameter :: dtdz = dt / dz
 
   ! variables
-  real(8), save :: Q(nx,ny,nz,5)
-  real(8), save :: T0(nx,ny,nz)
+  real(8), allocatable :: Q(:,:,:,:)
 end module mod_globals
 

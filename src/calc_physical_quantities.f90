@@ -19,8 +19,7 @@ contains
     Vr = Qr(2:dim+1)
   end subroutine set_q
 
-  subroutine calc_quantities_2D(Jacobian,Q,rho,u,v,p,T)
-    real(8), intent(in), dimension(nx,ny), device   :: Jacobian
+  subroutine calc_quantities_2D(Q,rho,u,v,p,T)
     real(8), intent(in), dimension(nx,ny,4), device :: Q
     real(8), intent(out), dimension(nx,ny), device  :: rho, u, v, p, T
     integer i, j
@@ -28,17 +27,17 @@ contains
     !$cuf kernel do(2) <<<*,*>>>
     do j = 1, ny
       do i = 1, nx
-        rho(i,j) = Jacobian(i,j) * Q(i,j,1)
-        u(i,j) = Jacobian(i,j) * Q(i,j,2) / rho(i,j)
-        v(i,j) = Jacobian(i,j) * Q(i,j,3) / rho(i,j)
-        p(i,j) = (gamma - 1.d0) * (Jacobian(i,j) * Q(i,j,4)- 0.5d0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
+        rho(i,j) = Q(i,j,1)
+        u(i,j) = Q(i,j,2) / rho(i,j)
+        v(i,j) = Q(i,j,3) / rho(i,j)
+        p(i,j) = (gamma - 1.d0) * (Q(i,j,4)- 0.5d0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
         T(i,j) = p(i,j) / (R * rho(i,j))
     enddo;enddo
   end subroutine calc_quantities_2D
 
-  subroutine calc_quantities_3D(Jacobian,Q,rho,u,v,w,p,T)
+  subroutine calc_quantities_3D(Jacobian,QJ,rho,u,v,w,p,T)
     real(8), intent(in), dimension(nx,ny), device       :: Jacobian
-    real(8), intent(in), dimension(nx,ny,nz,5), device  :: Q
+    real(8), intent(in), dimension(nx,ny,nz,5), device  :: QJ ! Q / Jacobian
     real(8), intent(out), dimension(nx,ny,nz), device   :: rho, u, v, w, p, T
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
@@ -46,11 +45,11 @@ contains
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
-          rho(i,j,k) = Jacobian(i,j) * Q(i,j,k,1)
-          u(i,j,k) = Jacobian(i,j) * Q(i,j,k,2) / rho(i,j,k)
-          v(i,j,k) = Jacobian(i,j) * Q(i,j,k,3) / rho(i,j,k)
-          w(i,j,k) = Jacobian(i,j) * Q(i,j,k,4) / rho(i,j,k)
-          p(i,j,k) = (gamma - 1.d0) * (Jacobian(i,j) * Q(i,j,k,5) - 0.5d0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
+          rho(i,j,k) = Jacobian(i,j) * QJ(i,j,k,1)
+          u(i,j,k) = Jacobian(i,j) * QJ(i,j,k,2) / rho(i,j,k)
+          v(i,j,k) = Jacobian(i,j) * QJ(i,j,k,3) / rho(i,j,k)
+          w(i,j,k) = Jacobian(i,j) * QJ(i,j,k,4) / rho(i,j,k)
+          p(i,j,k) = (gamma - 1.d0) * (Jacobian(i,j) * QJ(i,j,k,5) - 0.5d0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
           T(i,j,k) = p(i,j,k) / (R * rho(i,j,k))
     enddo;enddo;enddo
   end subroutine calc_quantities_3D

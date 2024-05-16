@@ -30,15 +30,15 @@ program main
   real(8) t_start, t_end
   real(8), allocatable :: x(:), xix(:), dx(:), y(:), etay(:), dy(:), z(:), Jacobian(:,:)
   real(8), allocatable :: Vin(:,:)
-  allocate(x(nx),xix(nx),dx(nx),y(ny),etay(ny),dy(ny),Jacobian(nx,ny),Vin(ny,2))
+  allocate(x(nx),xix(nx-1),dx(nx-1),y(ny),etay(ny-1),dy(ny-1),Jacobian(nx,ny),Vin(ny,2))
 
   call alloc(Q,z)
 
   call set_grid(x,y,z,dx,dy)
   call set_xix(dx,xix)
   call set_etay(dy,etay)
-  call set_Jacobian(dx,dy,Jacobian)
   call set_init(x,y,z,Q,Vin)
+  call set_Jacobian(dx,dy,Jacobian)
 
   call cpu_time(t_start)
   call RungeKutta(id_RungeKutta,x,dx,xix,y,dy,etay,z,Jacobian,Q,Vin)
