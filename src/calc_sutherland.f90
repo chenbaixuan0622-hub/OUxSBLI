@@ -31,6 +31,7 @@ contains
     real(8), intent(out)        :: kappa
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
     kappa =  0.5d0 * (mu(T1) + mu(T2)) * Cp / Pr
+    write(*,*) kappa
   end subroutine calc_kappa
 end module calc_sutherland
 

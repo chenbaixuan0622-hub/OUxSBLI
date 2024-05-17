@@ -69,10 +69,9 @@ contains
     F(:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:)) + pressure * Normal(:)
   end function flux_AUSM
 
-  attributes(device) function SLAU(id_dim,Ql,Qr,Normal,Jacobian) result(F)
+  attributes(device) function SLAU(id_dim,Ql,Qr,Normal) result(F)
     integer, intent(in), value :: id_dim
     real(8), intent(in), dimension(dimension+2), device :: Ql, Qr, Normal
-    real(8), intent(in), value :: Jacobian
     real(8) rhol, rhor, pl, pr, el, er, Hl, Hr, cl, cr, c
     real(8) Vp, Vm, Vt, Vtp, Vtm, Mp, Mm, M, x, fslau, g, p, dp, mass, bp, bm, Pressure
     real(8), dimension(dimension) :: Vl, Vr, xy
@@ -105,7 +104,6 @@ contains
     ! pressure flux
     Pressure = 0.5d0 * (pl + pr + (bp - bm) * (pl - pr) + (1.d0 - x) * (bp + bm - 1.d0) * (pl + pr))
     F(:) = flux_AUSM(mass,Pressure,Hl,Hr,Vl,Vr,Normal)
-    F(:) = F(:) / Jacobian
   end function SLAU
 end module calc_slau
 
