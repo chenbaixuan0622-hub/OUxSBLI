@@ -3,8 +3,8 @@ module set
   implicit none
 contains
   subroutine calc_Blasius(eta,d,u,v)
-    real(8), intent(in), value :: eta, d
-    real(8), intent(out) :: u, v
+    real(8), intent(in), value  :: eta, d
+    real(8), intent(out)        :: u, v
     real(8) f, df, x
     real(8) fs(45), dfs(45)
     real(8) :: nu0
@@ -64,22 +64,34 @@ contains
   end subroutine set_grid
 
   subroutine set_init(xs,ys,zs,Q,Vin)
-    real(8), intent(in) :: xs(nx), ys(ny), zs(nz)
+    real(8), intent(in)                         :: xs(nx), ys(ny), zs(nz)
     real(8), intent(out), dimension(nx,ny,nz,5) :: Q
-    real(8), intent(in), dimension(ny,2) :: Vin
+    real(8), intent(in), dimension(ny,2)        :: Vin
     integer i, j, k
     integer :: No = int(0.25 * nx)
-    real(8) :: d = 1.d-3
-    real(8) :: eta, u, v, p_wall
+    real(8) :: d = 0.2d0 * 1.d-3
+    real(8) :: eta, u, v, w, p_wall
+    ! random
+    real(8) :: ustd
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
           eta = ys(j) / d
           call calc_Blasius(eta,d,u,v)
+          if (ys(j) <= d) then
+            call random_number(ustd)
+            ustd = 2.d0 * ustd - 1.d0
+          else
+            ustd = 0.d0
+          endif
+          ustd = u * ustd
+          u = u + ustd
+          v = v + 0.5d0 * ustd
+          w = 0.5d0 * ustd
           Q(i,j,k,1) = rho0
           Q(i,j,k,2) = Q(i,j,k,1) * u
           Q(i,j,k,3) = Q(i,j,k,1) * v
-          Q(i,j,k,4) = Q(i,j,k,1) * 0.d0
+          Q(i,j,k,4) = Q(i,j,k,1) * w
           Q(i,j,k,5) = p0 / (gamma - 1.d0) + 0.5d0 * (Q(i,j,k,2)**2 + Q(i,j,k,3)**2 + Q(i,j,k,4)**2) / Q(i,j,k,1)
     enddo;enddo;enddo
 
