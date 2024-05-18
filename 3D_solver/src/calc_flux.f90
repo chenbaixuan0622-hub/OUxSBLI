@@ -22,19 +22,29 @@ contains
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
     real(8), intent(out), device                      :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
-    real(8), dimension(accuracy) :: rhos, ps
-    real(8) :: Normal(3) = (/1.d0, 0.d0, 0.d0/)
-    real(8), dimension(accuracy,3) :: Vs
+    real(8), dimension(2)   :: rho2, p2
+    real(8), dimension(2,3) :: V2
+    real(8), dimension(4)   :: rho4, p4
+    real(8), dimension(4,3) :: V4
+    real(8)                 :: Normal(3) = (/1.d0, 0.d0, 0.d0/)
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
-
-    rhos(:) = rho(i:i+accuracy-1,j,k)
-    ps(:) = p(i:i+accuracy-1,j,k)
-    Vs(:,1) = u(i:i+accuracy-1,j,k)
-    Vs(:,2) = v(i:i+accuracy-1,j,k)
-    Vs(:,3) = w(i:i+accuracy-1,j,k)
-    E(i,j-offset,k-offset,:) = KEEP(id_accuracy,1,rhos,ps,Vs,Normal)
+    if (2 <= i .and. i <= nx-2) then
+      rho4(:) = rho(i-1:i+2,j,k)
+      p4(:) = p(i-1:i+2,j,k)
+      V4(:,1) = u(i-1:i+2,j,k)
+      V4(:,2) = v(i-1:i+2,j,k)
+      V4(:,3) = w(i-1:i+2,j,k)
+      E(i,j-offset,k-offset,:) = KEEP4(1,rho4,p4,V4,Normal)
+    else
+      rho2(:) = rho(i:i+1,j,k)
+      p2(:) = p(i:i+1,j,k)
+      V2(:,1) = u(i:i+1,j,k)
+      V2(:,2) = v(i:i+1,j,k)
+      V2(:,3) = w(i:i+1,j,k)
+      E(i,j-offset,k-offset,:) = KEEP2(1,rho2,p2,V2,Normal)
+    endif
   end subroutine calc_E_NoMUSCL
 
   attributes(global) subroutine calc_F_NoMUSCL(id_muscl, rho, u, v, w, p, F)
@@ -42,19 +52,29 @@ contains
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
     real(8), intent(out), device                      :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
-    real(8), dimension(accuracy) :: rhos, ps
-    real(8) :: Normal(3) = (/0.d0, 1.d0, 0.d0/)
-    real(8), dimension(accuracy,3) :: Vs
+    real(8), dimension(2)   :: rho2, p2
+    real(8), dimension(2,3) :: V2
+    real(8), dimension(4)   :: rho4, p4
+    real(8), dimension(4,3) :: V4
+    real(8)                 :: Normal(3) = (/0.d0, 1.d0, 0.d0/)
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
-
-    rhos(:) = rho(i,j:j+accuracy-1,k)
-    ps(:) = p(i,j:j+accuracy-1,k)
-    Vs(:,1) = u(i,j:j+accuracy-1,k)
-    Vs(:,2) = v(i,j:j+accuracy-1,k)
-    Vs(:,3) = w(i,j:j+accuracy-1,k)
-    F(i-offset,j,k-offset,:) = KEEP(id_accuracy,2,rhos,ps,Vs,Normal)
+    if (2 <= j .and. j <= ny-2) then
+      rho4(:) = rho(i,j-1:j+2,k)
+      p4(:) = p(i,j-1:j+2,k)
+      V4(:,1) = u(i,j-1:j+2,k)
+      V4(:,2) = v(i,j-1:j+2,k)
+      V4(:,3) = w(i,j-1:j+2,k)
+      F(i-offset,j,k-offset,:) = KEEP4(2,rho4,p4,V4,Normal)
+    else
+      rho2(:) = rho(i,j:j+1,k)
+      p2(:) = p(i,j:j+1,k)
+      V2(:,1) = u(i,j:j+1,k)
+      V2(:,2) = v(i,j:j+1,k)
+      V2(:,3) = w(i,j:j+1,k)
+      F(i-offset,j,k-offset,:) = KEEP2(2,rho2,p2,V2,Normal)
+    endif
   end subroutine calc_F_NoMUSCL
 
   attributes(global) subroutine calc_G_NoMUSCL(id_muscl, rho, u, v, w, p, G)
@@ -62,19 +82,29 @@ contains
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p 
     real(8), intent(out), device                      :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
-    real(8), dimension(accuracy) :: rhos, ps
-    real(8) :: Normal(3) = (/0.d0, 0.d0, 1.d0/)
-    real(8), dimension(accuracy,3) :: Vs
+    real(8), dimension(2)   :: rho2, p2
+    real(8), dimension(2,3) :: V2
+    real(8), dimension(4)   :: rho4, p4
+    real(8), dimension(4,3) :: V4
+    real(8)                 :: Normal(3) = (/0.d0, 0.d0, 1.d0/)
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
-
-    rhos(:) = rho(i,j,k:k+accuracy-1)
-    ps(:) = p(i,j,k:k+accuracy-1)
-    Vs(:,1) = u(i,j,k:k+accuracy-1)
-    Vs(:,2) = v(i,j,k:k+accuracy-1)
-    Vs(:,3) = w(i,j,k:k+accuracy-1)
-    G(i-offset,j-offset,k,:) = KEEP(id_accuracy,3,rhos,ps,Vs,Normal)
+    if (2 <= k .and. k <= nz-2) then
+      rho4(:) = rho(i,j,k-1:k+2)
+      p4(:) = p(i,j,k-1:k+2)
+      V4(:,1) = u(i,j,k-1:k+2)
+      V4(:,2) = v(i,j,k-1:k+2)
+      V4(:,3) = w(i,j,k-1:k+2)
+      G(i-offset,j-offset,k,:) = KEEP4(3,rho4,p4,V4,Normal)
+    else
+      rho2(:) = rho(i,j,k:k+1)
+      p2(:) = p(i,j,k:k+1)
+      V2(:,1) = u(i,j,k:k+1)
+      V2(:,2) = v(i,j,k:k+1)
+      V2(:,3) = w(i,j,k:k+1)
+      G(i-offset,j-offset,k,:) = KEEP2(3,rho2,p2,V2,Normal)
+    endif
   end subroutine calc_G_NoMUSCL
 
 !MUSCL!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
