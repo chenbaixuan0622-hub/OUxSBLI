@@ -1,117 +1,165 @@
 module calc_hybrid
   use cudafor
-  use mod_globals, only : accuracy, offset, nx, ny, nz, dxi, dyi, dzi
+  use mod_globals, only : accuracy, offset, nx, ny, nz, dzi
   implicit none
 contains
-  attributes(global) subroutine calc_E_hybrid(rho,u,v,w,e,E_keep,E_upwind,E_hybrid)
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, e
-    real(8), intent(in), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E_keep, E_upwind
-    real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E_hybrid
-    real(8) d1, d2, d3, phi_p, phi_m, phi, E_tvd(5), div, rot(3), fd
-    real(8) :: eps = 1.d-16
+  attributes(global) subroutine calc_Ducros(dx,dy,u,v,w,fd)
+    real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
+    real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
+    real(8), intent(in), dimension(nx,ny,nz), device  :: u, v, w
+    real(8), intent(out), dimension(nx,ny,nz), device :: fd
     integer i, j, k
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset - 1
+    real(8) dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz
+    real(8) div, rot(3)
+    real(8) :: eps = 1.d-16
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1 
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
+    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
+    dudx = (-u(i-1,j,k) + u(i+1,j,k)) * 0.25d0 * (dx(i-1) + dx(i))
+    dvdx = (-v(i-1,j,k) + v(i+1,j,k)) * 0.25d0 * (dx(i-1) + dx(i))
+    dwdx = (-w(i-1,j,k) + w(i+1,j,k)) * 0.25d0 * (dx(i-1) + dx(i))
+    dudy = (-u(i,j-1,k) + u(i,j+1,k)) * 0.25d0 * (dy(j-1) + dy(j))
+    dvdy = (-v(i,j-1,k) + v(i,j+1,k)) * 0.25d0 * (dy(j-1) + dy(j))
+    dwdy = (-w(i,j-1,k) + w(i,j+1,k)) * 0.25d0 * (dy(j-1) + dy(j))
+    dudz = (-u(i,j,k-1) + u(i,j,k+1)) * 0.5d0 * dzi
+    dvdz = (-v(i,j,k-1) + v(i,j,k+1)) * 0.5d0 * dzi
+    dwdz = (-w(i,j,k-1) + w(i,j,k+1)) * 0.5d0 * dzi
+    div = dudx + dvdy + dwdz
+    rot(1) = dwdy - dvdz
+    rot(2) = dudz - dwdx
+    rot(3) = dvdx - dudy
+    fd(i,j,k) = (div**2) / (div**2 + (rot(1)**2 + rot(2)**2 + rot(3)**2) + eps)
+
+    ! boundary
+    ! x direction
+    if (i == 2) then
+      fd(1,j,k) = fd(2,j,k)
+    elseif (i == nx-1) then
+      fd(nx,j,k) = fd(nx-1,j,k)
+    endif
+    ! y direction
+    if (j == 2) then
+      fd(i,1,k) = fd(i,2,k)
+    elseif (j == ny-1) then
+      fd(i,ny,k) = fd(i,ny-1,k)
+    endif
+    ! z direction
+    if (k == 2) then
+      fd(i,j,1) = fd(i,j,2)
+    elseif (k == nz-1) then
+      fd(i,j,nz) = fd(i,j,nz-1)
+    endif
+  end subroutine calc_Ducros
+
+  attributes(global) subroutine calc_E_hybrid(u,v,w,fd,E_upwind,E)
+    real(8), intent(in), dimension(nx,ny,nz), device                                    :: u, v, w, fd
+    real(8), intent(in), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device     :: E_upwind
+    real(8), intent(inout), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device  :: E
+    ! Albada
+    !real(8) d1, d2, d3, phi_p, phi_m, phi, E_tvd(5)
+    integer i, j, k
+    real(8) fdx
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
-    if (2 <= i) then
-      d1 = -e(i-1,j,k) / rho(i-1,j,k) + e(i,j,k) / rho(i,j,k)
+    !if (2 <= i) then
+    !  d1 = -e(i-1,j,k) / rho(i-1,j,k) + e(i,j,k) / rho(i,j,k)
+    !else
+    !  d1  = 0.d0
+    !endif
+    !d2 = -e(i,j,k) / rho(i,j,k) + e(i+1,j,k) / rho(i+1,j,k)
+    !if (i <= nx-2) then
+    !  d3 = -e(i+1,j,k) / rho(i+1,j,k) + e(i+2,j,k) / rho(i+2,j,k)
+    !else
+    !  d3 = 0.d0
+    !endif
+    !phi_p = (d2 * d1 + d1**2) / (d2**2 + d1**2 + eps)
+    !phi_m = (d2 * d3 + d3**2) / (d2**2 + d3**2 + eps)
+    !phi = min(phi_p, phi_m)
+    !E_tvd(:) = phi * E_keep(i-offset+1,j-offset,k-offset,:) + (1.d0 - phi) * E_upwind(i-offset+1,j-offset,k-offset,:)
+
+    fdx = max(fd(i,j,k), fd(i+1,j,k))
+    if (0.4d0 <= fdx) then
+      fdx = 1.d0
     else
-      d1  = 0.d0
+      fdx = 0.d0
     endif
-    d2 = -e(i,j,k) / rho(i,j,k) + e(i+1,j,k) / rho(i+1,j,k)
-    if (i <= nx-2) then
-      d3 = -e(i+1,j,k) / rho(i+1,j,k) + e(i+2,j,k) / rho(i+2,j,k)
-    else
-      d3 = 0.d0
-    endif
-    phi_p = (d2 * d1 + d1**2) / (d2**2 + d1**2 + eps)
-    phi_m = (d2 * d3 + d3**2) / (d2**2 + d3**2 + eps)
-    phi = min(phi_p, phi_m)
-    E_tvd(:) = phi * E_keep(i-offset+1,j-offset,k-offset,:) + (1.d0 - phi) * E_upwind(i-offset+1,j-offset,k-offset,:)
-    
-    div = dxi * (-u(i,j,k) + u(i+1,j,k)) + 0.5d0 * dyi * (-v(i,j-1,k) + v(i,j+1,k)) + 0.5d0 * dzi * (-w(i,j,k-1) + w(i,j,k+1))
-    
-    rot(1) = 0.5d0 * dyi * (-w(i,j-1,k) + w(i,j+1,k)) - 0.5d0 * dzi * (-v(i,j,k-1) + v(i,j,k+1))
-    rot(2) = 0.5d0 * dzi * (-u(i,j,k-1) + u(i,j,k+1)) - dxi * (-w(i,j,k) + w(i+1,j,k))
-    rot(3) = dxi * (-v(i,j,k) + v(i+1,j,k)) - 0.5d0 * dyi * (-u(i,j-1,k) + u(i,j+1,k))
-    
-    !fd = div**2 / (div**2 + (rot(1)**2 + rot(2)**2 + rot(3)**2) + eps)
-    fd = 1.d0
-    E_hybrid(i-offset+1,j-offset,k-offset,:) = (1.d0 - fd) * E_keep(i-offset+1,j-offset,k-offset,:) + fd * E_tvd(:)
+    E(i-offset+1,j-offset,k-offset,:) = (1.d0 - fdx) * E(i-offset+1,j-offset,k-offset,:) &
+    & + fdx * E_upwind(i-offset+1,j-offset,k-offset,:)
   end subroutine calc_E_hybrid
   
-  attributes(global) subroutine calc_F_hybrid(rho,u,v,w,e,F_keep,F_upwind,F_hybrid)
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, e
-    real(8), intent(in), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F_keep, F_upwind
-    real(8), intent(out), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F_hybrid
-    real(8) d1, d2, d3, phi_p, phi_m, phi, F_tvd(5), div, rot(3), fd
-    real(8) :: eps = 1.d-16
+  attributes(global) subroutine calc_F_hybrid(u,v,w,fd,F_upwind,F)
+    real(8), intent(in), dimension(nx,ny,nz), device                                    :: u, v, w, fd
+    real(8), intent(in), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device     :: F_upwind
+    real(8), intent(inout), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device  :: F
+    ! Albada
+    !real(8) d1, d2, d3, phi_p, phi_m, phi, F_tvd(5)
     integer i, j, k
+    real(8) fdy
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset - 1
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
-    if (2 <= j) then
-      d1 = -e(i,j-1,k) / rho(i,j-1,k) + e(i,j,k) / rho(i,j,k)
+    !if (2 <= j) then
+    !  d1 = -e(i,j-1,k) / rho(i,j-1,k) + e(i,j,k) / rho(i,j,k)
+    !else
+    !  d1  = 0.d0
+    !endif
+    !d2 = -e(i,j,k) / rho(i,j,k) + e(i,j+1,k) / rho(i,j+1,k)
+    !if (j <= ny-2) then
+    !  d3 = -e(i,j+1,k) / rho(i,j+1,k) + e(i,j+2,k) / rho(i,j+2,k)
+    !else
+    !  d3 = 0.d0
+    !endif
+    !phi_p = (d2 * d1 + d1**2) / (d2**2 + d1**2 + eps)
+    !phi_m = (d2 * d3 + d3**2) / (d2**2 + d3**2 + eps)
+    !phi = min(phi_p, phi_m)
+    !F_tvd(:) = phi * F_keep(i-offset,j-offset+1,k-offset,:) + (1.d0 - phi) * F_upwind(i-offset,j-offset+1,k-offset,:)
+
+    fdy = max(fd(i,j,k), fd(i,j+1,k))
+    if (0.4d0 <= fdy) then
+      fdy = 1.d0
     else
-      d1  = 0.d0
+      fdy = 0.d0
     endif
-    d2 = -e(i,j,k) / rho(i,j,k) + e(i,j+1,k) / rho(i,j+1,k)
-    if (j <= ny-2) then
-      d3 = -e(i,j+1,k) / rho(i,j+1,k) + e(i,j+2,k) / rho(i,j+2,k)
-    else
-      d3 = 0.d0
-    endif
-    phi_p = (d2 * d1 + d1**2) / (d2**2 + d1**2 + eps)
-    phi_m = (d2 * d3 + d3**2) / (d2**2 + d3**2 + eps)
-    phi = min(phi_p, phi_m)
-    F_tvd(:) = phi * F_keep(i-offset,j-offset+1,k-offset,:) + (1.d0 - phi) * F_upwind(i-offset,j-offset+1,k-offset,:)
-    
-    div = 0.5d0 * dxi * (-u(i-1,j,k) + u(i+1,j,k)) + dyi * (-v(i,j,k) + v(i,j+1,k)) + 0.5d0 * dzi * (-w(i,j,k-1) + w(i,j,k+1))
-    
-    rot(1) = dyi * (-w(i,j,k) + w(i,j+1,k)) - 0.5d0 * dzi * (-v(i,j,k-1) + v(i,j,k+1))
-    rot(2) = 0.5d0 * dzi * (-u(i,j,k-1) + u(i,j,k+1)) - 0.5d0 * dxi * (-w(i-1,j,k) + w(i+1,j,k))
-    rot(3) = 0.5d0 * dxi * (-v(i-1,j,k) + v(i+1,j,k)) - dyi * (-u(i,j,k) + u(i,j+1,k))
-    
-    !fd = div**2 / (div**2 + (rot(1)**2 + rot(2)**2 + rot(3)**2) + eps)
-    fd = 1.d0
-    F_hybrid(i-offset,j-offset+1,k-offset,:) = (1.d0 - fd) * F_keep(i-offset,j-offset+1,k-offset,:) + fd * F_tvd(:)
+    F(i-offset,j-offset+1,k-offset,:) = (1.d0 - fdy) * F(i-offset,j-offset+1,k-offset,:) &
+    & + fdy * F_upwind(i-offset,j-offset+1,k-offset,:)
   end subroutine calc_F_hybrid
 
-  attributes(global) subroutine calc_G_hybrid(rho,u,v,w,e,G_keep,G_upwind,G_hybrid)
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, e
-    real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G_keep, G_upwind
-    real(8), intent(out), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G_hybrid
-    real(8) d1, d2, d3, phi_p, phi_m, phi, G_tvd(5), div, rot(3), fd
-    real(8) :: eps = 1.d-16
+  attributes(global) subroutine calc_G_hybrid(u,v,w,fd,G_upwind,G)
+    real(8), intent(in), dimension(nx,ny,nz), device                                    :: u, v, w, fd
+    real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device     :: G_upwind
+    real(8), intent(inout), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device  :: G
+    ! Albada
+    !real(8) d1, d2, d3, phi_p, phi_m, phi, G_tvd(5)
     integer i, j, k
+    real(8) fdz
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset - 1
-    if (2 <= k) then
-      d1 = -e(i,j,k-1) / rho(i,j,k-1) + e(i,j,k) / rho(i,j,k)
+    k = (blockIdx%z-1)*blockDim%z + threadIdx%z
+    !if (2 <= k) then
+    !  d1 = -e(i,j,k-1) / rho(i,j,k-1) + e(i,j,k) / rho(i,j,k)
+    !else
+    !  d1  = 0.d0
+    !endif
+    !d2 = -e(i,j,k) / rho(i,j,k) + e(i,j,k+1) / rho(i,j,k+1)
+    !if (k <= nz-2) then
+    !  d3 = -e(i,j,k+1) / rho(i,j,k+1) + e(i,j,k+2) / rho(i,j,k+2)
+    !else
+    !  d3 = 0.d0
+    !endif
+    !phi_p = (d2 * d1 + d1**2) / (d2**2 + d1**2 + eps)
+    !phi_m = (d2 * d3 + d3**2) / (d2**2 + d3**2 + eps)
+    !phi = min(phi_p, phi_m)
+    !G_tvd(:) = phi * G_keep(i-offset,j-offset,k-offset+1,:) + (1.d0 - phi) * G_upwind(i-offset,j-offset,k-offset+1,:)
+    
+    fdz = max(fd(i,j,k), fd(i,j,k+1))
+    if (0.4d0 <= fdz) then
+      fdz = 1.d0
     else
-      d1  = 0.d0
+      fdz = 0.d0
     endif
-    d2 = -e(i,j,k) / rho(i,j,k) + e(i,j,k+1) / rho(i,j,k+1)
-    if (k <= nz-2) then
-      d3 = -e(i,j,k+1) / rho(i,j,k+1) + e(i,j,k+2) / rho(i,j,k+2)
-    else
-      d3 = 0.d0
-    endif
-    phi_p = (d2 * d1 + d1**2) / (d2**2 + d1**2 + eps)
-    phi_m = (d2 * d3 + d3**2) / (d2**2 + d3**2 + eps)
-    phi = min(phi_p, phi_m)
-    G_tvd(:) = phi * G_keep(i-offset,j-offset,k-offset+1,:) + (1.d0 - phi) * G_upwind(i-offset,j-offset,k-offset+1,:)
-    
-    div = 0.5d0 * dxi * (-u(i-1,j,k) + u(i+1,j,k)) + 0.5d0 * dyi * (-v(i,j-1,k) + v(i,j+1,k)) + dzi * (-w(i,j,k) + w(i,j,k+1))
-    
-    rot(1) = 0.5d0 * dyi * (-w(i,j-1,k) + w(i,j+1,k)) - dzi * (-v(i,j,k) + v(i,j,k+1))
-    rot(2) = dzi * (-u(i,j,k) + u(i,j,k+1)) - 0.5d0 * dxi * (-w(i-1,j,k) + w(i+1,j,k))
-    rot(3) = 0.5d0 * dxi * (-v(i-1,j,k) + v(i+1,j,k)) - 0.5d0 * dyi * (-u(i,j-1,k) + u(i,j+1,k))
-    
-    !fd = div**2 / (div**2 + (rot(1)**2 + rot(2)**2 + rot(3)**2) + eps)
-    fd = 1.d0
-    G_hybrid(i-offset,j-offset,k-offset+1,:) = (1.d0 - fd) * G_keep(i-offset,j-offset,k-offset+1,:) + fd * G_tvd(:)
+    G(i-offset,j-offset,k-offset+1,:) = (1.d0 - fdz) * G(i-offset,j-offset,k-offset+1,:) &
+    & + fdz * G_upwind(i-offset,j-offset,k-offset+1,:)
   end subroutine calc_G_hybrid
 end module calc_hybrid
 

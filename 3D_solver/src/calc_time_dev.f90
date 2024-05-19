@@ -53,39 +53,37 @@ contains
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_basic
   
-  subroutine calc_EFG_hybrid(id_hybrid,dx,dy,Jacobian,QJ,mut,E_hybrid,F_hybrid,G_hybrid)
+  subroutine calc_EFG_hybrid(id_hybrid,dx,dy,Jacobian,QJ,mut,E,F,G)
     integer(kind=4), intent(in)                         :: id_hybrid
     real(8), intent(in), dimension(nx-1), device        :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device        :: dy ! 1 / dy
     real(8), intent(in), dimension(nx,ny), device       :: Jacobian
     real(8), intent(in), dimension(nx,ny,nz,5), device  :: QJ ! Q / Jacobian
     real(8), intent(inout), dimension(nx,ny,nz), device :: mut
-    real(8), intent(out), device                        :: E_hybrid(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
-    real(8), intent(out), device                        :: F_hybrid(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
-    real(8), intent(out), device                        :: G_hybrid(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
-    real(8), dimension(nx,ny,nz), device                                :: rho, u, v, w, p, T, energy
-    real(8), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E_keep, E_upwind
-    real(8), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F_keep, F_upwind
-    real(8), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G_keep, G_upwind
+    real(8), intent(out), device                        :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
+    real(8), intent(out), device                        :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
+    real(8), intent(out), device                        :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    real(8), dimension(nx,ny,nz), device                                :: rho, u, v, w, p, T, fd
+    real(8), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E_upwind
+    real(8), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F_upwind
+    real(8), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G_upwind
     integer stat
     integer(kind=2) :: id_muscl1
     call calc_quantities(Jacobian,QJ,rho,u,v,w,p,T)
 
-    call calc_E<<<blocksE,threadsE>>>(id_muscl1,rho,u,v,w,p,E_keep)
-    call calc_F<<<blocksF,threadsF>>>(id_muscl1,rho,u,v,w,p,F_keep)
-    call calc_G<<<blocksG,threadsG>>>(id_muscl1,rho,u,v,w,p,G_keep)
+    call calc_E<<<blocksE,threadsE>>>(id_muscl1,rho,u,v,w,p,E)
+    call calc_F<<<blocksF,threadsF>>>(id_muscl1,rho,u,v,w,p,F)
+    call calc_G<<<blocksG,threadsG>>>(id_muscl1,rho,u,v,w,p,G)
     call calc_E<<<blocksE,threadsE>>>(id_muscl,rho,u,v,w,p,E_upwind)
     call calc_F<<<blocksF,threadsF>>>(id_muscl,rho,u,v,w,p,F_upwind)
     call calc_G<<<blocksG,threadsG>>>(id_muscl,rho,u,v,w,p,G_upwind)
     stat = cudaDeviceSynchronize()
 
-    !!!!not correct !!!!!!!!!!!!!
-    energy(:,:,:) = QJ(:,:,:,5)
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-    call calc_E_hybrid<<<blocksE,threadsE>>>(rho,u,v,w,energy,E_keep,E_upwind,E_hybrid)
-    call calc_F_hybrid<<<blocksF,threadsF>>>(rho,u,v,w,energy,F_keep,F_upwind,F_hybrid)
-    call calc_G_hybrid<<<blocksG,threadsG>>>(rho,u,v,w,energy,G_keep,G_upwind,G_hybrid)
+    call calc_Ducros<<<blocks,threads>>>(dx,dy,u,v,w,fd)
+    stat = cudaDeviceSynchronize()
+    call calc_E_hybrid<<<blocksE,threadsE>>>(u,v,w,fd,E_upwind,E)
+    call calc_F_hybrid<<<blocksF,threadsF>>>(u,v,w,fd,F_upwind,F)
+    call calc_G_hybrid<<<blocksG,threadsG>>>(u,v,w,fd,G_upwind,G)
     stat = cudaDeviceSynchronize()
     !print *, trim(cudaGetErrorString(cudaGetLastError()))
 
@@ -96,9 +94,9 @@ contains
     endif
 
     if (id_visc == 1 .or. id_turbulence /= 0) then
-      call calc_Ev<<<blocksE,threadsE>>>(dx,dy,rho,u,v,w,T,p,mut,E_hybrid)
-      call calc_Fv<<<blocksF,threadsF>>>(dy,dx,rho,u,v,w,T,p,mut,F_hybrid)
-      call calc_Gv<<<blocksG,threadsG>>>(dx,dy,rho,u,v,w,T,p,mut,G_hybrid)
+      call calc_Ev<<<blocksE,threadsE>>>(dx,dy,rho,u,v,w,T,p,mut,E)
+      call calc_Fv<<<blocksF,threadsF>>>(dy,dx,rho,u,v,w,T,p,mut,F)
+      call calc_Gv<<<blocksG,threadsG>>>(dx,dy,rho,u,v,w,T,p,mut,G)
     endif
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_hybrid
