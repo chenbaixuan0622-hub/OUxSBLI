@@ -30,7 +30,7 @@ module mod_globals
   ! id_slau   ! kind2 slau  !
   !           ! kind4 sd    !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=2), parameter :: id_hybrid = 0
+  integer(kind=4), parameter :: id_hybrid = 0
   integer(kind=8), parameter :: id_muscl = 0
   integer, parameter         :: id_scheme = 3
   integer(kind=2), parameter :: id_slau = 0
@@ -63,10 +63,10 @@ module mod_globals
   !               ! kind8 ! 10step  !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_RungeKutta = 0
-  integer, parameter :: nt = 50
+  integer, parameter :: nt = 250
   integer, parameter :: np = 40
   real(8), parameter :: u0 = 506.8d0
-  real(8), parameter :: dt = 0.5d0 * (Lx / dble(nx-1)) / u0
+  real(8), parameter :: dt = 0.1d0 * (Lx / dble(nx-1)) / u0
 
   real(8), parameter :: dtdz = dt / dz
 

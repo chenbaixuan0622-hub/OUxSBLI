@@ -63,7 +63,7 @@ contains
     real(8), intent(out), device                        :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     real(8), intent(out), device                        :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device                        :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
-    real(8), dimension(nx,ny,nz), device                                :: rho, u, v, w, p, T
+    real(8), dimension(nx,ny,nz), device                                :: rho, u, v, w, p, T, fd
     real(8), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E_upwind
     real(8), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F_upwind
     real(8), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G_upwind
@@ -79,9 +79,11 @@ contains
     call calc_G<<<blocksG,threadsG>>>(id_muscl,rho,u,v,w,p,G_upwind)
     stat = cudaDeviceSynchronize()
 
-    call calc_E_hybrid<<<blocksE,threadsE>>>(dx,dy,rho,u,v,w,E_upwind,E)
-    call calc_F_hybrid<<<blocksF,threadsF>>>(dx,dy,rho,u,v,w,F_upwind,F)
-    call calc_G_hybrid<<<blocksG,threadsG>>>(dx,dy,rho,u,v,w,G_upwind,G)
+    call calc_Ducros<<<blocks,threads>>>(dx,dy,u,v,w,fd)
+    stat = cudaDeviceSynchronize()
+    call calc_E_hybrid<<<blocksE,threadsE>>>(u,v,w,fd,E_upwind,E)
+    call calc_F_hybrid<<<blocksF,threadsF>>>(u,v,w,fd,F_upwind,F)
+    call calc_G_hybrid<<<blocksG,threadsG>>>(u,v,w,fd,G_upwind,G)
     stat = cudaDeviceSynchronize()
     !print *, trim(cudaGetErrorString(cudaGetLastError()))
 
