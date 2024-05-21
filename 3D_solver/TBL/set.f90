@@ -53,7 +53,7 @@ contains
 
     y(1) = 0.d0
     do j = 1, ny-1
-      dy(j) = max(0.25d0, 2.d0 * dble(j)/dble(ny)) * dy1
+      dy(j) = max(0.1d0, 2.d0 * dble(j)/dble(ny)) * dy1
       !dy(j) = dy1
       y(j+1) = y(j) + dy(j)
     enddo
