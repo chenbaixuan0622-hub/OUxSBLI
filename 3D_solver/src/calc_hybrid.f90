@@ -79,11 +79,12 @@ contains
     !E_tvd(:) = phi * E_keep(i-offset+1,j-offset,k-offset,:) + (1.d0 - phi) * E_upwind(i-offset+1,j-offset,k-offset,:)
 
     fdx = max(fd(i,j,k), fd(i+1,j,k))
-    if (0.4d0 <= fdx) then
-      fdx = 1.d0
-    else
-      fdx = 0.d0
-    endif
+    !if (0.4d0 <= fdx) then
+    !  fdx = 1.d0
+    !else
+    !  fdx = 0.d0
+    !endif
+    fdx = min(1.d0, max(0.d0, fdx))
     E(i-offset+1,j-offset,k-offset,:) = (1.d0 - fdx) * E(i-offset+1,j-offset,k-offset,:) &
     & + fdx * E_upwind(i-offset+1,j-offset,k-offset,:)
   end subroutine calc_E_hybrid
@@ -116,11 +117,12 @@ contains
     !F_tvd(:) = phi * F_keep(i-offset,j-offset+1,k-offset,:) + (1.d0 - phi) * F_upwind(i-offset,j-offset+1,k-offset,:)
 
     fdy = max(fd(i,j,k), fd(i,j+1,k))
-    if (0.4d0 <= fdy) then
-      fdy = 1.d0
-    else
-      fdy = 0.d0
-    endif
+    !if (0.4d0 <= fdy) then
+    !  fdy = 1.d0
+    !else
+    !  fdy = 0.d0
+    !endif
+    fdy = min(1.d0, max(fdy, 0.d0))
     F(i-offset,j-offset+1,k-offset,:) = (1.d0 - fdy) * F(i-offset,j-offset+1,k-offset,:) &
     & + fdy * F_upwind(i-offset,j-offset+1,k-offset,:)
   end subroutine calc_F_hybrid
@@ -153,11 +155,12 @@ contains
     !G_tvd(:) = phi * G_keep(i-offset,j-offset,k-offset+1,:) + (1.d0 - phi) * G_upwind(i-offset,j-offset,k-offset+1,:)
     
     fdz = max(fd(i,j,k), fd(i,j,k+1))
-    if (0.4d0 <= fdz) then
-      fdz = 1.d0
-    else
-      fdz = 0.d0
-    endif
+    !if (0.4d0 <= fdz) then
+    !  fdz = 1.d0
+    !else
+    !  fdz = 0.d0
+    !endif
+    fdz = min(1.d0, max(0.d0, fdz))
     G(i-offset,j-offset,k-offset+1,:) = (1.d0 - fdz) * G(i-offset,j-offset,k-offset+1,:) &
     & + fdz * G_upwind(i-offset,j-offset,k-offset+1,:)
   end subroutine calc_G_hybrid
