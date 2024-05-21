@@ -27,6 +27,7 @@ program main
   use set_coordinate
   use calc_time_dev
   implicit none
+  integer i, j
   real(8) t_start, t_end
   real(8), allocatable :: x(:), xix(:), dx(:), y(:), etay(:), dy(:), z(:), Jacobian(:,:)
   real(8), allocatable :: Vin(:,:)
@@ -43,6 +44,15 @@ program main
   call cpu_time(t_start)
   call RungeKutta(id_RungeKutta,x,dx,xix,y,dy,etay,z,Jacobian,Q,Vin)
   call cpu_time(t_end)
+
+  ! save data
+  do j = 1, ny
+    do i = 1, nx
+      Q(i,j,:,:) = Jacobian(i,j) * Q(i,j,:,:)
+  enddo;enddo
+  open(10,file="recal/Q.dat",status="replace",action="write",form="unformatted",access="stream")
+  write(10) Q
+  close(10)
   print *, "elapsed time:", t_end - t_start
 
   deallocate(Q,x,xix,dx,y,etay,dy,z,Jacobian,Vin)

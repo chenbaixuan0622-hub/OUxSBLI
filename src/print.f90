@@ -17,12 +17,22 @@ module print
       real(8), intent(in), optional :: mut(nx,ny,nz)
     end subroutine print_vtk_3D
   end interface
+
+  interface mean
+    module procedure mean1D, mean3D
+  end interface
 contains
-  function mean(a) result(ans)
+  function mean1D(a) result(ans)
+    real(8), intent(in) :: a(:)
+    real(8) ans
+    ans = sum(a) / size(a)
+  end function mean1D
+
+  function mean3D(a) result(ans)
     real(8), intent(in) :: a(:,:,:)
     real(8) ans
     ans = sum(a) / size(a)
-  end function mean
+  end function mean3D
 
   subroutine calc_vorticity(x,y,z,u,v,w,omegax,omegay,omegaz)
     real(8), intent(in)                             :: x(nx), y(ny), z(nz)
@@ -86,6 +96,38 @@ contains
     write(10,"(2e12.4)") t, enstrophy
     close(10)
   end subroutine print_enstrophy
+
+  function mu(T) result(ans)
+    real(8), intent(in), value :: T
+    real(8) :: ans
+    real(8) :: mu0 = 1.716d-5
+    real(8) :: T0 = 273.2d0
+    real(8) :: S = 111.d0
+    ans = mu0 * ((T0 + S) / (T + S)) * (T / T0)**1.5d0
+  end function mu
+  
+  subroutine print_turbulent_boundary_layer(dy,y,rho,T,u)
+    real(8), intent(in), value                :: dy
+    real(8), intent(in), dimension(ny)        :: y
+    real(8), intent(in), dimension(nx,nz)     :: rho, T
+    real(8), intent(in), dimension(nx,ny,nz)  :: u
+    integer j
+    integer :: nx1 = int(0.2 * nx)
+    real(8) rhow, nuw, dudy, tw, ut
+    real(8), dimension(ny) :: yplus, uplus
+    rhow = mean(rho(nx1,:))
+    nuw = mu(mean(T(nx1,:))) / rhow
+    dudy = dy * mean(-u(nx1,1,:) + u(nx1,2,:))
+    tw = rhow * nuw * dudy
+    ut = sqrt(tw / rhow)
+    open(10,file="data/yplus.d",action="write")
+    do j = 1, ny
+      yplus(j) = ut * y(j) / nuw
+      uplus(j) = mean(u(nx1,j,:)) / ut
+      write(10,"(2e12.4)") yplus(j), uplus(j)
+    enddo
+    close(10)
+  end subroutine print_turbulent_boundary_layer
 
   subroutine print_boundary_layer(y,u)
     real(8), intent(in), dimension(ny) :: y, u
@@ -179,11 +221,12 @@ contains
     real(8), intent(inout)                :: ke0, entropy0
     real(8), intent(in), optional         :: mut(nx,ny,nz)
     integer i, j, k, l
-    real(8), allocatable :: rho(:,:,:), u(:,:,:), v(:,:,:), w(:,:,:), p(:,:,:), nut(:,:,:)
+    real(8) dy
+    real(8), allocatable :: rho(:,:,:), u(:,:,:), v(:,:,:), w(:,:,:), p(:,:,:), nut(:,:,:), Tw(:,:)
     character(len=40) filename
     character :: lf*1
     lf = char(10)
-    allocate(rho(nx,ny,nz),u(nx,ny,nz),v(nx,ny,nz),w(nx,ny,nz),p(nx,ny,nz))
+    allocate(rho(nx,ny,nz),u(nx,ny,nz),v(nx,ny,nz),w(nx,ny,nz),p(nx,ny,nz),Tw(nx,nz))
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
@@ -231,7 +274,10 @@ contains
     call print_KE(step,rho,u,v,w,ke0)
     call print_enstrophy(step,x,y,z,rho,u,v,w)
     call print_boundary_layer(y,u(int(0.5*nx),:,int(0.5*nz)))
-    deallocate(rho,u,v,w,p)
+    dy = 1.d0 / (-y(1) + y(2))
+    Tw(:,:) = p(:,1,:) / (R * rho(:,1,:))
+    call print_turbulent_boundary_layer(dy,y,rho(:,1,:),Tw,u)
+    deallocate(rho,u,v,w,p,Tw)
   end subroutine print_vtk_3D
 end module print
 

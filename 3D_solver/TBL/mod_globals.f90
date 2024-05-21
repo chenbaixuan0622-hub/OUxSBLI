@@ -30,31 +30,31 @@ module mod_globals
   ! id_slau   ! kind2 slau  !
   !           ! kind4 sd    !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=2), parameter :: id_hybrid = 0
-  integer(kind=2), parameter :: id_muscl = 0
-  integer, parameter         :: id_scheme = 1
+  integer(kind=4), parameter :: id_hybrid = 0
+  integer(kind=8), parameter :: id_muscl = 0
+  integer, parameter         :: id_scheme = 3
   integer(kind=2), parameter :: id_slau = 0
   real(8), parameter         :: dp_max = 0.d0
 
   ! mesh
-  real(8), parameter :: Lx = 24d-3
+  real(8), parameter :: Lx = 20d-3
   real(8), parameter :: Ly = 8d-3
-  real(8), parameter :: Lz = 2d-3
+  real(8), parameter :: Lz = 4d-3
   integer, parameter :: nx = 257
-  integer, parameter :: ny = 321
+  integer, parameter :: ny = 257
   integer, parameter :: nz = 65
   real(8), parameter :: dz = Lz / dble(nz-1)
   real(8), parameter :: dzi = 1.d0 / dz
 
   ! GPU
-  type(dim3) :: blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/11,(nz-accuracy)/1)
+  type(dim3) :: blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/5,(nz-accuracy)/1)
   type(dim3) :: blocksF = dim3((nx-accuracy)/1,(ny-accuracy+1)/32,(nz-accuracy)/3)
-  type(dim3) :: blocksG = dim3((nx-accuracy)/1,(ny-accuracy)/11,(nz-accuracy+1)/32)
-  type(dim3) :: blocks = dim3((nx-accuracy)/1,(ny-accuracy)/11,(nz-accuracy)/3)
-  type(dim3) :: threadsE = dim3(32,11,1)
+  type(dim3) :: blocksG = dim3((nx-accuracy)/1,(ny-accuracy)/5,(nz-accuracy+1)/32)
+  type(dim3) :: blocks = dim3((nx-accuracy)/5,(ny-accuracy)/5,(nz-accuracy)/3)
+  type(dim3) :: threadsE = dim3(32,5,1)
   type(dim3) :: threadsF = dim3(1,32,3)
-  type(dim3) :: threadsG = dim3(1,11,32)
-  type(dim3) :: threads = dim3(1,11,3)
+  type(dim3) :: threadsG = dim3(1,5,32)
+  type(dim3) :: threads = dim3(5,5,3)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
