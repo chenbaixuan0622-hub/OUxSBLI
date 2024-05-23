@@ -22,7 +22,7 @@ end module mod_allocate
 program main
   use, intrinsic :: iso_fortran_env
   use mod_allocate
-  use mod_globals, only : id_RungeKutta, nx, ny, nz, Q
+  use mod_globals, only : id_recal, id_RungeKutta, nx, ny, nz, Q
   use set
   use set_coordinate
   use calc_time_dev
@@ -38,7 +38,17 @@ program main
   call set_grid(x,y,z,dx,dy)
   call set_xix(dx,xix)
   call set_etay(dy,etay)
-  call set_init(x,y,z,Q,Vin)
+  if (kind(id_recal) == 4) then
+    write(*,*) "simulation restarted"
+    open(10,file="recal/Q.dat",action="read",form="unformatted",access="stream")
+    read(10) Q
+    close(10)
+  elseif (kind(id_recal) == 2) then
+    write(*,*) "set initial condition"
+    call set_init(x,y,z,Q,Vin)
+  else
+    write(*,*) "wrong paramater was found"
+  endif
   call set_Jacobian(dx,dy,Jacobian)
 
   call cpu_time(t_start)

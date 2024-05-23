@@ -67,7 +67,7 @@ contains
     real(8), intent(out), dimension(nx,ny,nz,5) :: Q
     real(8), intent(in), dimension(ny,2)        :: Vin
     integer i, j, k
-    integer :: No = int(0.25 * nx)
+    integer :: No = int(0.3 * nx)
     real(8) :: d = 0.2d0 * 1.d-3
     real(8) :: eta, u, v, w, p_wall
     ! random
@@ -118,8 +118,8 @@ contains
     real(8), intent(in), device         :: Jacobian(nx,ny)
     real(8), intent(inout), device      :: QJ(nx,ny,nz,5)
     integer i, j, k, l
-    integer :: No = int(0.25 * nx)
-    integer :: Nre = int(0.2 * nx)
+    integer :: No = int(0.3 * nx)
+    integer :: Nre = int(0.25 * nx)
     real(8) :: p_wall
     ! Riemann invariants
     real(8) :: pin, cin, vin, Rp, Rm, rhob, vb, cb, pb
