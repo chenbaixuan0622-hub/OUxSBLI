@@ -1,5 +1,5 @@
 module set
-  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, rho0, u0, p0, T0
+  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, rho0, u0, p0, T0, M0
   implicit none
 contains
   subroutine calc_Blasius(eta,d,u,v)
@@ -53,7 +53,7 @@ contains
 
     y(1) = 0.d0
     do j = 1, ny-1
-      dy(j) = max(0.1d0, 2.d0 * dble(j)/dble(ny)) * dy1
+      dy(j) = max(0.05d0, 2.d0 * dble(j)/dble(ny)) * dy1
       !dy(j) = dy1
       y(j+1) = y(j) + dy(j)
     enddo
@@ -70,15 +70,16 @@ contains
     integer i, j, k
     integer :: No = int(0.25 * nx)
     real(8) :: d = 0.2d0 * 1.d-3
-    real(8) :: eta, u, v, w, p_wall
+    real(8) :: d1= 1.d-3
+    real(8) :: eta, rho, u, v, w, T, p_wall
     ! random
-    real(8) :: ustd
+    real(8) :: ustd, Tstd
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
           eta = ys(j) / d
           call calc_Blasius(eta,d,u,v)
-          if (ys(j) <= d) then
+          if (ys(j) <= d1) then
             call random_number(ustd)
             ustd = 2.d0 * ustd - 1.d0
           else
@@ -88,7 +89,10 @@ contains
           u = u + ustd
           v = v + 0.5d0 * ustd
           w = 0.5d0 * ustd
-          Q(i,j,k,1) = rho0
+          Tstd = T0 * (gamma - 1.d0) * M0**2 / u0
+          T = T0 + Tstd
+          rho = p0 / (R * T)
+          Q(i,j,k,1) = rho
           Q(i,j,k,2) = Q(i,j,k,1) * u
           Q(i,j,k,3) = Q(i,j,k,1) * v
           Q(i,j,k,4) = Q(i,j,k,1) * w
