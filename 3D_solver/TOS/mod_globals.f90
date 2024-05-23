@@ -42,19 +42,19 @@ module mod_globals
   real(8), parameter :: Lz = 4d-3
   integer, parameter :: nx = 513
   integer, parameter :: ny = 321
-  integer, parameter :: nz = 65
+  integer, parameter :: nz = 33
   real(8), parameter :: dz = Lz / dble(nz-1)
   real(8), parameter :: dzi = 1.d0 / dz
 
   ! GPU
   type(dim3) :: blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/11,(nz-accuracy)/1)
-  type(dim3) :: blocksF = dim3((nx-accuracy)/1,(ny-accuracy+1)/32,(nz-accuracy)/3)
+  type(dim3) :: blocksF = dim3((nx-accuracy)/1,(ny-accuracy+1)/32,(nz-accuracy)/1)
   type(dim3) :: blocksG = dim3((nx-accuracy)/1,(ny-accuracy)/11,(nz-accuracy+1)/32)
-  type(dim3) :: blocks = dim3((nx-accuracy)/1,(ny-accuracy)/11,(nz-accuracy)/3)
+  type(dim3) :: blocks = dim3((nx-accuracy)/7,(ny-accuracy)/11,(nz-accuracy)/1)
   type(dim3) :: threadsE = dim3(32,11,1)
-  type(dim3) :: threadsF = dim3(1,32,3)
+  type(dim3) :: threadsF = dim3(1,32,1)
   type(dim3) :: threadsG = dim3(1,11,32)
-  type(dim3) :: threads = dim3(1,11,3)
+  type(dim3) :: threads = dim3(7,11,1)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -63,8 +63,8 @@ module mod_globals
   !               ! kind8 ! 10step  !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_RungeKutta = 0
-  integer, parameter :: nt = 500
-  integer, parameter :: np = 40
+  integer, parameter :: nt = 250
+  integer, parameter :: np = 80
   real(8), parameter :: u0 = 506.8d0
   real(8), parameter :: dt = 0.1d0 * (Lx / dble(nx-1)) / u0
 

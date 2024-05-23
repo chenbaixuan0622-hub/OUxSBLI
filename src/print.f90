@@ -19,7 +19,7 @@ module print
   end interface
 
   interface mean
-    module procedure mean1D, mean3D
+    module procedure mean1D, mean2D, mean3D
   end interface
 contains
   function mean1D(a) result(ans)
@@ -27,6 +27,12 @@ contains
     real(8) ans
     ans = sum(a) / size(a)
   end function mean1D
+
+  function mean2D(a) result(ans)
+    real(8), intent(in) :: a(:,:)
+    real(8) ans
+    ans = sum(a) / size(a)
+  end function mean2D
 
   function mean3D(a) result(ans)
     real(8), intent(in) :: a(:,:,:)
@@ -106,24 +112,27 @@ contains
     ans = mu0 * ((T0 + S) / (T + S)) * (T / T0)**1.5d0
   end function mu
   
-  subroutine print_turbulent_boundary_layer(dy,y,rho,T,u)
+  subroutine print_turbulent_boundary_layer(dy,y,T,u,rho)
     real(8), intent(in), value                :: dy
     real(8), intent(in), dimension(ny)        :: y
-    real(8), intent(in), dimension(nx,nz)     :: rho, T
-    real(8), intent(in), dimension(nx,ny,nz)  :: u
+    real(8), intent(in), dimension(nx,nz)     :: T
+    real(8), intent(in), dimension(nx,ny,nz)  :: u, rho
     integer j
-    integer :: nx1 = int(0.2 * nx)
-    real(8) rhow, nuw, dudy, tw, ut
+    real(8) rhow, nuw, dudy, tw, ut, uvd
     real(8), dimension(ny) :: yplus, uplus
-    rhow = mean(rho(nx1,:))
-    nuw = mu(mean(T(nx1,:))) / rhow
-    dudy = dy * mean(-u(nx1,1,:) + u(nx1,2,:))
+    rhow = mean(rho(:,1,:))
+    nuw = mu(mean(T(:,:))) / rhow
+    dudy = dy * mean(-u(:,1,:) + u(:,2,:))
     tw = rhow * nuw * dudy
     ut = sqrt(tw / rhow)
     open(10,file="data/yplus.d",action="write")
-    do j = 1, ny
+    yplus(1) = ut * y(1) / nuw
+    uplus(1) = mean(u(:,1,:)) / ut
+    do j = 2, ny
       yplus(j) = ut * y(j) / nuw
-      uplus(j) = mean(u(nx1,j,:)) / ut
+      ! van Driest transformation
+      uvd = mean(u(:,j-1,:)) + sqrt(mean(rho(:,j,:)) / rhow) * (-mean(u(:,j-1,:)) + mean(u(:,j,:)))
+      uplus(j) = uvd / ut
       write(10,"(2e12.4)") yplus(j), uplus(j)
     enddo
     close(10)
@@ -276,7 +285,7 @@ contains
     call print_boundary_layer(y,u(int(0.5*nx),:,int(0.5*nz)))
     dy = 1.d0 / (-y(1) + y(2))
     Tw(:,:) = p(:,1,:) / (R * rho(:,1,:))
-    call print_turbulent_boundary_layer(dy,y,rho(:,1,:),Tw,u)
+    call print_turbulent_boundary_layer(dy,y,Tw,u,rho)
     deallocate(rho,u,v,w,p,Tw)
   end subroutine print_vtk_3D
 end module print
