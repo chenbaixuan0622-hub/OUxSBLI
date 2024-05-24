@@ -1,5 +1,5 @@
 module set
-  use mod_globals, only : accuracy, offset, nx, ny, nz, dx, dy, dz, gamma, R, RHO0, L0, M0, V0, p0, T, dtn
+  use mod_globals, only : accuracy, offset, nx, ny, nz, Lx, Ly, Lz, gamma, R, RHO0, L0, M0, V0, p0, T, dtn
   implicit none
 
   interface set_bc
@@ -15,21 +15,29 @@ contains
     x = x1 + (x1 + x2) * (/ (dble(i - 1) / dble(n - 1), i = 1, n) /)
   end function linspace
 
-  subroutine set_grid(x,y,z)
-    real(8), intent(out), dimension(nx,ny,nz) :: x, y, z
+  subroutine set_grid(x,y,z,dx,dy)
+    real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx), dy(ny)
     integer i, j, k
+    real(8) :: dx1 = Lx / dble(nx-1)
+    real(8) :: dy1 = Ly / dble(ny-1)
+    real(8) :: dz1 = Lz / dble(nz-1)
+    x(1) = 0.d0
+    do i = 1, nx-1
+      dx(i) = dx1
+      x(i+1) = x(i) + dx(i)
+    enddo
+    y(1) = 0.d0
+    do j = 1, ny-1
+      dy(j) = dy1
+      y(j+1) = y(j) + dy(j)
+    enddo
     do k = 1, nz
-      do j = 1, ny
-        do i = 1, nx
-          x(i,j,k) = dble(i-1) * dx
-          y(i,j,k) = dble(j-1) * dy
-          z(i,j,k) = dble(k-1) * dz
-        enddo
-      enddo
+      z(k) = dble(k-1) * dz1
     enddo
   end subroutine set_grid
   
-  subroutine set_init(Q,Vin)
+  subroutine set_init(xs,ys,zs,Q,Vin)
+    real(8), intent(in) :: xs(nx), ys(ny), zs(nz)
     real(8), intent(out), dimension(nx,ny,nz,5) :: Q
     real(8), intent(in), dimension(ny,2) :: Vin
     integer i, j, k
@@ -58,9 +66,7 @@ contains
           Q(i,j,k,4) = 0.d0
           ! p / (gamma - 1) + 0.5 * (rhou ** 2 + rhov ** 2 ) / rho
           Q(i,j,k,5) = p / (gamma - 1.d0) + 0.5d0 * (Q(i,j,k,2) ** 2 + Q(i,j,k,3) ** 2) / Q(i,j,k,1)
-        enddo
-      enddo
-    enddo
+    enddo;enddo;enddo
     if (accuracy == 2) then
       call set_bc_init2(Q)
     else
@@ -75,15 +81,13 @@ contains
       do j = 2, ny-1
         Q(1,j,k,:) = Q(nx-1,j,k,:)
         Q(nx,j,k,:) = Q(2,j,k,:)
-      enddo
-    enddo
+    enddo;enddo
 
     do k = 2, nz-1
       do i = 2, nx-1
         Q(i,1,k,:) = Q(i,ny-1,k,:)
         Q(i,ny,k,:) = Q(i,2,k,:)
-      enddo
-    enddo
+    enddo;enddo
 
     do k = 2, nz-1
       Q(1,1,k,:) = Q(nx-1,ny-1,k,:)
@@ -96,8 +100,7 @@ contains
       do i = 1, nx
         Q(i,j,1,:) = Q(i,j,nz-1,:)
         Q(i,j,nz,:) = Q(i,j,2,:)
-      enddo
-    enddo
+    enddo;enddo
   end subroutine set_bc_init2
 
   subroutine set_bc_init4(Q)
@@ -108,15 +111,13 @@ contains
       do j = 3, ny-2
         Q(1:2,j,k,:) = Q(nx-3:nx-2,j,k,:)
         Q(nx-1:nx,j,k,:) = Q(3:4,j,k,:)
-      enddo
-    enddo
+    enddo;enddo
 
     do k = 3, nz-2
       do i = 3, nx-2
         Q(i,1:2,k,:) = Q(i,ny-3:ny-2,k,:)
         Q(i,ny-1:ny,k,:) = Q(i,3:4,k,:)
-      enddo
-    enddo
+    enddo;enddo
 
     do k = 3, nz-2
       Q(1:2,1:2,k,:) = Q(nx-3:nx-2,ny-3:ny-2,k,:)
@@ -129,16 +130,15 @@ contains
       do i = 1, nx
         Q(i,j,1:2,:) = Q(i,j,nz-3:nz-2,:)
         Q(i,j,nz-1:nz,:) = Q(i,j,3:4,:)
-      enddo
-    enddo
+    enddo;enddo
   end subroutine set_bc_init4
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine set_bc2(id_accuracy,Q,T)
-    integer(kind=2), intent(in), value :: id_accuracy
-    real(8), intent(inout), device :: Q(nx,ny,nz,5)
-    real(8), intent(inout), device :: T(nx,ny,nz)
+  subroutine set_bc2(id_accuracy,Jacobian,Q)
+    integer(kind=2), intent(in), value  :: id_accuracy
+    real(8), intent(in), device         :: Jacobian(nx,ny)
+    real(8), intent(inout), device      :: Q(nx,ny,nz,5)
     integer i, j, k, l
     !$cuf kernel do(3) <<<*,*>>>
     do l = 1, 5
@@ -146,9 +146,7 @@ contains
         do j = 2, ny-1
           Q(1,j,k,l) = Q(nx-1,j,k,l)
           Q(nx,j,k,l) = Q(2,j,k,l)
-        enddo
-      enddo
-    enddo
+    enddo;enddo;enddo
 
     !$cuf kernel do(3) <<<*,*>>>
     do l = 1, 5
@@ -156,9 +154,7 @@ contains
         do i = 2, nx-1
           Q(i,1,k,l) = Q(i,ny-1,k,l)
           Q(i,ny,k,l) = Q(i,2,k,l)
-        enddo
-      enddo
-    enddo
+    enddo;enddo;enddo
 
     !$cuf kernel do(2) <<<*,*>>>
     do l = 1, 5
@@ -167,8 +163,7 @@ contains
         Q(nx,1,k,l) = Q(2,ny-1,k,l)
         Q(1,ny,k,l) = Q(nx-1,2,k,l)
         Q(nx,ny,k,l) = Q(2,2,k,l)
-      enddo
-    enddo
+    enddo;enddo
 
     !$cuf kernel do(3) <<<*,*>>>
     do l = 1, 5
@@ -176,15 +171,13 @@ contains
         do i = 1, nx
           Q(i,j,1,l) = Q(i,j,nz-1,l)
           Q(i,j,nz,l) = Q(i,j,2,l)
-        enddo
-      enddo
-    enddo
+    enddo;enddo;enddo
   end subroutine set_bc2
 
-  subroutine set_bc4(id_accuracy,Q,T)
-    integer(kind=4), intent(in), value :: id_accuracy
-    real(8), intent(inout), device :: Q(nx,ny,nz,5)
-    real(8), intent(inout), device :: T(nx,ny,nz)
+  subroutine set_bc4(id_accuracy,Jacobian,Q)
+    integer(kind=4), intent(in), value  :: id_accuracy
+    real(8), intent(in), device         :: Jacobian(nx,ny)
+    real(8), intent(inout), device      :: Q(nx,ny,nz,5)
     integer i, j, k, l
   
     !$cuf kernel do(3) <<<*,*>>>
@@ -193,9 +186,7 @@ contains
         do j = 3, ny-2
           Q(1:2,j,k,l) = Q(nx-3:nx-2,j,k,l)
           Q(nx-1:nx,j,k,l) = Q(3:4,j,k,l)
-        enddo
-      enddo
-    enddo
+    enddo;enddo;enddo
   
     !$cuf kernel do(3) <<<*,*>>>
     do l = 1, 5
@@ -203,9 +194,7 @@ contains
         do i = 3, nx-2
           Q(i,1:2,k,l) = Q(i,ny-3:ny-2,k,l)
           Q(i,ny-1:ny,k,l) = Q(i,3:4,k,l)
-        enddo
-      enddo
-    enddo
+    enddo;enddo;enddo
   
     !$cuf kernel do(2) <<<*,*>>>
     do l = 1, 5
@@ -214,8 +203,7 @@ contains
         Q(nx-1:nx,1:2,k,l) = Q(3:4,ny-3:ny-2,k,l)
         Q(1:2,ny-1:ny,k,l) = Q(nx-3:nx-2,3:4,k,l)
         Q(nx-1:nx,ny-1:ny,k,l) = Q(3:4,3:4,k,l)
-      enddo
-    enddo
+    enddo;enddo
   
     !$cuf kernel do(3) <<<*,*>>>
     do l = 1, 5
@@ -223,9 +211,7 @@ contains
         do i = 1, nx
           Q(i,j,1:2,l) = Q(i,j,nz-3:nz-2,l)
           Q(i,j,nz-1:nz,l) = Q(i,j,3:4,l)
-        enddo
-      enddo
-    enddo
+    enddo;enddo;enddo
   end subroutine set_bc4
 
   subroutine set_bc_mut(mut)
@@ -236,16 +222,14 @@ contains
       do j = 2, ny-1
         mut(1,j,k) = mut(nx-1,j,k)
         mut(nx,j,k) = mut(2,j,k)
-      enddo
-    enddo
+    enddo;enddo
 
     !$cuf kernel do(2) <<<*,*>>>
     do k = 2, nz-1
       do i = 2, nx-1
         mut(i,1,k) = mut(i,ny-1,k)
         mut(i,ny,k) = mut(i,2,k)
-      enddo
-    enddo
+    enddo;enddo
 
     !$cuf kernel do(1) <<<*,*>>>
     do k = 2, nz-1
@@ -260,8 +244,7 @@ contains
       do i = 1, nx
         mut(i,j,1) = mut(i,j,nz-1)
         mut(i,j,nz) = mut(i,j,2)
-      enddo
-    enddo
+    enddo;enddo
   end subroutine set_bc_mut
 end module set
 

@@ -15,29 +15,23 @@ contains
   end function mu
 
   attributes(device) subroutine calc_mu2(T1,T2,mu_mean)
-    real(8), intent(in), value :: T1, T2
-    real(8), intent(out) :: mu_mean
-    real(8) mu1, mu2
+    real(8), intent(in), value  :: T1, T2
+    real(8), intent(out)        :: mu_mean
     mu_mean = 0.5d0 * (mu(T1) + mu(T2)) 
   end subroutine calc_mu2
 
   attributes(device) subroutine calc_mu4(T1,T2,T3,T4,mu_mean)
-    real(8), intent(in), value :: T1, T2, T3, T4
-    real(8), intent(out) :: mu_mean
-    real(8) mu1, mu2, mu3, mu4
+    real(8), intent(in), value  :: T1, T2, T3, T4
+    real(8), intent(out)        :: mu_mean
     mu_mean = 0.25d0 * (mu(T1) + mu(T2) + mu(T3) + mu(T4)) 
   end subroutine calc_mu4
 
   attributes(device) subroutine calc_kappa(T1,T2,kappa)
-    real(8), intent(in), value :: T1, T2
-    real(8), intent(out) :: kappa
-    real(8) kappa1, kappa2, mu1, mu2
+    real(8), intent(in), value  :: T1, T2
+    real(8), intent(out)        :: kappa
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
-    mu1 = mu(T1)
-    mu2 = mu(T2)
-    kappa1 = mu1 * Cp / Pr 
-    kappa2 = mu2 * Cp / Pr
-    kappa =  0.5d0 * (kappa1 + kappa2)
+    kappa =  0.5d0 * (mu(T1) + mu(T2)) * Cp / Pr
+    write(*,*) kappa
   end subroutine calc_kappa
 end module calc_sutherland
 
