@@ -1,23 +1,6 @@
 module print
-  use mod_globals, only : nt, nx, ny, nz, dt, gamma, R
+  use mod_globals, only : nt, dt, gamma, R
   implicit none
-  interface print_vtk
-    subroutine print_vtk_2D(step,x,y,Q,T)
-      integer, intent(in)           :: step
-      real(8), intent(in)           :: x(nx), y(ny)
-      real(8), intent(in)           :: Q(nx,ny,4)
-      real(8), intent(in), optional :: T(nx,ny)
-    end subroutine print_vtk_2D
-
-    subroutine print_vtk_3D(step,x,y,z,Jacobian,QJ,ke0,entropy0,mut)
-      integer, intent(in)           :: step
-      real(8), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny)
-      real(8), intent(in)           :: QJ(nx,ny,nz,5)
-      real(8), intent(inout)        :: ke0, entropy0
-      real(8), intent(in), optional :: mut(nx,ny,nz)
-    end subroutine print_vtk_3D
-  end interface
-
   interface mean
     module procedure mean1D, mean2D, mean3D
   end interface
@@ -40,7 +23,8 @@ contains
     ans = sum(a) / size(a)
   end function mean3D
 
-  subroutine calc_vorticity(x,y,z,u,v,w,omegax,omegay,omegaz)
+  subroutine calc_vorticity(nx,ny,nz,x,y,z,u,v,w,omegax,omegay,omegaz)
+    integer, intent(in)                             :: nx, ny, nz
     real(8), intent(in)                             :: x(nx), y(ny), z(nz)
     real(8), intent(in), dimension(nx,ny,nz)        :: u, v, w
     real(8), intent(out), dimension(nx-2,ny-2,nz-2) :: omegax, omegay, omegaz
@@ -57,8 +41,8 @@ contains
     enddo;enddo;enddo
   end subroutine calc_vorticity
 
-  subroutine print_entropy(step,rho,p,entropy0)
-    integer, intent(in)                       :: step
+  subroutine print_entropy(step,nx,ny,nz,rho,p,entropy0)
+    integer, intent(in)                       :: step, nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz)  :: rho, p
     real(8), intent(inout)                    :: entropy0
     real(8) entropy, t
@@ -72,8 +56,8 @@ contains
     close(10)
   end subroutine print_entropy
 
-  subroutine print_KE(step,rho,u,v,w,ke0)
-    integer, intent(in)                       :: step
+  subroutine print_KE(step,nx,ny,nz,rho,u,v,w,ke0)
+    integer, intent(in)                       :: step, nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz)  :: rho, u, v, w
     real(8), intent(inout)                    :: ke0
     real(8) ke, t
@@ -88,14 +72,14 @@ contains
     close(10)
   end subroutine print_KE
 
-  subroutine print_enstrophy(step,x,y,z,rho,u,v,w)
-    integer, intent(in)                       :: step
+  subroutine print_enstrophy(step,nx,ny,nz,x,y,z,rho,u,v,w)
+    integer, intent(in)                       :: step, nx, ny, nz
     real(8), intent(in)                       :: x(nx), y(ny), z(nz)
     real(8), intent(in), dimension(nx,ny,nz)  :: rho, u, v, w
     real(8) enstrophy, t
     real(8), dimension(nx-2,ny-2,nz-2) :: omegax, omegay, omegaz
     t = nt * step * dt
-    call calc_vorticity(x,y,z,u,v,w,omegax,omegay,omegaz)
+    call calc_vorticity(nx,ny,nz,x,y,z,u,v,w,omegax,omegay,omegaz)
     enstrophy = mean(0.5d0 * rho(2:nx-1,2:ny-1,2:nz-1) * (omegax**2 + omegay**2 + omegaz**2))
     open(10,file="data/enstrophy.d", position="append")
     !write(10,"(2(f9.4,1x))") t, enstrophy
@@ -112,8 +96,8 @@ contains
     ans = mu0 * ((T0 + S) / (T + S)) * (T / T0)**1.5d0
   end function mu
   
-  subroutine print_turbulent_boundary_layer(step,dy,y,T,u,rho)
-    integer, intent(in), value                :: step
+  subroutine print_turbulent_boundary_layer(step,nx,ny,nz,dy,y,T,u,rho)
+    integer, intent(in), value                :: step, nx, ny, nz
     real(8), intent(in), value                :: dy
     real(8), intent(in), dimension(ny)        :: y
     real(8), intent(in), dimension(nx,nz)     :: T
@@ -143,12 +127,14 @@ contains
     close(10)
   end subroutine print_turbulent_boundary_layer
 
-  subroutine print_boundary_layer(y,u)
-    real(8), intent(in), dimension(ny) :: y, u
+  subroutine print_boundary_layer(nx,ny,nz,y,u)
+    integer, intent(in) :: nx, ny, nz
+    real(8), intent(in) :: y(ny)
+    real(8), intent(in) :: u(nx,ny,nz)
     integer j
     open(10,file="data/boundary_layer.d",action="write")
     do j = 1, ny
-      write(10,"(2(f12.7,1x))") y(j), u(j)/u(ny)
+      write(10,"(2(f12.7,1x))") y(j), mean(u(:,j,:))/mean(u(:,ny,:))
     enddo
     close(10)
   end subroutine print_boundary_layer
@@ -181,55 +167,8 @@ contains
     write(10) lf//'POINT_DATA'//str4//lf
   end subroutine print_header
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-  subroutine print_vtk_2D(step,x,y,Q,T)
-    integer, intent(in)                   :: step
-    real(8), intent(in)                   :: x(nx), y(ny)
-    real(8), intent(in)                   :: Q(nx,ny,4)
-    real(8), intent(in), optional         :: T(nx,ny)
-    integer i, j
-    real(8), dimension(nx,ny) :: rho, u, v, p
-    real(8) :: z(1) = 0.d0
-    character(len=40) filename
-    character :: lf*1
-    lf = char(10)
-    do j = 1, ny
-      do i = 1, nx
-        rho(i,j) = Q(i,j,1)
-        u(i,j) = Q(i,j,2) / rho(i,j)
-        v(i,j) = Q(i,j,3) / rho(i,j)
-        p(i,j) = (gamma - 1.d0) * (Q(i,j,4) - 0.5d0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
-    enddo;enddo
-
-    write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtk"
-    open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="BIG_ENDIAN")
-    call print_header(nx,ny,1,x,y,z)
-
-    write(10) 'VECTORS Velocity float'//lf
-    do j = 1, ny
-      do i = 1, nx
-        write(10) real(u(i,j)), real(v(i,j)), 0.e0
-    enddo;enddo
-
-    write(10) lf//'SCALARS rho float'//lf
-    write(10) 'LOOKUP_TABLE default'//lf
-    write(10) real(rho), lf
-    
-    write(10) lf//'SCALARS P float'//lf
-    write(10) 'LOOKUP_TABLE default'//lf
-    write(10) real(p), lf
-
-    write(10) lf//'SCALARS T float'//lf
-    write(10) 'LOOKUP_TABLE default'//lf
-    write(10) real(T), lf
-    close(10)
-  
-    call print_boundary_layer(y,u(int(0.5*nx),:))
-  end subroutine print_vtk_2D
-  
-  subroutine print_vtk_3D(step,x,y,z,Jacobian,QJ,ke0,entropy0,mut)
-    integer, intent(in)                   :: step
+  subroutine print_vtk(step,nx,ny,nz,x,y,z,Jacobian,QJ,ke0,entropy0,mut)
+    integer, intent(in)                   :: step, nx, ny, nz
     real(8), intent(in)                   :: x(nx), y(ny), z(nz), Jacobian(nx,ny)
     real(8), intent(in)                   :: QJ(nx,ny,nz,5) ! Q / Jacobian
     real(8), intent(inout)                :: ke0, entropy0
@@ -284,14 +223,14 @@ contains
     endif
     close(10)
 
-    call print_entropy(step,rho,p,entropy0)
-    call print_KE(step,rho,u,v,w,ke0)
-    call print_enstrophy(step,x,y,z,rho,u,v,w)
-    call print_boundary_layer(y,u(int(0.5*nx),:,int(0.5*nz)))
+    call print_entropy(step,nx,ny,nz,rho,p,entropy0)
+    call print_KE(step,nx,ny,nz,rho,u,v,w,ke0)
+    call print_enstrophy(step,nx,ny,nz,x,y,z,rho,u,v,w)
+    call print_boundary_layer(nx,ny,nz,y,u)
     dy = 1.d0 / (-y(1) + y(2))
     Tw(:,:) = p(:,1,:) / (R * rho(:,1,:))
-    call print_turbulent_boundary_layer(step,dy,y,Tw,u,rho)
+    call print_turbulent_boundary_layer(step,nx,ny,nz,dy,y,Tw,u,rho)
     deallocate(rho,u,v,w,p,Tw)
-  end subroutine print_vtk_3D
+  end subroutine print_vtk
 end module print
 
