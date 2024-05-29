@@ -1,9 +1,10 @@
 module calc_hybrid
   use cudafor
-  use mod_globals, only : accuracy, offset, nx, ny, nz, dzi
+  use mod_globals, only : accuracy, offset, dzi
   implicit none
 contains
-  attributes(global) subroutine calc_Ducros(dx,dy,u,v,w,fd)
+  attributes(global) subroutine calc_Ducros(nx,ny,nz,dx,dy,u,v,w,fd)
+    integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
     real(8), intent(in), dimension(nx,ny,nz), device  :: u, v, w
@@ -51,7 +52,8 @@ contains
     endif
   end subroutine calc_Ducros
 
-  attributes(global) subroutine calc_E_hybrid(u,v,w,fd,E_upwind,E)
+  attributes(global) subroutine calc_E_hybrid(nx,ny,nz,u,v,w,fd,E_upwind,E)
+    integer, intent(in), value                                                          :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device                                    :: u, v, w, fd
     real(8), intent(in), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device     :: E_upwind
     real(8), intent(inout), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device  :: E
@@ -89,7 +91,8 @@ contains
     & + fdx * E_upwind(i-offset+1,j-offset,k-offset,:)
   end subroutine calc_E_hybrid
   
-  attributes(global) subroutine calc_F_hybrid(u,v,w,fd,F_upwind,F)
+  attributes(global) subroutine calc_F_hybrid(nx,ny,nz,u,v,w,fd,F_upwind,F)
+    integer, intent(in), value                                                          :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device                                    :: u, v, w, fd
     real(8), intent(in), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device     :: F_upwind
     real(8), intent(inout), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device  :: F
@@ -127,7 +130,8 @@ contains
     & + fdy * F_upwind(i-offset,j-offset+1,k-offset,:)
   end subroutine calc_F_hybrid
 
-  attributes(global) subroutine calc_G_hybrid(u,v,w,fd,G_upwind,G)
+  attributes(global) subroutine calc_G_hybrid(nx,ny,nz,u,v,w,fd,G_upwind,G)
+    integer, intent(in), value                                                          :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device                                    :: u, v, w, fd
     real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device     :: G_upwind
     real(8), intent(inout), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device  :: G

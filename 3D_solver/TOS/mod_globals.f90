@@ -62,11 +62,15 @@ module mod_globals
   !               ! kind4 ! 4th     !
   !               ! kind8 ! 10step  !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_recal      ! kind2 ! set 0   !
+  !               ! kind4 ! recal   !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_RungeKutta = 0
+  integer(kind=2), parameter :: id_recal = 0
   integer, parameter :: nt = 250
-  integer, parameter :: np = 80
+  integer, parameter :: np = 100
   real(8), parameter :: u0 = 506.8d0
-  real(8), parameter :: dt = 0.1d0 * (Lx / dble(nx-1)) / u0
+  real(8), parameter :: dt = 1d-8!0.1d0 * (Lx / dble(nx-1)) / u0
 
   real(8), parameter :: dtdz = dt / dz
 
