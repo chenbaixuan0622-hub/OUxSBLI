@@ -1,12 +1,26 @@
 module calc_physical_quantities
   use cudafor
-  use mod_globals, only : nx, ny, nz, gamma, R, dim => dimension
+  use mod_globals, only : gamma, R, dim => dimension
   implicit none
   interface calc_quantities
     module procedure calc_quantities_2D, calc_quantities_3D
   end interface
-
 contains
+  subroutine calc_mean(step,nx,ny,nz,QJ,Vmean)
+    integer, intent(in), value                            :: step, nx, ny, nz
+    real(8), intent(in), dimension(nx,ny,nz,5), device    :: QJ
+    real(8), intent(inout), dimension(nx,ny,nz,3), device :: Vmean
+    integer i, j, k
+    !$cuf kernel do(3) <<<*,*>>>
+    do k = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          Vmean(i,j,k,1) = ((dble(step) - 1.d0) * Vmean(i,j,k,1) + QJ(i,j,k,2) / QJ(i,j,k,1)) / dble(step)
+          Vmean(i,j,k,2) = ((dble(step) - 1.d0) * Vmean(i,j,k,2) + QJ(i,j,k,3) / QJ(i,j,k,1)) / dble(step)
+          Vmean(i,j,k,3) = ((dble(step) - 1.d0) * Vmean(i,j,k,3) + QJ(i,j,k,4) / QJ(i,j,k,1)) / dble(step)
+    enddo;enddo;enddo
+  end subroutine calc_mean
+
   attributes(device) subroutine set_q(Ql,Qr,rhol,rhor,pl,pr,Vl,Vr)
     real(8), intent(in), dimension(dim+2) :: Ql, Qr
     real(8), intent(out) :: rhol, rhor, pl, pr
@@ -19,7 +33,8 @@ contains
     Vr = Qr(2:dim+1)
   end subroutine set_q
 
-  subroutine calc_quantities_2D(Q,rho,u,v,p,T)
+  subroutine calc_quantities_2D(nx,ny,Q,rho,u,v,p,T)
+    integer, intent(in), value                      :: nx, ny
     real(8), intent(in), dimension(nx,ny,4), device :: Q
     real(8), intent(out), dimension(nx,ny), device  :: rho, u, v, p, T
     integer i, j
@@ -35,7 +50,8 @@ contains
     enddo;enddo
   end subroutine calc_quantities_2D
 
-  subroutine calc_quantities_3D(Jacobian,QJ,rho,u,v,w,p,T)
+  subroutine calc_quantities_3D(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p,T)
+    integer, intent(in), value                          :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny), device       :: Jacobian
     real(8), intent(in), dimension(nx,ny,nz,5), device  :: QJ ! Q / Jacobian
     real(8), intent(out), dimension(nx,ny,nz), device   :: rho, u, v, w, p, T
@@ -46,9 +62,9 @@ contains
       do j = 1, ny
         do i = 1, nx
           rho(i,j,k) = Jacobian(i,j) * QJ(i,j,k,1)
-          u(i,j,k) = Jacobian(i,j) * QJ(i,j,k,2) / rho(i,j,k)
-          v(i,j,k) = Jacobian(i,j) * QJ(i,j,k,3) / rho(i,j,k)
-          w(i,j,k) = Jacobian(i,j) * QJ(i,j,k,4) / rho(i,j,k)
+          u(i,j,k) = QJ(i,j,k,2) / QJ(i,j,k,1)
+          v(i,j,k) = QJ(i,j,k,3) / QJ(i,j,k,1)
+          w(i,j,k) = QJ(i,j,k,4) / QJ(i,j,k,1)
           p(i,j,k) = (gamma - 1.d0) * (Jacobian(i,j) * QJ(i,j,k,5) - 0.5d0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
           T(i,j,k) = p(i,j,k) / (R * rho(i,j,k))
     enddo;enddo;enddo

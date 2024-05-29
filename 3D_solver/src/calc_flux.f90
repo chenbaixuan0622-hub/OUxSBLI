@@ -1,5 +1,5 @@
 module calc_flux
-  use mod_globals, only : id_scheme, id_accuracy, accuracy, offset, nx, ny, nz, gamma
+  use mod_globals, only : id_scheme, id_accuracy, accuracy, offset, gamma
   use calc_qlr
   use calc_keep
   use calc_slau
@@ -17,8 +17,9 @@ module calc_flux
 contains
 !NoMUSCL!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  attributes(global) subroutine calc_E_NoMUSCL(id_muscl, rho, u, v, w, p, E)
+  attributes(global) subroutine calc_E_NoMUSCL(id_muscl, nx, ny, nz, rho, u, v, w, p, E)
     integer(kind=2), intent(in), value                :: id_muscl
+    integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
     real(8), intent(out), device                      :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
@@ -47,8 +48,9 @@ contains
     endif
   end subroutine calc_E_NoMUSCL
 
-  attributes(global) subroutine calc_F_NoMUSCL(id_muscl, rho, u, v, w, p, F)
+  attributes(global) subroutine calc_F_NoMUSCL(id_muscl, nx, ny, nz, rho, u, v, w, p, F)
     integer(kind=2), intent(in), value                :: id_muscl
+    integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
     real(8), intent(out), device                      :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
@@ -77,8 +79,9 @@ contains
     endif
   end subroutine calc_F_NoMUSCL
 
-  attributes(global) subroutine calc_G_NoMUSCL(id_muscl, rho, u, v, w, p, G)
+  attributes(global) subroutine calc_G_NoMUSCL(id_muscl, nx, ny, nz, rho, u, v, w, p, G)
     integer(kind=2), intent(in), value                :: id_muscl
+    integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p 
     real(8), intent(out), device                      :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
@@ -109,8 +112,9 @@ contains
 
 !MUSCL!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  attributes(global) subroutine calc_E_MUSCL(id_muscl, rho, u, v, w, p, E)
+  attributes(global) subroutine calc_E_MUSCL(id_muscl, nx, ny, nz, rho, u, v, w, p, E)
     integer(kind=4), intent(in), value                :: id_muscl
+    integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
     real(8), intent(out), device                      :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
@@ -142,8 +146,9 @@ contains
     endif
   end subroutine calc_E_MUSCL
 
-  attributes(global) subroutine calc_F_MUSCL(id_muscl, rho, u, v, w, p, F)
+  attributes(global) subroutine calc_F_MUSCL(id_muscl, nx, ny, nz, rho, u, v, w, p, F)
     integer(kind=4), intent(in), value                :: id_muscl
+    integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
     real(8), intent(out), device                      :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
@@ -175,8 +180,9 @@ contains
     endif
   end subroutine calc_F_MUSCL
   
-  attributes(global) subroutine calc_G_MUSCL(id_muscl, rho, u, v, w, p, G)
+  attributes(global) subroutine calc_G_MUSCL(id_muscl, nx, ny, nz, rho, u, v, w, p, G)
     integer(kind=4), intent(in), value                :: id_muscl
+    integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
     real(8), intent(out), device                      :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
@@ -210,8 +216,9 @@ contains
 
 !MUSCL4th!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  
-  attributes(global) subroutine calc_E_MUSCL_4th(id_muscl, rho, u, v, w, p, E)
+  attributes(global) subroutine calc_E_MUSCL_4th(id_muscl, nx, ny, nz, rho, u, v, w, p, E)
     integer(kind=8), intent(in), value                :: id_muscl
+    integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
     real(8), intent(out), device                      :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
@@ -261,8 +268,9 @@ contains
     endif
   end subroutine calc_E_MUSCL_4th
 
-  attributes(global) subroutine calc_F_MUSCL_4th(id_muscl, rho, u, v, w, p, F)
+  attributes(global) subroutine calc_F_MUSCL_4th(id_muscl, nx, ny, nz, rho, u, v, w, p, F)
     integer(kind=8), intent(in), value                :: id_muscl
+    integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
     real(8), intent(out), device                      :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
@@ -312,8 +320,9 @@ contains
     endif
   end subroutine calc_F_MUSCL_4th
   
-  attributes(global) subroutine calc_G_MUSCL_4th(id_muscl, rho, u, v, w, p, G)
+  attributes(global) subroutine calc_G_MUSCL_4th(id_muscl, nx, ny, nz, rho, u, v, w, p, G)
     integer(kind=8), intent(in), value                :: id_muscl
+    integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
     real(8), intent(out), device                      :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
