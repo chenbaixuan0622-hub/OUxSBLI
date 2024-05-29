@@ -1,5 +1,5 @@
 module calc_visc
-  use mod_globals, only : accuracy, offset, id_visc, id_turbulence, gamma, R, Pr, Prt, nx, ny, nz, dzi
+  use mod_globals, only : accuracy, offset, id_visc, id_turbulence, gamma, R, Pr, Prt, dzi
   use calc_Sutherland
   implicit none
 contains
@@ -24,7 +24,8 @@ contains
                 & + d2 * mu2 * (-u1 + u6 - u4 + u5)) 
   end function u_y
 
-  attributes(global) subroutine calc_Ev(dx, dy, rho, u, v, w, T, p, mut, E)
+  attributes(global) subroutine calc_Ev(nx, ny, nz, dx, dy, rho, u, v, w, T, p, mut, E)
+    integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p, mut
@@ -101,7 +102,8 @@ contains
     & + txz * 0.5d0 * (w(i,j,k) + w(i+1,j,k)) + kappa * (-T(i,j,k) + T(i+1,j,k)) * dx(i) + Hsgs)
   end subroutine calc_Ev
   
-  attributes(global) subroutine calc_Fv(dy, dx, rho, u, v, w, T, p, mut, F)
+  attributes(global) subroutine calc_Fv(nx, ny, nz, dy, dx, rho, u, v, w, T, p, mut, F)
+    integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
     real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p, mut
@@ -178,7 +180,8 @@ contains
     & + tyz * 0.5d0 * (w(i,j,k) + w(i,j+1,k)) + kappa * (-T(i,j,k) + T(i,j+1,k)) * dy(j) + Hsgs)
   end subroutine calc_Fv
   
-  attributes(global) subroutine calc_Gv(dx, dy, rho, u, v, w, T, p, mut, G)
+  attributes(global) subroutine calc_Gv(nx, ny, nz, dx, dy, rho, u, v, w, T, p, mut, G)
+    integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p, mut
