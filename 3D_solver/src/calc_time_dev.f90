@@ -81,7 +81,7 @@ contains
     call calc_G<<<blocksG,threadsG>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,G_upwind)
     stat = cudaDeviceSynchronize()
 
-    call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,u,v,w,fd)
+    call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,u,v,w,rho,p,fd)
     stat = cudaDeviceSynchronize()
     call calc_E_hybrid<<<blocksE,threadsE>>>(nx,ny,nz,u,v,w,fd,E_upwind,E)
     call calc_F_hybrid<<<blocksF,threadsF>>>(nx,ny,nz,u,v,w,fd,F_upwind,F)
