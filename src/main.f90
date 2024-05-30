@@ -35,7 +35,7 @@ program main
 
   call alloc(Q,z)
 
-  call set_grid(x,y,z,dx,dy)
+  call set_grid(nx,ny,nz,x,y,z,dx,dy)
   call set_xix(dx,xix)
   call set_etay(dy,etay)
   if (kind(id_recal) == 4) then
@@ -45,14 +45,14 @@ program main
     close(10)
   elseif (kind(id_recal) == 2) then
     write(*,*) "set initial condition"
-    call set_init(x,y,z,Q,Vin)
+    call set_init(nx,ny,nz,x,y,z,Q,Vin)
   else
     write(*,*) "wrong paramater was found"
   endif
   call set_Jacobian(dx,dy,Jacobian)
 
   call cpu_time(t_start)
-  call RungeKutta(id_RungeKutta,x,dx,xix,y,dy,etay,z,Jacobian,Q,Vin)
+  call RungeKutta(id_RungeKutta,nx,ny,nz,x,dx,xix,y,dy,etay,z,Jacobian,Q,Vin)
   call cpu_time(t_end)
 
   ! save data

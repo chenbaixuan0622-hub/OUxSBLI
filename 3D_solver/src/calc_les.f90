@@ -1,5 +1,5 @@
 module calc_les
-  use mod_globals, only : id_turbulence, nx, ny, nz, dx, dy, dz, dxi, dyi, dzi
+  use mod_globals, only : id_turbulence, dx, dy, dz, dxi, dyi, dzi
   implicit none
   interface nu_sgs
     module procedure Smagorinsky, selective_mixed_scale
@@ -93,7 +93,8 @@ contains
     nut = ((Cs * delta)**2) * sqrt(S2)
   end function Smagorinsky
 
-  attributes(global) subroutine calc_mut(rho,u,v,w,mut)
+  attributes(global) subroutine calc_mut(nx,ny,nz,rho,u,v,w,mut)
+    integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w
     real(8), intent(out), dimension(nx,ny,nz), device :: mut
     integer i, j, k, l, m, n

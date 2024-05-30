@@ -1,16 +1,17 @@
 module calc_hybrid
   use cudafor
-  use mod_globals, only : accuracy, offset, nx, ny, nz, dzi
+  use mod_globals, only : accuracy, offset, gamma, dzi
   implicit none
 contains
-  attributes(global) subroutine calc_Ducros(dx,dy,u,v,w,fd)
+  attributes(global) subroutine calc_Ducros(nx,ny,nz,dx,dy,u,v,w,rho,p,fd)
+    integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
-    real(8), intent(in), dimension(nx,ny,nz), device  :: u, v, w
+    real(8), intent(in), dimension(nx,ny,nz), device  :: u, v, w, rho, p
     real(8), intent(out), dimension(nx,ny,nz), device :: fd
     integer i, j, k
     real(8) dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz
-    real(8) div, rot(3)
+    real(8) div, rot(3), c, M
     real(8) :: eps = 1.d-16
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1 
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
@@ -29,6 +30,15 @@ contains
     rot(2) = dudz - dwdx
     rot(3) = dvdx - dudy
     fd(i,j,k) = (div**2) / (div**2 + (rot(1)**2 + rot(2)**2 + rot(3)**2) + eps)
+
+    ! sound speed
+    c = sqrt(gamma * p(i,j,k) / rho(i,j,k))
+    M = sqrt(u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2) / c
+    if (0.4d0 <= fd(i,j,k) .and. 1.d0 < M) then
+      fd(i,j,k) = 1.d0
+    else
+      fd(i,j,k) = 0.d0
+    endif
 
     ! boundary
     ! x direction
@@ -51,7 +61,8 @@ contains
     endif
   end subroutine calc_Ducros
 
-  attributes(global) subroutine calc_E_hybrid(u,v,w,fd,E_upwind,E)
+  attributes(global) subroutine calc_E_hybrid(nx,ny,nz,u,v,w,fd,E_upwind,E)
+    integer, intent(in), value                                                          :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device                                    :: u, v, w, fd
     real(8), intent(in), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device     :: E_upwind
     real(8), intent(inout), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device  :: E
@@ -79,17 +90,12 @@ contains
     !E_tvd(:) = phi * E_keep(i-offset+1,j-offset,k-offset,:) + (1.d0 - phi) * E_upwind(i-offset+1,j-offset,k-offset,:)
 
     fdx = max(fd(i,j,k), fd(i+1,j,k))
-    if (0.4d0 <= fdx) then
-      fdx = 1.d0
-    else
-      fdx = 0.d0
-    endif
-    !fdx = min(1.d0, max(0.d0, fdx))
     E(i-offset+1,j-offset,k-offset,:) = (1.d0 - fdx) * E(i-offset+1,j-offset,k-offset,:) &
     & + fdx * E_upwind(i-offset+1,j-offset,k-offset,:)
   end subroutine calc_E_hybrid
   
-  attributes(global) subroutine calc_F_hybrid(u,v,w,fd,F_upwind,F)
+  attributes(global) subroutine calc_F_hybrid(nx,ny,nz,u,v,w,fd,F_upwind,F)
+    integer, intent(in), value                                                          :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device                                    :: u, v, w, fd
     real(8), intent(in), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device     :: F_upwind
     real(8), intent(inout), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device  :: F
@@ -117,17 +123,12 @@ contains
     !F_tvd(:) = phi * F_keep(i-offset,j-offset+1,k-offset,:) + (1.d0 - phi) * F_upwind(i-offset,j-offset+1,k-offset,:)
 
     fdy = max(fd(i,j,k), fd(i,j+1,k))
-    if (0.4d0 <= fdy) then
-      fdy = 1.d0
-    else
-      fdy = 0.d0
-    endif
-    !fdy = min(1.d0, max(fdy, 0.d0))
     F(i-offset,j-offset+1,k-offset,:) = (1.d0 - fdy) * F(i-offset,j-offset+1,k-offset,:) &
     & + fdy * F_upwind(i-offset,j-offset+1,k-offset,:)
   end subroutine calc_F_hybrid
 
-  attributes(global) subroutine calc_G_hybrid(u,v,w,fd,G_upwind,G)
+  attributes(global) subroutine calc_G_hybrid(nx,ny,nz,u,v,w,fd,G_upwind,G)
+    integer, intent(in), value                                                          :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device                                    :: u, v, w, fd
     real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device     :: G_upwind
     real(8), intent(inout), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device  :: G
@@ -155,12 +156,6 @@ contains
     !G_tvd(:) = phi * G_keep(i-offset,j-offset,k-offset+1,:) + (1.d0 - phi) * G_upwind(i-offset,j-offset,k-offset+1,:)
     
     fdz = max(fd(i,j,k), fd(i,j,k+1))
-    if (0.4d0 <= fdz) then
-      fdz = 1.d0
-    else
-      fdz = 0.d0
-    endif
-    !fdz = min(1.d0, max(0.d0, fdz))
     G(i-offset,j-offset,k-offset+1,:) = (1.d0 - fdz) * G(i-offset,j-offset,k-offset+1,:) &
     & + fdz * G_upwind(i-offset,j-offset,k-offset+1,:)
   end subroutine calc_G_hybrid

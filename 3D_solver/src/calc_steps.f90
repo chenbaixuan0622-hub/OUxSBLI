@@ -1,9 +1,10 @@
 module calc_steps
   use cudafor
-  use mod_globals, only : accuracy, offset, nx, ny, nz, dt, dtdz
+  use mod_globals, only : accuracy, offset, dt, dtdz
   implicit none
   interface
-    subroutine calc_step(coef1,coef2,dx,dy,E,F,G,Q,Q2,Rs)
+    subroutine calc_step(nx,ny,nz,coef1,coef2,dx,dy,E,F,G,Q,Q2,Rs)
+      integer, intent(in), value                                                                  :: nx, ny, nz
       real(8), intent(in), value                                                                  :: coef1, coef2
       real(8), intent(in), dimension(nx-1), device                                                :: dx
       real(8), intent(in), dimension(ny-1), device                                                :: dy
@@ -16,7 +17,8 @@ module calc_steps
     end subroutine
   end interface
   interface
-    subroutine calc_step2(coef1,coef2,coef3,coef4,dx,dy,E,F,G,Q,Q2,Q3,Rs)
+    subroutine calc_step2(nx,ny,nz,coef1,coef2,coef3,coef4,dx,dy,E,F,G,Q,Q2,Q3,Rs)
+      integer, intent(in), value                                                                  :: nx, ny, nz
       real(8), intent(in), value                                                                  :: coef1, coef2, coef3, coef4
       real(8), intent(in), dimension(nx-1), device                                                :: dx
       real(8), intent(in), dimension(ny-1), device                                                :: dy
@@ -29,7 +31,8 @@ module calc_steps
     end subroutine
   end interface
 contains
-  subroutine calc_step(coef1,coef2,dx,dy,E,F,G,Q,Q2,Rs)
+  subroutine calc_step(nx,ny,nz,coef1,coef2,dx,dy,E,F,G,Q,Q2,Rs)
+    integer, intent(in), value                                                                  :: nx, ny, nz
     real(8), intent(in), value                                                                  :: coef1, coef2
     real(8), intent(in), dimension(nx-1), device                                                :: dx
     real(8), intent(in), dimension(ny-1), device                                                :: dy
@@ -56,7 +59,8 @@ contains
     ;enddo;enddo;enddo;enddo
   end subroutine calc_step
   
-  subroutine calc_step2(coef1,coef2,coef3,coef4,dx,dy,E,F,G,Q,Q2,Q3,Rs)
+  subroutine calc_step2(nx,ny,nz,coef1,coef2,coef3,coef4,dx,dy,E,F,G,Q,Q2,Q3,Rs)
+    integer, intent(in), value                                                                  :: nx, ny, nz
     real(8), intent(in), value                                                                  :: coef1, coef2, coef3, coef4
     real(8), intent(in), dimension(nx-1), device                                                :: dx
     real(8), intent(in), dimension(ny-1), device                                                :: dy
@@ -83,7 +87,8 @@ contains
     enddo;enddo;enddo;enddo
   end subroutine calc_step2
   
-  subroutine calc_step3(dx,dy,E,F,G,Q3,Q)
+  subroutine calc_step3(nx,ny,nz,dx,dy,E,F,G,Q3,Q)
+    integer, intent(in), value                                                      :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device                                    :: dx
     real(8), intent(in), dimension(ny-1), device                                    :: dy
     real(8), intent(in), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E
@@ -105,7 +110,8 @@ contains
     enddo;enddo;enddo;enddo
   end subroutine calc_step3
  
-  subroutine calc_step4(dx,dy,E,F,G,Rs,Q)
+  subroutine calc_step4(nx,ny,nz,dx,dy,E,F,G,Rs,Q)
+    integer, intent(in), value                                                        :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device                                      :: dx
     real(8), intent(in), dimension(ny-1), device                                      :: dy
     real(8), intent(in), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device   :: E
@@ -129,7 +135,8 @@ contains
     enddo;enddo;enddo;enddo
   end subroutine calc_step4
 
-  subroutine calc_step5(coef,dx,dy,E,F,G,Q)
+  subroutine calc_step5(nx,ny,nz,coef,dx,dy,E,F,G,Q)
+    integer, intent(in), value                                                      :: nx, ny, nz
     real(8), intent(in), value                                                      :: coef
     real(8), intent(in), dimension(nx-1), device                                    :: dx
     real(8), intent(in), dimension(ny-1), device                                    :: dy
@@ -151,7 +158,8 @@ contains
     ;enddo;enddo;enddo;enddo
   end subroutine calc_step5
 
-  subroutine calc_step10(dx,dy,E,F,G,R4,Q4,Q9,Q)
+  subroutine calc_step10(nx,ny,nz,dx,dy,E,F,G,R4,Q4,Q9,Q)
+    integer, intent(in), value                                                      :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device                                    :: dx
     real(8), intent(in), dimension(ny-1), device                                    :: dy
     real(8), intent(in), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E
