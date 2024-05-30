@@ -39,12 +39,14 @@ contains
     !write(*,*) eta, f, df
   end subroutine calc_Blasius
 
-  subroutine set_grid(x,y,z,dx,dy)
-    real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1)
+  subroutine set_grid(nx,ny,nz,x,y,z,dx,dy)
+    integer, intent(in)   :: nx, ny, nz
+    real(8), intent(out)  :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1)
     integer i, j, k
-    real(8) :: dx1 = Lx / dble(nx-1)
-    real(8) :: dy1 = Ly / dble(ny-1)
-    real(8) :: dz1 = Lz / dble(nz-1)
+    real(8) dx1, dy1, dz1
+    dx1 = Lx / dble(nx-1)
+    dy1 = Ly / dble(ny-1)
+    dz1 = Lz / dble(nz-1)
     x(1) = 0.d0
     do i = 1, nx-1
       dx(i) = dx1
@@ -63,34 +65,34 @@ contains
     enddo
   end subroutine set_grid
 
-  subroutine set_init(xs,ys,zs,Q,Vin)
+  subroutine set_init(nx,ny,nz,xs,ys,zs,Q,Vin)
+    integer, intent(in)                         :: nx, ny, nz
     real(8), intent(in)                         :: xs(nx), ys(ny), zs(nz)
     real(8), intent(out), dimension(nx,ny,nz,5) :: Q
     real(8), intent(in), dimension(ny,2)        :: Vin
     integer i, j, k
-    integer :: No = int(0.25 * nx)
     real(8) :: d = 0.2d0 * 1.d-3
-    real(8) :: d1= 1.d-3
+    real(8) :: d1= 2.d-3
     real(8) :: eta, rho, u, v, w, T, p_wall
     ! random
-    real(8) :: ustd, Tstd
+    real(8) :: std, ustd, Tstd
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
           eta = ys(j) / d
           call calc_Blasius(eta,d,u,v)
           if (ys(j) <= d1) then
-            call random_number(ustd)
-            ustd = 2.d0 * ustd - 1.d0
+            call random_number(std)   ! 0 <= std <= 1
+            std = 2.d0 * std - 1.d0   !-1 <= std <= 1
           else
-            ustd = 0.d0
+            std = 0.d0
           endif
-          ustd = u * ustd
+          ustd = 0.2d0 * u * std
           u = u + ustd
           v = v + 0.5d0 * ustd
           w = 0.5d0 * ustd
           Tstd = T0 * (gamma - 1.d0) * M0**2 / u0
-          T = T0 + Tstd
+          T = T0 + Tstd * std
           rho = p0 / (R * T)
           Q(i,j,k,1) = rho
           Q(i,j,k,2) = Q(i,j,k,1) * u
@@ -108,12 +110,11 @@ contains
     Q(:,1,:,5) = p_wall / (gamma - 1.d0)
   end subroutine set_init
   
-  subroutine set_bc(id_accuracy,Jacobian,QJ)
-    integer(kind=2), intent(in), value  :: id_accuracy
-    real(8), intent(in), device         :: Jacobian(nx,ny)
-    real(8), intent(inout), device      :: QJ(nx,ny,nz,5) ! Q / Jacobian
+  subroutine set_bc(nx,ny,nz,Jacobian,QJ)
+    integer, intent(in), value      :: nx, ny, nz
+    real(8), intent(in), device     :: Jacobian(nx,ny)
+    real(8), intent(inout), device  :: QJ(nx,ny,nz,5) ! Q / Jacobian
     integer i, j, k, l
-    integer :: No = int(0.25 * nx)
     real(8) :: p_wall
     ! Riemann invariants
     real(8) :: pin, cin, vin, Rp, Rm, rhob, vb, cb, pb
@@ -180,8 +181,9 @@ contains
     enddo;enddo;enddo
   end subroutine set_bc
 
-  subroutine set_bc_mut(mut)
-    real(8), intent(inout), device :: mut(nx,ny,nz)
+  subroutine set_bc_mut(nx,ny,nz,mut)
+    integer, intent(in), value      :: nx, ny, nz
+    real(8), intent(inout), device  :: mut(nx,ny,nz)
     integer i, j, k
     !$cuf kernel do(2) <<<*,*>>>
     do k = 1, nz
