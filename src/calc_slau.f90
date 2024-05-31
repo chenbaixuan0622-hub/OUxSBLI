@@ -9,15 +9,15 @@ module calc_slau
   end interface
 contains
   attributes(device) function basic_slau(id_slau,p,dp,dp_max,V,c,x) result(fslau)
-    integer(kind=2), intent(in), value :: id_slau
-    real(8), intent(in), value :: p, dp, dp_max, V, c, x
+    integer(kind=2), intent(in), value  :: id_slau
+    real(8), intent(in), value          :: p, dp, dp_max, V, c, x
     real(8) fslau
     fslau = x
   end function basic_slau
 
   attributes(device) function sd_slau(id_slau,p,dp,dp_max,V,c,x) result(fslau)
-    integer(kind=4), intent(in), value :: id_slau
-    real(8), intent(in), value :: p, dp, dp_max, V, c, x
+    integer(kind=4), intent(in), value  :: id_slau
+    real(8), intent(in), value          :: p, dp, dp_max, V, c, x
     real(8) :: Csd1 = 0.1d0
     real(8) :: Csd2 = 10.d0
     real(8) fslau, M, theta
@@ -29,9 +29,9 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   attributes(device) subroutine calc_quantities_AUSM(pl,pr,rhol,rhor,Vl,Vr,el,er,Hl,Hr,cl,cr)
-    real(8), intent(in), value :: pl, pr, rhol, rhor
+    real(8), intent(in), value                        :: pl, pr, rhol, rhor
     real(8), intent(in), dimension(dimension), device :: Vl, Vr
-    real(8), intent(out) :: el, er, Hl, Hr, cl, cr
+    real(8), intent(out)                              :: el, er, Hl, Hr, cl, cr
     el = energy(pl,rhol,Vl(:))
     er = energy(pr,rhor,Vr(:))
     Hl = ENTHALPY(el,pl,rhol)
@@ -42,7 +42,7 @@ contains
 
   attributes(device) subroutine calc_beta(Mp,Mm,bp,bm)
     real(8), intent(in), value :: Mp, Mm
-    real(8), intent(out) :: bp, bm
+    real(8), intent(out)       :: bp, bm
     if (abs(Mp) < 1.d0) then
       bp = 0.25d0 * (2.d0 - Mp) * (Mp + 1.d0) ** 2
     else
@@ -55,26 +55,25 @@ contains
     endif
   end subroutine calc_beta
 
-  attributes(device) function flux_AUSM(mass,pressure,Hl,Hr,Vl,Vr,Normal) result(F)
-    real(8), intent(in), value :: mass, pressure, Hl, Hr
-    real(8), intent(in), dimension(dimension), device :: Vl, Vr
-    real(8), intent(in), dimension(dimension+2), device :: Normal
-    real(8), dimension(dimension+2) :: F, phil, phir
+  attributes(device) function flux_AUSM(mass,Hl,Hr,Vl,Vr) result(F)
+    real(8), intent(in), value                          :: mass, Hl, Hr
+    real(8), intent(in), dimension(dimension), device   :: Vl, Vr
+    real(8), dimension(dimension+2)                     :: F, phil, phir
     phil(1) = 1.d0
     phil(2:dimension+1) = Vl(:)
     phil(dimension+2) = Hl
     phir(1) = 1.d0
     phir(2:dimension+1) = Vr(:)
     phir(dimension+2) = Hr
-    F(:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:)) + pressure * Normal(:)
+    F(:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:))
   end function flux_AUSM
 
   attributes(device) function SLAU(id_dim,Ql,Qr,Normal) result(F)
-    integer, intent(in), value :: id_dim
+    integer, intent(in), value                          :: id_dim
     real(8), intent(in), dimension(dimension+2), device :: Ql, Qr, Normal
     real(8) rhol, rhor, pl, pr, el, er, Hl, Hr, cl, cr, c
     real(8) Vp, Vm, Vt, Vtp, Vtm, Mp, Mm, M, x, fslau, g, p, dp, mass, bp, bm, Pressure
-    real(8), dimension(dimension) :: Vl, Vr, xy
+    real(8), dimension(dimension)   :: Vl, Vr, xy
     real(8), dimension(dimension+2) :: F
 
     call set_q(Ql,Qr,rhol,rhor,pl,pr,Vl,Vr)
@@ -103,7 +102,55 @@ contains
     mass = 0.5d0 * (rhol * (Vl(id_dim) + Vtp) + rhor * (Vr(id_dim) - Vtm) - fslau * dp / c)
     ! pressure flux
     Pressure = 0.5d0 * (pl + pr + (bp - bm) * (pl - pr) + (1.d0 - x) * (bp + bm - 1.d0) * (pl + pr))
-    F(:) = flux_AUSM(mass,Pressure,Hl,Hr,Vl,Vr,Normal)
+    F(:) = flux_AUSM(mass,Hl,Hr,Vl,Vr) + Pressure * Normal(id_dim)
   end function SLAU
+
+  attributes(device) function KEEP_SLAU(dim,Ql,Qr,Normal,fd) result(F)
+    integer, intent(in), value                          :: dim
+    real(8), intent(in), dimension(dimension+2), device :: Ql, Qr, Normal
+    real(8), intent(in), value                          :: fd
+    real(8) rhol, rhor, pl, pr, el, er, Hl, Hr, cl, cr, c
+    real(8) Vp, Vm, Vt, Vtp, Vtm, Mp, Mm, M, x, fslau, g, p, dp, mass, bp, bm, Pressure
+    real(8), dimension(dimension), device   :: Vl, Vr, xy
+    real(8), dimension(dimension+2), device :: F, Flux_slau, Flux_keep
+
+    call set_q(Ql,Qr,rhol,rhor,pl,pr,Vl,Vr)
+    call calc_quantities_AUSM(pl,pr,rhol,rhor,Vl,Vr,el,er,Hl,Hr,cl,cr)
+
+    c = 0.5d0 * (cl + cr)
+    !calc SLAU
+    Vp = Vl(dim)
+    Vm = Vr(dim)
+    Mp = Vp / c
+    Mm = Vm / c
+    M = min(1.d0, sqrt(0.5d0 * q2(Vl(:), Vr(:))) / c)
+    x = (1.d0 - M) ** 2
+    dp = pr - pl
+    call calc_beta(Mp,Mm,bp,bm)
+    p = 0.5d0 * (pl + pr)
+    ! pressure flux
+    Pressure = 0.5d0 * (pl + pr + (bp - bm) * (pl - pr) + (1.d0 - x) * (bp + bm - 1.d0) * (pl + pr))
+
+    ! calc SLAU and KEEP hybrid scheme
+    if (fd < 0.4d0 .and. max(Mp, Mm) < 1.d0) then
+      !clac KEEP
+      Flux_keep(1) = 0.25d0 * (rhol + rhor) * (Vl(dim) + Vr(dim))
+      Flux_keep(2:dimension+1) = Flux_keep(1) * 0.5d0 * (Vl(:) + Vr(:))
+      Flux_keep(dimension+2) = 0.5d0 * (Vl(dim) + Vr(dim)) * (pl + pr) / (gamma - 1.d0) &
+      & + 0.5d0 * Flux_keep(1) * vecsum(Vl(:), Vr(:)) &
+      & + 0.5d0 * (Vl(dim) * pr + Vr(dim) * pl)
+      F(:) = Flux_keep(:) + Pressure * Normal(dim)
+    else
+      !calc SLAU
+      g = -max(min(Mp, 0.d0), -1.d0) * min(max(Mm, 0.d0), 1.d0)
+      Vt = (rhol * abs(Vp) + rhor * abs(Vm)) / (rhol + rhor)
+      Vtp = (1.d0 - g) * Vt + g * abs(Vp)
+      Vtm = (1.d0 - g) * Vt + g * abs(Vm)
+      fslau = f_slau(id_slau,p,dp,dp_max,Vt,c,x)
+      mass = 0.5d0 * (rhol * (Vl(dim) + Vtp) + rhor * (Vr(dim) - Vtm) - fslau * dp / c)
+      Flux_slau(:) = flux_AUSM(mass,Hl,Hr,Vl,Vr)
+      F(:) = Flux_slau(:) + Pressure * Normal(dim)
+    endif
+ end function KEEP_SLAU
 end module calc_slau
 

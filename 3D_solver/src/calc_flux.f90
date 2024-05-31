@@ -112,14 +112,15 @@ contains
 
 !MUSCL!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  attributes(global) subroutine calc_E_MUSCL(id_muscl, nx, ny, nz, rho, u, v, w, p, E)
+  attributes(global) subroutine calc_E_MUSCL(id_muscl, nx, ny, nz, rho, u, v, w, p, fd, E)
     integer(kind=4), intent(in), value                :: id_muscl
     integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, fd
     real(8), intent(out), device                      :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
     real(8), dimension(5) :: Q1, Q2, Q3, Q4, Ql, Qr
     real(8) :: Normal(5) = (/0.d0, 1.d0, 0.d0, 0.d0, 0.d0/)
+    real(8) fdx
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
@@ -141,19 +142,23 @@ contains
 
     if (id_scheme == 2) then
       E(i,j-offset,k-offset,:) = Roe(1,Ql,Qr,Normal)
-    else
+    elseif (id_scheme == 3) then
       E(i,j-offset,k-offset,:) = SLAU(1,Ql,Qr,Normal)
+    elseif (id_scheme == 4) then
+      fdx = max(fd(i,j,k), fd(i+1,j,k))
+      E(i,j-offset,k-offset,:) = KEEP_SLAU(1,Ql,Qr,Normal,fdx)
     endif
   end subroutine calc_E_MUSCL
 
-  attributes(global) subroutine calc_F_MUSCL(id_muscl, nx, ny, nz, rho, u, v, w, p, F)
+  attributes(global) subroutine calc_F_MUSCL(id_muscl, nx, ny, nz, rho, u, v, w, p, fd, F)
     integer(kind=4), intent(in), value                :: id_muscl
     integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, fd
     real(8), intent(out), device                      :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
     real(8), dimension(5) :: Q1, Q2, Q3, Q4, Ql, Qr
     real(8) :: Normal(5) = (/0.d0, 0.d0, 1.d0, 0.d0, 0.d0/)
+    real(8) fdy
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
@@ -175,19 +180,23 @@ contains
 
     if (id_scheme == 2) then
       F(i-offset,j,k-offset,:) = Roe(2,Ql,Qr,Normal)
-    else
+    elseif (id_scheme == 3) then
       F(i-offset,j,k-offset,:) = SLAU(2,Ql,Qr,Normal)
+    elseif (id_scheme == 4) then
+      fdy = max(fd(i,j,k), fd(i,j+1,k))
+      F(i-offset,j,k-offset,:) = KEEP_SLAU(2,Ql,Qr,Normal,fdy)
     endif
   end subroutine calc_F_MUSCL
   
-  attributes(global) subroutine calc_G_MUSCL(id_muscl, nx, ny, nz, rho, u, v, w, p, G)
+  attributes(global) subroutine calc_G_MUSCL(id_muscl, nx, ny, nz, rho, u, v, w, p, fd, G)
     integer(kind=4), intent(in), value                :: id_muscl
     integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, fd
     real(8), intent(out), device                      :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
     real(8), dimension(5) :: Q1, Q2, Q3, Q4, Ql, Qr
     real(8) :: Normal(5) = (/0.d0, 0.d0, 0.d0, 1.d0, 0.d0/)
+    real(8) fdz
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
@@ -209,22 +218,26 @@ contains
 
     if (id_scheme == 2) then
       G(i-offset,j-offset,k,:) = Roe(3,Ql,Qr,Normal)
-    else
+    elseif (id_scheme == 3) then
       G(i-offset,j-offset,k,:) = SLAU(3,Ql,Qr,Normal)
+    elseif (id_scheme == 4) then
+      fdz = max(fd(i,j,k), fd(i,j,k+1))
+      G(i-offset,j-offset,k,:) = KEEP_SLAU(3,Ql,Qr,Normal,fdz)
     endif
   end subroutine calc_G_MUSCL
 
 !MUSCL4th!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  
-  attributes(global) subroutine calc_E_MUSCL_4th(id_muscl, nx, ny, nz, rho, u, v, w, p, E)
+  attributes(global) subroutine calc_E_MUSCL_4th(id_muscl, nx, ny, nz, rho, u, v, w, p, fd, E)
     integer(kind=8), intent(in), value                :: id_muscl
     integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, fd
     real(8), intent(out), device                      :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
     real(8), dimension(5) :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr
     real(8) :: Normal(5) = (/0.d0, 1.d0, 0.d0, 0.d0, 0.d0/)
     real(8) :: zero(5) = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
+    real(8) fdx
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
@@ -263,20 +276,24 @@ contains
 
     if (id_scheme == 2) then
       E(i,j-offset,k-offset,:) = Roe(1,Ql,Qr,Normal)
-    else
+    elseif (id_scheme == 3) then
       E(i,j-offset,k-offset,:) = SLAU(1,Ql,Qr,Normal)
+    elseif (id_scheme == 4) then
+      fdx = max(fd(i,j,k), fd(i+1,j,k))
+      E(i,j-offset,k-offset,:) = KEEP_SLAU(1,Ql,Qr,Normal,fdx)
     endif
   end subroutine calc_E_MUSCL_4th
 
-  attributes(global) subroutine calc_F_MUSCL_4th(id_muscl, nx, ny, nz, rho, u, v, w, p, F)
+  attributes(global) subroutine calc_F_MUSCL_4th(id_muscl, nx, ny, nz, rho, u, v, w, p,fd,  F)
     integer(kind=8), intent(in), value                :: id_muscl
     integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, fd
     real(8), intent(out), device                      :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
     real(8), dimension(5) :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr
     real(8) :: Normal(5) = (/0.d0, 0.d0, 1.d0, 0.d0, 0.d0/)
     real(8) :: zero(5) = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
+    real(8) fdy
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
@@ -315,20 +332,24 @@ contains
 
     if (id_scheme == 2) then
       F(i-offset,j,k-offset,:) = Roe(2,Ql,Qr,Normal)
-    else
+    elseif (id_scheme == 3) then
       F(i-offset,j,k-offset,:) = SLAU(2,Ql,Qr,Normal)
+    elseif (id_scheme == 4) then
+      fdy = max(fd(i,j,k),  fd(i,j+1,k))
+      F(i-offset,j,k-offset,:) = KEEP_SLAU(2,Ql,Qr,Normal,fdy)
     endif
   end subroutine calc_F_MUSCL_4th
   
-  attributes(global) subroutine calc_G_MUSCL_4th(id_muscl, nx, ny, nz, rho, u, v, w, p, G)
+  attributes(global) subroutine calc_G_MUSCL_4th(id_muscl, nx, ny, nz, rho, u, v, w, p, fd, G)
     integer(kind=8), intent(in), value                :: id_muscl
     integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, fd
     real(8), intent(out), device                      :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
     real(8), dimension(5) :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr
     real(8) :: Normal(5) = (/0.d0, 0.d0, 0.d0, 1.d0, 0.d0/)
     real(8) :: zero(5) = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
+    real(8) fdz
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
@@ -367,8 +388,11 @@ contains
 
     if (id_scheme == 2) then
       G(i-offset,j-offset,k,:) = Roe(3,Ql,Qr,Normal)
-    else
+    elseif (id_scheme == 3) then
       G(i-offset,j-offset,k,:) = SLAU(3,Ql,Qr,Normal)
+    elseif (id_scheme == 4) then
+      fdz = max(fd(i,j,k), fd(i,j,k+1))
+      G(i-offset,j-offset,k,:) = KEEP_SLAU(3,Ql,Qr,Normal,fdz)
     endif
   end subroutine calc_G_MUSCL_4th
 end module calc_flux
