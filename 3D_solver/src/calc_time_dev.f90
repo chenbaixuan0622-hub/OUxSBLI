@@ -4,7 +4,6 @@ module calc_time_dev
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG
   use calc_physical_quantities
   use calc_steps
-  use calc_flux
   use calc_hybrid
   use calc_visc
   use calc_les
@@ -19,6 +18,7 @@ module calc_time_dev
   end interface
 contains
   subroutine calc_EFG_basic(id_hybrid,nx,ny,nz,dx,dy,Jacobian,QJ,mut,E,F,G)
+    use calc_flux
     integer(kind=2), intent(in)                         :: id_hybrid
     integer, intent(in), value                          :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device        :: dx ! 1 / dx
@@ -29,14 +29,13 @@ contains
     real(8), intent(out), device                        :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     real(8), intent(out), device                        :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device                        :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
-    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, T, fd
+    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, T
     integer stat
     call calc_quantities(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p,T)
 
-    call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,u,v,w,rho,p,fd)
-    call calc_E<<<blocksE,threadsE>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,fd,E)
-    call calc_F<<<blocksF,threadsF>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,fd,F)
-    call calc_G<<<blocksG,threadsG>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,fd,G)
+    call calc_E<<<blocksE,threadsE>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,E)
+    call calc_F<<<blocksF,threadsF>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,F)
+    call calc_G<<<blocksG,threadsG>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,G)
     !print *, trim(cudaGetErrorString(cudaGetLastError()))
     stat = cudaDeviceSynchronize()
 
@@ -56,6 +55,7 @@ contains
   end subroutine calc_EFG_basic
   
   subroutine calc_EFG_hybrid(id_hybrid,nx,ny,nz,dx,dy,Jacobian,QJ,mut,E,F,G)
+    use calc_flux_hybrid
     integer(kind=4), intent(in)                         :: id_hybrid
     integer, intent(in), value                          :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device        :: dx ! 1 / dx
@@ -67,26 +67,29 @@ contains
     real(8), intent(out), device                        :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device                        :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     real(8), dimension(nx,ny,nz), device                                :: rho, u, v, w, p, T, fd
-    real(8), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E_upwind
-    real(8), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F_upwind
-    real(8), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G_upwind
+    !real(8), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E_upwind
+    !real(8), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F_upwind
+    !real(8), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G_upwind
     integer stat
-    integer(kind=2) :: id_muscl1
+    !integer(kind=2) :: id_muscl1
     call calc_quantities(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p,T)
 
-    call calc_E<<<blocksE,threadsE>>>(id_muscl1,nx,ny,nz,rho,u,v,w,p,E)
-    call calc_F<<<blocksF,threadsF>>>(id_muscl1,nx,ny,nz,rho,u,v,w,p,F)
-    call calc_G<<<blocksG,threadsG>>>(id_muscl1,nx,ny,nz,rho,u,v,w,p,G)
-    call calc_E<<<blocksE,threadsE>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,fd,E_upwind)
-    call calc_F<<<blocksF,threadsF>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,fd,F_upwind)
-    call calc_G<<<blocksG,threadsG>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,fd,G_upwind)
-    stat = cudaDeviceSynchronize()
+    !call calc_E<<<blocksE,threadsE>>>(id_muscl1,nx,ny,nz,rho,u,v,w,p,E)
+    !call calc_F<<<blocksF,threadsF>>>(id_muscl1,nx,ny,nz,rho,u,v,w,p,F)
+    !call calc_G<<<blocksG,threadsG>>>(id_muscl1,nx,ny,nz,rho,u,v,w,p,G)
+    !call calc_E<<<blocksE,threadsE>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,E_upwind)
+    !call calc_F<<<blocksF,threadsF>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,F_upwind)
+    !call calc_G<<<blocksG,threadsG>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,G_upwind)
+    !stat = cudaDeviceSynchronize()
 
     call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,u,v,w,rho,p,fd)
     stat = cudaDeviceSynchronize()
-    call calc_E_hybrid<<<blocksE,threadsE>>>(nx,ny,nz,u,v,w,fd,E_upwind,E)
-    call calc_F_hybrid<<<blocksF,threadsF>>>(nx,ny,nz,u,v,w,fd,F_upwind,F)
-    call calc_G_hybrid<<<blocksG,threadsG>>>(nx,ny,nz,u,v,w,fd,G_upwind,G)
+    call calc_E_hybrid<<<blocksE,threadsE>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
+    call calc_F_hybrid<<<blocksF,threadsF>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
+    call calc_G_hybrid<<<blocksG,threadsG>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
+    !call calc_E_hybrid<<<blocksE,threadsE>>>(nx,ny,nz,u,v,w,fd,E_upwind,E)
+    !call calc_F_hybrid<<<blocksF,threadsF>>>(nx,ny,nz,u,v,w,fd,F_upwind,F)
+    !call calc_G_hybrid<<<blocksG,threadsG>>>(nx,ny,nz,u,v,w,fd,G_upwind,G)
     stat = cudaDeviceSynchronize()
     !print *, trim(cudaGetErrorString(cudaGetLastError()))
 

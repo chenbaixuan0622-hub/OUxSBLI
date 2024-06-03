@@ -26,14 +26,13 @@ module mod_globals
   ! id_scheme ! 1  KEEP     !
   !           ! 2  Roe      !
   !           ! 3  SLAU     !
-  !           ! 4  KSLAU    !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_slau   ! kind2 slau  !
   !           ! kind4 sd    !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=2), parameter :: id_hybrid = 0
+  integer(kind=4), parameter :: id_hybrid = 0
   integer(kind=8), parameter :: id_muscl = 0
-  integer, parameter         :: id_scheme = 4
+  integer, parameter         :: id_scheme = 3
   integer(kind=2), parameter :: id_slau = 0
   real(8), parameter         :: dp_max = 0.d0
 
@@ -68,8 +67,8 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_RungeKutta = 0
   integer(kind=2), parameter :: id_recal = 0
-  integer, parameter :: nt = 2000
-  integer, parameter :: np = 100
+  integer, parameter :: nt = 200
+  integer, parameter :: np = 1000
   real(8), parameter :: u0 = 506.8d0
   real(8), parameter :: dt = 5d-9!0.025d0 * (Lx / dble(nx-1)) / u0
 
