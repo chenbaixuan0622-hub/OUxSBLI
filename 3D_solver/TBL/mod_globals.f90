@@ -67,8 +67,8 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_RungeKutta = 0
   integer(kind=2), parameter :: id_recal = 0
-  integer, parameter :: nt = 2000
-  integer, parameter :: np = 100
+  integer, parameter :: nt = 200
+  integer, parameter :: np = 1000
   real(8), parameter :: u0 = 506.8d0
   real(8), parameter :: dt = 5d-9!0.025d0 * (Lx / dble(nx-1)) / u0
 

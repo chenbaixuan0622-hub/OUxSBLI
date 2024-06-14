@@ -4,7 +4,6 @@ module calc_time_dev
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG
   use calc_physical_quantities
   use calc_steps
-  use calc_flux
   use calc_hybrid
   use calc_visc
   use calc_les
@@ -19,6 +18,7 @@ module calc_time_dev
   end interface
 contains
   subroutine calc_EFG_basic(id_hybrid,nx,ny,nz,dx,dy,Jacobian,QJ,mut,E,F,G)
+    use calc_flux
     integer(kind=2), intent(in)                         :: id_hybrid
     integer, intent(in), value                          :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device        :: dx ! 1 / dx
@@ -55,6 +55,7 @@ contains
   end subroutine calc_EFG_basic
   
   subroutine calc_EFG_hybrid(id_hybrid,nx,ny,nz,dx,dy,Jacobian,QJ,mut,E,F,G)
+    use calc_flux_hybrid
     integer(kind=4), intent(in)                         :: id_hybrid
     integer, intent(in), value                          :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device        :: dx ! 1 / dx
@@ -66,26 +67,35 @@ contains
     real(8), intent(out), device                        :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device                        :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     real(8), dimension(nx,ny,nz), device                                :: rho, u, v, w, p, T, fd
-    real(8), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E_upwind
-    real(8), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F_upwind
-    real(8), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G_upwind
+    !real(8), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E_upwind
+    !real(8), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F_upwind
+    !real(8), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G_upwind
     integer stat
-    integer(kind=2) :: id_muscl1
+    !integer(kind=2) :: id_muscl1
     call calc_quantities(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p,T)
 
-    call calc_E<<<blocksE,threadsE>>>(id_muscl1,nx,ny,nz,rho,u,v,w,p,E)
-    call calc_F<<<blocksF,threadsF>>>(id_muscl1,nx,ny,nz,rho,u,v,w,p,F)
-    call calc_G<<<blocksG,threadsG>>>(id_muscl1,nx,ny,nz,rho,u,v,w,p,G)
-    call calc_E<<<blocksE,threadsE>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,E_upwind)
-    call calc_F<<<blocksF,threadsF>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,F_upwind)
-    call calc_G<<<blocksG,threadsG>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,G_upwind)
-    stat = cudaDeviceSynchronize()
+    !call calc_E<<<blocksE,threadsE>>>(id_muscl1,nx,ny,nz,rho,u,v,w,p,E)
+    !call calc_F<<<blocksF,threadsF>>>(id_muscl1,nx,ny,nz,rho,u,v,w,p,F)
+    !call calc_G<<<blocksG,threadsG>>>(id_muscl1,nx,ny,nz,rho,u,v,w,p,G)
+    !call calc_E<<<blocksE,threadsE>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,E_upwind)
+    !call calc_F<<<blocksF,threadsF>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,F_upwind)
+    !call calc_G<<<blocksG,threadsG>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,G_upwind)
+    !stat = cudaDeviceSynchronize()
 
     call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,u,v,w,rho,p,fd)
     stat = cudaDeviceSynchronize()
-    call calc_E_hybrid<<<blocksE,threadsE>>>(nx,ny,nz,u,v,w,fd,E_upwind,E)
-    call calc_F_hybrid<<<blocksF,threadsF>>>(nx,ny,nz,u,v,w,fd,F_upwind,F)
-    call calc_G_hybrid<<<blocksG,threadsG>>>(nx,ny,nz,u,v,w,fd,G_upwind,G)
+    !call calc_E_hybrid<<<blocksE,threadsE>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
+    !call calc_F_hybrid<<<blocksF,threadsF>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
+    !call calc_G_hybrid<<<blocksG,threadsG>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
+    !call calc_E_KEEPUP<<<blocksE,threadsE>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
+    !call calc_F_KEEPUP<<<blocksF,threadsF>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
+    !call calc_G_KEEPUP<<<blocksG,threadsG>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
+    call calc_E_KEEPFVS<<<blocksE,threadsE>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
+    call calc_F_KEEPFVS<<<blocksF,threadsF>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
+    call calc_G_KEEPFVS<<<blocksG,threadsG>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
+    !call calc_E_hybrid<<<blocksE,threadsE>>>(nx,ny,nz,u,v,w,fd,E_upwind,E)
+    !call calc_F_hybrid<<<blocksF,threadsF>>>(nx,ny,nz,u,v,w,fd,F_upwind,F)
+    !call calc_G_hybrid<<<blocksG,threadsG>>>(nx,ny,nz,u,v,w,fd,G_upwind,G)
     stat = cudaDeviceSynchronize()
     !print *, trim(cudaGetErrorString(cudaGetLastError()))
 
@@ -124,6 +134,7 @@ contains
     real(8), dimension(ny-1), device        :: dy, etay ! etay = 1 / dy
     real(8), dimension(nx,ny), device       :: Jacobian
     real(8), dimension(nx,ny,nz,3), device  :: Vmean
+    real(8), dimension(nx,ny,nz), device    :: rhomean, Tmean
     ! for plot
     real(8) ke0, entropy0
 
@@ -140,9 +151,9 @@ contains
     enddo;enddo;enddo
     ! print initial condition
     if (id_turbulence == 0) then
-      call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,Vmean_cpu,ke0,entropy0)
+      call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0)
     else
-      call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,Vmean_cpu,ke0,entropy0,mut_cpu)
+      call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0,mut_cpu)
     endif
 
     ! copy on GPU
@@ -166,15 +177,15 @@ contains
         call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,Jacobian,QJ3,mut,E,F,G)
         call calc_step3(nx,ny,nz,dx,dy,E,F,G,QJ3,QJ)
         call set_bc(nx,ny,nz,Jacobian,QJ)
-        call calc_mean(t1+(t2-1)*nt,nx,ny,nz,QJ,Vmean)
+        call calc_mean(t1+(t2-1)*nt,nx,ny,nz,Jacobian,QJ,Vmean,rhomean,Tmean)
       enddo
       Q = QJ
       mut_cpu = mut
       Vmean_cpu = Vmean
       if (id_turbulence == 0) then
-        call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,Vmean_cpu,ke0,entropy0)
+        call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0)
       else
-        call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,Vmean_cpu,ke0,entropy0,mut_cpu) 
+        call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0,mut_cpu) 
       endif
     enddo
   end subroutine RungeKutta_3rd
@@ -201,6 +212,7 @@ contains
     real(8), dimension(ny-1), device        :: dy, etay ! etay = 1 / dy
     real(8), dimension(nx,ny), device       :: Jacobian
     real(8), dimension(nx,ny,nz,3), device  :: Vmean
+    real(8), dimension(nx,ny,nz), device    :: rhomean, Tmean
     ! for plot
     real(8) ke0, entropy0
 
@@ -217,9 +229,9 @@ contains
     enddo;enddo;enddo
     ! print initial condition
     if (id_turbulence == 0) then
-      call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,Vmean_cpu,ke0,entropy0)
+      call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0)
     else
-      call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,Vmean_cpu,ke0,entropy0,mut_cpu)
+      call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0,mut_cpu)
     endif
 
     ! copy on GPU
@@ -248,15 +260,15 @@ contains
         call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,Jacobian,QJs,mut,E,F,G)
         call calc_step4(nx,ny,nz,dx,dy,E,F,G,Rs,QJ)
         call set_bc(nx,ny,nz,Jacobian,QJ)
-        call calc_mean(t1+(t2-1)*nt,nx,ny,nz,QJ,Vmean)
+        call calc_mean(t1+(t2-1)*nt,nx,ny,nz,Jacobian,QJ,Vmean,rhomean,Tmean)
       enddo
       Q = QJ
       mut_cpu = mut
       Vmean_cpu = Vmean
       if (id_turbulence == 0) then
-        call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,Vmean_cpu,ke0,entropy0)
+        call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0)
       else
-        call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,Vmean_cpu,ke0,entropy0,mut_cpu)
+        call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0,mut_cpu)
       endif
     enddo
   end subroutine RungeKutta_4th
@@ -283,6 +295,7 @@ contains
     real(8), dimension(ny-1), device        :: dy, etay ! etay = 1 / dy
     real(8), dimension(nx,ny), device       :: Jacobian
     real(8), dimension(nx,ny,nz,3), device  :: Vmean
+    real(8), dimension(nx,ny,nz), device    :: rhomean, Tmean
     ! for plot
     real(8) ke0, entropy0
 
@@ -299,9 +312,9 @@ contains
     enddo;enddo;enddo
     ! print initial condition
     if (id_turbulence == 0) then
-      call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,Vmean_cpu,ke0,entropy0)
+      call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0)
     else
-      call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,Vmean_cpu,ke0,entropy0,mut_cpu)
+      call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0,mut_cpu)
     endif
 
     ! copy on GPU
@@ -355,15 +368,15 @@ contains
         call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,Jacobian,QJs,mut,E,F,G)
         call calc_step10(nx,ny,nz,dx,dy,E,F,G,R4,QJ4,QJs,QJ)
         call set_bc(nx,ny,nz,Jacobian,QJ)
-        call calc_mean(t1+(t2-1)*nt,nx,ny,nz,QJ,Vmean)
+        call calc_mean(t1+(t2-1)*nt,nx,ny,nz,Jacobian,QJ,Vmean,rhomean,Tmean)
       enddo
       Q = QJ
       mut_cpu = mut
       Vmean_cpu = Vmean
       if (id_turbulence == 0) then
-        call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,Vmean_cpu,ke0,entropy0)
+        call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0)
       else
-        call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,Vmean_cpu,ke0,entropy0,mut_cpu)
+        call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0,mut_cpu)
       endif
     enddo
   end subroutine RungeKutta_10th

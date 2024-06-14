@@ -60,7 +60,11 @@ module mod_globals
   !               ! kind=4 ! 4th     !
   !               ! kind=8 ! 10step  !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=8), parameter :: id_RungeKutta = 0
+  ! id_recal      ! kind=2 ! set 0   !
+  !               ! kind=4 ! recal   !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  integer(kind=2), parameter :: id_recal = 0
+  integer(kind=2), parameter :: id_RungeKutta = 0
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
