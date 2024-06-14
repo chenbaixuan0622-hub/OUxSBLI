@@ -9,11 +9,10 @@ module print
       real(8), intent(in), optional :: T(nx,ny)
     end subroutine print_vtk_2D
 
-    subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,Vmean,ke0,entropy0,mut)
+    subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,ke0,entropy0,mut)
       integer, intent(in)           :: step, nx, ny, nz
       real(8), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny)
       real(8), intent(in)           :: QJ(nx,ny,nz,5)
-      real(8), intent(in)           :: Vmean(nx,ny,nz,3)
       real(8), intent(inout)        :: ke0, entropy0
       real(8), intent(in), optional :: mut(nx,ny,nz)
     end subroutine print_vtk_3D
@@ -230,11 +229,10 @@ contains
     close(10)
   end subroutine print_vtk_2D
   
-  subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,Vmean,ke0,entropy0,mut)
+  subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,ke0,entropy0,mut)
     integer, intent(in)           :: step, nx, ny, nz
     real(8), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny)
     real(8), intent(in)           :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(in)           :: Vmean(nx,ny,nz,3)
     real(8), intent(inout)        :: ke0, entropy0
     real(8), intent(in), optional :: mut(nx,ny,nz)
     integer i, j, k, l
@@ -263,13 +261,6 @@ contains
       do j = 1, ny
         do i = 1, nx
           write(10) real(u(i,j,k)), real(v(i,j,k)), real(w(i,j,k))
-    enddo;enddo;enddo
-
-    write(10) lf//'VECTORS FluctuatingVelocity float'//lf
-    do k = 1, nz
-      do j = 1, ny
-        do i = 1, nx
-          write(10) real(u(i,j,k) - Vmean(i,j,k,1)), real(v(i,j,k) - Vmean(i,j,k,2)), real(w(i,j,k) - Vmean(i,j,k,3))
     enddo;enddo;enddo
 
     write(10) lf//'SCALARS rho float'//lf
