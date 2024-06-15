@@ -1,11 +1,6 @@
 module set
   use mod_globals, only : accuracy, offset, nx, ny, nz, Lx, Ly, Lz, gamma, R, RHO0, L0, M0, V0, p0, T, dtn
   implicit none
-
-  interface set_bc
-    module procedure set_bc2, set_bc4
-  end interface
-  
 contains
   function linspace(x1, x2, n) result(x)
     real(8), intent(in) :: x1, x2
@@ -15,12 +10,14 @@ contains
     x = x1 + (x1 + x2) * (/ (dble(i - 1) / dble(n - 1), i = 1, n) /)
   end function linspace
 
-  subroutine set_grid(x,y,z,dx,dy)
+  subroutine set_grid(nx,ny,nz,x,y,z,dx,dy)
+    integer, intent(in)  :: nx, ny, nz
     real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx), dy(ny)
     integer i, j, k
-    real(8) :: dx1 = Lx / dble(nx-1)
-    real(8) :: dy1 = Ly / dble(ny-1)
-    real(8) :: dz1 = Lz / dble(nz-1)
+    real(8) dx1, dy1, dz1
+    dx1 = Lx / dble(nx-1)
+    dy1 = Ly / dble(ny-1)
+    dz1 = Lz / dble(nz-1)
     x(1) = 0.d0
     do i = 1, nx-1
       dx(i) = dx1
@@ -36,10 +33,11 @@ contains
     enddo
   end subroutine set_grid
   
-  subroutine set_init(xs,ys,zs,Q,Vin)
-    real(8), intent(in) :: xs(nx), ys(ny), zs(nz)
-    real(8), intent(out), dimension(nx,ny,nz,5) :: Q
-    real(8), intent(in), dimension(ny,2) :: Vin
+  subroutine set_init(nx,ny,nz,xs,ys,zs,Q,Vin)
+    integer, intent(in)  :: nx, ny, nz
+    real(8), intent(in)  :: xs(nx), ys(ny), zs(nz)
+    real(8), intent(out) :: Q(nx,ny,nz,5)
+    real(8), intent(in)  :: Vin(ny,2)
     integer i, j, k
     real(8) :: pi = 2.d0 * acos(0.d0)
     real(8) x(nx-accuracy), y(ny-accuracy), z(nz-accuracy)
@@ -135,10 +133,10 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine set_bc2(id_accuracy,Jacobian,Q)
-    integer(kind=2), intent(in), value  :: id_accuracy
-    real(8), intent(in), device         :: Jacobian(nx,ny)
-    real(8), intent(inout), device      :: Q(nx,ny,nz,5)
+  subroutine set_bc(nx,ny,nz,Jacobian,Q)
+    integer, intent(in), value      :: nx, ny, nz
+    real(8), intent(in), device     :: Jacobian(nx,ny)
+    real(8), intent(inout), device  :: Q(nx,ny,nz,5)
     integer i, j, k, l
     !$cuf kernel do(3) <<<*,*>>>
     do l = 1, 5
@@ -172,7 +170,7 @@ contains
           Q(i,j,1,l) = Q(i,j,nz-1,l)
           Q(i,j,nz,l) = Q(i,j,2,l)
     enddo;enddo;enddo
-  end subroutine set_bc2
+  end subroutine set_bc
 
   subroutine set_bc4(id_accuracy,Jacobian,Q)
     integer(kind=4), intent(in), value  :: id_accuracy
@@ -214,7 +212,8 @@ contains
     enddo;enddo;enddo
   end subroutine set_bc4
 
-  subroutine set_bc_mut(mut)
+  subroutine set_bc_mut(nx,ny,nz,mut)
+    integer, intent(in), value     :: nx, ny, nz
     real(8), intent(inout), device :: mut(nx,ny,nz)
     integer i, j, k
     !$cuf kernel do(2) <<<*,*>>>
