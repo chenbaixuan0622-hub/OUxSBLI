@@ -11,7 +11,7 @@ contains
     real(8), intent(out), dimension(nx,ny,nz), device :: fd
     integer i, j, k
     real(8) dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz
-    real(8) div, rot(3), c, M
+    real(8) div, rot(3)
     real(8) :: eps = 1.d-16
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1 
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
@@ -31,14 +31,7 @@ contains
     rot(3) = dvdx - dudy
     fd(i,j,k) = (div**2) / (div**2 + (rot(1)**2 + rot(2)**2 + rot(3)**2) + eps)
 
-    ! sound speed
-    c = sqrt(gamma * p(i,j,k) / rho(i,j,k))
-    M = sqrt(u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2) / c
-    if (0.4d0 <= fd(i,j,k) .or. 1.d0 < M) then
-      fd(i,j,k) = 1.d0
-    else
-      fd(i,j,k) = 0.d0
-    endif
+    fd(i,j,k) = min(1.d0, fd(i,j,k))
 
     ! boundary
     ! x direction
