@@ -55,9 +55,9 @@ contains
     endif
   end subroutine calc_beta
 
-  attributes(device) function flux_AUSM(mass,pressure,Hl,Hr,Vl,Vr,Normal) result(F)
-    real(8), intent(in), value :: mass, pressure, Hl, Hr
-    real(8), intent(in), dimension(dimension), device :: Vl, Vr
+  attributes(device) function flux_AUSM(mass,pressure,Hl,Hr,fd,Vl,Vr,Normal) result(F)
+    real(8), intent(in), value                          :: mass, pressure, Hl, Hr, fd
+    real(8), intent(in), dimension(dimension), device   :: Vl, Vr
     real(8), intent(in), dimension(dimension+2), device :: Normal
     real(8), dimension(dimension+2) :: F, phil, phir
     phil(1) = 1.d0
@@ -66,8 +66,9 @@ contains
     phir(1) = 1.d0
     phir(2:dimension+1) = Vr(:)
     phir(dimension+2) = Hr
-    F(:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:)) + pressure * Normal(:)
-  end function flux_AUSM
+    !F(:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:)) + pressure * Normal(:)
+    F(:) = 0.5d0 * mass * (phil(:) + phir(:)) - 0.5d0 * abs(mass) * (phir(:) - phil(:)) + pressure * Normal(:)
+ end function flux_AUSM
 
   attributes(device) function SLAU(id_dim,Ql,Qr,Normal) result(F)
     integer, intent(in), value :: id_dim
@@ -103,7 +104,31 @@ contains
     mass = 0.5d0 * (rhol * (Vl(id_dim) + Vtp) + rhor * (Vr(id_dim) - Vtm) - fslau * dp / c)
     ! pressure flux
     Pressure = 0.5d0 * (pl + pr + (bp - bm) * (pl - pr) + (1.d0 - x) * (bp + bm - 1.d0) * (pl + pr))
-    F(:) = flux_AUSM(mass,Pressure,Hl,Hr,Vl,Vr,Normal)
+    F(:) = flux_AUSM(mass,Pressure,Hl,Hr,1.d0,Vl,Vr,Normal)
   end function SLAU
+
+  attributes(device) function simpleSLAU(id_dim,Ql,Qr,Normal,fd) result(F)
+    integer, intent(in), value                          :: id_dim
+    real(8), intent(in), dimension(dimension+2), device :: Ql, Qr, Normal
+    real(8), intent(in), value                          :: fd
+    real(8) rhol, rhor, pl, pr, el, er, Hl, Hr, cl, cr
+    real(8) Vp, Vm, Vt, mass, bp, bm, Pressure
+    real(8), dimension(dimension)   :: Vl, Vr, xy
+    real(8), dimension(dimension+2) :: F
+
+    call set_q(Ql,Qr,rhol,rhor,pl,pr,Vl,Vr)
+    call calc_quantities_AUSM(pl,pr,rhol,rhor,Vl,Vr,el,er,Hl,Hr,cl,cr)
+
+    Vp = Vl(id_dim)
+    Vm = Vr(id_dim)
+    Vt = (rhol * abs(Vp) + rhor * abs(Vm)) / (rhol + rhor)
+    ! mass flux
+    mass = 0.5d0 * (rhol * Vl(id_dim) + rhor * Vr(id_dim) - Vt * (rhor - rhol))
+    ! pressure flux
+    bp = 0.5d0 * (1.d0 + sign(1.d0,  Vp)) 
+    bm = 0.5d0 * (1.d0 + sign(1.d0, -Vm))
+    Pressure = bp * pl + bm * pr
+    F(:) = flux_AUSM(mass,Pressure,Hl,Hr,fd,Vl,Vr,Normal)
+  end function simpleSLAU
 end module calc_slau
 
