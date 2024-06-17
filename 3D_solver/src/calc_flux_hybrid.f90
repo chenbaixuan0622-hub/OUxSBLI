@@ -25,7 +25,7 @@ contains
     fdx = max(fd(i,j,k), fd(i+1,j,k))
     M = max(abs(u(i,j,k))   / sqrt(gamma * p(i,j,k)   / rho(i,j,k)), &
     &       abs(u(i+1,j,k)) / sqrt(gamma * p(i+1,j,k) / rho(i+1,j,k)))
-    if (fdx < 0.4d0 .and. M < 1.d0) then
+    if (M < 1.d0) then
       ! KEEP
       if (2 <= i .and. i <= nx-2) then
         rho4(:) = rho(i-1:i+2,j,k)
@@ -74,7 +74,7 @@ contains
         Q2 = (/rho(i-1,j,k), u(i-1,j,k), v(i-1,j,k), w(i-1,j,k), p(i-1,j,k)/)
         call Qlr_right(Q2,Q3,Q4,Ql,Qr)
       endif
-      E(i,j-offset,k-offset,:) = SLAU(1,Ql,Qr,Normal5)
+      E(i,j-offset,k-offset,:) = simpleSLAU(1,Ql,Qr,Normal5,fdx)
     endif
   end subroutine calc_E_hybrid
 
@@ -98,7 +98,7 @@ contains
     fdy = max(fd(i,j,k), fd(i,j+1,k))
     M = max(abs(v(i,j,k))   / sqrt(gamma * p(i,j,k)   / rho(i,j,k)), &
     &       abs(v(i,j+1,k)) / sqrt(gamma * p(i,j+1,k) / rho(i,j+1,k)))
-    if (fdy < 0.4d0 .and. M < 1.d0) then
+    if (M < 1.d0) then
       ! KEEP
       if (2 <= j .and. j <= ny-2) then
         rho4(:) = rho(i,j-1:j+2,k)
@@ -147,7 +147,7 @@ contains
         Q2 = (/rho(i,j-1,k), u(i,j-1,k), v(i,j-1,k), w(i,j-1,k), p(i,j-1,k)/)
         call Qlr_right(Q2,Q3,Q4,Ql,Qr)
       endif
-      F(i-offset,j,k-offset,:) = SLAU(2,Ql,Qr,Normal5)
+      F(i-offset,j,k-offset,:) = simpleSLAU(2,Ql,Qr,Normal5,fdy)
     endif
   end subroutine calc_F_hybrid
 
@@ -171,7 +171,7 @@ contains
     fdz = max(fd(i,j,k), fd(i,j,k+1))
     M = max(abs(w(i,j,k))   / sqrt(gamma * p(i,j,k)   / rho(i,j,k)), &
     &       abs(w(i,j,k+1)) / sqrt(gamma * p(i,j,k+1) / rho(i,j,k+1)))
-    if (fdz < 0.4d0 .and. M < 1.d0) then
+    if (M < 1.d0) then
       ! KEEP
       if (2 <= k .and. k <= nz-2) then
         rho4(:) = rho(i,j,k-1:k+2)
@@ -220,144 +220,6 @@ contains
         Q2 = (/rho(i,j,k-1), u(i,j,k-1), v(i,j,k-1), w(i,j,k-1), p(i,j,k-1)/)
         call Qlr_right(Q2,Q3,Q4,Ql,Qr)
       endif
-      G(i-offset,j-offset,k,:) = SLAU(3,Ql,Qr,Normal5)
+      G(i-offset,j-offset,k,:) = simpleSLAU(3,Ql,Qr,Normal5,fdz)
     endif
   end subroutine calc_G_hybrid
-
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-  attributes(global) subroutine calc_E_KEEPUP(nx, ny, nz, rho, u, v, w, p, fd, E)
-    integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, fd
-    real(8), intent(out), device                      :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
-    integer i, j, k
-    real(8), dimension(2)   :: rho2, p2
-    real(8), dimension(2,3) :: V2
-    real(8)                 :: Normal(3) = (/1.d0, 0.d0, 0.d0/)
-    real(8) fdx,  M
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
-    fdx = max(fd(i,j,k), fd(i+1,j,k))
-    M = max(abs(u(i,j,k))   / sqrt(gamma * p(i,j,k) / rho(i,j,k)), &
-    &       abs(u(i+1,j,k)) / sqrt(gamma * p(i+1,j,k) / rho(i+1,j,k)))
-    rho2(:) = rho(i:i+1,j,k)
-    p2(:) = p(i:i+1,j,k)
-    V2(:,1) = u(i:i+1,j,k)
-    V2(:,2) = v(i:i+1,j,k)
-    V2(:,3) = w(i:i+1,j,k)
-    E(i,j-offset,k-offset,:) = KEEPUP(1,rho2,p2,V2,Normal,M)
-  end subroutine calc_E_KEEPUP
-
-  attributes(global) subroutine calc_F_KEEPUP(nx, ny, nz, rho, u, v, w, p, fd, F)
-    integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, fd
-    real(8), intent(out), device                      :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
-    integer i, j, k
-    real(8), dimension(2)   :: rho2, p2
-    real(8), dimension(2,3) :: V2
-    real(8)                 :: Normal(3) = (/0.d0, 1.d0, 0.d0/)
-    real(8) fdy, M
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
-    fdy = max(fd(i,j,k), fd(i,j+1,k))
-    M = max(abs(v(i,j,k))   / sqrt(gamma * p(i,j,k)   / rho(i,j,k)), &
-    &       abs(v(i,j+1,k)) / sqrt(gamma * p(i,j+1,k) / rho(i,j+1,k)))
-    rho2(:) = rho(i,j:j+1,k)
-    p2(:) = p(i,j:j+1,k)
-    V2(:,1) = u(i,j:j+1,k)
-    V2(:,2) = v(i,j:j+1,k)
-    V2(:,3) = w(i,j:j+1,k)
-    F(i-offset,j,k-offset,:) = KEEPUP(2,rho2,p2,V2,Normal,M)
-  end subroutine calc_F_KEEPUP
-
-  attributes(global) subroutine calc_G_KEEPUP(nx, ny, nz, rho, u, v, w, p, fd, G)
-    integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, fd
-    real(8), intent(out), device                      :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
-    integer i, j, k
-    real(8), dimension(2)   :: rho2, p2
-    real(8), dimension(2,3) :: V2
-    real(8)                 :: Normal(3) = (/0.d0, 0.d0, 1.d0/)
-    real(8) fdz, M
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z
-    fdz = max(fd(i,j,k), fd(i,j,k+1))
-    M = max(abs(w(i,j,k))   / sqrt(gamma * p(i,j,k)   / rho(i,j,k)), &
-    &       abs(w(i,j,k+1)) / sqrt(gamma * p(i,j,k+1) / rho(i,j,k+1)))
-    rho2(:) = rho(i,j,k:k+1)
-    p2(:) = p(i,j,k:k+1)
-    V2(:,1) = u(i,j,k:k+1)
-    V2(:,2) = v(i,j,k:k+1)
-    V2(:,3) = w(i,j,k:k+1)
-    G(i-offset,j-offset,k,:) = KEEPUP(3,rho2,p2,V2,Normal,M)
-  end subroutine calc_G_KEEPUP
-  
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-  attributes(global) subroutine calc_E_KEEPFVS(nx, ny, nz, rho, u, v, w, p, fd, E)
-    integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, fd
-    real(8), intent(out), device                      :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
-    integer i, j, k
-    real(8), dimension(2)   :: rho2, p2
-    real(8), dimension(2,3) :: V2
-    real(8)                 :: Normal(3) = (/1.d0, 0.d0, 0.d0/)
-    real(8) fdx
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
-    fdx = max(fd(i,j,k), fd(i+1,j,k))
-    rho2(:) = rho(i:i+1,j,k)
-    p2(:) = p(i:i+1,j,k)
-    V2(:,1) = u(i:i+1,j,k)
-    V2(:,2) = v(i:i+1,j,k)
-    V2(:,3) = w(i:i+1,j,k)
-    E(i,j-offset,k-offset,:) = KEEPFVS2(1,rho2,p2,V2,Normal,fdx)
-  end subroutine calc_E_KEEPFVS
-
-  attributes(global) subroutine calc_F_KEEPFVS(nx, ny, nz, rho, u, v, w, p, fd, F)
-    integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, fd
-    real(8), intent(out), device                      :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
-    integer i, j, k
-    real(8), dimension(2)   :: rho2, p2
-    real(8), dimension(2,3) :: V2
-    real(8)                 :: Normal(3) = (/0.d0, 1.d0, 0.d0/)
-    real(8) fdy
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
-    fdy = max(fd(i,j,k), fd(i,j+1,k))
-    rho2(:) = rho(i,j:j+1,k)
-    p2(:) = p(i,j:j+1,k)
-    V2(:,1) = u(i,j:j+1,k)
-    V2(:,2) = v(i,j:j+1,k)
-    V2(:,3) = w(i,j:j+1,k)
-    F(i-offset,j,k-offset,:) = KEEPFVS2(2,rho2,p2,V2,Normal,fdy)
-  end subroutine calc_F_KEEPFVS
-
-  attributes(global) subroutine calc_G_KEEPFVS(nx, ny, nz, rho, u, v, w, p, fd, G)
-    integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, fd
-    real(8), intent(out), device                      :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
-    integer i, j, k
-    real(8), dimension(2)   :: rho2, p2
-    real(8), dimension(2,3) :: V2
-    real(8)                 :: Normal(3) = (/0.d0, 0.d0, 1.d0/)
-    real(8) fdz
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z
-    fdz = max(fd(i,j,k), fd(i,j,k+1))
-    rho2(:) = rho(i,j,k:k+1)
-    p2(:) = p(i,j,k:k+1)
-    V2(:,1) = u(i,j,k:k+1)
-    V2(:,2) = v(i,j,k:k+1)
-    V2(:,3) = w(i,j,k:k+1)
-    G(i-offset,j-offset,k,:) = KEEPFVS2(3,rho2,p2,V2,Normal,fdz)
-  end subroutine calc_G_KEEPFVS
-end module calc_flux_hybrid
-
