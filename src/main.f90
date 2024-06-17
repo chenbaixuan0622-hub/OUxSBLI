@@ -21,6 +21,7 @@ end module mod_allocate
 
 program main
   use, intrinsic :: iso_fortran_env
+  use nvtx
   use mod_allocate
   use mod_globals, only : id_recal, id_RungeKutta, nx, ny, nz, Q
   use set

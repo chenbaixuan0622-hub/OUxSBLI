@@ -1,5 +1,5 @@
 module set
-  use mod_globals, only : accuracy, offset, nx, ny, nz, Lx, Ly, Lz, gamma, R, RHO0, L0, M0, V0, p0, T, dtn
+  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, RHO0, L0, M0, V0, p0, T, dtn
   implicit none
 contains
   function linspace(x1, x2, n) result(x)
@@ -39,6 +39,8 @@ contains
     real(8), intent(out) :: Q(nx,ny,nz,5)
     real(8), intent(in)  :: Vin(ny,2)
     integer i, j, k
+    integer :: accuracy = 4
+    integer :: offset = 2
     real(8) :: pi = 2.d0 * acos(0.d0)
     real(8) x(nx-accuracy), y(ny-accuracy), z(nz-accuracy)
     x = linspace(0.d0, 2.d0 * pi * L0, nx-accuracy)
