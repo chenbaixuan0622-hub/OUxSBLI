@@ -17,6 +17,7 @@ OBJ =	mod_globals.o \
       set_coordinate.o \
       set.o \
       calc_common_dim.o \
+      calc_mat.o \
       calc_physical_quantities.o \
       calc_sutherland.o \
       calc_visc.o \
@@ -45,7 +46,7 @@ set.o: mod_globals.mod
 calc_physical_quantities.o: mod_globals.mod
 calc_common.o: mod_globals.mod
 calc_term.o: calc_common_dim.mod
-calc_keep.o: mod_globals.mod calc_common_dim.mod calc_term.mod
+calc_keep.o: mod_globals.mod calc_common_dim.mod calc_term.mod calc_mat.o
 calc_visc.o: mod_globals.mod calc_sutherland.mod
 calc_qlr.o: mod_globals.mod calc_muscl.mod
 calc_mat.o: mod_globals.mod calc_common_dim.mod

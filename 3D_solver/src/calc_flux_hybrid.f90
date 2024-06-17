@@ -25,7 +25,6 @@ contains
     fdx = max(fd(i,j,k), fd(i+1,j,k))
     M = max(abs(u(i,j,k))   / sqrt(gamma * p(i,j,k)   / rho(i,j,k)), &
     &       abs(u(i+1,j,k)) / sqrt(gamma * p(i+1,j,k) / rho(i+1,j,k)))
-    !if (fdx < 0.4d0 .and. M < 1.d0) then
     if (M < 1.d0) then
       ! KEEP
       if (2 <= i .and. i <= nx-2) then
@@ -99,7 +98,6 @@ contains
     fdy = max(fd(i,j,k), fd(i,j+1,k))
     M = max(abs(v(i,j,k))   / sqrt(gamma * p(i,j,k)   / rho(i,j,k)), &
     &       abs(v(i,j+1,k)) / sqrt(gamma * p(i,j+1,k) / rho(i,j+1,k)))
-    !if (fdy < 0.4d0 .and. M < 1.d0) then
     if (M < 1.d0) then
       ! KEEP
       if (2 <= j .and. j <= ny-2) then
@@ -173,7 +171,6 @@ contains
     fdz = max(fd(i,j,k), fd(i,j,k+1))
     M = max(abs(w(i,j,k))   / sqrt(gamma * p(i,j,k)   / rho(i,j,k)), &
     &       abs(w(i,j,k+1)) / sqrt(gamma * p(i,j,k+1) / rho(i,j,k+1)))
-    !if (fdz < 0.4d0 .and. M < 1.d0) then
     if (M < 1.d0) then
       ! KEEP
       if (2 <= k .and. k <= nz-2) then
@@ -226,5 +223,3 @@ contains
       G(i-offset,j-offset,k,:) = simpleSLAU(3,Ql,Qr,Normal5,fdz)
     endif
   end subroutine calc_G_hybrid
-end module calc_flux_hybrid
-
