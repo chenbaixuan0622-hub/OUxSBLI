@@ -22,13 +22,14 @@ module mod_globals
   ! id_scheme ! 1  KEEP    !
   !           ! 2  Roe     !
   !           ! 3  SLAU    !
+  !           ! 4  KEEPUP  !
   !!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_slau   ! kind2 slau !
   !           ! kind4 sd   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter  :: id_hybrid = 0
-  integer(kind=2), parameter  :: id_muscl = 0
-  integer, parameter          :: id_scheme = 1
+  integer(kind=4), parameter  :: id_muscl = 0
+  integer, parameter          :: id_scheme = 4
   integer(kind=2), parameter  :: id_slau = 0
   real(8), parameter          :: dp_max = 0.d0
 
@@ -38,20 +39,20 @@ module mod_globals
   real(8), parameter :: Lx = 2.d0 * pi * L0
   real(8), parameter :: Ly = 2.d0 * pi * L0
   real(8), parameter :: Lz = 2.d0 * pi * L0
-  integer, parameter :: nx = 130!66
-  integer, parameter :: ny = 130!66
-  integer, parameter :: nz = 130!66
+  integer, parameter :: nx = 66
+  integer, parameter :: ny = 66
+  integer, parameter :: nz = 66
   real(8), parameter :: dz = Lz / dble(nz-1)
   real(8), parameter :: dzi = 1.d0 / dz
 
   ! GPU
-  type(dim3) :: blocksE = dim3((nx-accuracy+1)/3,(ny-accuracy)/8,(nz-accuracy)/8)
-  type(dim3) :: blocksF = dim3((nx-accuracy)/8,(ny-accuracy+1)/3,(nz-accuracy)/8)
-  type(dim3) :: blocksG = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy+1)/3)
+  type(dim3) :: blocksE = dim3((nx-accuracy+1)/5,(ny-accuracy)/8,(nz-accuracy)/8)
+  type(dim3) :: blocksF = dim3((nx-accuracy)/8,(ny-accuracy+1)/5,(nz-accuracy)/8)
+  type(dim3) :: blocksG = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy+1)/5)
   type(dim3) :: blocks = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy)/8)
-  type(dim3) :: threadsE = dim3(3,8,8)
-  type(dim3) :: threadsF = dim3(8,3,8)
-  type(dim3) :: threadsG = dim3(8,8,3)
+  type(dim3) :: threadsE = dim3(5,8,8)
+  type(dim3) :: threadsF = dim3(8,5,8)
+  type(dim3) :: threadsG = dim3(8,8,5)
   type(dim3) :: threads = dim3(8,8,8)
 
   ! time
@@ -64,7 +65,7 @@ module mod_globals
   !               ! kind=4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter  :: id_recal = 0
-  integer(kind=2), parameter  :: id_RungeKutta = 0
+  integer(kind=4), parameter  :: id_RungeKutta = 0
   integer, parameter          :: nt = 200
   integer, parameter          :: np = 200
   real(8), parameter          :: dt = 0.01d0
