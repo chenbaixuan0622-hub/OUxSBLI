@@ -118,8 +118,11 @@ contains
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
     real(8), intent(out), device                      :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
-    real(8), dimension(5) :: Q1, Q2, Q3, Q4, Ql, Qr
-    real(8) :: Normal(5) = (/0.d0, 1.d0, 0.d0, 0.d0, 0.d0/)
+    real(8), dimension(5)   :: Q1, Q2, Q3, Q4, Ql, Qr
+    real(8), dimension(2)   :: rho2, p2
+    real(8), dimension(2,3) :: V2
+    real(8) :: Normal5(5) = (/0.d0, 1.d0, 0.d0, 0.d0, 0.d0/)
+    real(8) :: Normal3(3) = (/1.d0, 0.d0, 0.d0/)
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
@@ -140,9 +143,16 @@ contains
     endif
 
     if (id_scheme == 2) then
-      E(i,j-offset,k-offset,:) = Roe(1,Ql,Qr,Normal)
-    else
-      E(i,j-offset,k-offset,:) = SLAU(1,Ql,Qr,Normal)
+      E(i,j-offset,k-offset,:) = Roe(1,Ql,Qr,Normal5)
+    elseif (id_scheme == 3) then
+      E(i,j-offset,k-offset,:) = SLAU(1,Ql,Qr,Normal5)
+    elseif (id_scheme == 4) then
+      rho2(:) = (/Ql(1), Qr(1)/)
+      V2(:,1) = (/Ql(2), Qr(2)/)
+      V2(:,2) = (/Ql(3), Qr(3)/)
+      V2(:,3) = (/Ql(4), Qr(4)/)
+      p2(:)   = (/Ql(5), Qr(5)/)
+      E(i,j-offset,k-offset,:) = KEEP2(1,rho2,p2,V2,Normal3)
     endif
   end subroutine calc_E_MUSCL
 
@@ -152,8 +162,11 @@ contains
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
     real(8), intent(out), device                      :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
-    real(8), dimension(5) :: Q1, Q2, Q3, Q4, Ql, Qr
-    real(8) :: Normal(5) = (/0.d0, 0.d0, 1.d0, 0.d0, 0.d0/)
+    real(8), dimension(5)   :: Q1, Q2, Q3, Q4, Ql, Qr
+    real(8), dimension(2)   :: rho2, p2
+    real(8), dimension(2,3) :: V2
+    real(8) :: Normal5(5) = (/0.d0, 0.d0, 1.d0, 0.d0, 0.d0/)
+    real(8) :: Normal3(3) = (/0.d0, 1.d0, 0.d0/)
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
@@ -174,9 +187,16 @@ contains
     endif
 
     if (id_scheme == 2) then
-      F(i-offset,j,k-offset,:) = Roe(2,Ql,Qr,Normal)
-    else
-      F(i-offset,j,k-offset,:) = SLAU(2,Ql,Qr,Normal)
+      F(i-offset,j,k-offset,:) = Roe(2,Ql,Qr,Normal5)
+    elseif (id_scheme == 3) then
+      F(i-offset,j,k-offset,:) = SLAU(2,Ql,Qr,Normal5)
+    elseif (id_scheme == 4) then
+      rho2(:) = (/Ql(1), Qr(1)/)
+      V2(:,1) = (/Ql(2), Qr(2)/)
+      V2(:,2) = (/Ql(3), Qr(3)/)
+      V2(:,3) = (/Ql(4), Qr(4)/)
+      p2(:)   = (/Ql(5), Qr(5)/)
+      F(i-offset,j,k-offset,:) = KEEP2(2,rho2,p2,V2,Normal3)
     endif
   end subroutine calc_F_MUSCL
   
@@ -186,8 +206,11 @@ contains
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
     real(8), intent(out), device                      :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
-    real(8), dimension(5) :: Q1, Q2, Q3, Q4, Ql, Qr
-    real(8) :: Normal(5) = (/0.d0, 0.d0, 0.d0, 1.d0, 0.d0/)
+    real(8), dimension(5)   :: Q1, Q2, Q3, Q4, Ql, Qr
+    real(8), dimension(2)   :: rho2, p2
+    real(8), dimension(2,3) :: V2
+    real(8) :: Normal5(5) = (/0.d0, 0.d0, 0.d0, 1.d0, 0.d0/)
+    real(8) :: Normal3(3) = (/0.d0, 0.d0, 1.d0/)
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
@@ -208,9 +231,16 @@ contains
     endif
 
     if (id_scheme == 2) then
-      G(i-offset,j-offset,k,:) = Roe(3,Ql,Qr,Normal)
-    else
-      G(i-offset,j-offset,k,:) = SLAU(3,Ql,Qr,Normal)
+      G(i-offset,j-offset,k,:) = Roe(3,Ql,Qr,Normal5)
+    elseif (id_scheme == 3) then
+      G(i-offset,j-offset,k,:) = SLAU(3,Ql,Qr,Normal5)
+    elseif (id_scheme == 4) then
+      rho2(:) = (/Ql(1), Qr(1)/)
+      V2(:,1) = (/Ql(2), Qr(2)/)
+      V2(:,2) = (/Ql(3), Qr(3)/)
+      V2(:,3) = (/Ql(4), Qr(4)/)
+      p2(:)   = (/Ql(5), Qr(5)/)
+      G(i-offset,j-offset,k,:) = KEEP2(3,rho2,p2,V2,Normal3)
     endif
   end subroutine calc_G_MUSCL
 
@@ -222,8 +252,11 @@ contains
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
     real(8), intent(out), device                      :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
-    real(8), dimension(5) :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr
-    real(8) :: Normal(5) = (/0.d0, 1.d0, 0.d0, 0.d0, 0.d0/)
+    real(8), dimension(5)   :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr
+    real(8), dimension(2)   :: rho2, p2
+    real(8), dimension(2,3) :: V2
+    real(8) :: Normal5(5) = (/0.d0, 1.d0, 0.d0, 0.d0, 0.d0/)
+    real(8) :: Normal3(3) = (/1.d0, 0.d0, 0.d0/)
     real(8) :: zero(5) = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
@@ -262,9 +295,16 @@ contains
     endif
 
     if (id_scheme == 2) then
-      E(i,j-offset,k-offset,:) = Roe(1,Ql,Qr,Normal)
-    else
-      E(i,j-offset,k-offset,:) = SLAU(1,Ql,Qr,Normal)
+      E(i,j-offset,k-offset,:) = Roe(1,Ql,Qr,Normal5)
+    elseif (id_scheme == 3) then
+      E(i,j-offset,k-offset,:) = SLAU(1,Ql,Qr,Normal5)
+    elseif (id_scheme == 4) then
+      rho2(:) = (/Ql(1), Qr(1)/)
+      V2(:,1) = (/Ql(2), Qr(2)/)
+      V2(:,2) = (/Ql(3), Qr(3)/)
+      V2(:,3) = (/Ql(4), Qr(4)/)
+      p2(:)   = (/Ql(5), Qr(5)/)
+      E(i,j-offset,k-offset,:) = KEEP2(1,rho2,p2,V2,Normal3)
     endif
   end subroutine calc_E_MUSCL_4th
 
@@ -274,8 +314,11 @@ contains
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
     real(8), intent(out), device                      :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
-    real(8), dimension(5) :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr
-    real(8) :: Normal(5) = (/0.d0, 0.d0, 1.d0, 0.d0, 0.d0/)
+    real(8), dimension(5)   :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr
+    real(8), dimension(2)   :: rho2, p2
+    real(8), dimension(2,3) :: V2
+    real(8) :: Normal5(5) = (/0.d0, 0.d0, 1.d0, 0.d0, 0.d0/)
+    real(8) :: Normal3(3) = (/0.d0, 1.d0, 0.d0/)
     real(8) :: zero(5) = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
@@ -314,9 +357,16 @@ contains
     endif
 
     if (id_scheme == 2) then
-      F(i-offset,j,k-offset,:) = Roe(2,Ql,Qr,Normal)
-    else
-      F(i-offset,j,k-offset,:) = SLAU(2,Ql,Qr,Normal)
+      F(i-offset,j,k-offset,:) = Roe(2,Ql,Qr,Normal5)
+    elseif (id_scheme == 3) then
+      F(i-offset,j,k-offset,:) = SLAU(2,Ql,Qr,Normal5)
+    elseif (id_scheme == 4) then
+      rho2(:) = (/Ql(1), Qr(1)/)
+      V2(:,1) = (/Ql(2), Qr(2)/)
+      V2(:,2) = (/Ql(3), Qr(3)/)
+      V2(:,3) = (/Ql(4), Qr(4)/)
+      p2(:)   = (/Ql(5), Qr(5)/)
+      F(i-offset,j,k-offset,:) = KEEP2(2,rho2,p2,V2,Normal3)
     endif
   end subroutine calc_F_MUSCL_4th
   
@@ -326,8 +376,11 @@ contains
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
     real(8), intent(out), device                      :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
-    real(8), dimension(5) :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr
-    real(8) :: Normal(5) = (/0.d0, 0.d0, 0.d0, 1.d0, 0.d0/)
+    real(8), dimension(5)   :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr
+    real(8), dimension(2)   :: rho2, p2
+    real(8), dimension(2,3) :: V2
+    real(8) :: Normal5(5) = (/0.d0, 0.d0, 0.d0, 1.d0, 0.d0/)
+    real(8) :: Normal3(3) = (/0.d0, 0.d0, 1.d0/)
     real(8) :: zero(5) = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
@@ -366,9 +419,16 @@ contains
     endif
 
     if (id_scheme == 2) then
-      G(i-offset,j-offset,k,:) = Roe(3,Ql,Qr,Normal)
-    else
-      G(i-offset,j-offset,k,:) = SLAU(3,Ql,Qr,Normal)
+      G(i-offset,j-offset,k,:) = Roe(3,Ql,Qr,Normal5)
+    elseif (id_scheme == 3) then
+      G(i-offset,j-offset,k,:) = SLAU(3,Ql,Qr,Normal5)
+    elseif (id_scheme == 4) then
+      rho2(:) = (/Ql(1), Qr(1)/)
+      V2(:,1) = (/Ql(2), Qr(2)/)
+      V2(:,2) = (/Ql(3), Qr(3)/)
+      V2(:,3) = (/Ql(4), Qr(4)/)
+      p2(:)   = (/Ql(5), Qr(5)/)
+      G(i-offset,j-offset,k,:) = KEEP2(3,rho2,p2,V2,Normal3)
     endif
   end subroutine calc_G_MUSCL_4th
 end module calc_flux

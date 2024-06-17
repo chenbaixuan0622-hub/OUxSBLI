@@ -223,3 +223,4 @@ contains
       G(i-offset,j-offset,k,:) = simpleSLAU(3,Ql,Qr,Normal5,fdz)
     endif
   end subroutine calc_G_hybrid
+end module calc_flux_hybrid
