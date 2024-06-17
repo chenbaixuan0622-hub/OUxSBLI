@@ -1,5 +1,6 @@
 module calc_time_dev
   use cudafor
+  use nvtx
   use mod_globals, only : accuracy, id_hybrid, id_muscl, id_visc, id_turbulence, nt, np, &
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG
   use calc_physical_quantities
@@ -84,15 +85,9 @@ contains
 
     call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,u,v,w,rho,p,fd)
     stat = cudaDeviceSynchronize()
-    !call calc_E_hybrid<<<blocksE,threadsE>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
-    !call calc_F_hybrid<<<blocksF,threadsF>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
-    !call calc_G_hybrid<<<blocksG,threadsG>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
-    !call calc_E_KEEPUP<<<blocksE,threadsE>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
-    !call calc_F_KEEPUP<<<blocksF,threadsF>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
-    !call calc_G_KEEPUP<<<blocksG,threadsG>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
-    call calc_E_KEEPFVS<<<blocksE,threadsE>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
-    call calc_F_KEEPFVS<<<blocksF,threadsF>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
-    call calc_G_KEEPFVS<<<blocksG,threadsG>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
+    call calc_E_hybrid<<<blocksE,threadsE>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
+    call calc_F_hybrid<<<blocksF,threadsF>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
+    call calc_G_hybrid<<<blocksG,threadsG>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
     !call calc_E_hybrid<<<blocksE,threadsE>>>(nx,ny,nz,u,v,w,fd,E_upwind,E)
     !call calc_F_hybrid<<<blocksF,threadsF>>>(nx,ny,nz,u,v,w,fd,F_upwind,F)
     !call calc_G_hybrid<<<blocksG,threadsG>>>(nx,ny,nz,u,v,w,fd,G_upwind,G)
@@ -166,8 +161,13 @@ contains
     Jacobian = Jacobian_cpu
     do t2 = 1, np
       do t1 = 1, nt
+        call nvtxStartRange("calc 1step",1)
+        call nvtxStartRange("calc flux",2)
         call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,Jacobian,QJ,mut,E,F,G)
+        call nvtxEndRange
+        call nvtxStartRange("calc time dev",3)
         call calc_step(nx,ny,nz,1.d0,0.d0,dx,dy,E,F,G,QJ,QJ2)
+        call nvtxEndRange
         call set_bc(nx,ny,nz,Jacobian,QJ2)
 
         call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,Jacobian,QJ2,mut,E,F,G)
@@ -178,6 +178,7 @@ contains
         call calc_step3(nx,ny,nz,dx,dy,E,F,G,QJ3,QJ)
         call set_bc(nx,ny,nz,Jacobian,QJ)
         call calc_mean(t1+(t2-1)*nt,nx,ny,nz,Jacobian,QJ,Vmean,rhomean,Tmean)
+        call nvtxEndRange
       enddo
       Q = QJ
       mut_cpu = mut
@@ -246,15 +247,15 @@ contains
     do t2 = 1, np
       do t1 = 1, nt
         call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,Jacobian,QJ,mut,E,F,G)
-        call calc_step(nx,ny,nz,0.5d0,1.d0,dx,dy,E,F,G,QJ,QJs,Rs)
+        call calc_step(nx,ny,nz,0.5d0,1.d0,dx,dy,E,F,G,QJ,QJs,Rs) ! QJs = Q2
         call set_bc(nx,ny,nz,Jacobian,QJs)
 
         call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,Jacobian,QJs,mut,E,F,G)
-        call calc_step(nx,ny,nz,0.5d0,2.d0,dx,dy,E,F,G,QJ,QJs,Rs)
+        call calc_step(nx,ny,nz,0.5d0,2.d0,dx,dy,E,F,G,QJ,QJs,Rs) ! QJs = Q3
         call set_bc(nx,ny,nz,Jacobian,QJs)
 
         call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,Jacobian,QJs,mut,E,F,G)
-        call calc_step(nx,ny,nz,1.d0,2.d0,dx,dy,E,F,G,QJ,QJs,Rs)
+        call calc_step(nx,ny,nz,1.0d0,2.d0,dx,dy,E,F,G,QJ,QJs,Rs) ! QJs = Q4
         call set_bc(nx,ny,nz,Jacobian,QJs)
 
         call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,Jacobian,QJs,mut,E,F,G)
