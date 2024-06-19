@@ -158,31 +158,61 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine print_header(ni,nj,nk,x,y,z)
-    integer, intent(in) :: ni, nj, nk
-    real(8), intent(in) :: x(ni), y(nj), z(nk)
-    integer i, j, k
-    character :: lf*1, str1*8, str2*8, str3*8, str4*8
+  subroutine print_xml(ni,nj,nk,dimension,x,y,z,rho1d,p1d,T1d,v1d)
+    integer, intent(in)                                 :: ni, nj, nk, dimension
+    real(8), intent(in)                                 :: x(ni), y(nj), z(nk)
+    real(4), intent(in), dimension(ni*nj*nk)            :: rho1d, p1d, T1d
+    real(4), intent(in), dimension(dimension*ni*nj*nk)  :: v1d
+    integer(4) byte_x, byte_y, byte_z, byte_rho, byte_p, byte_T, byte_v
+    character :: lf*1, str1*4, str2*4, str3*4, str4*1
+    character :: offset1*10, offset2*10, offset3*10, offset4*10, offset5*10, offset6*10
     lf = char(10)
-    write(str1(1:8),'(i8)') ni
-    write(str2(1:8),'(i8)') nj
-    write(str3(1:8),'(i8)') nk
-    write(str4(1:8),'(i8)') ni * nj * nk
+    write(str1(1:4),'(i4)') ni-1
+    write(str2(1:4),'(i4)') nj-1
+    write(str3(1:4),'(i4)') nk-1
+    write(str4(1:1),'(i1)') dimension
+    byte_x   = 4 + 4 * ni
+    byte_y   = 4 + 4 * nj
+    byte_z   = 4 + 4 * nk
+    byte_rho = 4 + 4 * (ni * nj * nk)
+    byte_p   = byte_rho
+    byte_T   = byte_rho
+    byte_v   = 4 + 4 * (dimension * ni * nj * nk)
+    write(offset1(1:10),'(i10)') byte_x
+    write(offset2(1:10),'(i10)') byte_x + byte_y
+    write(offset3(1:10),'(i10)') byte_x + byte_y + byte_z
+    write(offset4(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho
+    write(offset5(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho + byte_p
+    write(offset6(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho + byte_p + byte_T
 
-    write(10) '# vtk DataFile Version 3.0'//lf
-    write(10) 'Q'//lf
-    write(10) 'BINARY'//lf
-    write(10) 'DATASET RECTILINEAR_GRID'//lf
-    write(10) 'DIMENSIONS'//str1//str2//str3//lf
-    write(10) 'X_COORDINATES'//str1//'  float'//lf
-    write(10) real(x), lf
-    write(10) lf//'Y_COORDINATES'//str2//'  float'//lf
-    write(10) real(y), lf
-    write(10) lf//'Z_COORDINATES'//str3//'  float'//lf
-    write(10) real(z), lf
-
-    write(10) lf//'POINT_DATA'//str4//lf
-  end subroutine print_header
+    write(10) '<?xml version="1.0"?>'//lf
+    write(10) '<VTKFile type="RectilinearGrid" version="1.0" byte_order="LittleEndian">'//lf
+    write(10) '  <RectilinearGrid WholeExtent="0 '//str1//' 0 '//str2//' 0 '//str3//'">'//lf
+    write(10) '    <Piece Extent="0 '//str1//' 0 '//str2//' 0 '//str3//'">'//lf
+    write(10) '      <Coordinates>'//lf
+    write(10) '        <DataArray type="Float32" format="appended" offset="0"/>'//lf
+    write(10) '        <DataArray type="Float32" format="appended" offset="'//offset1//'"/>'//lf
+    write(10) '        <DataArray type="Float32" format="appended" offset="'//offset2//'"/>'//lf
+    write(10) '      </Coordinates>'//lf
+    write(10) '      <PointData>'//lf
+    write(10) '        <DataArray type="Float32" format="appended" offset="'//offset3//'"&
+    & Name="rho" NumberOfComponents="1"/>'//lf
+    write(10) '        <DataArray type="Float32" format="appended" offset="'//offset4//'"&
+    & Name="p" NumberOfComponents="1"/>'//lf
+    write(10) '        <DataArray type="Float32" format="appended" offset="'//offset5//'"&
+    & Name="T" NumberOfComponents="1"/>'//lf
+    write(10) '        <DataArray type="Float32" format="appended" offset="'//offset6//'"&
+    & Name="velocity" NumberOfComponents="'//str4//'"/>'//lf
+    write(10) '      </PointData>'//lf
+    write(10) '    </Piece>'//lf
+    write(10) '  </RectilinearGrid>'//lf
+    write(10) '  <AppendedData encoding="raw">'//lf
+    write(10) '  _', byte_x, real(x), byte_y, real(y), byte_z, real(z),&
+    & byte_rho, rho1d, byte_p, p1d, byte_T, T1d, byte_v, v1d, lf
+    write(10) '  </AppendedData>'//lf
+    write(10) '</VTKFile>'//lf
+    close(10)
+  end subroutine print_xml
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -191,42 +221,34 @@ contains
     real(8), intent(in)                   :: x(nx), y(ny)
     real(8), intent(in)                   :: Q(nx,ny,4)
     real(8), intent(in), optional         :: T(nx,ny)
-    integer i, j
+    integer i, j, l, m
     real(8), dimension(nx,ny) :: rho, u, v, p
     real(8) :: z(1) = 0.d0
+    real(4), dimension(nx*ny)   :: rho1d, p1d, T1d
+    real(4), dimension(2*nx*ny) :: v1d
     character(len=40) filename
     character :: lf*1
     lf = char(10)
+    l = 1
+    m = 1
     do j = 1, ny
       do i = 1, nx
         rho(i,j) = Q(i,j,1)
         u(i,j) = Q(i,j,2) / rho(i,j)
         v(i,j) = Q(i,j,3) / rho(i,j)
         p(i,j) = (gamma - 1.d0) * (Q(i,j,4) - 0.5d0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
+        rho1d(l) = real(rho(i,j))
+        p1d(l)   = real(p(i,j))
+        T1d(l)   = p1d(l) / (real(R) * rho1d(l))
+        v1d(m)   = real(u(i,j))
+        v1d(m+1) = real(v(i,j))
+        l = l + 1
+        m = m + 2
     enddo;enddo
 
-    write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtk"
-    open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="BIG_ENDIAN")
-    call print_header(nx,ny,1,x,y,z)
-
-    write(10) 'VECTORS Velocity float'//lf
-    do j = 1, ny
-      do i = 1, nx
-        write(10) real(u(i,j)), real(v(i,j)), 0.e0
-    enddo;enddo
-
-    write(10) lf//'SCALARS rho float'//lf
-    write(10) 'LOOKUP_TABLE default'//lf
-    write(10) real(rho), lf
-    
-    write(10) lf//'SCALARS P float'//lf
-    write(10) 'LOOKUP_TABLE default'//lf
-    write(10) real(p), lf
-
-    write(10) lf//'SCALARS T float'//lf
-    write(10) 'LOOKUP_TABLE default'//lf
-    write(10) real(T), lf
-    close(10)
+    write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtr"
+    open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
+    call print_xml(nx,ny,1,2,x,y,z,rho1d,p1d,T1d,v1d)
   end subroutine print_vtk_2D
   
   subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,ke0,entropy0,mut)
@@ -235,13 +257,17 @@ contains
     real(8), intent(in)           :: QJ(nx,ny,nz,5) ! Q / Jacobian
     real(8), intent(inout)        :: ke0, entropy0
     real(8), intent(in), optional :: mut(nx,ny,nz)
-    integer i, j, k, l
+    integer i, j, k, l, m, len
     real(8) dy
     real(8), allocatable :: rho(:,:,:), u(:,:,:), v(:,:,:), w(:,:,:), p(:,:,:), nut(:,:,:), Tw(:,:)
+    real(4), allocatable :: rho1d(:), p1d(:), T1d(:), v1d(:)
     character(len=40) filename
     character :: lf*1
     lf = char(10)
-    allocate(rho(nx,ny,nz),u(nx,ny,nz),v(nx,ny,nz),w(nx,ny,nz),p(nx,ny,nz),Tw(nx,nz))
+    len = nx * ny * nz
+    allocate(rho(nx,ny,nz),u(nx,ny,nz),v(nx,ny,nz),w(nx,ny,nz),p(nx,ny,nz),Tw(nx,nz),rho1d(len),p1d(len),T1d(len),v1d(3*len))
+    l = 1
+    m = 1
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
@@ -250,41 +276,20 @@ contains
           v(i,j,k) = Jacobian(i,j) * QJ(i,j,k,3) / rho(i,j,k)
           w(i,j,k) = Jacobian(i,j) * QJ(i,j,k,4) / rho(i,j,k)
           p(i,j,k) = (gamma - 1.d0) * (Jacobian(i,j) * QJ(i,j,k,5) - 0.5d0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
-    enddo;enddo;enddo
-    
-    write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtk"
-    open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="BIG_ENDIAN")
-    call print_header(nx,ny,nz,x,y,z)
-
-    write(10) 'VECTORS Velocity float'//lf
-    do k = 1, nz
-      do j = 1, ny
-        do i = 1, nx
-          write(10) real(u(i,j,k)), real(v(i,j,k)), real(w(i,j,k))
+          rho1d(l) = real(rho(i,j,k))
+          p1d(l)   = real(p(i,j,k))
+          T1d(l)   = p1d(l) / (real(R) * rho1d(l))
+          v1d(m)   = real(u(i,j,k))
+          v1d(m+1) = real(v(i,j,k))
+          v1d(m+2) = real(w(i,j,k))
+          l = l + 1
+          m = m + 3
     enddo;enddo;enddo
 
-    write(10) lf//'SCALARS rho float'//lf
-    write(10) 'LOOKUP_TABLE default'//lf
-    write(10) real(rho), lf
+    write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtr"
+    open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
+    call print_xml(nx,ny,nz,3,x,y,z,rho1d,p1d,T1d,v1d)
     
-    write(10) lf//'SCALARS P float'//lf
-    write(10) 'LOOKUP_TABLE default'//lf
-    write(10) real(p), lf
-
-    write(10) lf//'SCALARS T float'//lf
-    write(10) 'LOOKUP_TABLE default'//lf
-    write(10) real(p / (R * rho)), lf
-
-    if (present(mut)) then
-      allocate(nut(nx,ny,nz))
-      nut(:,:,:) = mut(:,:,:) / rho(:,:,:)
-      write(10) lf//'SCALARS nut float'//lf
-      write(10) 'LOOKUP_TABLE default'//lf
-      write(10) real(nut), lf
-      deallocate(nut)
-    endif
-    close(10)
-
     call print_entropy(step,nx,ny,nz,rho,p,entropy0)
     call print_KE(step,nx,ny,nz,rho,u,v,w,ke0)
     call print_enstrophy(step,nx,ny,nz,x,y,z,rho,u,v,w)
@@ -292,7 +297,7 @@ contains
     dy = 1.d0 / (-y(1) + y(2))
     Tw(:,:) = p(:,1,:) / (R * rho(:,1,:))
     call print_turbulent_boundary_layer(step,nx,ny,nz,dy,y,Tw,u,rho)
-    deallocate(rho,u,v,w,p,Tw)
+    deallocate(rho,u,v,w,p,Tw,rho1d,p1d,T1d,v1d)
   end subroutine print_vtk_3D
 end module print
 
