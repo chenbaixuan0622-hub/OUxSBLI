@@ -21,6 +21,7 @@ end module mod_allocate
 
 program main
   use, intrinsic :: iso_fortran_env
+  use mpi
   use nvtx
   use mod_allocate
   use mod_globals, only : id_recal, id_RungeKutta, nx, ny, nz, Q
@@ -31,41 +32,54 @@ program main
   integer i, j
   real(8) t_start, t_end
   real(8), allocatable :: x(:), xix(:), dx(:), y(:), etay(:), dy(:), z(:), Jacobian(:,:)
-  real(8), allocatable :: Vin(:,:)
-  allocate(x(nx),xix(nx-1),dx(nx-1),y(ny),etay(ny-1),dy(ny-1),Jacobian(nx,ny),Vin(ny,2))
+  ! MPI
+  integer ierr, nranks, myrank
+
+  call MPI_INIT(ierr)
+  call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
+  call MPI_COMM_RANK(MPI_COMM_WORLD, myrank, ierr)
+  print *, "my rank is", myrank
+
+  allocate(x(nx),xix(nx-1),dx(nx-1),y(ny),etay(ny-1),dy(ny-1),Jacobian(nx,ny))
 
   call alloc(Q,z)
 
   call set_grid(nx,ny,nz,x,y,z,dx,dy)
   call set_xix(dx,xix)
   call set_etay(dy,etay)
-  if (kind(id_recal) == 4) then
-    write(*,*) "simulation restarted"
-    open(10,file="recal/Q.dat",action="read",form="unformatted",access="stream")
-    read(10) Q
-    close(10)
-  elseif (kind(id_recal) == 2) then
-    write(*,*) "set initial condition"
-    call set_init(nx,ny,nz,x,y,z,Q,Vin)
-  else
-    write(*,*) "wrong paramater was found"
+
+  if (myrank == 0) then
+    if (kind(id_recal) == 4) then
+      write(*,*) "simulation restarted"
+      open(10,file="recal/Q.dat",action="read",form="unformatted",access="stream")
+      read(10) Q
+      close(10)
+    elseif (kind(id_recal) == 2) then
+      write(*,*) "set initial condition"
+      call set_init(nx,ny,nz,x,y,z,Q)
+    else
+      write(*,*) "wrong paramater was found"
+    endif
   endif
   call set_Jacobian(dx,dy,Jacobian)
 
   call cpu_time(t_start)
-  call RungeKutta(id_RungeKutta,nx,ny,nz,x,dx,xix,y,dy,etay,z,Jacobian,Q,Vin)
+  call RungeKutta(id_RungeKutta,myrank,nx,ny,nz,x,dx,xix,y,dy,etay,z,Jacobian,Q)
   call cpu_time(t_end)
 
-  ! save data
-  do j = 1, ny
-    do i = 1, nx
-      Q(i,j,:,:) = Jacobian(i,j) * Q(i,j,:,:)
-  enddo;enddo
-  open(10,file="recal/Q.dat",status="replace",action="write",form="unformatted",access="stream")
-  write(10) Q
-  close(10)
-  print *, "elapsed time:", t_end - t_start
+  if (myrank == 0) then
+    ! save data
+    do j = 1, ny
+      do i = 1, nx
+        Q(i,j,:,:) = Jacobian(i,j) * Q(i,j,:,:)
+    enddo;enddo
+    open(10,file="recal/Q.dat",status="replace",action="write",form="unformatted",access="stream")
+    write(10) Q
+    close(10)
+    print *, "elapsed time:", t_end - t_start
+  endif
 
-  deallocate(Q,x,xix,dx,y,etay,dy,z,Jacobian,Vin)
+  deallocate(Q,x,xix,dx,y,etay,dy,z,Jacobian)
+  call MPI_FINALIZE(ierr)
 end program main
 

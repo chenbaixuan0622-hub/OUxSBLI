@@ -64,11 +64,10 @@ contains
     enddo
   end subroutine set_grid
 
-  subroutine set_init(nx,ny,nz,xs,ys,zs,Q,Vin)
+  subroutine set_init(nx,ny,nz,xs,ys,zs,Q)
     integer, intent(in)                         :: nx, ny, nz
     real(8), intent(in)                         :: xs(nx), ys(ny), zs(nz)
     real(8), intent(out), dimension(nx,ny,nz,5) :: Q
-    real(8), intent(in), dimension(ny,2)        :: Vin
     integer i, j, k, No
     real(8) :: d = 0.2d0 * 1.d-3
     real(8) :: d1= 2.d-3

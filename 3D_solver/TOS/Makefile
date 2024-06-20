@@ -1,4 +1,4 @@
-FC = nvfortran
+FC = mpif90#nvfortran
 
 OUTPUT_OPTIN = -cuda -acc -fast -Minfo=accel -lnvhpcwrapnvtx
 
