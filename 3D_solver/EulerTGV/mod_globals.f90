@@ -28,8 +28,8 @@ module mod_globals
   !           ! kind4 sd   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter  :: id_hybrid = 0
-  integer(kind=4), parameter  :: id_muscl = 0
-  integer, parameter          :: id_scheme = 4
+  integer(kind=2), parameter  :: id_muscl = 0
+  integer, parameter          :: id_scheme = 1
   integer(kind=2), parameter  :: id_slau = 0
   real(8), parameter          :: dp_max = 0.d0
 

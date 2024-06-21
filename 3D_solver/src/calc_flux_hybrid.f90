@@ -75,7 +75,7 @@ contains
         call Qlr_right(Q2,Q3,Q4,Ql,Qr)
       endif
       !E(i,j-offset,k-offset,:) = simpleSLAU(1,Ql,Qr,Normal5,fdx)
-      E(i,j-offset,k-offset,:) = SLAU(1,Ql,Qr,Normal5)
+      E(i,j-offset,k-offset,:) = SLAU(1,Ql,Qr,Normal5,fdx)
     endif
   end subroutine calc_E_hybrid
 
@@ -149,7 +149,7 @@ contains
         call Qlr_right(Q2,Q3,Q4,Ql,Qr)
       endif
       !F(i-offset,j,k-offset,:) = simpleSLAU(2,Ql,Qr,Normal5,fdy)
-      F(i-offset,j,k-offset,:) = SLAU(2,Ql,Qr,Normal5)
+      F(i-offset,j,k-offset,:) = SLAU(2,Ql,Qr,Normal5,fdy)
     endif
   end subroutine calc_F_hybrid
 
@@ -223,7 +223,7 @@ contains
         call Qlr_right(Q2,Q3,Q4,Ql,Qr)
       endif
       !G(i-offset,j-offset,k,:) = simpleSLAU(3,Ql,Qr,Normal5,fdz)
-      G(i-offset,j-offset,k,:) = SLAU(3,Ql,Qr,Normal5)
+      G(i-offset,j-offset,k,:) = SLAU(3,Ql,Qr,Normal5,fdz)
     endif
   end subroutine calc_G_hybrid
 end module calc_flux_hybrid

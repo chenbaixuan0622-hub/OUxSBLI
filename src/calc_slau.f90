@@ -67,12 +67,13 @@ contains
     phir(2:dimension+1) = Vr(:)
     phir(dimension+2) = Hr
     !F(:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:)) + pressure * Normal(:)
-    F(:) = 0.5d0 * mass * (phil(:) + phir(:)) - 0.5d0 * abs(mass) * (phir(:) - phil(:)) + pressure * Normal(:)
+    F(:) = 0.5d0 * mass * (phil(:) + phir(:)) - 0.5d0 * min(1.d0, 5.d0 * fd) * abs(mass) * (phir(:) - phil(:)) + pressure * Normal(:)
  end function flux_AUSM
 
-  attributes(device) function SLAU(id_dim,Ql,Qr,Normal) result(F)
-    integer, intent(in), value :: id_dim
+  attributes(device) function SLAU(id_dim,Ql,Qr,Normal,fd) result(F)
+    integer, intent(in), value                          :: id_dim
     real(8), intent(in), dimension(dimension+2), device :: Ql, Qr, Normal
+    real(8), intent(in), value                          :: fd
     real(8) rhol, rhor, pl, pr, el, er, Hl, Hr, cl, cr, c
     real(8) Vp, Vm, Vt, Vtp, Vtm, Mp, Mm, M, x, fslau, g, p, dp, mass, bp, bm, Pressure
     real(8), dimension(dimension) :: Vl, Vr, xy
