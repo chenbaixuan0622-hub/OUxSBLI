@@ -23,8 +23,8 @@ contains
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
     fdx = max(fd(i,j,k), fd(i+1,j,k))
-    M = max(abs(u(i,j,k))   / sqrt(gamma * p(i,j,k)   / rho(i,j,k)), &
-    &       abs(u(i+1,j,k)) / sqrt(gamma * p(i+1,j,k) / rho(i+1,j,k)))
+    M = max(sqrt(u(i,j,k)**2   + v(i,j,k)**2   + w(i,j,k)**2)   / sqrt(gamma * p(i,j,k)   / rho(i,j,k)), &
+    &       sqrt(u(i+1,j,k)**2 + v(i+1,j,k)**2 + w(i+1,j,k)**2) / sqrt(gamma * p(i+1,j,k) / rho(i+1,j,k)))
     if (M < 1.d0) then
       ! KEEP
       if (2 <= i .and. i <= nx-2) then
@@ -74,7 +74,8 @@ contains
         Q2 = (/rho(i-1,j,k), u(i-1,j,k), v(i-1,j,k), w(i-1,j,k), p(i-1,j,k)/)
         call Qlr_right(Q2,Q3,Q4,Ql,Qr)
       endif
-      E(i,j-offset,k-offset,:) = simpleSLAU(1,Ql,Qr,Normal5,fdx)
+      !E(i,j-offset,k-offset,:) = simpleSLAU(1,Ql,Qr,Normal5,fdx)
+      E(i,j-offset,k-offset,:) = SLAU(1,Ql,Qr,Normal5,fdx)
     endif
   end subroutine calc_E_hybrid
 
@@ -96,8 +97,8 @@ contains
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
     fdy = max(fd(i,j,k), fd(i,j+1,k))
-    M = max(abs(v(i,j,k))   / sqrt(gamma * p(i,j,k)   / rho(i,j,k)), &
-    &       abs(v(i,j+1,k)) / sqrt(gamma * p(i,j+1,k) / rho(i,j+1,k)))
+    M = max(sqrt(u(i,j,k)**2   + v(i,j,k)**2   + w(i,j,k)**2)   / sqrt(gamma * p(i,j,k)   / rho(i,j,k)), &
+    &       sqrt(u(i,j+1,k)**2 + v(i,j+1,k)**2 + w(i,j+1,k)**2) / sqrt(gamma * p(i,j+1,k) / rho(i,j+1,k)))
     if (M < 1.d0) then
       ! KEEP
       if (2 <= j .and. j <= ny-2) then
@@ -147,7 +148,8 @@ contains
         Q2 = (/rho(i,j-1,k), u(i,j-1,k), v(i,j-1,k), w(i,j-1,k), p(i,j-1,k)/)
         call Qlr_right(Q2,Q3,Q4,Ql,Qr)
       endif
-      F(i-offset,j,k-offset,:) = simpleSLAU(2,Ql,Qr,Normal5,fdy)
+      !F(i-offset,j,k-offset,:) = simpleSLAU(2,Ql,Qr,Normal5,fdy)
+      F(i-offset,j,k-offset,:) = SLAU(2,Ql,Qr,Normal5,fdy)
     endif
   end subroutine calc_F_hybrid
 
@@ -169,8 +171,8 @@ contains
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
     fdz = max(fd(i,j,k), fd(i,j,k+1))
-    M = max(abs(w(i,j,k))   / sqrt(gamma * p(i,j,k)   / rho(i,j,k)), &
-    &       abs(w(i,j,k+1)) / sqrt(gamma * p(i,j,k+1) / rho(i,j,k+1)))
+    M = max(sqrt(u(i,j,k)**2   + v(i,j,k)**2   + w(i,j,k)**2)   / sqrt(gamma * p(i,j,k)   / rho(i,j,k)), &
+    &       sqrt(u(i,j,k+1)**2 + v(i,j,k+1)**2 + w(i,j,k+1)**2) / sqrt(gamma * p(i,j,k+1) / rho(i,j,k+1)))
     if (M < 1.d0) then
       ! KEEP
       if (2 <= k .and. k <= nz-2) then
@@ -220,7 +222,8 @@ contains
         Q2 = (/rho(i,j,k-1), u(i,j,k-1), v(i,j,k-1), w(i,j,k-1), p(i,j,k-1)/)
         call Qlr_right(Q2,Q3,Q4,Ql,Qr)
       endif
-      G(i-offset,j-offset,k,:) = simpleSLAU(3,Ql,Qr,Normal5,fdz)
+      !G(i-offset,j-offset,k,:) = simpleSLAU(3,Ql,Qr,Normal5,fdz)
+      G(i-offset,j-offset,k,:) = SLAU(3,Ql,Qr,Normal5,fdz)
     endif
   end subroutine calc_G_hybrid
 end module calc_flux_hybrid
