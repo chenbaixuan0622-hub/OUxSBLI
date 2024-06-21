@@ -32,35 +32,26 @@ contains
     real(8), intent(out), device                        :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device                        :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, T
-    integer stat, stream1, stream2, stream3
-    stat = cudaStreamCreate(stream1)
-    stat = cudaStreamCreate(stream2)
-    stat = cudaStreamCreate(stream3)
-
+    integer stat, itr
     call calc_quantities(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p,T)
 
-    call calc_E<<<blocksE,threadsE,stream1>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,E)
-    call calc_F<<<blocksF,threadsF,stream2>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,F)
-    call calc_G<<<blocksG,threadsG,stream3>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,G)
-    !print *, trim(cudaGetErrorString(cudaGetLastError()))
+    call calc_E<<<blocksE,threadsE,1>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,E)
+    call calc_F<<<blocksF,threadsF,2>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,F)
+    call calc_G<<<blocksG,threadsG,3>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,G)
 
     if (id_turbulence /= 0) then
-      call calc_mut<<<blocks,threads>>>(nx,ny,nz,rho,u,v,w,mut)
+      call calc_mut<<<blocks,threads,4>>>(nx,ny,nz,rho,u,v,w,mut)
       stat = cudaDeviceSynchronize()
       call set_bc_mut(nx,ny,nz,mut)
     endif
 
-    if (id_visc == 1 .or. id_turbulence /= 0) then
-      call calc_Ev<<<blocksE,threadsE,stream1>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,E)
-      call calc_Fv<<<blocksF,threadsF,stream2>>>(nx,ny,nz,dy,dx,rho,u,v,w,T,p,mut,F)
-      call calc_Gv<<<blocksG,threadsG,stream3>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,G)
-    endif
-    !print *, trim(cudaGetErrorString(cudaGetLastError()))
     stat = cudaDeviceSynchronize()
-
-    stat = cudaStreamDestroy(stream1)
-    stat = cudaStreamDestroy(stream2)
-    stat = cudaStreamDestroy(stream3)
+    if (id_visc == 1 .or. id_turbulence /= 0) then
+      call calc_Ev<<<blocksE,threadsE,1>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,E)
+      call calc_Fv<<<blocksF,threadsF,2>>>(nx,ny,nz,dy,dx,rho,u,v,w,T,p,mut,F)
+      call calc_Gv<<<blocksG,threadsG,3>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,G)
+    endif
+    stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_basic
   
   subroutine calc_EFG_hybrid(id_hybrid,nx,ny,nz,dx,dy,Jacobian,QJ,mut,E,F,G)
@@ -79,13 +70,8 @@ contains
     !real(8), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E_upwind
     !real(8), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F_upwind
     !real(8), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G_upwind
-    integer stat, stream1, stream2, stream3
-    !integer(kind=2) :: id_muscl1
+    integer stat
 
-    stat = cudaStreamCreate(stream1)
-    stat = cudaStreamCreate(stream2)
-    stat = cudaStreamCreate(stream3)
-    
     call calc_quantities(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p,T)
 
     !call calc_E<<<blocksE,threadsE>>>(id_muscl1,nx,ny,nz,rho,u,v,w,p,E)
@@ -94,33 +80,29 @@ contains
     !call calc_E<<<blocksE,threadsE>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,E_upwind)
     !call calc_F<<<blocksF,threadsF>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,F_upwind)
     !call calc_G<<<blocksG,threadsG>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,G_upwind)
-    !stat = cudaDeviceSynchronize()
 
     call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,u,v,w,rho,p,fd)
-    stat = cudaDeviceSynchronize()
-    call calc_E_hybrid<<<blocksE,threadsE>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
-    call calc_F_hybrid<<<blocksF,threadsF>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
-    call calc_G_hybrid<<<blocksG,threadsG>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
+    call calc_E_hybrid<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
+    call calc_F_hybrid<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
+    call calc_G_hybrid<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
     !call calc_E_hybrid<<<blocksE,threadsE>>>(nx,ny,nz,u,v,w,fd,E_upwind,E)
     !call calc_F_hybrid<<<blocksF,threadsF>>>(nx,ny,nz,u,v,w,fd,F_upwind,F)
     !call calc_G_hybrid<<<blocksG,threadsG>>>(nx,ny,nz,u,v,w,fd,G_upwind,G)
     !print *, trim(cudaGetErrorString(cudaGetLastError()))
 
     if (id_turbulence /= 0) then
-      call calc_mut<<<blocks,threads>>>(nx,ny,nz,rho,u,v,w,mut)
+      call calc_mut<<<blocks,threads,4>>>(nx,ny,nz,rho,u,v,w,mut)
       stat = cudaDeviceSynchronize()
       call set_bc_mut(nx,ny,nz,mut)
     endif
 
+    stat = cudaDeviceSynchronize()
     if (id_visc == 1 .or. id_turbulence /= 0) then
-      call calc_Ev<<<blocksE,threadsE>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,E)
-      call calc_Fv<<<blocksF,threadsF>>>(nx,ny,nz,dy,dx,rho,u,v,w,T,p,mut,F)
-      call calc_Gv<<<blocksG,threadsG>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,G)
+      call calc_Ev<<<blocksE,threadsE,1>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,E)
+      call calc_Fv<<<blocksF,threadsF,2>>>(nx,ny,nz,dy,dx,rho,u,v,w,T,p,mut,F)
+      call calc_Gv<<<blocksG,threadsG,3>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,G)
     endif
     stat = cudaDeviceSynchronize()
-    stat = cudaStreamDestroy(stream1)
-    stat = cudaStreamDestroy(stream2)
-    stat = cudaStreamDestroy(stream3)
   end subroutine calc_EFG_hybrid
 
   subroutine RungeKutta_3rd(id_RungeKutta,myrank,nx,ny,nz,x,dx_cpu,xix_cpu,y,dy_cpu,etay_cpu,z,Jacobian_cpu,Q)
@@ -156,11 +138,6 @@ contains
           Q(i,j,:,:) = Q(i,j,:,:) / Jacobian_cpu(i,j)
       enddo;enddo
   
-      do k = 1, nz
-        do j = 1, ny
-          do i = 1, nx
-            Vmean_cpu(i,j,k,:) = Q(i,j,k,2:4) / Q(i,j,k,1)
-      enddo;enddo;enddo
       ! print initial condition
       if (id_turbulence == 0) then
         call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
@@ -268,11 +245,6 @@ contains
           Q(i,j,:,:) = Q(i,j,:,:) / Jacobian_cpu(i,j)
       enddo;enddo
 
-      do k = 1, nz
-        do j = 1, ny
-          do i = 1, nx
-            Vmean_cpu(i,j,k,:) = Q(i,j,k,2:4) / Q(i,j,k,1)
-      enddo;enddo;enddo
       ! print initial condition
       if (id_turbulence == 0) then
         call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
@@ -373,11 +345,6 @@ contains
           Q(i,j,:,:) = Q(i,j,:,:) / Jacobian_cpu(i,j)
       enddo;enddo
 
-      do k = 1, nz
-        do j = 1, ny
-          do i = 1, nx
-            Vmean_cpu(i,j,k,:) = Q(i,j,k,2:4) / Q(i,j,k,1)
-      enddo;enddo;enddo
       ! print initial condition
       if (id_turbulence == 0) then
         call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)

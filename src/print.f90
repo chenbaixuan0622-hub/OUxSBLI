@@ -21,6 +21,10 @@ module print
   interface mean
     module procedure mean1D, mean2D, mean3D
   end interface
+
+  interface cudaHalf
+    module procedure cudaHalf3D, cudaHalf4D
+  end interface
 contains
   function mean1D(a) result(ans)
     real(4), intent(in) :: a(:)
@@ -39,6 +43,33 @@ contains
     real(4) ans
     ans = sum(a) / size(a)
   end function mean3D
+
+  subroutine cudaHalf3D(nx,ny,nz,a8,a4)
+    integer, intent(in), value    :: nx, ny, nz
+    real(8), intent(in), device   :: a8(nx,ny,nz)
+    real(4), intent(out), device  :: a4(nx,ny,nz)
+    integer i, j, k
+    !$cuf kernel do(3)<<<*,*>>>
+    do k = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          a4(i,j,k) = real(a8(i,j,k))
+    enddo;enddo;enddo
+  end subroutine cudaHalf3D
+
+  subroutine cudaHalf4D(nx,ny,nz,dim,a8,a4)
+    integer, intent(in), value    :: nx, ny, nz, dim
+    real(8), intent(in), device   :: a8(nx,ny,nz,dim)
+    real(4), intent(out), device  :: a4(nx,ny,nz,dim)
+    integer i, j, k, l
+    !$cuf kernel do(4)<<<*,*>>>
+    do l = 1, dim
+      do k = 1, nz
+        do j = 1, ny
+          do i = 1, nx
+            a4(i,j,k,l) = real(a8(i,j,k,l))
+    enddo;enddo;enddo;enddo
+  end subroutine cudaHalf4D
 
   subroutine calc_vorticity(nx,ny,nz,x,y,z,u,v,w,omegax,omegay,omegaz)
     integer, intent(in)                             :: nx, ny, nz
