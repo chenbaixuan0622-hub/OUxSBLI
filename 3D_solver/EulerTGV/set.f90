@@ -33,14 +33,13 @@ contains
     enddo
   end subroutine set_grid
   
-  subroutine set_init(nx,ny,nz,xs,ys,zs,Q,Vin)
+  subroutine set_init(nx,ny,nz,xs,ys,zs,Q)
     integer, intent(in)  :: nx, ny, nz
     real(8), intent(in)  :: xs(nx), ys(ny), zs(nz)
     real(8), intent(out) :: Q(nx,ny,nz,5)
-    real(8), intent(in)  :: Vin(ny,2)
     integer i, j, k
-    integer :: accuracy = 4
-    integer :: offset = 2
+    integer :: accuracy = 2!4
+    integer :: offset = 1!2
     real(8) :: pi = 2.d0 * acos(0.d0)
     real(8) x(nx-accuracy), y(ny-accuracy), z(nz-accuracy)
     x = linspace(0.d0, 2.d0 * pi * L0, nx-accuracy)
@@ -63,8 +62,8 @@ contains
           Q(i,j,k,5) = (1.d0/gamma+RHO0*(M0**2)*(cos(2.d0*x(i-offset)/L0)+cos(2.d0*y(j-offset)/L0))*(cos(2.d0*z(k-offset)/L0)+2.d0)/16.d0)&
           &/(gamma-1.d0)+0.5d0*(Q(i,j,k,2)**2+Q(i,j,k,3)**2+Q(i,j,k,4)**2)/Q(i,j,k,1)
     enddo;enddo;enddo
-    !call set_bc_init2(Q)
-    call set_bc_init4(Q)
+    call set_bc_init2(Q)
+    !call set_bc_init4(Q)
   end subroutine set_init
   
   subroutine set_bc_init2(Q)
@@ -128,7 +127,7 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine set_bc2(nx,ny,nz,Jacobian,Q)
+  subroutine set_bc(nx,ny,nz,Jacobian,Q)
     integer, intent(in), value      :: nx, ny, nz
     real(8), intent(in), device     :: Jacobian(nx,ny)
     real(8), intent(inout), device  :: Q(nx,ny,nz,5)
@@ -165,9 +164,9 @@ contains
           Q(i,j,1,l) = Q(i,j,nz-1,l)
           Q(i,j,nz,l) = Q(i,j,2,l)
     enddo;enddo;enddo
-  end subroutine set_bc2
+  end subroutine set_bc
 
-  subroutine set_bc(nx,ny,nz,Jacobian,Q)
+  subroutine set_bc4(nx,ny,nz,Jacobian,Q)
     integer, intent(in), value      :: nx, ny, nz
     real(8), intent(in), device     :: Jacobian(nx,ny)
     real(8), intent(inout), device  :: Q(nx,ny,nz,5)
@@ -226,7 +225,7 @@ contains
           Q(i,j,nz-1,l) = Q(i,j,3,l)
           Q(i,j,nz,l) = Q(i,j,4,l)
     enddo;enddo;enddo
-  end subroutine set_bc
+  end subroutine set_bc4
 
   subroutine set_bc_mut(nx,ny,nz,mut)
     integer, intent(in), value     :: nx, ny, nz
