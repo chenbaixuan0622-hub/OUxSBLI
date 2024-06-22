@@ -4,47 +4,78 @@ module print
   interface print_vtk
     subroutine print_vtk_2D(step,nx,ny,x,y,Q,T)
       integer, intent(in)           :: step, nx, ny
-      real(8), intent(in)           :: x(nx), y(ny)
-      real(8), intent(in)           :: Q(nx,ny,4)
-      real(8), intent(in), optional :: T(nx,ny)
+      real(4), intent(in)           :: x(nx), y(ny)
+      real(4), intent(in)           :: Q(nx,ny,4)
+      real(4), intent(in), optional :: T(nx,ny)
     end subroutine print_vtk_2D
 
     subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,ke0,entropy0,mut)
       integer, intent(in)           :: step, nx, ny, nz
-      real(8), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny)
-      real(8), intent(in)           :: QJ(nx,ny,nz,5)
-      real(8), intent(inout)        :: ke0, entropy0
-      real(8), intent(in), optional :: mut(nx,ny,nz)
+      real(4), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny)
+      real(4), intent(in)           :: QJ(nx,ny,nz,5)
+      real(4), intent(inout)        :: ke0, entropy0
+      real(4), intent(in), optional :: mut(nx,ny,nz)
     end subroutine print_vtk_3D
   end interface
 
   interface mean
     module procedure mean1D, mean2D, mean3D
   end interface
+
+  interface cudaHalf
+    module procedure cudaHalf3D, cudaHalf4D
+  end interface
 contains
   function mean1D(a) result(ans)
-    real(8), intent(in) :: a(:)
-    real(8) ans
+    real(4), intent(in) :: a(:)
+    real(4) ans
     ans = sum(a) / size(a)
   end function mean1D
 
   function mean2D(a) result(ans)
-    real(8), intent(in) :: a(:,:)
-    real(8) ans
+    real(4), intent(in) :: a(:,:)
+    real(4) ans
     ans = sum(a) / size(a)
   end function mean2D
 
   function mean3D(a) result(ans)
-    real(8), intent(in) :: a(:,:,:)
-    real(8) ans
+    real(4), intent(in) :: a(:,:,:)
+    real(4) ans
     ans = sum(a) / size(a)
   end function mean3D
 
+  subroutine cudaHalf3D(nx,ny,nz,a8,a4)
+    integer, intent(in), value    :: nx, ny, nz
+    real(8), intent(in), device   :: a8(nx,ny,nz)
+    real(4), intent(out), device  :: a4(nx,ny,nz)
+    integer i, j, k
+    !$cuf kernel do(3)<<<*,*>>>
+    do k = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          a4(i,j,k) = real(a8(i,j,k))
+    enddo;enddo;enddo
+  end subroutine cudaHalf3D
+
+  subroutine cudaHalf4D(nx,ny,nz,dim,a8,a4)
+    integer, intent(in), value    :: nx, ny, nz, dim
+    real(8), intent(in), device   :: a8(nx,ny,nz,dim)
+    real(4), intent(out), device  :: a4(nx,ny,nz,dim)
+    integer i, j, k, l
+    !$cuf kernel do(4)<<<*,*>>>
+    do l = 1, dim
+      do k = 1, nz
+        do j = 1, ny
+          do i = 1, nx
+            a4(i,j,k,l) = real(a8(i,j,k,l))
+    enddo;enddo;enddo;enddo
+  end subroutine cudaHalf4D
+
   subroutine calc_vorticity(nx,ny,nz,x,y,z,u,v,w,omegax,omegay,omegaz)
     integer, intent(in)                             :: nx, ny, nz
-    real(8), intent(in)                             :: x(nx), y(ny), z(nz)
-    real(8), intent(in), dimension(nx,ny,nz)        :: u, v, w
-    real(8), intent(out), dimension(nx-2,ny-2,nz-2) :: omegax, omegay, omegaz
+    real(4), intent(in)                             :: x(nx), y(ny), z(nz)
+    real(4), intent(in), dimension(nx,ny,nz)        :: u, v, w
+    real(4), intent(out), dimension(nx-2,ny-2,nz-2) :: omegax, omegay, omegaz
     integer i, j, k
     do k = 2, nz-1
       do j = 2, ny-1
@@ -60,9 +91,9 @@ contains
 
   subroutine print_entropy(step,nx,ny,nz,rho,p,entropy0)
     integer, intent(in)                       :: step, nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz)  :: rho, p
-    real(8), intent(inout)                    :: entropy0
-    real(8) entropy, t
+    real(4), intent(in), dimension(nx,ny,nz)  :: rho, p
+    real(4), intent(inout)                    :: entropy0
+    real(4) entropy, t
     entropy = sum(rho * log(p * rho ** (-gamma)))
     if (step == 0) then
       entropy0 = entropy
@@ -75,10 +106,10 @@ contains
 
   subroutine print_KE(step,nx,ny,nz,rho,u,v,w,ke0)
     integer, intent(in)                       :: step, nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz)  :: rho, u, v, w
-    real(8), intent(inout)                    :: ke0
-    real(8) ke, t
-    ke = mean(0.5d0 * rho * (u**2 + v**2 + w**2))
+    real(4), intent(in), dimension(nx,ny,nz)  :: rho, u, v, w
+    real(4), intent(inout)                    :: ke0
+    real(4) ke, t
+    ke = mean(0.5e0 * rho * (u**2 + v**2 + w**2))
     if (step == 0) then
       ke0 = ke
     endif
@@ -91,13 +122,13 @@ contains
 
   subroutine print_enstrophy(step,nx,ny,nz,x,y,z,rho,u,v,w)
     integer, intent(in)                       :: step, nx, ny, nz
-    real(8), intent(in)                       :: x(nx), y(ny), z(nz)
-    real(8), intent(in), dimension(nx,ny,nz)  :: rho, u, v, w
-    real(8) enstrophy, t
-    real(8), dimension(nx-2,ny-2,nz-2) :: omegax, omegay, omegaz
+    real(4), intent(in)                       :: x(nx), y(ny), z(nz)
+    real(4), intent(in), dimension(nx,ny,nz)  :: rho, u, v, w
+    real(4) enstrophy, t
+    real(4), dimension(nx-2,ny-2,nz-2) :: omegax, omegay, omegaz
     t = nt * step * dt
     call calc_vorticity(nx,ny,nz,x,y,z,u,v,w,omegax,omegay,omegaz)
-    enstrophy = mean(0.5d0 * rho(2:nx-1,2:ny-1,2:nz-1) * (omegax**2 + omegay**2 + omegaz**2))
+    enstrophy = mean(0.5e0 * rho(2:nx-1,2:ny-1,2:nz-1) * (omegax**2 + omegay**2 + omegaz**2))
     open(10,file="data/enstrophy.d", position="append")
     !write(10,"(2(f9.4,1x))") t, enstrophy
     write(10,"(2e12.4)") t, enstrophy
@@ -105,23 +136,23 @@ contains
   end subroutine print_enstrophy
 
   function mu(T) result(ans)
-    real(8), intent(in), value :: T
-    real(8) :: ans
-    real(8) :: mu0 = 1.716d-5
-    real(8) :: T0 = 273.2d0
-    real(8) :: S = 111.d0
-    ans = mu0 * ((T0 + S) / (T + S)) * (T / T0)**1.5d0
+    real(4), intent(in), value :: T
+    real(4) :: ans
+    real(4) :: mu0 = 1.716e-5
+    real(4) :: T0 = 273.2e0
+    real(4) :: S = 111.e0
+    ans = mu0 * ((T0 + S) / (T + S)) * (T / T0)**1.5
   end function mu
   
   subroutine print_turbulent_boundary_layer(step,nx,ny,nz,dy,y,T,u,rho)
     integer, intent(in), value                :: step, nx, ny, nz
-    real(8), intent(in), value                :: dy
-    real(8), intent(in), dimension(ny)        :: y
-    real(8), intent(in), dimension(nx,nz)     :: T
-    real(8), intent(in), dimension(nx,ny,nz)  :: u, rho
+    real(4), intent(in), value                :: dy
+    real(4), intent(in), dimension(ny)        :: y
+    real(4), intent(in), dimension(nx,nz)     :: T
+    real(4), intent(in), dimension(nx,ny,nz)  :: u, rho
     integer j
-    real(8) rhow, nuw, dudy, tw, ut, uvd
-    real(8), dimension(ny) :: yplus, uplus
+    real(4) rhow, nuw, dudy, tw, ut, uvd
+    real(4), dimension(ny) :: yplus, uplus
     rhow = mean(rho(:,1,:))
     nuw = mu(mean(T(:,:))) / rhow
     dudy = dy * mean(-u(:,1,:) + u(:,2,:))
@@ -146,8 +177,8 @@ contains
 
   subroutine print_boundary_layer(nx,ny,nz,y,u)
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), dimension(ny)        :: y
-    real(8), intent(in), dimension(nx,ny,nz)  :: u
+    real(4), intent(in), dimension(ny)        :: y
+    real(4), intent(in), dimension(nx,ny,nz)  :: u
     integer j
     open(10,file="data/boundary_layer.d",action="write")
     do j = 1, ny
@@ -160,7 +191,7 @@ contains
 
   subroutine print_xml(ni,nj,nk,dimension,x,y,z,rho1d,p1d,T1d,v1d)
     integer, intent(in)                                 :: ni, nj, nk, dimension
-    real(8), intent(in)                                 :: x(ni), y(nj), z(nk)
+    real(4), intent(in)                                 :: x(ni), y(nj), z(nk)
     real(4), intent(in), dimension(ni*nj*nk)            :: rho1d, p1d, T1d
     real(4), intent(in), dimension(dimension*ni*nj*nk)  :: v1d
     integer(4) byte_x, byte_y, byte_z, byte_rho, byte_p, byte_T, byte_v
@@ -207,7 +238,7 @@ contains
     write(10) '    </Piece>'//lf
     write(10) '  </RectilinearGrid>'//lf
     write(10) '  <AppendedData encoding="raw">'//lf
-    write(10) '  _', byte_x, real(x), byte_y, real(y), byte_z, real(z),&
+    write(10) '  _', byte_x, x, byte_y, y, byte_z, z,&
     & byte_rho, rho1d, byte_p, p1d, byte_T, T1d, byte_v, v1d, lf
     write(10) '  </AppendedData>'//lf
     write(10) '</VTKFile>'//lf
@@ -218,12 +249,12 @@ contains
 
   subroutine print_vtk_2D(step,nx,ny,x,y,Q,T)
     integer, intent(in)                   :: step, nx, ny
-    real(8), intent(in)                   :: x(nx), y(ny)
-    real(8), intent(in)                   :: Q(nx,ny,4)
-    real(8), intent(in), optional         :: T(nx,ny)
+    real(4), intent(in)                   :: x(nx), y(ny)
+    real(4), intent(in)                   :: Q(nx,ny,4)
+    real(4), intent(in), optional         :: T(nx,ny)
     integer i, j, l, m
-    real(8), dimension(nx,ny) :: rho, u, v, p
-    real(8) :: z(1) = 0.d0
+    real(4), dimension(nx,ny) :: rho, u, v, p
+    real(4) :: z(1) = 0.e0
     real(4), dimension(nx*ny)   :: rho1d, p1d, T1d
     real(4), dimension(2*nx*ny) :: v1d
     character(len=40) filename
@@ -236,12 +267,12 @@ contains
         rho(i,j) = Q(i,j,1)
         u(i,j) = Q(i,j,2) / rho(i,j)
         v(i,j) = Q(i,j,3) / rho(i,j)
-        p(i,j) = (gamma - 1.d0) * (Q(i,j,4) - 0.5d0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
-        rho1d(l) = real(rho(i,j))
-        p1d(l)   = real(p(i,j))
+        p(i,j) = (gamma - 1.e0) * (Q(i,j,4) - 0.5e0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
+        rho1d(l) = rho(i,j)
+        p1d(l)   = p(i,j)
         T1d(l)   = p1d(l) / (real(R) * rho1d(l))
-        v1d(m)   = real(u(i,j))
-        v1d(m+1) = real(v(i,j))
+        v1d(m)   = u(i,j)
+        v1d(m+1) = v(i,j)
         l = l + 1
         m = m + 2
     enddo;enddo
@@ -253,13 +284,13 @@ contains
   
   subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,ke0,entropy0,mut)
     integer, intent(in)           :: step, nx, ny, nz
-    real(8), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny)
-    real(8), intent(in)           :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(inout)        :: ke0, entropy0
-    real(8), intent(in), optional :: mut(nx,ny,nz)
+    real(4), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny)
+    real(4), intent(in)           :: QJ(nx,ny,nz,5) ! Q / Jacobian
+    real(4), intent(inout)        :: ke0, entropy0
+    real(4), intent(in), optional :: mut(nx,ny,nz)
     integer i, j, k, l, m, len
-    real(8) dy
-    real(8), allocatable :: rho(:,:,:), u(:,:,:), v(:,:,:), w(:,:,:), p(:,:,:), nut(:,:,:), Tw(:,:)
+    real(4) dy
+    real(4), allocatable :: rho(:,:,:), u(:,:,:), v(:,:,:), w(:,:,:), p(:,:,:), nut(:,:,:), Tw(:,:)
     real(4), allocatable :: rho1d(:), p1d(:), T1d(:), v1d(:)
     character(len=40) filename
     character :: lf*1
@@ -275,28 +306,28 @@ contains
           u(i,j,k) = Jacobian(i,j) * QJ(i,j,k,2) / rho(i,j,k)
           v(i,j,k) = Jacobian(i,j) * QJ(i,j,k,3) / rho(i,j,k)
           w(i,j,k) = Jacobian(i,j) * QJ(i,j,k,4) / rho(i,j,k)
-          p(i,j,k) = (gamma - 1.d0) * (Jacobian(i,j) * QJ(i,j,k,5) - 0.5d0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
-          rho1d(l) = real(rho(i,j,k))
-          p1d(l)   = real(p(i,j,k))
+          p(i,j,k) = (gamma - 1.e0) * (Jacobian(i,j) * QJ(i,j,k,5) - 0.e0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
+          rho1d(l) = rho(i,j,k)
+          p1d(l)   = p(i,j,k)
           T1d(l)   = p1d(l) / (real(R) * rho1d(l))
-          v1d(m)   = real(u(i,j,k))
-          v1d(m+1) = real(v(i,j,k))
-          v1d(m+2) = real(w(i,j,k))
+          v1d(m)   = u(i,j,k)
+          v1d(m+1) = v(i,j,k)
+          v1d(m+2) = w(i,j,k)
           l = l + 1
           m = m + 3
     enddo;enddo;enddo
 
     write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtr"
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
-    call print_xml(nx,ny,nz,3,x,y,z,rho1d,p1d,T1d,v1d)
+    call print_xml(nx,ny,nz,3,real(x),real(y),real(z),rho1d,p1d,T1d,v1d)
     
     call print_entropy(step,nx,ny,nz,rho,p,entropy0)
     call print_KE(step,nx,ny,nz,rho,u,v,w,ke0)
-    call print_enstrophy(step,nx,ny,nz,x,y,z,rho,u,v,w)
-    call print_boundary_layer(nx,ny,nz,y,u)
-    dy = 1.d0 / (-y(1) + y(2))
+    call print_enstrophy(step,nx,ny,nz,real(x),real(y),real(z),rho,u,v,w)
+    call print_boundary_layer(nx,ny,nz,real(y),u)
+    dy = 1.e0 / (-y(1) + y(2))
     Tw(:,:) = p(:,1,:) / (R * rho(:,1,:))
-    call print_turbulent_boundary_layer(step,nx,ny,nz,dy,y,Tw,u,rho)
+    call print_turbulent_boundary_layer(step,nx,ny,nz,dy,real(y),Tw,u,rho)
     deallocate(rho,u,v,w,p,Tw,rho1d,p1d,T1d,v1d)
   end subroutine print_vtk_3D
 end module print

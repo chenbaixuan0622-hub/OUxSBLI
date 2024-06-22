@@ -32,35 +32,26 @@ contains
     real(8), intent(out), device                        :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device                        :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, T
-    integer stat, stream1, stream2, stream3
-    stat = cudaStreamCreate(stream1)
-    stat = cudaStreamCreate(stream2)
-    stat = cudaStreamCreate(stream3)
-
+    integer stat
     call calc_quantities(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p,T)
 
-    call calc_E<<<blocksE,threadsE,stream1>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,E)
-    call calc_F<<<blocksF,threadsF,stream2>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,F)
-    call calc_G<<<blocksG,threadsG,stream3>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,G)
-    !print *, trim(cudaGetErrorString(cudaGetLastError()))
+    call calc_E<<<blocksE,threadsE,1>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,E)
+    call calc_F<<<blocksF,threadsF,2>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,F)
+    call calc_G<<<blocksG,threadsG,3>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,G)
 
     if (id_turbulence /= 0) then
-      call calc_mut<<<blocks,threads>>>(nx,ny,nz,rho,u,v,w,mut)
+      call calc_mut<<<blocks,threads,4>>>(nx,ny,nz,rho,u,v,w,mut)
       stat = cudaDeviceSynchronize()
       call set_bc_mut(nx,ny,nz,mut)
     endif
 
-    if (id_visc == 1 .or. id_turbulence /= 0) then
-      call calc_Ev<<<blocksE,threadsE,stream1>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,E)
-      call calc_Fv<<<blocksF,threadsF,stream2>>>(nx,ny,nz,dy,dx,rho,u,v,w,T,p,mut,F)
-      call calc_Gv<<<blocksG,threadsG,stream3>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,G)
-    endif
-    !print *, trim(cudaGetErrorString(cudaGetLastError()))
     stat = cudaDeviceSynchronize()
-
-    stat = cudaStreamDestroy(stream1)
-    stat = cudaStreamDestroy(stream2)
-    stat = cudaStreamDestroy(stream3)
+    if (id_visc == 1 .or. id_turbulence /= 0) then
+      call calc_Ev<<<blocksE,threadsE,1>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,E)
+      call calc_Fv<<<blocksF,threadsF,2>>>(nx,ny,nz,dy,dx,rho,u,v,w,T,p,mut,F)
+      call calc_Gv<<<blocksG,threadsG,3>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,G)
+    endif
+    stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_basic
   
   subroutine calc_EFG_hybrid(id_hybrid,nx,ny,nz,dx,dy,Jacobian,QJ,mut,E,F,G)
@@ -79,13 +70,8 @@ contains
     !real(8), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E_upwind
     !real(8), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F_upwind
     !real(8), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G_upwind
-    integer stat, stream1, stream2, stream3
-    !integer(kind=2) :: id_muscl1
+    integer stat
 
-    stat = cudaStreamCreate(stream1)
-    stat = cudaStreamCreate(stream2)
-    stat = cudaStreamCreate(stream3)
-    
     call calc_quantities(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p,T)
 
     !call calc_E<<<blocksE,threadsE>>>(id_muscl1,nx,ny,nz,rho,u,v,w,p,E)
@@ -94,33 +80,29 @@ contains
     !call calc_E<<<blocksE,threadsE>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,E_upwind)
     !call calc_F<<<blocksF,threadsF>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,F_upwind)
     !call calc_G<<<blocksG,threadsG>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,G_upwind)
-    !stat = cudaDeviceSynchronize()
 
     call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,u,v,w,rho,p,fd)
-    stat = cudaDeviceSynchronize()
-    call calc_E_hybrid<<<blocksE,threadsE,stream1>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
-    call calc_F_hybrid<<<blocksF,threadsF,stream2>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
-    call calc_G_hybrid<<<blocksG,threadsG,stream3>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
+    call calc_E_hybrid<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
+    call calc_F_hybrid<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
+    call calc_G_hybrid<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
     !call calc_E_hybrid<<<blocksE,threadsE>>>(nx,ny,nz,u,v,w,fd,E_upwind,E)
     !call calc_F_hybrid<<<blocksF,threadsF>>>(nx,ny,nz,u,v,w,fd,F_upwind,F)
     !call calc_G_hybrid<<<blocksG,threadsG>>>(nx,ny,nz,u,v,w,fd,G_upwind,G)
     !print *, trim(cudaGetErrorString(cudaGetLastError()))
 
     if (id_turbulence /= 0) then
-      call calc_mut<<<blocks,threads>>>(nx,ny,nz,rho,u,v,w,mut)
+      call calc_mut<<<blocks,threads,4>>>(nx,ny,nz,rho,u,v,w,mut)
       stat = cudaDeviceSynchronize()
       call set_bc_mut(nx,ny,nz,mut)
     endif
 
+    stat = cudaDeviceSynchronize()
     if (id_visc == 1 .or. id_turbulence /= 0) then
-      call calc_Ev<<<blocksE,threadsE,stream1>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,E)
-      call calc_Fv<<<blocksF,threadsF,stream2>>>(nx,ny,nz,dy,dx,rho,u,v,w,T,p,mut,F)
-      call calc_Gv<<<blocksG,threadsG,stream3>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,G)
+      call calc_Ev<<<blocksE,threadsE,1>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,E)
+      call calc_Fv<<<blocksF,threadsF,2>>>(nx,ny,nz,dy,dx,rho,u,v,w,T,p,mut,F)
+      call calc_Gv<<<blocksG,threadsG,3>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,G)
     endif
     stat = cudaDeviceSynchronize()
-    stat = cudaStreamDestroy(stream1)
-    stat = cudaStreamDestroy(stream2)
-    stat = cudaStreamDestroy(stream3)
   end subroutine calc_EFG_hybrid
 
   subroutine RungeKutta_3rd(id_RungeKutta,myrank,nx,ny,nz,x,dx_cpu,xix_cpu,y,dy_cpu,etay_cpu,z,Jacobian_cpu,Q)
@@ -135,11 +117,10 @@ contains
     real(8), dimension(nx,ny,nz,3)  :: Vmean_cpu
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type(cudaDeviceProp)          :: prop
-    real(8), device               :: mut(nx,ny,nz)
     real(8), allocatable, device  :: QJ(:,:,:,:), QJ2(:,:,:,:), QJ3(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
-    real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), Jacobian(:,:), Vmean(:,:,:,:), rhomean(:,:,:), Tmean(:,:,:)
+    real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), Jacobian(:,:), mut(:,:,:), Vmean(:,:,:,:), rhomean(:,:,:), Tmean(:,:,:)
     ! for plot
-    real(8) :: ke0 = 1.d0, entropy0 = 1.d0
+    real(4) :: ke0 = 1.d0, entropy0 = 1.d0
 
     ! check GPU
     stat = cudaSetDevice(0)
@@ -148,8 +129,8 @@ contains
     print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", 0, ") is available"
 
     if (myrank == 0) then
-      allocate(QJ2(nx,ny,nz,5),QJ3(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
-      allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),Jacobian(nx,ny),Vmean(nx,ny,nz,3),rhomean(nx,ny,nz),Tmean(nx,ny,nz))
+      allocate(QJ(nx,ny,nz,5),QJ2(nx,ny,nz,5),QJ3(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
+      allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),Jacobian(nx,ny),mut(nx,ny,nz),Vmean(nx,ny,nz,3),rhomean(nx,ny,nz),Tmean(nx,ny,nz))
 
       ! set Q / Jacobian
       do j = 1, ny
@@ -157,16 +138,11 @@ contains
           Q(i,j,:,:) = Q(i,j,:,:) / Jacobian_cpu(i,j)
       enddo;enddo
   
-      do k = 1, nz
-        do j = 1, ny
-          do i = 1, nx
-            Vmean_cpu(i,j,k,:) = Q(i,j,k,2:4) / Q(i,j,k,1)
-      enddo;enddo;enddo
       ! print initial condition
       if (id_turbulence == 0) then
-        call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0)
+        call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
       else
-        call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0,mut_cpu)
+        call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0,real(mut_cpu))
       endif
 
       ! copy on GPU
@@ -210,26 +186,30 @@ contains
       ! send and recv device arrays
       if (myrank == 0) then
         Q = QJ
+        call nvtxStartRange("MPI_SEND",4)
         if (id_turbulence /= 0) then
           mut_cpu = mut
           call MPI_SEND(mut_cpu, nx*ny*nz, MPI_REAL8, 1, 1, MPI_COMM_WORLD, ierr)
         endif
         call MPI_SEND(Q, nx*ny*nz*5, MPI_REAL8, 1, 0, MPI_COMM_WORLD, ierr) 
+        call nvtxEndRange
       elseif (myrank == 1) then
+        call nvtxStartRange("MPI_RECV",5)
         call MPI_RECV(Q, nx*ny*nz*5, MPI_REAL8, 0, 0, MPI_COMM_WORLD, status, ierr)
-        call nvtxStartRange("print",4)
+        call nvtxEndRange
+        call nvtxStartRange("print",6)
         if (id_turbulence == 0) then
-          call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0)
+          call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
         else
           call MPI_RECV(mut_cpu, nx*ny*nz, MPI_REAL8, 0, 1, MPI_COMM_WORLD, status, ierr)
-          call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0,mut_cpu) 
+          call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0,real(mut_cpu)) 
         endif
         call nvtxEndRange
       endif
     enddo
     
     if (myrank == 0) then
-      deallocate(QJ,QJ2,QJ3,E,F,G,dx,xix,dy,etay,Jacobian,Vmean,rhomean,Tmean)
+      deallocate(QJ,QJ2,QJ3,E,F,G,dx,xix,dy,etay,Jacobian,mut,Vmean,rhomean,Tmean)
     endif
   end subroutine RungeKutta_3rd
 
@@ -245,11 +225,10 @@ contains
     real(8), dimension(nx,ny,nz,3)  :: Vmean_cpu
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type(cudaDeviceProp)          :: prop
-    real(8), device               :: QJ(nx,ny,nz,5), mut(nx,ny,nz)
-    real(8), allocatable, device  :: QJs(:,:,:,:), Rs(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
-    real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), Jacobian(:,:), Vmean(:,:,:,:), rhomean(:,:,:), Tmean(:,:,:)
+    real(8), allocatable, device  :: QJ(:,:,:,:), QJs(:,:,:,:), Rs(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
+    real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), Jacobian(:,:), mut(:,:,:), Vmean(:,:,:,:), rhomean(:,:,:), Tmean(:,:,:)
     ! for plot
-    real(8) ke0, entropy0
+    real(4) :: ke0 = 1.d0, entropy0 = 1.d0
 
     ! check GPU
     stat = cudaSetDevice(0)
@@ -257,8 +236,8 @@ contains
     ilen = verify(prop%name, ' ', .true.)
 
     if (myrank == 0) then
-      allocate(QJs(nx,ny,nz,5),Rs(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
-      allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),Jacobian(nx,ny),Vmean(nx,ny,nz,3),rhomean(nx,ny,nz),Tmean(nx,ny,nz))
+      allocate(QJ(nx,ny,nz,5),QJs(nx,ny,nz,5),Rs(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
+      allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),Jacobian(nx,ny),mut(nx,ny,nz),Vmean(nx,ny,nz,3),rhomean(nx,ny,nz),Tmean(nx,ny,nz))
 
       ! set Q / Jacobian
       do j = 1, ny
@@ -266,16 +245,11 @@ contains
           Q(i,j,:,:) = Q(i,j,:,:) / Jacobian_cpu(i,j)
       enddo;enddo
 
-      do k = 1, nz
-        do j = 1, ny
-          do i = 1, nx
-            Vmean_cpu(i,j,k,:) = Q(i,j,k,2:4) / Q(i,j,k,1)
-      enddo;enddo;enddo
       ! print initial condition
       if (id_turbulence == 0) then
-        call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0)
+        call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
       else
-        call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0,mut_cpu)
+        call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0,real(mut_cpu))
       endif
 
       ! copy on GPU
@@ -326,16 +300,16 @@ contains
       elseif (myrank == 1) then
         call MPI_RECV(Q, nx*ny*nz*5, MPI_REAL8, 0, 0, MPI_COMM_WORLD, status, ierr)
         if (id_turbulence == 0) then
-          call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0)
+          call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
         else
           call MPI_RECV(mut_cpu, nx*ny*nz, MPI_REAL8, 0, 1, MPI_COMM_WORLD, status, ierr)
-          call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0,mut_cpu) 
-        endif  
+          call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0,real(mut_cpu))
+        endif
       endif
     enddo
 
     if (myrank == 0) then
-      deallocate(QJs,Rs,E,F,G,dx,xix,dy,etay,Jacobian,Vmean,rhomean,Tmean)
+      deallocate(QJ,QJs,Rs,E,F,G,dx,xix,dy,etay,Jacobian,mut,Vmean,rhomean,Tmean)
     endif
   end subroutine RungeKutta_4th
 
@@ -351,11 +325,10 @@ contains
     real(8), dimension(nx,ny,nz,3)  :: Vmean_cpu
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type(cudaDeviceProp)          :: prop
-    real(8), device               :: QJ(nx,ny,nz,5), mut(nx,ny,nz)
-    real(8), allocatable, device  :: QJs(:,:,:,:), QJ4(:,:,:,:), R4(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
-    real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), Jacobian(:,:), Vmean(:,:,:,:), rhomean(:,:,:), Tmean(:,:,:)
+    real(8), allocatable, device  :: QJ(:,:,:,:), QJs(:,:,:,:), QJ4(:,:,:,:), R4(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
+    real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), Jacobian(:,:), mut(:,:,:), Vmean(:,:,:,:), rhomean(:,:,:), Tmean(:,:,:)
     ! for plot
-    real(8) ke0, entropy0
+    real(4) :: ke0 = 1.d0, entropy0 = 1.d0
 
     ! check GPU
     stat = cudaSetDevice(0)
@@ -363,8 +336,8 @@ contains
     ilen = verify(prop%name, ' ', .true.)
 
     if (myrank == 0) then
-      allocate(QJs(nx,ny,nz,5),QJ4(nx,ny,nz,5),R4(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
-      allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),Jacobian(nx,ny),Vmean(nx,ny,nz,3),rhomean(nx,ny,nz),Tmean(nx,ny,nz))
+      allocate(QJ(nx,ny,nz,5),QJs(nx,ny,nz,5),QJ4(nx,ny,nz,5),R4(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
+      allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),Jacobian(nx,ny),mut(nx,ny,nz),Vmean(nx,ny,nz,3),rhomean(nx,ny,nz),Tmean(nx,ny,nz))
 
       ! set Q / Jacobian
       do j = 1, ny
@@ -372,16 +345,11 @@ contains
           Q(i,j,:,:) = Q(i,j,:,:) / Jacobian_cpu(i,j)
       enddo;enddo
 
-      do k = 1, nz
-        do j = 1, ny
-          do i = 1, nx
-            Vmean_cpu(i,j,k,:) = Q(i,j,k,2:4) / Q(i,j,k,1)
-      enddo;enddo;enddo
       ! print initial condition
       if (id_turbulence == 0) then
-        call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0)
+        call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
       else
-        call print_vtk(0,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0,mut_cpu)
+        call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0,real(mut_cpu))
       endif
 
       ! copy on GPU
@@ -457,16 +425,16 @@ contains
       elseif (myrank == 1) then
         call MPI_RECV(Q, nx*ny*nz*5, MPI_REAL8, 0, 0, MPI_COMM_WORLD, status, ierr)
         if (id_turbulence == 0) then
-          call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0)
+          call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
         else
           call MPI_RECV(mut_cpu, nx*ny*nz, MPI_REAL8, 0, 1, MPI_COMM_WORLD, status, ierr)
-          call print_vtk(t2,nx,ny,nz,x,y,z,Jacobian_cpu,Q,ke0,entropy0,mut_cpu) 
-        endif  
+          call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0,real(mut_cpu))
+        endif 
       endif
     enddo
 
     if (myrank == 0) then
-      deallocate(QJs,QJ4,R4,E,F,G,dx,xix,dy,etay,Jacobian,Vmean,rhomean,Tmean)
+      deallocate(QJ,QJs,QJ4,R4,E,F,G,dx,xix,dy,etay,Jacobian,mut,Vmean,rhomean,Tmean)
     endif
   end subroutine RungeKutta_10th
 end module calc_time_dev
