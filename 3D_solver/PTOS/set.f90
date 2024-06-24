@@ -44,25 +44,24 @@ contains
   subroutine set_grid(myrank,nx,ny,nz,x,y,z,dx,dy)
     integer, intent(in)   :: myrank, nx, ny, nz
     real(8), intent(out)  :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1)
-    integer i, j, k
+    integer i, j, k, ierr, status(MPI_STATUS_SIZE)
     real(8) dx1, dy1, dx2, dy2, dz
+    dy1 = Ly1 / dble(256)
     if (myrank == 0) then
       dx1 = Lx1 / dble(nx-1)
-      dy1 = Ly1 / dble(ny-1)
       x(1) = 0.d0
       do i = 1, nx-1
         dx(i) = dx1
         x(i+1) = x(i) + dx(i)
       enddo
 
-      y(1) = 2.d-3
+      call MPI_RECV(y(1), 1, MPI_REAL8, 2, 0, MPI_COMM_WORLD, status, ierr)
       do j = 1, ny-1
         dy(j) = dy1
         y(j+1) = y(j) + dy(j)
       enddo
     elseif (myrank ==2) then
       dx2 = Lx2 / dble(nx-1)
-      dy2 = Ly2 / dble(ny-1)
       x(1) = 0.d0
       do i = 1, nx-1
         dx(i) = dx2
@@ -70,10 +69,16 @@ contains
       enddo
 
       y(1) = 0.d0
-      do j = 1, ny-1
-        dy(j) = max(0.125d0, 2.d0 * dble(j)/dble(ny)) * dy2
+      do j = 1, ny-3
+        dy(j) = min(1.d0, max(0.5d0, dble(j) / dble(ny-3))) * dy1
         y(j+1) = y(j) + dy(j)
+        print *, dy1, dy(j)
       enddo
+      dy(ny-2) = dy1
+      y(ny-1) = y(ny-2) + dy1
+      dy(ny-1) = dy1
+      y(ny) = y(ny-1) + dy1
+      call MPI_SEND(y(ny-1), 1, MPI_REAL8, 0, 0, MPI_COMM_WORLD, ierr)
     endif
 
     dz = Lz / dble(nz-1)
