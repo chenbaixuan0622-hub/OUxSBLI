@@ -38,9 +38,9 @@ module mod_globals
 
   ! mesh
   real(8), parameter :: Lx1 = 48d-3
-  real(8), parameter :: Ly1 = 14d-3
+  real(8), parameter :: Ly1 = 12d-3
   real(8), parameter :: Lx2 = Lx1
-  real(8), parameter :: Ly2 = 2d-3
+  real(8), parameter :: Ly2 = 4d-3
   real(8), parameter :: Lz  = 8d-3
   
   integer, parameter :: nx1 = 513
@@ -58,8 +58,8 @@ module mod_globals
   !               ! kind4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_recal = 0
-  integer, parameter :: nt = 100!2!500
-  integer, parameter :: np = 10!2!100!100
+  integer, parameter :: nt = 500
+  integer, parameter :: np = 100
   real(8), parameter :: u0 = 506.8d0
   real(8), parameter :: dt = 1d-8!0.1d0 * (Lx / dble(nx-1)) / u0
 
