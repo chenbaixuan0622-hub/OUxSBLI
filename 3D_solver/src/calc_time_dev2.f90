@@ -14,12 +14,11 @@ module calc_time_dev2
   use set
   use print
   implicit none
-  interface calc_EFG
-    module procedure calc_EFG_basic, calc_EFG_hybrid
-  end interface
 contains
-  subroutine calc_EFG(nx,ny,nz,dx,dy,Jacobian,QJ,mut,E,F,G)
+  subroutine calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,dx,dy,Jacobian,QJ,mut,E,F,G)
     integer, intent(in), value                          :: nx, ny, nz
+    type(dim3), intent(in)                              :: blocksE, blocksF, blocksG, blocks
+    type(dim3), intent(in)                              :: threadsE, threadsF, threadsG, threads
     real(8), intent(in), dimension(nx-1), device        :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device        :: dy ! 1 / dy
     real(8), intent(in), dimension(nx,ny), device       :: Jacobian
@@ -36,13 +35,13 @@ contains
       call calc_E<<<blocksE,threadsE,1>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,E)
       call calc_F<<<blocksF,threadsF,2>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,F)
       call calc_G<<<blocksG,threadsG,3>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,G)
-    else
+    elseif (kind(id_hybrid) == 4) then
       call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,u,v,w,rho,p,fd)
       call calc_E_hybrid<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
       call calc_F_hybrid<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
       call calc_G_hybrid<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
     endif
-
+  
     if (id_turbulence /= 0) then
       call calc_mut<<<blocks,threads,4>>>(nx,ny,nz,rho,u,v,w,mut)
       stat = cudaDeviceSynchronize()
@@ -67,14 +66,12 @@ contains
     integer i, j, k, t1, t2, itr, ilen, ierr, stat, request, status(MPI_STATUS_SIZE)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type(cudaDeviceProp)          :: prop
+    type(dim3)                    :: blocksE, blocksF, blocksG, blocks
+    type(dim3)                    :: threadsE, threadsF, threadsG, threads
     real(8), allocatable, device  :: QJ(:,:,:,:), QJ2(:,:,:,:), QJ3(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
     real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), Jacobian(:,:), mut(:,:,:), Vmean(:,:,:,:), rhomean(:,:,:), Tmean(:,:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
-    ! for MPI
-    real(8), allocatable, pinned  :: Qp1, Qp2
-    real(8), allocatable, device  :: Qd
-    integer, dimension(MPI_STATUS_SIZE,1) :: stat1, stat2, stat3
 
     ! check GPU
     stat = cudaSetDevice(0)
@@ -85,7 +82,7 @@ contains
     if (mod(myrank,2) == 0) then
       allocate(QJ(nx,ny,nz,5),QJ2(nx,ny,nz,5),QJ3(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
       allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),Jacobian(nx,ny),mut(nx,ny,nz),Vmean(nx,ny,nz,3),rhomean(nx,ny,nz),Tmean(nx,ny,nz))
-      allocate(Qp1(),Qp2(),Qd())
+      call set_blocks_threads(myrank,nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads)
 
       ! set Q / Jacobian
       do j = 1, ny
@@ -94,7 +91,7 @@ contains
       enddo;enddo
   
       ! print initial condition
-      call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
+      call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0,myrank+1)
 
       ! copy on GPU
       QJ = Q
@@ -120,32 +117,32 @@ contains
         do t1 = 1, nt
           call nvtxStartRange("calc 1step",1)
           call nvtxStartRange("calc flux",2)
-          call calc_EFG(nx,ny,nz,xix,etay,Jacobian,QJ,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,xix,etay,Jacobian,QJ,mut,E,F,G)
           call nvtxEndRange
           call nvtxStartRange("calc time dev",3)
           call calc_step(nx,ny,nz,1.d0,0.d0,dx,dy,E,F,G,QJ,QJ2)
           call nvtxEndRange
-          Qp1 = QJ()
-          call MPI_SENDRECV(Qp1, , MPI_REAL8, , 0, &
-                            Qp2, , MPI_REAL8, , 0, MPI_COMM_WORLD, stat1, ierr)
-          Qd = Qp2
-          call set_bc(myrank,nx,ny,nz,Jacobian,Qd,QJ2)
+          if (myrank == 0) then 
+            call set_bc1(nx,ny,nz,Jacobian,QJ2)
+          elseif (myrank == 2) then
+            call set_bc2(nx,ny,nz,Jacobian,QJ2)
+          endif
 
-          call calc_EFG(nx,ny,nz,xix,etay,Jacobian,QJ2,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,xix,etay,Jacobian,QJ2,mut,E,F,G)
           call calc_step2(nx,ny,nz,0.75d0,0.25d0,0.25d0,1.d0,dx,dy,E,F,G,QJ,QJ2,QJ3)
-          Qp1 = QJ()
-          call MPI_SENDRECV(Qp1, , MPI_REAL8, , 0, &
-                            Qp2, , MPI_REAL8, , 0, MPI_COMM_WORLD, stat2, ierr)
-          Qd = Qp2
-          call set_bc(myrank,nx,ny,nz,Jacobian,Qd,QJ3)
+          if (myrank == 0) then 
+            call set_bc1(nx,ny,nz,Jacobian,QJ3)
+          elseif (myrank == 2) then
+            call set_bc2(nx,ny,nz,Jacobian,QJ3)
+          endif
 
-          call calc_EFG(nx,ny,nz,xix,etay,Jacobian,QJ3,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,xix,etay,Jacobian,QJ3,mut,E,F,G)
           call calc_step3(nx,ny,nz,dx,dy,E,F,G,QJ3,QJ)
-          Qp1 = QJ()
-          call MPI_SENDRECV(Qp1, , MPI_REAL8, , 0, &
-                            Qp2, , MPI_REAL8, , 0, MPI_COMM_WORLD, stat3, ierr)
-          Qd = Qp2
-          call set_bc(myrank,nx,ny,nz,Jacobian,Qd,QJ)
+          if (myrank == 0) then 
+            call set_bc1(nx,ny,nz,Jacobian,QJ)
+          elseif (myrank == 2) then
+            call set_bc2(nx,ny,nz,Jacobian,QJ)
+          endif
           !call calc_mean(t1+(t2-1)*nt,nx,ny,nz,Jacobian,QJ,Vmean,rhomean,Tmean)
           call nvtxEndRange
         enddo
@@ -162,13 +159,13 @@ contains
         call MPI_RECV(Q, nx*ny*nz*5, MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
         call nvtxEndRange
         call nvtxStartRange("print",6)
-        call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
+        call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0,myrank)
         call nvtxEndRange
       endif
     enddo
     
     if (mod(myrank,2) == 0) then
-      deallocate(QJ,QJ2,QJ3,Qp1,Qp2,Qd,E,F,G,dx,xix,dy,etay,Jacobian,mut,Vmean,rhomean,Tmean)
+      deallocate(QJ,QJ2,QJ3,E,F,G,dx,xix,dy,etay,Jacobian,mut,Vmean,rhomean,Tmean)
     endif
   end subroutine RungeKutta
 end module calc_time_dev2
