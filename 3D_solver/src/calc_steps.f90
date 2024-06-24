@@ -56,7 +56,7 @@ contains
             if (present(Rs)) then
               Rs(i-offset,j-offset,k-offset,l) = Rs(i-offset,j-offset,k-offset,l) + coef2 * R
             endif
-    ;enddo;enddo;enddo;enddo
+    enddo;enddo;enddo;enddo
   end subroutine calc_step
   
   subroutine calc_step2(nx,ny,nz,coef1,coef2,coef3,coef4,dx,dy,E,F,G,Q,Q2,Q3,Rs)
