@@ -9,12 +9,12 @@ module print
       real(4), intent(in), optional :: T(nx,ny)
     end subroutine print_vtk_2D
 
-    subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,ke0,entropy0,mut)
+    subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,ke0,entropy0,myrank)
       integer, intent(in)           :: step, nx, ny, nz
       real(4), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny)
       real(4), intent(in)           :: QJ(nx,ny,nz,5)
       real(4), intent(inout)        :: ke0, entropy0
-      real(4), intent(in), optional :: mut(nx,ny,nz)
+      integer, intent(in), optional :: myrank
     end subroutine print_vtk_3D
   end interface
 
@@ -282,12 +282,12 @@ contains
     call print_xml(nx,ny,1,2,x,y,z,rho1d,p1d,T1d,v1d)
   end subroutine print_vtk_2D
   
-  subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,ke0,entropy0,mut)
+  subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,ke0,entropy0,myrank)
     integer, intent(in)           :: step, nx, ny, nz
     real(4), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny)
     real(4), intent(in)           :: QJ(nx,ny,nz,5) ! Q / Jacobian
     real(4), intent(inout)        :: ke0, entropy0
-    real(4), intent(in), optional :: mut(nx,ny,nz)
+    integer, intent(in), optional :: myrank
     integer i, j, k, l, m, len
     real(4) dy
     real(4), allocatable :: rho(:,:,:), u(:,:,:), v(:,:,:), w(:,:,:), p(:,:,:), nut(:,:,:), Tw(:,:)
@@ -313,21 +313,26 @@ contains
           v1d(m)   = u(i,j,k)
           v1d(m+1) = v(i,j,k)
           v1d(m+2) = w(i,j,k)
+          !print *, "myrank is", myrank, "rho1d", Jacobian(i,j)
           l = l + 1
           m = m + 3
     enddo;enddo;enddo
 
-    write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtr"
+    if (present(myrank)) then
+      write(filename, "(a, i1.1, a, i5.5, a)") "data/",int(myrank),"/Q",int(step),".vtr"
+    else
+      write(filename, "(a, i5.5, a)") "data/Q",int(step),".vtr"
+    endif
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
     call print_xml(nx,ny,nz,3,real(x),real(y),real(z),rho1d,p1d,T1d,v1d)
     
-    call print_entropy(step,nx,ny,nz,rho,p,entropy0)
-    call print_KE(step,nx,ny,nz,rho,u,v,w,ke0)
-    call print_enstrophy(step,nx,ny,nz,real(x),real(y),real(z),rho,u,v,w)
-    call print_boundary_layer(nx,ny,nz,real(y),u)
-    dy = 1.e0 / (-y(1) + y(2))
-    Tw(:,:) = p(:,1,:) / (R * rho(:,1,:))
-    call print_turbulent_boundary_layer(step,nx,ny,nz,dy,real(y),Tw,u,rho)
+    !call print_entropy(step,nx,ny,nz,rho,p,entropy0)
+    !call print_KE(step,nx,ny,nz,rho,u,v,w,ke0)
+    !call print_enstrophy(step,nx,ny,nz,real(x),real(y),real(z),rho,u,v,w)
+    !call print_boundary_layer(nx,ny,nz,real(y),u)
+    !dy = 1.e0 / (-y(1) + y(2))
+    !Tw(:,:) = p(:,1,:) / (R * rho(:,1,:))
+    !call print_turbulent_boundary_layer(step,nx,ny,nz,dy,real(y),Tw,u,rho)
     deallocate(rho,u,v,w,p,Tw,rho1d,p1d,T1d,v1d)
   end subroutine print_vtk_3D
 end module print

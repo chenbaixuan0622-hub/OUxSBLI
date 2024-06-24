@@ -1,8 +1,8 @@
 module set_coordinate
-  use mod_globals, only : nx, ny
   implicit none
 contains
-  subroutine set_xix(dx,xix)
+  subroutine set_xix(nx,dx,xix)
+    integer, intent(in)   :: nx
     real(8), intent(in)   :: dx(nx-1)
     real(8), intent(out)  :: xix(nx-1)
     integer i
@@ -11,7 +11,8 @@ contains
     enddo
   end subroutine set_xix
 
-  subroutine set_etay(dy,etay)
+  subroutine set_etay(ny,dy,etay)
+    integer, intent(in)   :: ny
     real(8), intent(in)   :: dy(ny-1)
     real(8), intent(out)  :: etay(ny-1)
     integer j
@@ -20,7 +21,8 @@ contains
     enddo
   end subroutine set_etay
 
-  subroutine set_Jacobian(dx,dy,Jacobian)
+  subroutine set_Jacobian(nx,ny,dx,dy,Jacobian)
+    integer, intent(in)  :: nx, ny
     real(8), intent(in)  :: dx(nx-1), dy(ny-1)
     real(8), intent(out) :: Jacobian(nx,ny)
     integer i, j

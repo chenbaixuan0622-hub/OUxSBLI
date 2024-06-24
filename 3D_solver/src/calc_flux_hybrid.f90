@@ -14,7 +14,7 @@ contains
     real(8), dimension(2,3) :: V2
     real(8), dimension(4)   :: rho4, p4
     real(8), dimension(4,3) :: V4
-    real(8)                 :: Normal3(3) = (/1.d0, 0.d0, 0.d0/)
+    real(8), device         :: Normal3(3) = (/1.d0, 0.d0, 0.d0/)
     real(8)                 :: Normal5(5) = (/0.d0, 1.d0, 0.d0, 0.d0, 0.d0/)
     real(8)                 :: zero(5) = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
     real(8), dimension(5)   :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr
@@ -88,7 +88,7 @@ contains
     real(8), dimension(2,3) :: V2
     real(8), dimension(4)   :: rho4, p4
     real(8), dimension(4,3) :: V4
-    real(8)                 :: Normal3(3) = (/0.d0, 1.d0, 0.d0/)
+    real(8), device         :: Normal3(3) = (/0.d0, 1.d0, 0.d0/)
     real(8)                 :: Normal5(5) = (/0.d0, 0.d0, 1.d0, 0.d0, 0.d0/)
     real(8)                 :: zero(5) = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
     real(8), dimension(5)   :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr
@@ -162,7 +162,7 @@ contains
     real(8), dimension(2,3) :: V2
     real(8), dimension(4)   :: rho4, p4
     real(8), dimension(4,3) :: V4
-    real(8)                 :: Normal3(3) = (/0.d0, 0.d0, 1.d0/)
+    real(8), device         :: Normal3(3) = (/0.d0, 0.d0, 1.d0/)
     real(8)                 :: Normal5(5) = (/0.d0, 0.d0, 0.d0, 1.d0, 0.d0/)
     real(8)                 :: zero(5) = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
     real(8), dimension(5)   :: Q1, Q2, Q3, Q4, Q5, Q6, Ql, Qr
