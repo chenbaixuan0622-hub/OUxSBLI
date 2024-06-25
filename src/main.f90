@@ -45,8 +45,8 @@ program main
   call alloc(Q,z)
 
   call set_grid(nx,ny,nz,x,y,z,dx,dy)
-  call set_xix(dx,xix)
-  call set_etay(dy,etay)
+  call set_xix(nx,dx,xix)
+  call set_etay(ny,dy,etay)
 
   if (myrank == 0) then
     if (kind(id_recal) == 4) then
@@ -61,7 +61,7 @@ program main
       write(*,*) "wrong paramater was found"
     endif
   endif
-  call set_Jacobian(dx,dy,Jacobian)
+  call set_Jacobian(nx,ny,dx,dy,Jacobian)
 
   call cpu_time(t_start)
   call RungeKutta(id_RungeKutta,myrank,nx,ny,nz,x,dx,xix,y,dy,etay,z,Jacobian,Q)
