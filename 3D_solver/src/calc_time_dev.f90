@@ -139,11 +139,7 @@ contains
       enddo;enddo
   
       ! print initial condition
-      if (id_turbulence == 0) then
-        call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
-      else
-        call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0,real(mut_cpu))
-      endif
+      call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
 
       ! copy on GPU
       QJ = Q
@@ -187,10 +183,6 @@ contains
       if (myrank == 0) then
         Q = QJ
         call nvtxStartRange("MPI_SEND",4)
-        if (id_turbulence /= 0) then
-          mut_cpu = mut
-          call MPI_SEND(mut_cpu, nx*ny*nz, MPI_REAL8, 1, 1, MPI_COMM_WORLD, ierr)
-        endif
         call MPI_SEND(Q, nx*ny*nz*5, MPI_REAL8, 1, 0, MPI_COMM_WORLD, ierr) 
         call nvtxEndRange
       elseif (myrank == 1) then
@@ -198,12 +190,7 @@ contains
         call MPI_RECV(Q, nx*ny*nz*5, MPI_REAL8, 0, 0, MPI_COMM_WORLD, status, ierr)
         call nvtxEndRange
         call nvtxStartRange("print",6)
-        if (id_turbulence == 0) then
-          call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
-        else
-          call MPI_RECV(mut_cpu, nx*ny*nz, MPI_REAL8, 0, 1, MPI_COMM_WORLD, status, ierr)
-          call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0,real(mut_cpu)) 
-        endif
+        call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
         call nvtxEndRange
       endif
     enddo
@@ -246,11 +233,7 @@ contains
       enddo;enddo
 
       ! print initial condition
-      if (id_turbulence == 0) then
-        call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
-      else
-        call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0,real(mut_cpu))
-      endif
+      call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
 
       ! copy on GPU
       QJ = Q
@@ -292,19 +275,10 @@ contains
       ! send and recv device arrays
       if (myrank == 0) then
         Q = QJ
-        if (id_turbulence /= 0) then
-          mut_cpu = mut
-          call MPI_SEND(mut_cpu, nx*ny*nz, MPI_REAL8, 1, 1, MPI_COMM_WORLD, ierr)
-        endif
         call MPI_SEND(Q, nx*ny*nz*5, MPI_REAL8, 1, 0, MPI_COMM_WORLD, ierr) 
       elseif (myrank == 1) then
         call MPI_RECV(Q, nx*ny*nz*5, MPI_REAL8, 0, 0, MPI_COMM_WORLD, status, ierr)
-        if (id_turbulence == 0) then
-          call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
-        else
-          call MPI_RECV(mut_cpu, nx*ny*nz, MPI_REAL8, 0, 1, MPI_COMM_WORLD, status, ierr)
-          call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0,real(mut_cpu))
-        endif
+        call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
       endif
     enddo
 
@@ -346,11 +320,7 @@ contains
       enddo;enddo
 
       ! print initial condition
-      if (id_turbulence == 0) then
-        call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
-      else
-        call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0,real(mut_cpu))
-      endif
+      call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
 
       ! copy on GPU
       QJ = Q
@@ -417,19 +387,10 @@ contains
       ! send and recv device arrays
       if (myrank == 0) then
         Q = QJ
-        if (id_turbulence /= 0) then
-          mut_cpu = mut
-          call MPI_SEND(mut_cpu, nx*ny*nz, MPI_REAL8, 1, 1, MPI_COMM_WORLD, ierr)
-        endif
         call MPI_SEND(Q, nx*ny*nz*5, MPI_REAL8, 1, 0, MPI_COMM_WORLD, ierr) 
       elseif (myrank == 1) then
         call MPI_RECV(Q, nx*ny*nz*5, MPI_REAL8, 0, 0, MPI_COMM_WORLD, status, ierr)
-        if (id_turbulence == 0) then
-          call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
-        else
-          call MPI_RECV(mut_cpu, nx*ny*nz, MPI_REAL8, 0, 1, MPI_COMM_WORLD, status, ierr)
-          call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0,real(mut_cpu))
-        endif 
+        call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
       endif
     enddo
 

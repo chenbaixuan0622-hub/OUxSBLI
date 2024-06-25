@@ -15,12 +15,13 @@ module calc_time_dev2
   use print
   implicit none
 contains
-  subroutine calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,dx,dy,Jacobian,QJ,mut,E,F,G)
+  subroutine calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,dx,dy,dz,Jacobian,QJ,mut,E,F,G)
     integer, intent(in), value                          :: nx, ny, nz
     type(dim3), intent(in)                              :: blocksE, blocksF, blocksG, blocks
     type(dim3), intent(in)                              :: threadsE, threadsF, threadsG, threads
     real(8), intent(in), dimension(nx-1), device        :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device        :: dy ! 1 / dy
+    real(8), intent(in), value                          :: dz ! 1 / dz
     real(8), intent(in), dimension(nx,ny), device       :: Jacobian
     real(8), intent(in), dimension(nx,ny,nz,5), device  :: QJ ! Q / Jacobian
     real(8), intent(inout), dimension(nx,ny,nz), device :: mut
@@ -36,7 +37,7 @@ contains
       call calc_F<<<blocksF,threadsF,2>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,F)
       call calc_G<<<blocksG,threadsG,3>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,G)
     elseif (kind(id_hybrid) == 4) then
-      call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,u,v,w,rho,p,fd)
+      call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,dz,u,v,w,rho,p,fd)
       call calc_E_hybrid<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
       call calc_F_hybrid<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
       call calc_G_hybrid<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
@@ -50,18 +51,18 @@ contains
 
     stat = cudaDeviceSynchronize()
     if (id_visc == 1 .or. id_turbulence /= 0) then
-      call calc_Ev<<<blocksE,threadsE,1>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,E)
-      call calc_Fv<<<blocksF,threadsF,2>>>(nx,ny,nz,dy,dx,rho,u,v,w,T,p,mut,F)
-      call calc_Gv<<<blocksG,threadsG,3>>>(nx,ny,nz,dx,dy,rho,u,v,w,T,p,mut,G)
+      call calc_Ev<<<blocksE,threadsE,1>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,T,p,mut,E)
+      call calc_Fv<<<blocksF,threadsF,2>>>(nx,ny,nz,dy,dx,dz,rho,u,v,w,T,p,mut,F)
+      call calc_Gv<<<blocksG,threadsG,3>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,T,p,mut,G)
     endif
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG
 
-  subroutine RungeKutta(myrank,nx,ny,nz,x,dx_cpu,xix_cpu,y,dy_cpu,etay_cpu,z,Jacobian_cpu,Q)
+  subroutine RungeKutta(myrank,nx,ny,nz,x,dx_cpu,xix_cpu,y,dy_cpu,etay_cpu,z,dz,Jacobian_cpu,Q)
     integer, intent(in)    :: myrank, nx, ny, nz
     real(8), intent(in)    :: x(nx), dx_cpu(nx-1), xix_cpu(nx-1)
     real(8), intent(in)    :: y(ny), dy_cpu(ny-1), etay_cpu(ny-1)
-    real(8), intent(in)    :: z(nz), Jacobian_cpu(nx,ny)
+    real(8), intent(in)    :: z(nz), dz, Jacobian_cpu(nx,ny) ! dz = 1 / dz
     real(8), intent(inout) :: Q(nx,ny,nz,5)
     integer i, j, k, t1, t2, itr, ilen, ierr, stat, request, status(MPI_STATUS_SIZE)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -117,10 +118,10 @@ contains
         do t1 = 1, nt
           call nvtxStartRange("calc 1step",1)
           call nvtxStartRange("calc flux",2)
-          call calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,xix,etay,Jacobian,QJ,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,xix,etay,dz,Jacobian,QJ,mut,E,F,G)
           call nvtxEndRange
           call nvtxStartRange("calc time dev",3)
-          call calc_step(nx,ny,nz,1.d0,0.d0,dx,dy,E,F,G,QJ,QJ2)
+          call calc_step(nx,ny,nz,1.d0,0.d0,dx,dy,dz,E,F,G,QJ,QJ2)
           call nvtxEndRange
           if (myrank == 0) then 
             call set_bc1(nx,ny,nz,Jacobian,QJ2)
@@ -128,22 +129,22 @@ contains
             call set_bc2(nx,ny,nz,Jacobian,QJ2)
           endif
 
-          call calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,xix,etay,Jacobian,QJ2,mut,E,F,G)
-          call calc_step2(nx,ny,nz,0.75d0,0.25d0,0.25d0,1.d0,dx,dy,E,F,G,QJ,QJ2,QJ3)
+          call calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,xix,etay,dz,Jacobian,QJ2,mut,E,F,G)
+          call calc_step2(nx,ny,nz,0.75d0,0.25d0,0.25d0,1.d0,dx,dy,dz,E,F,G,QJ,QJ2,QJ3)
           if (myrank == 0) then 
             call set_bc1(nx,ny,nz,Jacobian,QJ3)
           elseif (myrank == 2) then
             call set_bc2(nx,ny,nz,Jacobian,QJ3)
           endif
 
-          call calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,xix,etay,Jacobian,QJ3,mut,E,F,G)
-          call calc_step3(nx,ny,nz,dx,dy,E,F,G,QJ3,QJ)
+          call calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,xix,etay,dz,Jacobian,QJ3,mut,E,F,G)
+          call calc_step3(nx,ny,nz,dx,dy,dz,E,F,G,QJ3,QJ)
           if (myrank == 0) then 
             call set_bc1(nx,ny,nz,Jacobian,QJ)
           elseif (myrank == 2) then
             call set_bc2(nx,ny,nz,Jacobian,QJ)
           endif
-          !call calc_mean(t1+(t2-1)*nt,nx,ny,nz,Jacobian,QJ,Vmean,rhomean,Tmean)
+          call calc_mean(t1+(t2-1)*nt,nx,ny,nz,Jacobian,QJ,Vmean,rhomean,Tmean)
           call nvtxEndRange
         enddo
       endif

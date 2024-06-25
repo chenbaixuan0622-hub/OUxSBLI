@@ -2,13 +2,13 @@ program main2
   use, intrinsic :: iso_fortran_env
   use mpi
   use nvtx
-  use mod_globals, only : id_recal, nx1, ny1, nz1, nx2, ny2, nz2
+  use mod_globals, only : id_recal, nx1, ny1, nz1, nx2, ny2, nz2, dz1, dz2
   use set
   use set_coordinate
   use calc_time_dev2
   implicit none
   integer i, j, nx, ny, nz
-  real(8) t_start, t_end
+  real(8) t_start, t_end, dz
   real(8), allocatable :: x(:), xix(:), dx(:), y(:), etay(:), dy(:), z(:), Jacobian(:,:)
   real(8), allocatable, pinned :: Q(:,:,:,:)
   ! MPI
@@ -36,11 +36,13 @@ program main2
     nx = nx1
     ny = ny1
     nz = nz1
+    dz = dz1
     allocate(Q(nx,ny,nz,5),x(nx),xix(nx-1),dx(nx-1),y(ny),etay(ny-1),dy(ny-1),z(nz),Jacobian(nx,ny))
   elseif (myrank >= 2) then
     nx = nx2
     ny = ny2
     nz = nz2
+    dz = dz2
     allocate(Q(nx,ny,nz,5),x(nx),xix(nx-1),dx(nx-1),y(ny),etay(ny-1),dy(ny-1),z(nz),Jacobian(nx,ny))
   endif
 
@@ -95,7 +97,7 @@ program main2
   endif
 
   call cpu_time(t_start)
-  call RungeKutta(myrank,nx,ny,nz,x,dx,xix,y,dy,etay,z,Jacobian,Q)
+  call RungeKutta(myrank,nx,ny,nz,x,dx,xix,y,dy,etay,z,dz,Jacobian,Q)
   call cpu_time(t_end)
 
   if (mod(myrank,2) == 0) then
