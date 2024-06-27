@@ -5,15 +5,18 @@ import numpy as np
 from scipy.stats import gaussian_kde
 from scipy.fft import fft
 import matplotlib.pyplot as plt
+
+# mylibs
 import readVTK
 import turbulent_statistics as ts
 import myplot as myplt
+
 
 start_time = time.time()
 
 # search vtk files
 directory_path = "./data/"
-vtk_files = [f for f in os.listdir(directory_path) if f.endswith(".vtk")]
+vtk_files = [f for f in os.listdir(directory_path) if f.endswith(".vtr")]
 num_files = len(vtk_files)
 
 # get grid information
@@ -34,88 +37,82 @@ else:
   np.save("./data/umean.npy", umean)
   np.save("./data/vmean.npy", vmean)
   np.save("./data/wmean.npy", wmean)
-'''
-myplt.plot_velocity(x,y,umean[0,:,:])
-myplt.plot_velocity(x,y,vmean[0,:,:])
-myplt.plot_velocity(x,y,wmean[0,:,:])
-'''
-'''
-# calc 2 points longitudial / lateral velocity correlation
-u1 = np.zeros(num_files)
-v1 = np.zeros(num_files)
-u2 = np.zeros(num_files)
-v2 = np.zeros(num_files)
 
-# choose grid points
-Nx1 = 50
-Ny1 = 20
-Nx2 = 150
-Ny2 = 20
-
-t = 0
-for vtk_file in vtk_files:
-  # get path
-  file_path = os.path.join(directory_path, vtk_file)
-  u, v, w = readVTK.getVelocity(file_path,Nx,Ny,Nz)
-  u1[t] = u[0,Ny1,Nx1] - umean[0,Ny1,Nx1]
-  v1[t] = v[0,Ny1,Nx1] - vmean[0,Ny1,Nx1]
-  u2[t] = u[0,Ny2,Nx2] - umean[0,Ny2,Nx2]
-  v2[t] = v[0,Ny2,Nx2] - vmean[0,Ny2,Nx2]
-  t += 1
-  print("read No.", vtk_file, "file")
-
-# velocity correlation
-R11 = ts.longitudinal_corr(x[Nx1],y[Ny1],u1,v1,x[Nx2],y[Ny2],u2,v2)
-R22 = ts.lateral_corr(x[Nx1],y[Ny1],u1,v1,x[Nx2],y[Ny2],u2,v2)
-
-print("longitudinal velocity correlation",R11)
-print("lateral velocity correlation",R22)
-'''
-'''
-del u1
-del v1
-del u2
-del v2
-del R11
-del R22
-'''
+# plot mean velocity
+myplt.plot_velocity(x,y,umean[int(0.5*Nz),:,:],"./data/umean.png")
+myplt.plot_velocity(x,y,vmean[int(0.5*Nz),:,:],"./data/vmean.png")
+myplt.plot_velocity(x,y,wmean[int(0.5*Nz),:,:],"./data/wmean.png")
 
 # calc integral length scale
 # reference point
-Nx1 = 50
+Nx1 = 100
 Ny1 = 20
-Nz1 = 0
 
-length = 100
+length = 200
 span = Nz-1
-us = np.zeros((num_files,span,length))
-vs = np.zeros((num_files,span,length))
+# velocity time series data
+ut = np.zeros((num_files,span,length))
+vt = np.zeros((num_files,span,length))
+wt = np.zeros((num_files,span,length))
+# fluctuating velocity time series data
+uf = np.zeros((num_files,span,length))
+vf = np.zeros((num_files,span,length))
+wf = np.zeros((num_files,span,length))
+# velocity gradient time series data
+du = np.zeros((num_files,span,length))
+dv = np.zeros((num_files,span,length))
+dw = np.zeros((num_files,span,length))
 
 t = 0
 for vtk_file in vtk_files:
   # get path
   file_path = os.path.join(directory_path, vtk_file)
   u, v, w = readVTK.getVelocity(file_path,Nx,Ny,Nz)
+
+  # time series data
   for j in range(span):
     for i in range(length):
-      I = Nx1 + i
-      J = Nz1 + j
-      us[t,j,i] = u[J,Ny1,I] - umean[J,Ny1,I]
-      vs[t,j,i] = v[J,Ny1,I] - vmean[J,Ny1,I]
+      ut[t,j,i] = u[j,Ny1,i+Nx1]
+      ut[t,j,i] = v[j,Ny1,i+Nx1]
+      wt[t,j,i] = w[j,Ny1,i+Nx1]
+      uf[t,j,i] = ut[t,j,i] - umean[j,Ny1,i+Nx1]
+      vf[t,j,i] = vt[t,j,i] - vmean[j,Ny1,i+Nx1]
+      wf[t,j,i] = wt[t,j,i] - wmean[j,Ny1,i+Nx1]
   t += 1
   print("read No.", vtk_file, "file")
 
-R11, R22 = ts.longitudinal_and_lateral_corr(span,length,Nx1,Ny1,x,y,us,vs)
+t0 = time.time()
+# numpy
+R11, R22 = ts.longitudinal_and_lateral_corr(span,length,Nx1,Ny1,x,y,uf,vf)
 L11, L22 = ts.integral_scale(x[Nx1:Nx1+length-1],R11,R22)
+
+t1 = time.time()
+print("correlation and scale calculation time:", t1 - t0)
+
 print("longitudinal integral scale is",L11)
 print("lateral integral scale is",L22)
 myplt.plot_corr(x,Nx1,length,R11,R22)
 
 # calculate probability density function
-x_range = np.linspace(min(us[:,0,0]), max(us[:,0,0]), 1000)
-u_kde = gaussian_kde(us[:,0,0])
-u_pdf = u_kde(x_range)
-myplt.plot_pdf(x_range,u_pdf)
+# PDF for 1 point velocity profile
+u_range, u_pdf = ts.PDF(ut[:,int(0.5*Nz),Nx1])
+myplt.plot_pdf(u_range,u_pdf,"u")
+
+v_range, v_pdf = ts.PDF(vt[:,int(0.5*Nz),Nx1])
+myplt.plot_pdf(v_range,v_pdf,"v")
+
+w_range, w_pdf = ts.PDF(wt[:,int(0.5*Nz),Nx1])
+myplt.plot_pdf(w_range,w_pdf,"w")
+
+# PDF for 1 point fluctuating velocity profile
+u_range, u_pdf = ts.PDF(uf[:,int(0.5*Nz),Nx1])
+myplt.plot_pdf(u_range,u_pdf,"uf")
+
+v_range, v_pdf = ts.PDF(vf[:,int(0.5*Nz),Nx1])
+myplt.plot_pdf(v_range,v_pdf,"vf")
+
+w_range, w_pdf = ts.PDF(wf[:,int(0.5*Nz),Nx1])
+myplt.plot_pdf(w_range,w_pdf,"wf")
 
 end_time = time.time()
 
