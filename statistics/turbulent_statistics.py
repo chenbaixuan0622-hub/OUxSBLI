@@ -1,5 +1,12 @@
 import numpy as np
 from numba import jit
+from scipy.stats import gaussian_kde
+
+def PDF(data):
+  range = np.linspace(min(data), max(data), 1000)
+  kde   = gauusian_kde(data)
+  pdf   = kde(range)
+  return range, pdf
 
 @jit(nopython=True, cache=True, fastmath=True)
 def unit_vector(r1,r2):
@@ -55,7 +62,6 @@ def longitudinal_and_lateral_corr(span,length,Nx1,Ny1,x,y,us,vs):
   for i in range(length-1):
     I = Nx1 + i + 1
     for j in range(span):
-      print(x[Nx1],x[I])
       R11_span[j,i] = longitudinal_corr(x[Nx1],y[Ny1],us[:,j,0],vs[:,j,0],x[I],y[Ny1],us[:,j,i+1],vs[:,j,i+1])
       R22_span[j,i] = lateral_corr(x[Nx1],y[Ny1],us[:,j,0],vs[:,j,0],x[I],y[Ny1],us[:,j,i+1],vs[:,j,i+1])
     R11[i] = np.mean(R11_span[:,i])
