@@ -5,7 +5,7 @@ from vtk.util import numpy_support
 
 def getGrid(file_path):
   # make VTK Structured Grid Reader
-  reader = vtk.vtkRectilinearGridReader()
+  reader = vtk.vtkXMLRectilinearGridReader()
   reader.SetFileName(file_path)
   reader.Update()
   
@@ -18,13 +18,13 @@ def getGrid(file_path):
 
 def getVelocity(file_path,Nx,Ny,Nz):
   # make VTK Structured Grid Reader
-  reader = vtk.vtkRectilinearGridReader()
+  reader = vtk.vtkXMLRectilinearGridReader()
   reader.SetFileName(file_path)
   reader.Update()
 
   # get dataset
   Q = reader.GetOutput()
-  V = numpy_support.vtk_to_numpy(Q.GetPointData().GetArray("Velocity"))
+  V = numpy_support.vtk_to_numpy(Q.GetPointData().GetArray("velocity"))
 
   u = np.reshape(V[:,0], [Nz,Ny,Nx])
   v = np.reshape(V[:,1], [Nz,Ny,Nx])
