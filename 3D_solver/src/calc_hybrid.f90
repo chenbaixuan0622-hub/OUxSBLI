@@ -7,7 +7,7 @@ contains
     integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
-    real(8), intent(in), value                        :: dz ! 1 / dz
+    real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
     real(8), intent(in), dimension(nx,ny,nz), device  :: u, v, w, rho, p
     real(8), intent(out), dimension(nx,ny,nz), device :: fd
     integer i, j, k
@@ -23,9 +23,9 @@ contains
     dudy = (-u(i,j-1,k) + u(i,j+1,k)) * 0.25d0 * (dy(j-1) + dy(j))
     dvdy = (-v(i,j-1,k) + v(i,j+1,k)) * 0.25d0 * (dy(j-1) + dy(j))
     dwdy = (-w(i,j-1,k) + w(i,j+1,k)) * 0.25d0 * (dy(j-1) + dy(j))
-    dudz = (-u(i,j,k-1) + u(i,j,k+1)) * 0.5d0 * dz
-    dvdz = (-v(i,j,k-1) + v(i,j,k+1)) * 0.5d0 * dz
-    dwdz = (-w(i,j,k-1) + w(i,j,k+1)) * 0.5d0 * dz
+    dudz = (-u(i,j,k-1) + u(i,j,k+1)) * 0.25d0 * (dz(k-1) + dz(k))
+    dvdz = (-v(i,j,k-1) + v(i,j,k+1)) * 0.25d0 * (dz(k-1) + dz(k))
+    dwdz = (-w(i,j,k-1) + w(i,j,k+1)) * 0.25d0 * (dz(k-1) + dz(k))
     div = dudx + dvdy + dwdz
     rot(1) = dwdy - dvdz
     rot(2) = dudz - dwdx
