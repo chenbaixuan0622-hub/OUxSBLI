@@ -37,10 +37,10 @@ module print
   end interface
 
   interface
-    subroutine print_xml(ni,nj,nk,dimension,x,y,z,rho1d,p1d,T1d,v1d,Q1d)
+    subroutine print_xml(ni,nj,nk,dimension,x,y,z,rho1d,p1d,T1d,M1d,v1d,Q1d)
       integer, intent(in)                                 :: ni, nj, nk, dimension
       real(4), intent(in)                                 :: x(ni), y(nj), z(nk)
-      real(4), intent(in), dimension(ni*nj*nk)            :: rho1d, p1d, T1d
+      real(4), intent(in), dimension(ni*nj*nk)            :: rho1d, p1d, T1d, M1d
       real(4), intent(in), dimension(dimension*ni*nj*nk)  :: v1d
       real(4), intent(in), dimension(ni*nj*nk), optional  :: Q1d
     end subroutine print_xml
@@ -56,7 +56,7 @@ module print
 
     subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,ke0,entropy0,myrank)
       integer, intent(in)           :: step, nx, ny, nz
-      real(4), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny)
+      real(4), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny,nz)
       real(4), intent(in)           :: QJ(nx,ny,nz,5)
       real(4), intent(inout)        :: ke0, entropy0
       integer, intent(in), optional :: myrank
@@ -323,15 +323,15 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine print_xml(ni,nj,nk,dimension,x,y,z,rho1d,p1d,T1d,v1d,Q1d)
+  subroutine print_xml(ni,nj,nk,dimension,x,y,z,rho1d,p1d,T1d,M1d,v1d,Q1d)
     integer, intent(in)                                 :: ni, nj, nk, dimension
     real(4), intent(in)                                 :: x(ni), y(nj), z(nk)
-    real(4), intent(in), dimension(ni*nj*nk)            :: rho1d, p1d, T1d
+    real(4), intent(in), dimension(ni*nj*nk)            :: rho1d, p1d, T1d, M1d
     real(4), intent(in), dimension(dimension*ni*nj*nk)  :: v1d
     real(4), intent(in), dimension(ni*nj*nk), optional  :: Q1d
-    integer(4) byte_x, byte_y, byte_z, byte_rho, byte_p, byte_T, byte_v, byte_Q
+    integer(4) byte_x, byte_y, byte_z, byte_rho, byte_p, byte_T, byte_M, byte_v, byte_Q
     character :: lf*1, str1*4, str2*4, str3*4, str4*1
-    character :: offset1*10, offset2*10, offset3*10, offset4*10, offset5*10, offset6*10, offset7*10
+    character :: offset1*10, offset2*10, offset3*10, offset4*10, offset5*10, offset6*10, offset7*10, offset8*10
     lf = char(10)
     write(str1(1:4),'(i4)') ni-1
     write(str2(1:4),'(i4)') nj-1
@@ -343,6 +343,7 @@ contains
     byte_rho = 4 + 4 * (ni * nj * nk)
     byte_p   = byte_rho
     byte_T   = byte_rho
+    byte_M   = byte_rho
     byte_v   = 4 + 4 * (dimension * ni * nj * nk)
     byte_Q   = byte_rho
     write(offset1(1:10),'(i10)') byte_x
@@ -351,7 +352,8 @@ contains
     write(offset4(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho
     write(offset5(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho + byte_p
     write(offset6(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho + byte_p + byte_T
-    write(offset7(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho + byte_P + byte_T + byte_v
+    write(offset7(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho + byte_P + byte_T + byte_M
+    write(offset8(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho + byte_P + byte_T + byte_M + byte_v
 
     write(10) '<?xml version="1.0"?>'//lf
     write(10) '<VTKFile type="RectilinearGrid" version="1.0" byte_order="LittleEndian">'//lf
@@ -370,9 +372,11 @@ contains
     write(10) '        <DataArray type="Float32" format="appended" offset="'//offset5//'"&
     & Name="T" NumberOfComponents="1"/>'//lf
     write(10) '        <DataArray type="Float32" format="appended" offset="'//offset6//'"&
+    & Name="M" NumberOfComponents="1"/>'//lf
+    write(10) '        <DataArray type="Float32" format="appended" offset="'//offset7//'"&
     & Name="velocity" NumberOfComponents="'//str4//'"/>'//lf
     if (present(Q1d)) then
-    write(10) '        <DataArray type="Float32" format="appended" offset="'//offset7//'"&
+    write(10) '        <DataArray type="Float32" format="appended" offset="'//offset8//'"&
     & Name="Qcriterion" NumberOfComponents="1"/>'//lf
     endif
     write(10) '      </PointData>'//lf
@@ -381,10 +385,10 @@ contains
     write(10) '  <AppendedData encoding="raw">'//lf
     if (present(Q1d)) then
       write(10) '  _', byte_x, x, byte_y, y, byte_z, z,&
-      & byte_rho, rho1d, byte_p, p1d, byte_T, T1d, byte_v, v1d, byte_Q, Q1d, lf
+      & byte_rho, rho1d, byte_p, p1d, byte_T, T1d, byte_M, M1d, byte_v, v1d, byte_Q, Q1d, lf
     else
       write(10) '  _', byte_x, x, byte_y, y, byte_z, z,&
-      & byte_rho, rho1d, byte_p, p1d, byte_T, T1d, byte_v, v1d, lf
+      & byte_rho, rho1d, byte_p, p1d, byte_T, T1d, byte_M, M1d, byte_v, v1d, lf
     endif
     write(10) '  </AppendedData>'//lf
     write(10) '</VTKFile>'//lf
@@ -401,7 +405,7 @@ contains
     integer i, j, l, m
     real(4), dimension(nx,ny) :: rho, u, v, p
     real(4) :: z(1) = 0.e0
-    real(4), dimension(nx*ny)   :: rho1d, p1d, T1d
+    real(4), dimension(nx*ny)   :: rho1d, p1d, T1d, M1d
     real(4), dimension(2*nx*ny) :: v1d
     character(len=40) filename
     character :: lf*1
@@ -419,48 +423,49 @@ contains
         T1d(l)   = p1d(l) / (real(R) * rho1d(l))
         v1d(m)   = u(i,j)
         v1d(m+1) = v(i,j)
+        M1d(l)   = sqrt(v1d(m)**2 + v1d(m+1)**2) / sqrt(gamma * p1d(l) / rho1d(l))
         l = l + 1
         m = m + 2
     enddo;enddo
 
     write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtr"
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
-    call print_xml(nx,ny,1,2,x,y,z,rho1d,p1d,T1d,v1d)
+    call print_xml(nx,ny,1,2,x,y,z,rho1d,p1d,T1d,M1d,v1d)
   end subroutine print_vtk_2D
   
   subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,ke0,entropy0,myrank)
     integer, intent(in)           :: step, nx, ny, nz
-    real(4), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny)
+    real(4), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny,nz)
     real(4), intent(in)           :: QJ(nx,ny,nz,5) ! Q / Jacobian
     real(4), intent(inout)        :: ke0, entropy0
     integer, intent(in), optional :: myrank
     integer i, j, k, l, m, len
     real(4) dy
     real(4), allocatable :: rho(:,:,:), u(:,:,:), v(:,:,:), w(:,:,:), p(:,:,:), div(:,:,:), omega(:,:,:,:), Qcriterion(:,:,:), Tw(:,:)
-    real(4), allocatable :: rho1d(:), p1d(:), T1d(:), v1d(:), div1d(:), omega1d(:), Qcriterion1d(:)
+    real(4), allocatable :: rho1d(:), p1d(:), T1d(:), M1d(:), v1d(:), div1d(:), omega1d(:), Qcriterion1d(:)
     character(len=40) filename
     character :: lf*1
     lf = char(10)
     len = nx * ny * nz
-    allocate(rho(nx,ny,nz),u(nx,ny,nz),v(nx,ny,nz),w(nx,ny,nz),p(nx,ny,nz),Tw(nx,nz),rho1d(len),p1d(len),T1d(len),v1d(3*len))
+    allocate(rho(nx,ny,nz),u(nx,ny,nz),v(nx,ny,nz),w(nx,ny,nz),p(nx,ny,nz),Tw(nx,nz),rho1d(len),p1d(len),T1d(len),M1d(len),v1d(3*len))
     allocate(div(nx,ny,nz),omega(nx,ny,nz,3),Qcriterion(nx,ny,nz),div1d(len),omega1d(3*len),Qcriterion1d(len))
     l = 1
     m = 1
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
-          rho(i,j,k) = Jacobian(i,j) * QJ(i,j,k,1)
-          u(i,j,k) = Jacobian(i,j) * QJ(i,j,k,2) / rho(i,j,k)
-          v(i,j,k) = Jacobian(i,j) * QJ(i,j,k,3) / rho(i,j,k)
-          w(i,j,k) = Jacobian(i,j) * QJ(i,j,k,4) / rho(i,j,k)
-          p(i,j,k) = (gamma - 1.e0) * (Jacobian(i,j) * QJ(i,j,k,5) - 0.e0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
+          rho(i,j,k) = Jacobian(i,j,k) * QJ(i,j,k,1)
+          u(i,j,k) = Jacobian(i,j,k) * QJ(i,j,k,2) / rho(i,j,k)
+          v(i,j,k) = Jacobian(i,j,k) * QJ(i,j,k,3) / rho(i,j,k)
+          w(i,j,k) = Jacobian(i,j,k) * QJ(i,j,k,4) / rho(i,j,k)
+          p(i,j,k) = (gamma - 1.e0) * (Jacobian(i,j,k) * QJ(i,j,k,5) - 0.e0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
           rho1d(l) = rho(i,j,k)
           p1d(l)   = p(i,j,k)
           T1d(l)   = p1d(l) / (real(R) * rho1d(l))
           v1d(m)   = u(i,j,k)
           v1d(m+1) = v(i,j,k)
           v1d(m+2) = w(i,j,k)
-          !print *, "myrank is", myrank, "rho1d", Jacobian(i,j)
+          M1d(l)   = sqrt(v1d(m)**2 + v1d(m+1)**2 + v1d(m+2)**2) / sqrt(gamma * p1d(l) / rho1d(l))
           l = l + 1
           m = m + 3
     enddo;enddo;enddo
@@ -505,9 +510,9 @@ contains
       write(filename, "(a, i5.5, a)") "data/Q",int(step),".vtr"
     endif
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
-    call print_xml(nx,ny,nz,3,real(x),real(y),real(z),rho1d,p1d,T1d,v1d,Qcriterion1d)
+    call print_xml(nx,ny,nz,3,real(x),real(y),real(z),rho1d,p1d,T1d,M1d,v1d,Qcriterion1d)
     
-    deallocate(rho,u,v,w,p,div,omega,Qcriterion,Tw,rho1d,p1d,T1d,v1d,div1d,omega1d,Qcriterion1d)
+    deallocate(rho,u,v,w,p,div,omega,Qcriterion,Tw,rho1d,p1d,T1d,M1d,v1d,div1d,omega1d,Qcriterion1d)
   end subroutine print_vtk_3D
 end module print
 
