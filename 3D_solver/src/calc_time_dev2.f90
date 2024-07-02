@@ -21,8 +21,8 @@ contains
     type(dim3), intent(in)                              :: threadsE, threadsF, threadsG, threads
     real(8), intent(in), dimension(nx-1), device        :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device        :: dy ! 1 / dy
-    real(8), intent(in), value                          :: dz ! 1 / dz
-    real(8), intent(in), dimension(nx,ny), device       :: Jacobian
+    real(8), intent(in), dimension(nz-1), device        :: dz ! 1 / dz
+    real(8), intent(in), dimension(nx,ny,nz), device    :: Jacobian
     real(8), intent(in), dimension(nx,ny,nz,5), device  :: QJ ! Q / Jacobian
     real(8), intent(inout), dimension(nx,ny,nz), device :: mut
     real(8), intent(out), device                        :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
@@ -58,11 +58,11 @@ contains
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG
 
-  subroutine RungeKutta(myrank,nx,ny,nz,x,dx_cpu,xix_cpu,y,dy_cpu,etay_cpu,z,dz,Jacobian_cpu,Q)
+  subroutine RungeKutta(myrank,nx,ny,nz,x,dx_cpu,xix_cpu,y,dy_cpu,etay_cpu,z,dz_cpu,zetaz_cpu,Jacobian_cpu,Q)
     integer, intent(in)    :: myrank, nx, ny, nz
     real(8), intent(in)    :: x(nx), dx_cpu(nx-1), xix_cpu(nx-1)
     real(8), intent(in)    :: y(ny), dy_cpu(ny-1), etay_cpu(ny-1)
-    real(8), intent(in)    :: z(nz), dz, Jacobian_cpu(nx,ny) ! dz = 1 / dz
+    real(8), intent(in)    :: z(nz), dz_cpu(nz-1), zetaz_cpu(nz-1), Jacobian_cpu(nx,ny,nz)
     real(8), intent(inout) :: Q(nx,ny,nz,5)
     integer i, j, k, t1, t2, itr, ilen, ierr, stat, request, status(MPI_STATUS_SIZE)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -70,7 +70,8 @@ contains
     type(dim3)                    :: blocksE, blocksF, blocksG, blocks
     type(dim3)                    :: threadsE, threadsF, threadsG, threads
     real(8), allocatable, device  :: QJ(:,:,:,:), QJ2(:,:,:,:), QJ3(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
-    real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), Jacobian(:,:), mut(:,:,:), Vmean(:,:,:,:), rhomean(:,:,:), Tmean(:,:,:)
+    real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), dz(:), zetaz(:), Jacobian(:,:,:)
+    real(8), allocatable, device  :: mut(:,:,:), Vmean(:,:,:,:), rhomean(:,:,:), Tmean(:,:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
 
@@ -82,25 +83,29 @@ contains
 
     if (mod(myrank,2) == 0) then
       allocate(QJ(nx,ny,nz,5),QJ2(nx,ny,nz,5),QJ3(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
-      allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),Jacobian(nx,ny),mut(nx,ny,nz),Vmean(nx,ny,nz,3),rhomean(nx,ny,nz),Tmean(nx,ny,nz))
+      allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),dz(nz-1),zetaz(nz-1),Jacobian(nx,ny,nz))
+      allocate(mut(nx,ny,nz),Vmean(nx,ny,nz,3),rhomean(nx,ny,nz),Tmean(nx,ny,nz))
       call set_blocks_threads(myrank,nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads)
 
       ! set Q / Jacobian
-      do j = 1, ny
-        do i = 1, nx
-          Q(i,j,:,:) = Q(i,j,:,:) / Jacobian_cpu(i,j)
-      enddo;enddo
+      do k = 1, nz
+        do j = 1, ny
+          do i = 1, nx
+            Q(i,j,k,:) = Q(i,j,k,:) / Jacobian_cpu(i,j,k)
+      enddo;enddo;enddo
   
       ! print initial condition
       call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0,myrank+1)
 
       ! copy on GPU
-      QJ = Q
-      mut = 0.d0
-      xix = xix_cpu
-      etay = etay_cpu
-      dx = dx_cpu
-      dy = dy_cpu
+      QJ    = Q
+      mut   = 0.d0
+      xix   = xix_cpu
+      etay  = etay_cpu
+      zetaz = zetaz_cpu
+      dx    = dx_cpu
+      dy    = dy_cpu
+      dz    = dz_cpu
       Jacobian = Jacobian_cpu
     endif
 
@@ -166,7 +171,7 @@ contains
     enddo
     
     if (mod(myrank,2) == 0) then
-      deallocate(QJ,QJ2,QJ3,E,F,G,dx,xix,dy,etay,Jacobian,mut,Vmean,rhomean,Tmean)
+      deallocate(QJ,QJ2,QJ3,E,F,G,dx,xix,dy,etay,dz,zetaz,Jacobian,mut,Vmean,rhomean,Tmean)
     endif
   end subroutine RungeKutta
 end module calc_time_dev2
