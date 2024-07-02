@@ -9,7 +9,7 @@ contains
   subroutine calc_mean(step,nx,ny,nz,Jacobian,QJ,Vmean,rhomean,Tmean)
     integer, intent(in), value                            :: step, nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz,5), device    :: QJ
-    real(8), intent(in), dimension(nx,ny), device         :: Jacobian
+    real(8), intent(in), dimension(nx,ny,nz), device      :: Jacobian
     real(8), intent(inout), dimension(nx,ny,nz,3), device :: Vmean
     real(8), intent(inout), dimension(nx,ny,nz), device   :: rhomean, Tmean
     integer i, j, k
@@ -21,7 +21,7 @@ contains
           Vmean(i,j,k,1) = ((dble(step) - 1.d0) * Vmean(i,j,k,1) + QJ(i,j,k,2) / QJ(i,j,k,1)) / dble(step)
           Vmean(i,j,k,2) = ((dble(step) - 1.d0) * Vmean(i,j,k,2) + QJ(i,j,k,3) / QJ(i,j,k,1)) / dble(step)
           Vmean(i,j,k,3) = ((dble(step) - 1.d0) * Vmean(i,j,k,3) + QJ(i,j,k,4) / QJ(i,j,k,1)) / dble(step)
-          rhomean(i,j,k) = ((dble(step) - 1.d0) * rhomean(i,j,k) + QJ(i,j,k,1) * Jacobian(i,j)) / dble(step)
+          rhomean(i,j,k) = ((dble(step) - 1.d0) * rhomean(i,j,k) + QJ(i,j,k,1) * Jacobian(i,j,k)) / dble(step)
           pJ = (gamma - 1.d0) * (QJ(i,j,k,5) - 0.5d0 * (QJ(i,j,k,2)**2 + QJ(i,j,k,3)**2 + QJ(i,j,k,4)**2) / QJ(i,j,k,1))
           T = pJ / (R * QJ(i,j,k,1))
           Tmean(i,j,k) = ((dble(step) - 1.d0) * Tmean(i,j,k) + T) / dble(step)
@@ -70,7 +70,7 @@ contains
 
   subroutine calc_quantities_3D(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p,T)
     integer, intent(in), value                          :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny), device       :: Jacobian
+    real(8), intent(in), dimension(nx,ny,nz), device    :: Jacobian
     real(8), intent(in), dimension(nx,ny,nz,5), device  :: QJ ! Q / Jacobian
     real(8), intent(out), dimension(nx,ny,nz), device   :: rho, u, v, w, p, T
     integer i, j, k
@@ -79,11 +79,11 @@ contains
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
-          rho(i,j,k) = Jacobian(i,j) * QJ(i,j,k,1)
+          rho(i,j,k) = Jacobian(i,j,k) * QJ(i,j,k,1)
           u(i,j,k) = QJ(i,j,k,2) / QJ(i,j,k,1)
           v(i,j,k) = QJ(i,j,k,3) / QJ(i,j,k,1)
           w(i,j,k) = QJ(i,j,k,4) / QJ(i,j,k,1)
-          p(i,j,k) = (gamma - 1.d0) * (Jacobian(i,j) * QJ(i,j,k,5) - 0.5d0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
+          p(i,j,k) = (gamma - 1.d0) * (Jacobian(i,j,k) * QJ(i,j,k,5) - 0.5d0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
           T(i,j,k) = p(i,j,k) / (R * rho(i,j,k))
     enddo;enddo;enddo
   end subroutine calc_quantities_3D

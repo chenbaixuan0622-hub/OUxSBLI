@@ -50,8 +50,6 @@ module mod_globals
   integer, parameter :: nx2 = 1025
   integer, parameter :: ny2 = 65
   integer, parameter :: nz2 = 129
-  real(8), parameter :: dz1 = 1.d0 / (Lz1 / dble(nz1-1)) ! 1 / dz1
-  real(8), parameter :: dz2 = 1.d0 / (Lz2 / dble(nz2-1)) ! 1 / dz2
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -59,10 +57,10 @@ module mod_globals
   !               ! kind4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_recal = 0
-  integer, parameter :: nt = 500
-  integer, parameter :: np = 10!100
+  integer, parameter :: nt = 1!500
+  integer, parameter :: np = 1!100
   real(8), parameter :: u0 = 506.8d0
-  real(8), parameter :: dt = 1d-8!0.1d0 * (Lx / dble(nx-1)) / u0
+  real(8), parameter :: dt = 1d-8
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
