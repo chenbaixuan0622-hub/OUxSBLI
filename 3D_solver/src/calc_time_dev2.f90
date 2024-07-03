@@ -11,6 +11,7 @@ module calc_time_dev2
   use calc_flux_hybrid
   use calc_visc
   use calc_les
+  use calc_tracer
   use set
   use print
   implicit none
@@ -151,6 +152,8 @@ contains
           endif
           call calc_mean(t1+(t2-1)*nt,nx,ny,nz,Jacobian,QJ,Vmean,rhomean,Tmean)
           call nvtxEndRange
+          
+          call calc_a(nx,ny,nz,dx,dy,dz,Jacobian,u,v,w,a)
         enddo
       endif
 
