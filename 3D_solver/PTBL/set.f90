@@ -41,9 +41,9 @@ contains
     v = 0.d0
   end subroutine calc_Blasius
 
-  subroutine set_grid(myrank,nx,ny,nz,x,y,z,dx,dy)
+  subroutine set_grid(myrank,nx,ny,nz,x,y,z,dx,dy,dz)
     integer, intent(in)   :: myrank, nx, ny, nz
-    real(8), intent(out)  :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1)
+    real(8), intent(out)  :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     integer i, j, k, ierr, status(MPI_STATUS_SIZE)
     real(8) dx1, dy1, dz1, dx2, dy2, dz2
     dy1 = 12d-3 / dble(256)!Ly1 / dble(256)
@@ -63,6 +63,7 @@ contains
 
       dz1 = Lz1 / dble(nz-1)
       do k = 1, nz
+        dz(k) = dz1
         z(k) = dble(k-1) * dz1
       enddo
     elseif (myrank ==2) then
@@ -87,6 +88,7 @@ contains
       
       dz2 = Lz2 / dble(nz-1)
       do k = 1, nz
+        dz(k) = dz2
         z(k) = dble(k-1) * dz2
       enddo
     endif
@@ -237,22 +239,27 @@ contains
     real(8) :: c0 = sqrt(gamma * p0 / rho0)
     real(8), device :: Qd(nx,2,nz,5)
     real(8), device :: Q(nx,ny,nz,5)
-    No = int(0.35 * nx)
     Nre = int(0.3 * nx)
     !$cuf kernel do<<<*,*>>>
     do l = 1, 5
       do k = 3, nz-2
         do j = 3, ny-1
+          ! cyclic boudary condition
+          QJ(1,j,k,l)    = QJ(nx-3,j,k,l)
+          QJ(2,j,k,l)    = QJ(nx-2,j,k,l)
+          QJ(nx-1,j,k,l) = QJ(3,j,k,l)
+          QJ(nx,j,k,l)   = QJ(4,j,k,l)
+
           ! inlet
-          QJ(1,j,k,l)  = QJ(Nre,j,k,l)
+          !QJ(1,j,k,l)  = QJ(Nre,j,k,l)
           ! outlet
-          QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
+          !QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
     enddo;enddo;enddo
 
     ! Riemann boundary condition
     !$cuf kernel do(2)<<<*,*>>>
     do k = 3, nz-2
-      do i = 1, No
+      do i = 1, nx
         ! Riemann invariants
         pin = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) / QJ(i,ny-1,k,1)) &
         & * Jacobian(i,ny-1)
@@ -314,10 +321,16 @@ contains
     do l = 1, 5
       do k = 3, nz-2
         do j = 2, ny-2
+          ! cyclic boudary condition
+          QJ(1,j,k,l)    = QJ(nx-3,j,k,l)
+          QJ(2,j,k,l)    = QJ(nx-2,j,k,l)
+          QJ(nx-1,j,k,l) = QJ(3,j,k,l)
+          QJ(nx,j,k,l)   = QJ(4,j,k,l)
+          
           ! inlet
-          QJ(1,j,k,l) = QJ(Nre,j,k,l)
+          !QJ(1,j,k,l) = QJ(Nre,j,k,l)
           ! outlet
-          QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
+          !QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
     enddo;enddo;enddo
 
     ! bottom
