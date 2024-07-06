@@ -1,109 +1,169 @@
 module calc_rescale
-  use openacc
+  use cudafor
   use mpi
   use mod_globals, only : gamma , R, u0
 contains
-  subroutine calc_mean(step,nx,ny,nz,nre,QJ,Jacobians,ure,vre,wre,rhore,Tre)
-    integer, intent(in), value                          :: step, nx, ny, nz, nre ! nre: rescale plane
-    real(8), intent(in), dimension(nx,ny,nz,5), device  :: QJ
-    real(8), intent(in), dimension(nx,ny), device       :: Jacobians
-    real(8), intent(inout), dimension(ny), device       :: ure, vre, wre, rhore, Tre
-    integer j, k
-    real(8) pJ
-    real(8), dimension(ny), device :: us, vs, ws, rhos, Ts
-    ! get mean value for span
-    us(:) = 0.d0; vs(:) = 0.d0; ws(:) = 0.d0; rhos(:) = 0.d0; Ts(:) = 0.d0
-    !$acc parallel loop reduction(+:us, vs, ws, rhos, Ts)
-    do k = 2, nz-1
+  subroutine calc_mean(step,nx,ny,nz,Q,Um,Vm,Wm,pm,Tm)
+    integer, intent(in)                       :: step, nx, ny, nz
+    real(8), intent(in), dimension(2,ny,nz,5) :: Q
+    real(8), intent(inout), dimension(2,ny)   :: Um, Vm, Wm, pm, Tm
+    integer i, j, k
+    real(8) p, rho
+    real(8), dimension(2,ny) :: usum, vsum, wsum, psum, Tsum
+    usum(:,:) = 0.d0; vsum(:,:) = 0.d0; wsum(:,:) = 0.d0; psum(:,:) = 0.d0; Tsum(:,:) = 0.d0
+    ! span-wise direction
+    do k = 1, nz
       do j = 1, ny
-        us(j)   = us(j) +   QJ(nre,j,k,2) / QJ(nre,j,k,1) 
-        vs(j)   = vs(j) +   QJ(nre,j,k,3) / QJ(nre,j,k,1)
-        ws(j)   = ws(j) +   QJ(nre,j,k,4) / QJ(nre,j,k,1)
-        rhos(j) = rhos(j) + QJ(nre,j,k,1) * Jacobian(nre,j)
-        pJ = (gamma - 1.d0) * (QJ(nre,j,k,5) - 0.5d0 * (QJ(nre,j,k,2)**2 + QJ(nre,j,k,3)**2 + QJ(nre,j,k,4)**2) / QJ(nre,j,k,1))
-        Ts(j)   = Ts(j) + pJ / (R * QJ(nre,j,k,1))
-    enddo;enddo
+        do i = 1, 2
+          rho       = Q(i,j,k,1)
+          usum(i,j) = usum(i,j) + Q(i,j,k,2) / rho 
+          vsum(i,j) = vsum(i,j) + Q(i,j,k,3) / rho
+          wsum(i,j) = wsum(i,j) + Q(i,j,k,4) / rho
+          p         = (gamma - 1.d0) * (Q(i,j,k,5) &
+                      - 0.5d0 * (Q(i,j,k,2)**2 + Q(i,j,k,3)**2 + Q(i,j,k,4)**2) / rho) 
+          psum(i,j) = psum(i,j) + p
+          Tsum(i,j) = Tsum(i,j) + p / (R * rho)
+    enddo;enddo;enddo
 
-    ! get mean value for time
-    !$cuf kernel do(1) <<<*,*>>>
+    ! time direction
     do j = 1, ny
-      ure(j) =   ((dble(step) - 1.d0) * ure(j)   + us(j)   / dble(nz-2)) / dble(step)
-      vre(j) =   ((dble(step) - 1.d0) * vre(j)   + vs(j)   / dble(nz-2)) / dble(step)
-      wre(j) =   ((dble(step) - 1.d0) * wre(j)   + ws(j)   / dble(nz-2)) / dble(step)
-      rhore(j) = ((dble(step) - 1.d0) * rhore(j) + rhos(j) / dble(nz-2)) / dble(step)
-      Tre(j) =   ((dble(step) - 1.d0) * Tre(j)   + Ts(j)   / dble(nz-2)) / dble(step)
-    enddo
+      do i = 1, 2
+        Um(i,j) = ((dble(step) - 1.d0) * Um(i,j) + usum(i,j) / dble(nz)) / dble(step)
+        Vm(i,j) = ((dble(step) - 1.d0) * Vm(i,j) + vsum(i,j) / dble(nz)) / dble(step)
+        Wm(i,j) = ((dble(step) - 1.d0) * Wm(i,j) + wsum(i,j) / dble(nz)) / dble(step)
+        pm(i,j) = ((dble(step) - 1.d0) * pm(i,j) + psum(i,j) / dble(nz)) / dble(step)
+        Tm(i,j) = ((dble(step) - 1.d0) * Tm(i,j) + Tsum(i,j) / dble(nz)) / dble(step)
+    enddo;enddo
   end subroutine calc_mean
 
-  subroutine set_rescale(nx,ny,nz,y,Um,Vm,Wm,pm,Tm,QJ)
-    integer, intent(in), value                   :: nx, ny, nz
-    real(8), intent(in), device                  :: y(ny)
-    real(8), intent(in), dimension(2,ny), device :: Um, Vm, Wm, pm, Tm ! mean properties at rescaling plane
-    real(8), intent(inout), device               :: QJ(nx,ny,nz,5)
-    integer i, j, jj, k, l
-    real(8) blt99
-    real(8) :: blt = 2.d-3
+  subroutine set_rescale(step,myrank,nx,ny,nz,nre,blt,y,Jacobian,Um,Vm,Wm,pm,Tm,Qre)
+    integer, intent(in)                     :: step, myrank, nx, ny, nz, nre
+    real(8), intent(in)                     :: blt
+    real(8), intent(in)                     :: y(ny)
+    real(8), intent(in)                     :: Jacobian(nx,ny,nz)
+    real(8), intent(inout), dimension(2,ny) :: Um, Vm, Wm, pm, Tm
+    real(8), intent(inout)                  :: Qre(2,ny,nz,5) ! Q / J
+    integer i, j, jj, k, l, id_blt, ierr, status(MPI_STATUS_SIZE)
+    real(8) :: mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0
+    real(8) bltre1, bltre2, bltre, taure, utre, utin, beta, mu, nu, ady, ade 
+    ! mean properties at rescaling plane
     ! fluctuating properties at rescaling plane
-    real(8), dimension(nx,ny,nz), device :: ufre, vfre, wfre, pfre, Tfre
+    real(8), dimension(2,ny,nz) :: ufre, vfre, wfre, pfre, Tfre
+    real(8), dimension(ny)      :: ypre, ypin, etre, etin
+    ! fluctuating properties at both inner and outer region
+    real(8), dimension(2,ny,nz) :: ufin, vfin, wfin, pfin, Tfin, ufout, vfout, wfout, pfout, Tfout
+    ! mean properties at both inner and outer region
+    real(8), dimension(2,ny,nz) :: Umin, Vmin, Wmin, pmin, Tmin, Umout, Vmout, Wmout, pmout, Tmout
+    ! weighting function
+    real(8), dimension(ny)      :: weight
+    ! properties at rescaling plane
+    real(8) ure, vre, wre, pre, Tre, rhore
+    ! rescaled properties at inlet
+    real(8) uin, vin, win, pin, Tin, rhoin
 
-    ! calc boundary layer thickness at rescaling plane
-    do j = 2, ny
-      if (u(j) >= 0.99d0 * u0) then
-        blt99 = y(j) - (-y(j-1) + y(j)) * (Um(j) - 0.99d0 * u0) / (-Um(j-1) + Um(j))
-        exit
+    do l = 1, 5
+      do k = 1, nz
+        do j = 1, ny
+          do i = 1, 2
+            Qre(i,j,k,l) = Qre(i,j,k,l) * Jacobian(nre+i,j,k)
+    enddo;enddo;enddo;enddo
+
+    call calc_mean(step,nx,ny,nz,Qre,Um,Vm,Wm,pm,Tm)
+
+    ! check boundary layer thickness at rescaling plane
+    if (myrank == 3) then
+      do j = 2, ny
+        if (Um(1,j) >= 0.99d0 * u0 .and. Um(2,j) >= 0.99d0 * u0) then
+          bltre1 = y(j) - (-y(j-1) + y(j)) * (Um(1,j) - 0.99d0 * u0) / (-Um(1,j-1) + Um(1,j))
+          bltre2 = y(j) - (-y(j-1) + y(j)) * (Um(2,j) - 0.99d0 * u0) / (-Um(2,j-1) + Um(2,j))
+          bltre  = 0.5d0 * (bltre1 + bltre2)
+          exit
+        endif
+      enddo
+      if (j == ny) then
+        id_blt = 1
+      else
+        id_blt = 0
       endif
-    enddo
-
-    if (blt99 <= blt) then
-      ! cyclic boundary condition !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      do l = 1, 5
-        do k = 2, nz-1
-          do j = 1, ny
-            ! inlet
-            QJ(1,j,k,l) = QJ(nx,j,k,l)
-            QJ(2,j,k,l) = QJ(nx,j,k,l)
-      enddo;enddo;enddo;enddo
+      call MPI_SEND(bltre,  1, MPI_REAL8, 1, 0, MPI_COMM_WORLD, ierr)
+      call MPI_SEND(id_blt, 1, MPI_REAL8, 1, 1, MPI_COMM_WORLD, ierr)
+      call MPI_RECV(bltre,  1, MPI_REAL8, 1, 2, MPI_COMM_WORLD, status, ierr)
     else
+      call MPI_RECV(bltre,  1, MPI_REAL8, 3, 0, MPI_COMM_WORLD, status, ierr)
+      call MPI_RECV(id_blt, 1, MPI_REAL8, 3, 1, MPI_COMM_WORLD, status, ierr)
+      if (id_blt == 1) then
+        do j = 2, ny
+          if (Um(1,j) >= 0.99d0 * u0 .and. Um(2,j) >= 0.99d0 * u0) then
+            bltre1 = y(j) - (-y(j-1) + y(j)) * (Um(1,j) - 0.99d0 * u0) / (-Um(1,j-1) + Um(1,j))
+            bltre2 = y(j) - (-y(j-1) + y(j)) * (Um(2,j) - 0.99d0 * u0) / (-Um(2,j-1) + Um(2,j))
+            bltre  = 0.5d0 * (bltre1 + bltre2)
+            exit
+          endif
+        enddo
+      endif
+      call MPI_SEND(bltre,  1, MPI_REAL8, 3, 2, MPI_COMM_WORLD, ierr)
+    endif
+
+    if (bltre >= blt) then
+      print *, "myrank=", myrank, "rescale", " blt=", real(bltre), " id_blt=", id_blt
       ! rescaling !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! calc fluctuating part   u'(x,y,z,t) = u(x,y,z,t) - U(x,y)
       ! U(x,y) average velocity in the spanwise direction and time
-      do k = 2, nz-1
-        do j = 2, ny-1
+      do k = 1, nz
+        do j = 1, ny
           do i = 1, 2 ! 2 rescaleing planes are required for 4th-order accuracy flux
-            ufre(i,j,k) = u(i+offsetre,j,k) - Um(i,j)
-            vfre(i,j,k) = v(i+offsetre,j,k) - Vm(i,j)
-            wfre(i,j,k) = w(i+offsetre,j,k) - Wm(i,j)
-            pfre(i,j,k) = p(i+offsetre,j,k) - pm(i,j)
-            Tfre(i,j,k) = T(i+offsetre,j,k) - Tm(i,j)
+            rhore = Qre(i,j,k,1)
+            ure   = Qre(i,j,k,2) / rhore
+            vre   = Qre(i,j,k,3) / rhore
+            wre   = Qre(i,j,k,4) / rhore
+            pre   = (gamma - 1.d0) * (Qre(i,j,k,5) - 0.5d0 * rhore * (ure**2 + vre**2 + wre**2)) 
+            Tre   = pre / (rhore * R)
+            ufre(i,j,k) = ure - Um(i,j)
+            vfre(i,j,k) = vre - Vm(i,j)
+            wfre(i,j,k) = wre - Wm(i,j)
+            pfre(i,j,k) = pre - pm(i,j)
+            Tfre(i,j,k) = Tre - Tm(i,j)
       enddo;enddo;enddo
 
-      ! friction velocity
-      rhore = pr(1) / (R * Tr(1))
-      ! linear interpolation
-      taure = mu(Tr(1)) * abs(ur(2)) / (-y(1) + y(2))
-      utre  = sqrt(taur / rhor)
-      utin  = utre * (bltre / blt)**0.1
-      ! rescaling factor
-      beta = utin / utre
+      if (myrank == 3) then
+        ! friction velocity
+        rhore = pm(1,1) / (R * Tm(1,1))
+        mu    = mu0 * ((T0 + S) / (Tm(1,1) + S)) * (Tm(1,1) / T0)**1.5
+        nu    = mu / rhore
+        taure = mu * abs(Um(1,2)) / (-y(1) + y(2))
+        utre  = sqrt(taure / rhore)
+        utin  = utre * (bltre / blt)**0.1
+        beta  = utin / utre
+        call MPI_SEND(utin, 1, MPI_REAL8, 1, 0, MPI_COMM_WORLD, ierr)
+        call MPI_SEND(utre, 1, MPI_REAL8, 1, 1, MPI_COMM_WORLD, ierr)
+        call MPI_SEND(nu,   1, MPI_REAL8, 1, 2, MPI_COMM_WORLD, ierr)
+        call MPI_SEND(beta, 1, MPI_REAL8, 1, 3, MPI_COMM_WORLD, ierr)
+      else
+        call MPI_RECV(utin, 1, MPI_REAL8, 3, 0, MPI_COMM_WORLD, status, ierr)
+        call MPI_RECV(utre, 1, MPI_REAL8, 3, 1, MPI_COMM_WORLD, status, ierr)
+        call MPI_RECV(nu,   1, MPI_REAL8, 3, 2, MPI_COMM_WORLD, status, ierr)
+        call MPI_RECV(beta, 1, MPI_REAL8, 3, 3, MPI_COMM_WORLD, status, ierr)
+      endif
 
-      ! inner region
-      ! y plus
       do j = 1, ny
-        ypin(j) = 
-        ypre(j) = 
+        ypin(j) = y(j) * utin / nu
+        ypre(j) = y(j) * utre / nu
+        etin(j) = y(j) / blt
+        etre(j) = y(j) / bltre
       enddo
-      do j = 2, ny
+
+      do j = 1, ny
         do jj = 2, ny
           if (ypre(jj) > ypin(j)) then
             ady = (-ypre(jj-1) + ypin(j)) / (-ypre(jj-1) + ypre(jj))
-            do k = 2, nz-1
+            do k = 1, nz
               do i = 1, 2
                 ! mean
-                Umin(i,j,k) = beta * (Um(i,jj-1,k) + ady * (-Um(i,jj-1,k) + Um(i,jj,k)))
-                Vmin(i,j,k) =         Vm(i,jj-1,k) + ady * (-Vm(i,jj-1,k) + Vm(i,jj,k))
+                Umin(i,j,k) = beta * (Um(i,jj-1) + ady * (-Um(i,jj-1) + Um(i,jj)))
+                Vmin(i,j,k) =         Vm(i,jj-1) + ady * (-Vm(i,jj-1) + Vm(i,jj))
                 Wmin(i,j,k) = 0.d0
-                pmin(i,j,k) =         pm(i,jj-1,k) + ady * (-pm(i,jj-1,k) + pm(i,jj,k)) 
-                Tmin(i,j,k) =         Tm(i,jj-1,k) + ady * (-Tm(i,jj-1,k) + Tm(i,jj,k))
+                pmin(i,j,k) =         pm(i,jj-1) + ady * (-pm(i,jj-1) + pm(i,jj)) 
+                Tmin(i,j,k) =         Tm(i,jj-1) + ady * (-Tm(i,jj-1) + Tm(i,jj))
                 ! fluctuating
                 ufin(i,j,k) = beta * (ufre(i,jj-1,k) + ady * (-ufre(i,jj-1,k) + ufre(i,jj,k)))
                 vfin(i,j,k) = beta * (vfre(i,jj-1,k) + ady * (-vfre(i,jj-1,k) + vfre(i,jj,k)))
@@ -115,24 +175,18 @@ contains
           endif
       enddo;enddo
 
-      ! outer region
-      ! eta
       do j = 1, ny
-        etin(j) =
-        etre(j) = 
-      enddo
-      do j = 2, ny
         do jj = 2, ny
-          if (ypre(jj) > ypin(j)) then
+          if (etre(jj) > etin(j)) then
             ade = (-etre(jj-1) + etin(j)) / (-etre(jj-1) + etre(jj))
-            do k = 2, nz-1
+            do k = 1, nz
               do i = 1, 2
                 ! mean
-                Umout(i,j,k) = beta * (Um(i,jj-1,k) + ade * (-Um(i,jj-1,k) + Um(i,jj,k))) + (1.d0 - beta) * u0
-                Vmout(i,j,k) =         Vm(i,jj-1,k) + ade
+                Umout(i,j,k) = beta * (Um(i,jj-1) + ade * (-Um(i,jj-1) + Um(i,jj))) + (1.d0 - beta) * u0
+                Vmout(i,j,k) =         Vm(i,jj-1) + ade
                 Wmout(i,j,k) = 0.d0
-                pmout(i,j,k) =         pm(i,jj-1,k) + ade * (-pm(i,jj-1,k) + pm(i,jj,k))
-                Tmout(i,j,k) =         Tm(i,jj-1,k) + ade * (-Tm(i,jj-1,k) + Tm(i,jj,k))
+                pmout(i,j,k) =         pm(i,jj-1) + ade * (-pm(i,jj-1) + pm(i,jj))
+                Tmout(i,j,k) =         Tm(i,jj-1) + ade * (-Tm(i,jj-1) + Tm(i,jj))
                 ! fluctuating
                 ufout(i,j,k) = beta * (ufre(i,jj-1,k) + ade * (-ufre(i,jj-1,k) + ufre(i,jj,k)))
                 vfout(i,j,k) = beta * (vfre(i,jj-1,k) + ade * (-vfre(i,jj-1,k) + vfre(i,jj,k)))
@@ -145,21 +199,35 @@ contains
       enddo;enddo
       
       ! weighting function
-      do j = 2, ny
-        weight(j) = min(1.d0, &
-                   0.5d0 * (1.d0 + tanh(4.d0 * (etin(j) - 0.2d0) / ((1.d0 - 0.4d0) * etin(j) + 0.2d0)) / tanh(4.d0)))
+      do j = 1, ny
+        weight(j) = min(1.d0, 0.5d0 * (1.d0 + tanh(4.d0 * (etin(j) - 0.2d0) / ((1.d0 - 0.4d0) * etin(j) + 0.2d0)) / tanh(4.d0)))
       enddo
 
       ! re-introducing
       do k = 2, nz-1
-        do j = 1, ny
+        do j = 2, ny-1
           do i = 1, 2
-            uin(i,j,k) = (Umin(i,j,k) + ufin(i,j,k)) * (1.d0 - weight(j)) + (Umout(i,j,k) + ufout(i,j,k)) * weight(j)
-            vin(i,j,k) = (Vmin(i,j,k) + vfin(i,j,k)) * (1.d0 - weight(j)) + (Vmout(i,j,k) + vfout(i,j,k)) * weight(j)
-            win(i,j,k) = (Wmin(i,j,k) + wfin(i,j,k)) * (1.d0 - weight(j)) + (Wmout(i,j,k) + wfout(i,j,k)) * weight(j)
-            pin(i,j,k) = (pmin(i,j,k) + pfin(i,j,k)) * (1.d0 - weight(j)) + (pmout(i,j,k) + pfout(i,j,k)) * weight(j)
-            Tin(i,j,k) = (Tmin(i,j,k) + Tfin(i,j,k)) * (1.d0 - weight(j)) + (Tmout(i,j,k) + Tfout(i,j,k)) * weight(j)
-            rhoin(i,j,k) = pin(i,j,k) / (R * Tin(i,j,k))
+            uin   = (Umin(i,j,k) + ufin(i,j,k)) * (1.d0 - weight(j)) + (Umout(i,j,k) + ufout(i,j,k)) * weight(j)
+            vin   = (Vmin(i,j,k) + vfin(i,j,k)) * (1.d0 - weight(j)) + (Vmout(i,j,k) + vfout(i,j,k)) * weight(j)
+            win   = (Wmin(i,j,k) + wfin(i,j,k)) * (1.d0 - weight(j)) + (Wmout(i,j,k) + wfout(i,j,k)) * weight(j)
+            pin   = (pmin(i,j,k) + pfin(i,j,k)) * (1.d0 - weight(j)) + (pmout(i,j,k) + pfout(i,j,k)) * weight(j)
+            Tin   = (Tmin(i,j,k) + Tfin(i,j,k)) * (1.d0 - weight(j)) + (Tmout(i,j,k) + Tfout(i,j,k)) * weight(j)
+            rhoin = pin / (R * Tin)
+            Qre(i,j,k,1) = rhoin / Jacobian(i,j,k)
+            Qre(i,j,k,2) = rhoin * uin / Jacobian(i,j,k)
+            Qre(i,j,k,3) = rhoin * vin / Jacobian(i,j,k)
+            Qre(i,j,k,4) = rhoin * win / Jacobian(i,j,k)
+            Qre(i,j,k,5) = (pin / (gamma - 1.d0) + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) / Jacobian(i,j,k)
+      enddo;enddo;enddo
+    else
+      ! cyclic boundary condition !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      print *, "myrank=", myrank, "cyclic ", " blt=", real(bltre), " id_blt", id_blt
+      do l = 1, 5
+        do k = 1, nz
+          do j = 1, ny
+            ! inlet
+            Qre(1,j,k,l) = Qre(1,j,k,l) / Jacobian(nre+1,j,k)
+            Qre(2,j,k,l) = Qre(2,j,k,l) / Jacobian(nre+2,j,k)
       enddo;enddo;enddo
     endif
   end subroutine set_rescale

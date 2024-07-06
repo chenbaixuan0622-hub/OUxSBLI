@@ -120,7 +120,7 @@ contains
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type(cudaDeviceProp)          :: prop
     real(8), allocatable, device  :: QJ(:,:,:,:), QJ2(:,:,:,:), QJ3(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
-    real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), dz(:), zetaz(:), Jacobian(:,:,:), mut(:,:,:), Vmean(:,:,:,:), rhomean(:,:,:), Tmean(:,:,:)
+    real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), dz(:), zetaz(:), Jacobian(:,:,:), mut(:,:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
 
@@ -132,8 +132,7 @@ contains
 
     if (myrank == 0) then
       allocate(QJ(nx,ny,nz,5),QJ2(nx,ny,nz,5),QJ3(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
-      allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),dz(nz-1),zetaz(nz-1),Jacobian(nx,ny,nz))
-      allocate(mut(nx,ny,nz),Vmean(nx,ny,nz,3),rhomean(nx,ny,nz),Tmean(nx,ny,nz))
+      allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),dz(nz-1),zetaz(nz-1),Jacobian(nx,ny,nz),mut(nx,ny,nz))
 
       ! set Q / Jacobian
       do k = 1, nz
@@ -180,7 +179,6 @@ contains
           call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJ3,mut,E,F,G)
           call calc_step3(nx,ny,nz,dx,dy,dz,E,F,G,QJ3,QJ)
           call set_bc(nx,ny,nz,Jacobian,QJ)
-          call calc_mean(t1+(t2-1)*nt,nx,ny,nz,Jacobian,QJ,Vmean,rhomean,Tmean)
           call nvtxEndRange
         enddo
       endif
@@ -202,7 +200,7 @@ contains
     enddo
     
     if (myrank == 0) then
-      deallocate(QJ,QJ2,QJ3,E,F,G,dx,xix,dy,etay,dz,zetaz,Jacobian,mut,Vmean,rhomean,Tmean)
+      deallocate(QJ,QJ2,QJ3,E,F,G,dx,xix,dy,etay,dz,zetaz,Jacobian,mut)
     endif
   end subroutine RungeKutta_3rd
 
@@ -219,7 +217,7 @@ contains
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type(cudaDeviceProp)          :: prop
     real(8), allocatable, device  :: QJ(:,:,:,:), QJs(:,:,:,:), Rs(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
-    real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), dz(:), zetaz(:), Jacobian(:,:,:), mut(:,:,:), Vmean(:,:,:,:), rhomean(:,:,:), Tmean(:,:,:)
+    real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), dz(:), zetaz(:), Jacobian(:,:,:), mut(:,:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
 
@@ -230,8 +228,7 @@ contains
 
     if (myrank == 0) then
       allocate(QJ(nx,ny,nz,5),QJs(nx,ny,nz,5),Rs(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
-      allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),dz(nz-1),zetaz(nz-1),Jacobian(nx,ny,nz))
-      allocate(mut(nx,ny,nz),Vmean(nx,ny,nz,3),rhomean(nx,ny,nz),Tmean(nx,ny,nz))
+      allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),dz(nz-1),zetaz(nz-1),Jacobian(nx,ny,nz),mut(nx,ny,nz))
 
       ! set Q / Jacobian
       do k = 1, nz
@@ -278,7 +275,6 @@ contains
           call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
           call calc_step4(nx,ny,nz,dx,dy,dz,E,F,G,Rs,QJ)
           call set_bc(nx,ny,nz,Jacobian,QJ)
-          call calc_mean(t1+(t2-1)*nt,nx,ny,nz,Jacobian,QJ,Vmean,rhomean,Tmean)
         enddo
       endif
 
@@ -293,7 +289,7 @@ contains
     enddo
 
     if (myrank == 0) then
-      deallocate(QJ,QJs,Rs,E,F,G,dx,xix,dy,etay,dz,zetaz,Jacobian,mut,Vmean,rhomean,Tmean)
+      deallocate(QJ,QJs,Rs,E,F,G,dx,xix,dy,etay,dz,zetaz,Jacobian,mut)
     endif
   end subroutine RungeKutta_4th
 
@@ -310,7 +306,7 @@ contains
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type(cudaDeviceProp)          :: prop
     real(8), allocatable, device  :: QJ(:,:,:,:), QJs(:,:,:,:), QJ4(:,:,:,:), R4(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
-    real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), dz(:), zetaz(:), Jacobian(:,:,:), mut(:,:,:), Vmean(:,:,:,:), rhomean(:,:,:), Tmean(:,:,:)
+    real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), dz(:), zetaz(:), Jacobian(:,:,:), mut(:,:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
 
@@ -321,8 +317,7 @@ contains
 
     if (myrank == 0) then
       allocate(QJ(nx,ny,nz,5),QJs(nx,ny,nz,5),QJ4(nx,ny,nz,5),R4(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
-      allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),dz(nz-1),zetaz(nz-1),Jacobian(nx,ny,nz))
-      allocate(mut(nx,ny,nz),Vmean(nx,ny,nz,3),rhomean(nx,ny,nz),Tmean(nx,ny,nz))
+      allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),dz(nz-1),zetaz(nz-1),Jacobian(nx,ny,nz),mut(nx,ny,nz))
 
       ! set Q / Jacobian
       do k = 1, nz
@@ -394,7 +389,6 @@ contains
           call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
           call calc_step10(nx,ny,nz,dx,dy,dz,E,F,G,R4,QJ4,QJs,QJ)
           call set_bc(nx,ny,nz,Jacobian,QJ)
-          call calc_mean(t1+(t2-1)*nt,nx,ny,nz,Jacobian,QJ,Vmean,rhomean,Tmean)
         enddo
       endif
 
@@ -409,7 +403,7 @@ contains
     enddo
 
     if (myrank == 0) then
-      deallocate(QJ,QJs,QJ4,R4,E,F,G,dx,xix,dy,etay,dz,zetaz,Jacobian,mut,Vmean,rhomean,Tmean)
+      deallocate(QJ,QJs,QJ4,R4,E,F,G,dx,xix,dy,etay,dz,zetaz,Jacobian,mut)
     endif
   end subroutine RungeKutta_10th
 end module calc_time_dev

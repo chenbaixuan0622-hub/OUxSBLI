@@ -11,7 +11,7 @@ module calc_time_dev2
   use calc_flux_hybrid
   use calc_visc
   use calc_les
-  use calc_tracer
+  use calc_rescale
   use set
   use print
   implicit none
@@ -65,16 +65,20 @@ contains
     real(8), intent(in)    :: y(ny), dy_cpu(ny-1), etay_cpu(ny-1)
     real(8), intent(in)    :: z(nz), dz_cpu(nz-1), zetaz_cpu(nz-1), Jacobian_cpu(nx,ny,nz)
     real(8), intent(inout) :: Q(nx,ny,nz,5)
-    integer i, j, k, t1, t2, itr, ilen, ierr, stat, request, status(MPI_STATUS_SIZE)
+    integer i, j, k, nre, t1, t2, itr, ilen, ierr, stat, request, status(MPI_STATUS_SIZE)
+    real(8), allocatable   :: Qre_CPU(:,:,:,:), Um(:,:), Vm(:,:), Wm(:,:), pm(:,:), Tm(:,:)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    type(cudaDeviceProp)          :: prop
-    type(dim3)                    :: blocksE, blocksF, blocksG, blocks
-    type(dim3)                    :: threadsE, threadsF, threadsG, threads
-    real(8), allocatable, device  :: QJ(:,:,:,:), QJ2(:,:,:,:), QJ3(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
-    real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), dz(:), zetaz(:), Jacobian(:,:,:)
-    real(8), allocatable, device  :: mut(:,:,:), Vmean(:,:,:,:), rhomean(:,:,:), Tmean(:,:,:)
+    type(cudaDeviceProp)         :: prop
+    type(dim3)                   :: blocksE, blocksF, blocksG, blocks
+    type(dim3)                   :: threadsE, threadsF, threadsG, threads
+    real(8), allocatable, device :: QJ(:,:,:,:), QJ2(:,:,:,:), QJ3(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
+    real(8), allocatable, device :: dx(:), xix(:), dy(:), etay(:), dz(:), zetaz(:), Jacobian(:,:,:), mut(:,:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
+    ! for rescaling
+    real(8), allocatable, device :: Qre(:,:,:,:)
+    ! rescaling plane
+    nre = nx-4
 
     ! check GPU
     stat = cudaSetDevice(0)
@@ -82,10 +86,10 @@ contains
     ilen = verify(prop%name, ' ', .true.)
     print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", 0, ") is available"
 
+    allocate(QJ(nx,ny,nz,5),Qre_cpu(2,ny,nz,5))
     if (mod(myrank,2) == 0) then
-      allocate(QJ(nx,ny,nz,5),QJ2(nx,ny,nz,5),QJ3(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
-      allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),dz(nz-1),zetaz(nz-1),Jacobian(nx,ny,nz))
-      allocate(mut(nx,ny,nz),Vmean(nx,ny,nz,3),rhomean(nx,ny,nz),Tmean(nx,ny,nz))
+      allocate(QJ2(nx,ny,nz,5),QJ3(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
+      allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),dz(nz-1),zetaz(nz-1),Jacobian(nx,ny,nz),mut(nx,ny,nz),Qre(2,ny,nz,5))
       call set_blocks_threads(myrank,nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads)
 
       ! set Q / Jacobian
@@ -108,6 +112,8 @@ contains
       dy    = dy_cpu
       dz    = dz_cpu
       Jacobian = Jacobian_cpu
+    else
+      allocate(Um(2,ny),Vm(2,ny),Wm(2,ny),pm(2,ny),Tm(2,ny))
     endif
 
     ! share necessary data
@@ -120,8 +126,10 @@ contains
     endif
 
     do t2 = 1, np
-      if (mod(myrank,2) == 0) then
-        do t1 = 1, nt
+      do t1 = 1, nt
+        if (mod(myrank,2) == 0) then
+          Qre_cpu(:,:,:,:) = QJ(nre+1:nre+2,:,:,:)
+          call MPI_SEND(Qre_cpu, 10*ny*nz, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
           call nvtxStartRange("calc 1step",1)
           call nvtxStartRange("calc flux",2)
           call calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,xix,etay,dz,Jacobian,QJ,mut,E,F,G)
@@ -129,33 +137,62 @@ contains
           call nvtxStartRange("calc time dev",3)
           call calc_step(nx,ny,nz,1.d0,0.d0,dx,dy,dz,E,F,G,QJ,QJ2)
           call nvtxEndRange
+        else
+          call MPI_RECV(Qre_cpu, 10*ny*nz, MPI_REAL8, myrank-1, myrank, MPI_COMM_WORLD, status, ierr)
+          call set_rescale(t1+(t2-1)*nt,myrank,nx,ny,nz,nre,2.d-3,y,Jacobian_cpu,Um,Vm,Wm,pm,Tm,Qre_cpu)
+          call MPI_SEND(Qre_cpu, 10*ny*nz, MPI_REAL8, myrank-1, myrank, MPI_COMM_WORLD, ierr)
+        endif
+        if (mod(myrank,2) == 0) then
+          call MPI_RECV(Qre_cpu, 10*ny*nz, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, status, ierr)
+          Qre = Qre_cpu
           if (myrank == 0) then 
-            call set_bc1(nx,ny,nz,Jacobian,QJ2)
+            call set_bc1(nx,ny,nz,Jacobian,Qre,QJ2)
           elseif (myrank == 2) then
-            call set_bc2(nx,ny,nz,Jacobian,QJ2)
+            call set_bc2(nx,ny,nz,Jacobian,Qre,QJ2)
           endif
+        endif
 
+        if (mod(myrank,2) == 0) then
+          Qre_cpu(:,:,:,:) = QJ(nre+1:nre+2,:,:,:)
+          call MPI_SEND(Qre_cpu, 10*ny*nz, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
           call calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,xix,etay,dz,Jacobian,QJ2,mut,E,F,G)
           call calc_step2(nx,ny,nz,0.75d0,0.25d0,0.25d0,1.d0,dx,dy,dz,E,F,G,QJ,QJ2,QJ3)
+        else
+          call MPI_RECV(Qre_cpu, 10*ny*nz, MPI_REAL8, myrank-1, myrank, MPI_COMM_WORLD, status, ierr)
+          call set_rescale(t1+(t2-1)*nt,myrank,nx,ny,nz,nre,2.d-3,y,Jacobian_cpu,Um,Vm,Wm,pm,Tm,Qre_cpu)
+          call MPI_SEND(Qre_cpu, 10*ny*nz, MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, ierr)
+        endif
+        if (mod(myrank,2) == 0) then
+          call MPI_RECV(Qre_cpu, 10*ny*nz, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, status, ierr)
+          Qre = Qre_cpu
           if (myrank == 0) then 
-            call set_bc1(nx,ny,nz,Jacobian,QJ3)
+            call set_bc1(nx,ny,nz,Jacobian,Qre,QJ3)
           elseif (myrank == 2) then
-            call set_bc2(nx,ny,nz,Jacobian,QJ3)
+            call set_bc2(nx,ny,nz,Jacobian,Qre,QJ3)
           endif
+        endif
 
+        if (mod(myrank,2) == 0) then
+          Qre_cpu(:,:,:,:) = QJ(nre+1:nre+2,:,:,:)
+          call MPI_SEND(Qre_cpu, 10*ny*nz, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
           call calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,xix,etay,dz,Jacobian,QJ3,mut,E,F,G)
           call calc_step3(nx,ny,nz,dx,dy,dz,E,F,G,QJ3,QJ)
+        else
+          call MPI_RECV(Qre_cpu, 10*ny*nz, MPI_REAL8, myrank-1, myrank, MPI_COMM_WORLD, status, ierr)
+          call set_rescale(t1+(t2-1)*nt,myrank,nx,ny,nz,nre,2.d-3,y,Jacobian_cpu,Um,Vm,Wm,pm,Tm,Qre_cpu)
+          call MPI_SEND(Qre_cpu, 10*ny*nz, MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, ierr)
+        endif
+        if (mod(myrank,2) == 0) then
+          call MPI_RECV(Qre_cpu, 10*ny*nz, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, status, ierr)
+          Qre = Qre_cpu
           if (myrank == 0) then 
-            call set_bc1(nx,ny,nz,Jacobian,QJ)
+            call set_bc1(nx,ny,nz,Jacobian,Qre,QJ)
           elseif (myrank == 2) then
-            call set_bc2(nx,ny,nz,Jacobian,QJ)
+            call set_bc2(nx,ny,nz,Jacobian,Qre,QJ)
           endif
-          call calc_mean(t1+(t2-1)*nt,nx,ny,nz,Jacobian,QJ,Vmean,rhomean,Tmean)
           call nvtxEndRange
-          
-          call calc_a(nx,ny,nz,dx,dy,dz,Jacobian,u,v,w,a)
-        enddo
-      endif
+        endif
+      enddo
 
       ! send and recv device arrays
       if (mod(myrank,2) == 0) then
@@ -174,8 +211,11 @@ contains
     enddo
     
     if (mod(myrank,2) == 0) then
-      deallocate(QJ,QJ2,QJ3,E,F,G,dx,xix,dy,etay,dz,zetaz,Jacobian,mut,Vmean,rhomean,Tmean)
+      deallocate(QJ2,QJ3,E,F,G,dx,xix,dy,etay,dz,zetaz,Jacobian,mut,Qre)
+    else
+      deallocate(Um,Vm,Wm,pm,Tm)
     endif
+    deallocate(QJ,Qre_cpu)
   end subroutine RungeKutta
 end module calc_time_dev2
 
