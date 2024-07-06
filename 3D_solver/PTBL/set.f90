@@ -227,9 +227,10 @@ contains
     deallocate(Qp1,Qp2)
   end subroutine
 
-  subroutine set_bc1(nx,ny,nz,Jacobian,QJ)
+  subroutine set_bc1(nx,ny,nz,Jacobian,Qre,QJ)
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: Jacobian(nx,ny)
+    real(8), intent(in), device    :: Qre(2,ny,nz,5)
     real(8), intent(inout), device :: QJ(nx,ny,nz,5)
     integer i, j, k, l, No, Nre
     real(8) :: p_wall
@@ -244,16 +245,12 @@ contains
     do l = 1, 5
       do k = 3, nz-2
         do j = 3, ny-1
-          ! cyclic boudary condition
-          QJ(1,j,k,l)    = QJ(nx-3,j,k,l)
-          QJ(2,j,k,l)    = QJ(nx-2,j,k,l)
-          QJ(nx-1,j,k,l) = QJ(3,j,k,l)
-          QJ(nx,j,k,l)   = QJ(4,j,k,l)
-
-          ! inlet
-          !QJ(1,j,k,l)  = QJ(Nre,j,k,l)
+          ! inlet 
+          QJ(1,j,k,l)    = Qre(1,j,k,l)
+          QJ(2,j,k,l)    = Qre(2,j,k,l)
           ! outlet
-          !QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
+          QJ(nx-1,j,k,l) = QJ(nx-3,j,k,l)
+          QJ(nx,j,k,l)   = QJ(nx-2,j,k,l)
     enddo;enddo;enddo
 
     ! Riemann boundary condition
@@ -308,10 +305,11 @@ contains
     enddo;enddo;enddo
   end subroutine set_bc1
 
-  subroutine set_bc2(nx,ny,nz,Jacobian,QJ)
-    integer, intent(in), value          :: nx, ny, nz
-    real(8), intent(in), device         :: Jacobian(nx,ny)
-    real(8), intent(inout), device      :: QJ(nx,ny,nz,5)
+  subroutine set_bc2(nx,ny,nz,Jacobian,Qre,QJ)
+    integer, intent(in), value     :: nx, ny, nz
+    real(8), intent(in), device    :: Jacobian(nx,ny)
+    real(8), intent(in), device    :: Qre(2,ny,nz,5)
+    real(8), intent(inout), device :: QJ(nx,ny,nz,5)
     integer i, j, k, l, Nre
     real(8) :: p_wall
     real(8), device :: Qd(nx,2,nz,5)
@@ -321,16 +319,12 @@ contains
     do l = 1, 5
       do k = 3, nz-2
         do j = 2, ny-2
-          ! cyclic boudary condition
-          QJ(1,j,k,l)    = QJ(nx-3,j,k,l)
-          QJ(2,j,k,l)    = QJ(nx-2,j,k,l)
-          QJ(nx-1,j,k,l) = QJ(3,j,k,l)
-          QJ(nx,j,k,l)   = QJ(4,j,k,l)
-          
-          ! inlet
-          !QJ(1,j,k,l) = QJ(Nre,j,k,l)
+          ! inlet 
+          QJ(1,j,k,l)    = Qre(1,j,k,l)
+          QJ(2,j,k,l)    = Qre(2,j,k,l)
           ! outlet
-          !QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
+          QJ(nx-1,j,k,l) = QJ(nx-3,j,k,l)
+          QJ(nx,j,k,l)   = QJ(nx-2,j,k,l)
     enddo;enddo;enddo
 
     ! bottom

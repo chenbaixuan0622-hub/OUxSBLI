@@ -1,6 +1,6 @@
 FC = mpifort
 
-OUTPUT_OPTIN = -gpu=cc80 -cuda -acc -fast -Minfo=accel -lnvhpcwrapnvtx
+OUTPUT_OPTIN = -gpu=cc89 -cuda -acc -fast -Minfo=accel -lnvhpcwrapnvtx
 
 .SUFFIXES : .f90
 
@@ -32,6 +32,7 @@ OBJ =	mod_globals.o \
       calc_flux_hybrid.o \
       calc_hybrid.o \
       calc_steps.o \
+      calc_rescale.o \
       print.o \
       calc_time_dev2.o \
       main2.o
@@ -55,7 +56,8 @@ calc_roe.o: mod_globals.mod calc_common.mod calc_common_dim.mod calc_physical_qu
 calc_flux.o: mod_globals.mod calc_qlr.mod calc_keep.mod calc_slau.mod calc_roe.mod
 calc_hybrid.o: mod_globals.mod
 calc_steps.o: mod_globals.mod
-calc_time_dev2.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_flux.mod calc_flux_hybrid.mod calc_hybrid.mod calc_visc.mod calc_les.mod calc_steps.mod print.mod
+calc_rescale.o: mod_globals.mod calc_sutherland.mod
+calc_time_dev2.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_flux.mod calc_flux_hybrid.mod calc_hybrid.mod calc_visc.mod calc_les.mod calc_steps.mod calc_rescale.mod print.mod
 print.o: mod_globals.mod
 main2.o: main2.f90 mod_globals.mod set_coordinate.mod set.mod calc_time_dev2.mod
 

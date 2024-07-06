@@ -59,8 +59,8 @@ module mod_globals
   !               ! kind4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_recal = 0
-  integer, parameter :: nt = 50
-  integer, parameter :: np = 1000
+  integer, parameter :: nt = 500
+  integer, parameter :: np = 100
   real(8), parameter :: u0 = 506.8d0
   real(8), parameter :: dt = 1d-8 ! Kolmogrov time scale is 2d-9
 
