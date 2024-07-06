@@ -179,7 +179,8 @@ contains
     integer, intent(in), optional             :: myrank
     real(4) entropy, t
     character(len=40) filename
-    entropy = sum(rho * log(p * rho ** (-gamma)))
+    entropy = sum(rho(2:nx-1,2:ny-1,2:nz-1) * &
+              log(p(2:nx-1,2:ny-1,2:nz-1) * rho(2:nx-1,2:ny-1,2:nz-1) ** (-gamma)))
     if (step == 0) then
       entropy0 = entropy
     endif
@@ -201,7 +202,8 @@ contains
     integer, intent(in), optional             :: myrank
     real(4) ke, t
     character(len=40) filename
-    ke = mean(0.5e0 * rho * (u**2 + v**2 + w**2))
+    ke = mean(0.5e0 * rho(2:nx-1,2:ny-1,2:nz-1) * &
+         (u(2:nx-1,2:ny-1,2:nz-1)**2 + v(2:nx-1,2:ny-1,2:nz-1)**2 + w(2:nx-1,2:ny-1,2:nz-1)**2))
     if (step == 0) then
       ke0 = ke
     endif

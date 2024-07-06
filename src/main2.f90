@@ -111,12 +111,12 @@ program main2
           Q(i,j,l,:) = Jacobian(i,j,l) * Q(i,j,l,:)
     enddo;enddo;enddo
     if (myrank == 0) then
-      open(10,file="recal/Q1.dat",status="replace",action="write",form="unformatted",access="stream")
+      !open(10,file="recal/Q1.dat",status="replace",action="write",form="unformatted",access="stream")
     else
-      open(10,file="recal/Q2.dat",status="replace",action="write",form="unformatted",access="stream")
+      !open(10,file="recal/Q2.dat",status="replace",action="write",form="unformatted",access="stream")
     endif
-    write(10) Q
-    close(10)
+    !write(10) Q
+    !close(10)
     print *, "elapsed time:", t_end - t_start
   endif
 
