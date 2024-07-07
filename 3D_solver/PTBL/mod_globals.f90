@@ -45,10 +45,10 @@ module mod_globals
   real(8), parameter :: Lz2 = 8d-3
   
   integer, parameter :: nx1 = 257
-  integer, parameter :: ny1 = 129
+  integer, parameter :: ny1 = 65
   integer, parameter :: nz1 = 65
   integer, parameter :: nx2 = 513
-  integer, parameter :: ny2 = 65
+  integer, parameter :: ny2 = 129
   integer, parameter :: nz2 = 129
   real(8), parameter :: dz1 = 1.d0 / (Lz1 / dble(nz1-1)) ! 1 / dz1
   real(8), parameter :: dz2 = 1.d0 / (Lz2 / dble(nz2-1)) ! 1 / dz2
@@ -60,7 +60,7 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_recal = 0
   integer, parameter :: nt = 500
-  integer, parameter :: np = 100
+  integer, parameter :: np = 20!100
   real(8), parameter :: u0 = 506.8d0
   real(8), parameter :: dt = 1d-8 ! Kolmogrov time scale is 2d-9
 
