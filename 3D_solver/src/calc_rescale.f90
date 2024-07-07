@@ -43,7 +43,7 @@ contains
     real(8), intent(in)                     :: Jacobian(nx,ny,nz)
     real(8), intent(inout), dimension(2,ny) :: Um, Vm, Wm, pm, Tm
     real(8), intent(inout)                  :: Qre(2,ny,nz,5) ! Q / J
-    integer i, j, jj, k, l, id_blt, ierr, status(MPI_STATUS_SIZE)
+    integer i, j, jj, k, l, ierr, status(MPI_STATUS_SIZE)
     real(8) :: mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0
     real(8) bltre1, bltre2, bltre, taure, utre, utin, beta, mu, nu, ady, ade 
     ! mean properties at rescaling plane
@@ -74,38 +74,19 @@ contains
     if (myrank == 3) then
       do j = 2, ny
         if (Um(1,j) >= 0.99d0 * u0 .and. Um(2,j) >= 0.99d0 * u0) then
-          bltre1 = y(j) - (-y(j-1) + y(j)) * (Um(1,j) - 0.99d0 * u0) / (-Um(1,j-1) + Um(1,j))
-          bltre2 = y(j) - (-y(j-1) + y(j)) * (Um(2,j) - 0.99d0 * u0) / (-Um(2,j-1) + Um(2,j))
-          bltre  = 0.5d0 * (bltre1 + bltre2)
-          exit
-        endif
-      enddo
-      if (j == ny) then
-        id_blt = 1
-      else
-        id_blt = 0
-      endif
-      call MPI_SEND(bltre,  1, MPI_REAL8, 1, 0, MPI_COMM_WORLD, ierr)
-      call MPI_SEND(id_blt, 1, MPI_REAL8, 1, 1, MPI_COMM_WORLD, ierr)
-      call MPI_RECV(bltre,  1, MPI_REAL8, 1, 2, MPI_COMM_WORLD, status, ierr)
-    else
-      call MPI_RECV(bltre,  1, MPI_REAL8, 3, 0, MPI_COMM_WORLD, status, ierr)
-      call MPI_RECV(id_blt, 1, MPI_REAL8, 3, 1, MPI_COMM_WORLD, status, ierr)
-      if (id_blt == 1) then
-        do j = 2, ny
-          if (Um(1,j) >= 0.99d0 * u0 .and. Um(2,j) >= 0.99d0 * u0) then
-            bltre1 = y(j) - (-y(j-1) + y(j)) * (Um(1,j) - 0.99d0 * u0) / (-Um(1,j-1) + Um(1,j))
-            bltre2 = y(j) - (-y(j-1) + y(j)) * (Um(2,j) - 0.99d0 * u0) / (-Um(2,j-1) + Um(2,j))
-            bltre  = 0.5d0 * (bltre1 + bltre2)
+          bltre1 = y(j) - (-y(j-1) + y(j)) * (Um(1,j) - 0.99d0 * u0) / (-Um(1,j-1) + Um(1,j) + 1.d-20)
+          bltre2 = y(j) - (-y(j-1) + y(j)) * (Um(2,j) - 0.99d0 * u0) / (-Um(2,j-1) + Um(2,j) + 1.d-20)
+          ! ensure bltre is not NaN
+          if (bltre1 == bltre1 .and. bltre2 == bltre2) then
+            bltre = 0.5d0 * (bltre1 + bltre2)
             exit
           endif
-        enddo
-      endif
-      call MPI_SEND(bltre,  1, MPI_REAL8, 3, 2, MPI_COMM_WORLD, ierr)
+        endif
+      enddo
     endif
 
-    if (bltre >= blt) then
-      print *, "myrank=", myrank, "rescale", " blt=", real(bltre), " id_blt=", id_blt
+    if (bltre >= blt .and. myrank == 3 .and. step >= 1000) then
+      print *, "rescale", " blt=", real(bltre)
       ! rescaling !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! calc fluctuating part   u'(x,y,z,t) = u(x,y,z,t) - U(x,y)
       ! U(x,y) average velocity in the spanwise direction and time
@@ -125,25 +106,14 @@ contains
             Tfre(i,j,k) = Tre - Tm(i,j)
       enddo;enddo;enddo
 
-      if (myrank == 3) then
-        ! friction velocity
-        rhore = pm(1,1) / (R * Tm(1,1))
-        mu    = mu0 * ((T0 + S) / (Tm(1,1) + S)) * (Tm(1,1) / T0)**1.5
-        nu    = mu / rhore
-        taure = mu * abs(Um(1,2)) / (-y(1) + y(2))
-        utre  = sqrt(taure / rhore)
-        utin  = utre * (bltre / blt)**0.1
-        beta  = utin / utre
-        call MPI_SEND(utin, 1, MPI_REAL8, 1, 0, MPI_COMM_WORLD, ierr)
-        call MPI_SEND(utre, 1, MPI_REAL8, 1, 1, MPI_COMM_WORLD, ierr)
-        call MPI_SEND(nu,   1, MPI_REAL8, 1, 2, MPI_COMM_WORLD, ierr)
-        call MPI_SEND(beta, 1, MPI_REAL8, 1, 3, MPI_COMM_WORLD, ierr)
-      else
-        call MPI_RECV(utin, 1, MPI_REAL8, 3, 0, MPI_COMM_WORLD, status, ierr)
-        call MPI_RECV(utre, 1, MPI_REAL8, 3, 1, MPI_COMM_WORLD, status, ierr)
-        call MPI_RECV(nu,   1, MPI_REAL8, 3, 2, MPI_COMM_WORLD, status, ierr)
-        call MPI_RECV(beta, 1, MPI_REAL8, 3, 3, MPI_COMM_WORLD, status, ierr)
-      endif
+      ! friction velocity
+      rhore = pm(1,1) / (R * Tm(1,1))
+      mu    = mu0 * ((T0 + S) / (Tm(1,1) + S)) * (Tm(1,1) / T0)**1.5
+      nu    = mu / rhore
+      taure = mu * abs(Um(1,2)) / (-y(1) + y(2))
+      utre  = sqrt(taure / rhore)
+      utin  = utre * (bltre / blt)**0.1
+      beta  = utin / utre
 
       do j = 1, ny
         ypin(j) = y(j) * utin / nu
@@ -221,7 +191,9 @@ contains
       enddo;enddo;enddo
     else
       ! cyclic boundary condition !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      print *, "myrank=", myrank, "cyclic ", " blt=", real(bltre), " id_blt", id_blt
+      if (myrank == 3) then
+        print *, "cyclic ", " blt=", real(bltre)
+      endif
       do l = 1, 5
         do k = 1, nz
           do j = 1, ny

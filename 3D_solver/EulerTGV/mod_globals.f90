@@ -42,18 +42,16 @@ module mod_globals
   integer, parameter :: nx = 66
   integer, parameter :: ny = 66
   integer, parameter :: nz = 66
-  real(8), parameter :: dz = Lz / dble(nz-1)
-  real(8), parameter :: dzi = 1.d0 / dz
 
   ! GPU
   type(dim3) :: blocksE = dim3((nx-accuracy+1)/5,(ny-accuracy)/8,(nz-accuracy)/8)
   type(dim3) :: blocksF = dim3((nx-accuracy)/8,(ny-accuracy+1)/5,(nz-accuracy)/8)
   type(dim3) :: blocksG = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy+1)/5)
-  type(dim3) :: blocks = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy)/8)
+  type(dim3) :: blocks  = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy)/8)
   type(dim3) :: threadsE = dim3(5,8,8)
   type(dim3) :: threadsF = dim3(8,5,8)
   type(dim3) :: threadsG = dim3(8,8,5)
-  type(dim3) :: threads = dim3(8,8,8)
+  type(dim3) :: threads  = dim3(8,8,8)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -69,7 +67,6 @@ module mod_globals
   integer, parameter          :: nt = 200
   integer, parameter          :: np = 200
   real(8), parameter          :: dt = 0.01d0
-  real(8), parameter          :: dtdz = dt / dz
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
@@ -87,8 +84,5 @@ module mod_globals
   ! initial condition
   real(8), parameter :: M0 = 0.4d0
   real(8), parameter :: RHO0 = 1.d0
-
-  ! variables
-  real(8), allocatable :: Q(:,:,:,:)
 end module mod_globals
 
