@@ -153,14 +153,14 @@ contains
       threadsG = dim3(5,1,32)
       threads  = dim3(5,1,9)
     elseif (myrank == 2) then
-      blocksE  = dim3((nx-accuracy+1)/32,(ny-accuracy)/3,(nz-accuracy)/1)
+      blocksE  = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
       blocksF  = dim3((nx-accuracy)/7,(ny-accuracy+1)/32,(nz-accuracy)/1)
       blocksG  = dim3((nx-accuracy)/7,(ny-accuracy)/1,(nz-accuracy+1)/32)
-      blocks   = dim3((nx-accuracy)/7,(ny-accuracy)/3,(nz-accuracy)/1)
-      threadsE = dim3(32,3,1)
+      blocks   = dim3((nx-accuracy)/127,(ny-accuracy)/1,(nz-accuracy)/1)
+      threadsE = dim3(32,1,1)
       threadsF = dim3(7,32,1)
       threadsG = dim3(7,1,32)
-      threads  = dim3(7,3,1)
+      threads  = dim3(127,1,1)
     endif
   end subroutine set_blocks_threads
 
