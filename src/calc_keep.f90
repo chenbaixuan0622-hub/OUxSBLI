@@ -40,7 +40,6 @@ contains
     RhoV(:) = RhoPhi(rho(:), V(:,id))
     ! energy equation
     P_over_Rho(:) = p(:) / rho(:)
-    !V_m(:) = Phi(V(:,id))
     RhoVIE(:) = RhoPhiU(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
     RhoVKE(:) = RhoUPhiPhi(RhoV(:), V(:,:))
     VP(:) = PhiPsi(V(:,id), p(:))
@@ -53,6 +52,63 @@ contains
     enddo
     F(dimension+2) = Flux(Energy(:))
   end function KEEP4
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  
+  attributes(device) function KEEP2_LowM(id,rho,p,V,Normal,M,c) result(F)
+    integer, intent(in), value                          :: id
+    real(8), intent(in), dimension(2), device           :: rho, p
+    real(8), intent(in), dimension(2,dimension), device :: V
+    real(8), intent(in), dimension(dimension), device   :: Normal
+    real(8), intent(in), value                          :: M, c
+    real(8), dimension(dimension+2) :: F
+    real(8)                         :: Rho_m, P_m, PRho
+    real(8), dimension(dimension)   :: V_m, V1, V2
+    V1(:) = V(1,:)
+    V2(:) = V(2,:)
+    Rho_m = 0.5d0 * (rho(1) + rho(2))
+    ! contravariant velocity
+    V_m(:) = 0.5d0 * (V1(:) + V2(:)) * Normal(id)
+    P_m = 0.5d0 * (p(1) + p(2))
+    PRho = 0.5d0 * (p(1) / rho(1) + p(2) / rho(2))
+    ! add pressure gradient term
+    F(1) = Rho_m * V_m(id) - (1.d0 - min(1.d0, M))**2 * (-p(1) + p(2)) / c
+    F(2:dimension+1) = F(1) * V_m(:) + P_m * Normal(:)
+    F(dimension+2) = F(1) * PRho / (gamma - 1.d0) &
+    & + 0.5d0 * F(1) * vecsum(V1, V2) &
+    & + 0.5d0 * (V(1,id) * p(2) + V(2,id) * p(1)) * Normal(id)
+  end function KEEP2_LowM
+
+  attributes(device) function KEEP4_LowM(id,rho,p,V,Normal,M,c) result(F)
+    integer, intent(in), value                          :: id
+    real(8), intent(in), dimension(4), device           :: rho, p
+    real(8), intent(in), dimension(4,dimension), device :: V
+    real(8), intent(in), dimension(dimension), device   :: Normal
+    real(8), intent(in), value                          :: M, c
+    real(8), dimension(4)           :: P_over_Rho
+    real(8), dimension(dimension+2) :: F
+    real(8), dimension(3)           :: V_m, RhoV, RhoVIE, RhoVKE, VP, Energy, dp
+    real(8), dimension(3,dimension) :: RhoVV_P
+    integer i
+    RhoV(:) = RhoPhi(rho(:), V(:,id))
+    ! add pressure gradient term
+    dp(:)   = (/-p(2) + p(3), -p(2) + p(4), -p(1) + p(3)/)
+    RhoV(:) = RhoV(:) - (1.d0 - min(1.d0, M))**2 * dp(:) / c
+
+    ! energy equation
+    P_over_Rho(:) = p(:) / rho(:)
+    RhoVIE(:) = RhoPhiU(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
+    RhoVKE(:) = RhoUPhiPhi(RhoV(:), V(:,:))
+    VP(:) = PhiPsi(V(:,id), p(:))
+
+    Energy(:) = RhoVIE(:) + RhoVKE(:) + VP(:)
+    F(1) = Flux(RhoV(:))
+    do i = 1, dimension
+      RhoVV_P(:,i) = RhoPhiU(RhoV(:), V(:,i)) + Phi(p(:)) * Normal(i)
+      F(i+1) = Flux(RhoVV_P(:,i))
+    enddo
+    F(dimension+2) = Flux(Energy(:))
+  end function KEEP4_LowM
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -171,45 +227,5 @@ contains
     Q2(dimension+2) = e2
     F(:) = F(:) - 0.5d0 * min(1.d0, Mach**2) * fd * (cumatmul(A2(:,:), Q2(:)) - cumatmul(A1(:,:), Q1(:)))
   end function KEEPFVS4
-
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-  attributes(device) function KEEPUP(id,rho,p,V,Normal,Ma) result(F)
-    integer, intent(in), value                          :: id
-    real(8), intent(in), dimension(2), device           :: rho, p
-    real(8), intent(in), dimension(2,dimension), device :: V
-    real(8), intent(in), dimension(dimension), device   :: Normal
-    real(8), intent(in), value                          :: Ma
-    real(8), dimension(dimension+2) :: F
-    real(8)                         :: C, IE, KE, PG, PD, uave, phi, psi
-    real(8), dimension(dimension)   :: V1, V2, M
-    V1(:) = V(1,:)
-    V2(:) = V(2,:)
-    uave = (sqrt(rho(1)) * V1(id) + sqrt(rho(2)) * V2(id)) / (sqrt(rho(1)) + sqrt(rho(2)))
-    ! blend central and upwind
-    phi = 0.5d0
-    psi = 0.d0!min(1.d0, Ma)
-    ! mass convection
-    C = 0.5d0 * (phi * (rho(1) * V1(id) + rho(2) * V2(id)) + (1.d0 - phi) * (rho(1) * V2(id) + rho(2) * V1(id)) &
-    & - psi * abs(uave) * (-rho(1) + rho(2)))
-    ! momentum convection
-    M(:) = 0.5d0 * (C * (V1(:) + V2(:)) - psi * abs(C) * (-V1(:) + V2(:)))
-    ! internal energy
-    IE = (C * (p(1) / rho(1) + p(2) / rho(2)) - psi * abs(C) * (-p(1) / rho(1) + p(2) / rho(2))) / (2.d0 * (gamma - 1.d0))
-    ! kinetic energy
-    KE = (1.d0 - psi) * C * 0.5d0 * vecsum(V1, V2) &
-    & + 0.25d0 * psi * (C * (vecsum(V1, V1) + vecsum(V2,V2)) - abs(C) * (-vecsum(V1, V1) + vecsum(V2, V2)))
-    ! pressure gradient
-    PG = 0.5d0 * (p(1) + p(2))
-    !PG = 0.5d0 * ((p(1) + p(2)) - psi * (-p(1) + p(2)) * C / abs(C))
-    ! pressure diffusion
-    PD = 0.5d0 * (V1(id) * p(2) + V2(id) * p(1))
-    !PD = 0.5d0 * ((1.d0 - psi) * (V1(id) * p(2) + V2(id) * p(1)) &
-    !& + psi * (V1(id) * p(1) + V2(id) * p(2) - (-V1(id) * p(1) + V2(id) * p(2)) * C / abs(C)))
-
-    F(1) = C
-    F(2:dimension+1) = M(:) + PG * Normal(:)
-    F(dimension+2) = IE + KE + PD
-  end function KEEPUP
 end module calc_keep
 
