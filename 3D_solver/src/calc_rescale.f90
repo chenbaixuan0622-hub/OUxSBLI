@@ -28,11 +28,11 @@ contains
     ! time direction
     do j = 1, ny
       do i = 1, 2
-        Um(i,j) = ((dble(step) - 1.d0) * Um(i,j) + usum(i,j) / dble(nz)) / dble(step)
-        Vm(i,j) = ((dble(step) - 1.d0) * Vm(i,j) + vsum(i,j) / dble(nz)) / dble(step)
-        Wm(i,j) = ((dble(step) - 1.d0) * Wm(i,j) + wsum(i,j) / dble(nz)) / dble(step)
-        pm(i,j) = ((dble(step) - 1.d0) * pm(i,j) + psum(i,j) / dble(nz)) / dble(step)
-        Tm(i,j) = ((dble(step) - 1.d0) * Tm(i,j) + Tsum(i,j) / dble(nz)) / dble(step)
+        Um(i,j) = usum(i,j) / dble(nz) !((dble(step) - 1.d0) * Um(i,j) + usum(i,j) / dble(nz)) / dble(step)
+        Vm(i,j) = vsum(i,j) / dble(nz) !((dble(step) - 1.d0) * Vm(i,j) + vsum(i,j) / dble(nz)) / dble(step)
+        Wm(i,j) = wsum(i,j) / dble(nz) !((dble(step) - 1.d0) * Wm(i,j) + wsum(i,j) / dble(nz)) / dble(step)
+        pm(i,j) = psum(i,j) / dble(nz) !((dble(step) - 1.d0) * pm(i,j) + psum(i,j) / dble(nz)) / dble(step)
+        Tm(i,j) = Tsum(i,j) / dble(nz) !((dble(step) - 1.d0) * Tm(i,j) + Tsum(i,j) / dble(nz)) / dble(step)
     enddo;enddo
   end subroutine calc_mean
 
@@ -121,6 +121,38 @@ contains
         etin(j) = y(j) / blt
         etre(j) = y(j) / bltre
       enddo
+
+      ! set temporal values to avoid NaN
+      do k = 1, nz
+        do j = 1, ny
+          do i = 1, 2
+            ! inner region
+            ! mean
+            Umin(i,j,k) = Um(i,j)
+            Vmin(i,j,k) = Vm(i,j)
+            Wmin(i,j,k) = Wm(i,j)
+            pmin(i,j,k) = pm(i,j)
+            Tmin(i,j,k) = Tm(i,j)
+            ! fluctuating
+            ufin(i,j,k) = 0.d0
+            vfin(i,j,k) = 0.d0
+            wfin(i,j,k) = 0.d0
+            pfin(i,j,k) = 0.d0
+            Tfin(i,j,k) = 0.d0
+            ! outer region
+            ! mean
+            Umout(i,j,k) = Um(i,j)
+            Vmout(i,j,k) = Vm(i,j)
+            Wmout(i,j,k) = Wm(i,j)
+            pmout(i,j,k) = pm(i,j)
+            Tmout(i,j,k) = Tm(i,j)
+            ! fluctuating
+            ufout(i,j,k) = 0.d0
+            vfout(i,j,k) = 0.d0
+            wfout(i,j,k) = 0.d0
+            pfout(i,j,k) = 0.d0
+            Tfout(i,j,k) = 0.d0
+      enddo;enddo;enddo
 
       do j = 1, ny
         do jj = 2, ny
