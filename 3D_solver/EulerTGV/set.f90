@@ -1,5 +1,5 @@
 module set
-  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, RHO0, L0, M0, V0, p0, T, dtn
+  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, RHO0, M0, V0, p0, T, dtn
   implicit none
 contains
   function linspace(x1, x2, n) result(x)
@@ -42,15 +42,14 @@ contains
     integer i, j, k
     integer :: accuracy = 4
     integer :: offset   = 2
-    real(8) :: pi = 2.d0 * acos(0.d0)
     real(8) x(nx-accuracy), y(ny-accuracy), z(nz-accuracy)
     real(8) dx, dy, dz
     dx = Lx / dble(nx-4)
     dy = Ly / dble(ny-4)
     dz = Lz / dble(nz-4)
-    x = linspace(0.5d0 * dx, 2.d0 * pi * L0 - 0.5d0 * dx, nx-accuracy)
-    y = linspace(0.5d0 * dy, 2.d0 * pi * L0 - 0.5d0 * dy, ny-accuracy)
-    z = linspace(0.5d0 * dz, 2.d0 * pi * L0 - 0.5d0 * dx, nz-accuracy)
+    x = linspace(0.5d0 * dx, Lx - 0.5d0 * dx, nx-accuracy)
+    y = linspace(0.5d0 * dy, Ly - 0.5d0 * dy, ny-accuracy)
+    z = linspace(0.5d0 * dz, Lz - 0.5d0 * dx, nz-accuracy)
     ! 2nd-order accuracy : offset = 1
     ! 4th-order accuracy : offset = 2
     do k = 1+offset, nz-offset
@@ -59,13 +58,13 @@ contains
           ! rho
           Q(i,j,k,1) =  RHO0
           ! rho u
-          Q(i,j,k,2) =  RHO0 * M0 * sin(x(i-offset) / L0) * cos(y(j-offset) / L0) * cos(z(k-offset) / L0)
+          Q(i,j,k,2) =  RHO0 * M0 * sin(x(i-offset)) * cos(y(j-offset)) * cos(z(k-offset))
           ! rho v
-          Q(i,j,k,3) = -RHO0 * M0 * cos(x(i-offset) / L0) * sin(y(j-offset) / L0) * cos(z(k-offset) / L0)
+          Q(i,j,k,3) = -RHO0 * M0 * cos(x(i-offset)) * sin(y(j-offset)) * cos(z(k-offset))
           ! rho w0
           Q(i,j,k,4) = 0.d0
           ! p / (gamma - 1) + 0.5 * (rhou ** 2 + rhov ** 2 ) / rho
-          Q(i,j,k,5) = (1.d0/gamma+RHO0*(M0**2)*(cos(2.d0*x(i-offset)/L0)+cos(2.d0*y(j-offset)/L0))*(cos(2.d0*z(k-offset)/L0)+2.d0)/16.d0)&
+          Q(i,j,k,5) = (1.d0/gamma+0.0625d0*RHO0*(M0**2)*(cos(2.d0*x(i-offset))+cos(2.d0*y(j-offset)))*(cos(2.d0*z(k-offset))+2.d0))&
                        / (gamma - 1.d0) + 0.5d0 * (Q(i,j,k,2)**2 + Q(i,j,k,3)**2 + Q(i,j,k,4)**2) / Q(i,j,k,1)
     enddo;enddo;enddo
     !call set_bc_init2(Q)
