@@ -1,2 +1,2 @@
-nohup mpirun -n 4 a.out &
+nohup mpiexec -n 4 ./a.out &
 

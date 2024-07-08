@@ -22,6 +22,7 @@ module mod_globals
   ! id_muscl  ! kind2 no    !
   !           ! kind4 3rd   !
   !           ! kind8 4th   !
+  !           ! real4 wall  !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_scheme ! 1  KEEP     !
   !           ! 2  Roe      !
@@ -60,7 +61,7 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_recal = 0
   integer, parameter :: nt = 500
-  integer, parameter :: np = 20!100
+  integer, parameter :: np = 30!100
   real(8), parameter :: u0 = 506.8d0
   real(8), parameter :: dt = 1d-8 ! Kolmogrov time scale is 2d-9
 
