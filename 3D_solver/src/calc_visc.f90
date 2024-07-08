@@ -1,5 +1,5 @@
 module calc_visc
-  use mod_globals, only : accuracy, offset, id_visc, id_turbulence, gamma, R, Pr, Prt, dzi
+  use mod_globals, only : accuracy, offset, id_visc, id_turbulence, gamma, R, Pr, Prt
   use calc_Sutherland
   implicit none
 contains
@@ -24,10 +24,11 @@ contains
                 & + d2 * mu2 * (-u1 + u6 - u4 + u5)) 
   end function u_y
 
-  attributes(global) subroutine calc_Ev(nx, ny, nz, dx, dy, rho, u, v, w, T, p, mut, E)
+  attributes(global) subroutine calc_Ev(nx, ny, nz, dx, dy, dz, rho, u, v, w, T, p, mut, E)
     integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
+    real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p, mut
     real(8), intent(inout), device                    :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
@@ -58,8 +59,8 @@ contains
     wx = u_x(dx(i),mux,w(i,j,k),w(i+1,j,k))
     uy = u_y(dy(j-1),dy(j),muy1,muy2,u(i,j,k),u(i,j-1,k),u(i+1,j-1,k),u(i+1,j,k),u(i+1,j+1,k),u(i,j+1,k))
     vy = u_y(dy(j-1),dy(j),muy1,muy2,v(i,j,k),v(i,j-1,k),v(i+1,j-1,k),v(i+1,j,k),v(i+1,j+1,k),v(i,j+1,k))
-    uz = u_y(dzi,dzi,muz1,muz2,u(i,j,k),u(i,j,k-1),u(i+1,j,k-1),u(i+1,j,k),u(i+1,j,k+1),u(i,j,k+1))
-    wz = u_y(dzi,dzi,muz1,muz2,w(i,j,k),w(i,j,k-1),w(i+1,j,k-1),w(i+1,j,k),w(i+1,j,k+1),w(i,j,k+1))
+    uz = u_y(dz(k-1),dz(k),muz1,muz2,u(i,j,k),u(i,j,k-1),u(i+1,j,k-1),u(i+1,j,k),u(i+1,j,k+1),u(i,j,k+1))
+    wz = u_y(dz(k-1),dz(k),muz1,muz2,w(i,j,k),w(i,j,k-1),w(i+1,j,k-1),w(i+1,j,k),w(i+1,j,k+1),w(i,j,k+1))
 
     txx = 2.d0 * (2.d0 * ux - vy - wz) / 3.d0
     txy = uy + vx
@@ -80,8 +81,8 @@ contains
       wx = u_x(dx(i),mux,w(i,j,k),w(i+1,j,k))
       uy = u_y(dy(j-1),dy(j),muy1,muy2,u(i,j,k),u(i,j-1,k),u(i+1,j-1,k),u(i+1,j,k),u(i+1,j+1,k),u(i,j+1,k))
       vy = u_y(dy(j-1),dy(j),muy1,muy2,v(i,j,k),v(i,j-1,k),v(i+1,j-1,k),v(i+1,j,k),v(i+1,j+1,k),v(i,j+1,k))
-      uz = u_y(dzi,dzi,muz1,muz2,u(i,j,k),u(i,j,k-1),u(i+1,j,k-1),u(i+1,j,k),u(i+1,j,k+1),u(i,j,k+1))
-      wz = u_y(dzi,dzi,muz1,muz2,w(i,j,k),w(i,j,k-1),w(i+1,j,k-1),w(i+1,j,k),w(i+1,j,k+1),w(i,j,k+1))
+      uz = u_y(dz(k-1),dz(k),muz1,muz2,u(i,j,k),u(i,j,k-1),u(i+1,j,k-1),u(i+1,j,k),u(i+1,j,k+1),u(i,j,k+1))
+      wz = u_y(dz(k-1),dz(k),muz1,muz2,w(i,j,k),w(i,j,k-1),w(i+1,j,k-1),w(i+1,j,k),w(i+1,j,k+1),w(i,j,k+1))
       ! sgs visc
       txxsgs = (2.d0 * (2.d0 * ux - vy - wz) / 3.d0) - (rho(i,j,k) + rho(i+1,j,k)) * ksgs / 3.d0
       txysgs = uy + vx
@@ -102,10 +103,11 @@ contains
     & + txz * 0.5d0 * (w(i,j,k) + w(i+1,j,k)) + kappa * (-T(i,j,k) + T(i+1,j,k)) * dx(i) + Hsgs)
   end subroutine calc_Ev
   
-  attributes(global) subroutine calc_Fv(nx, ny, nz, dy, dx, rho, u, v, w, T, p, mut, F)
+  attributes(global) subroutine calc_Fv(nx, ny, nz, dy, dx, dz, rho, u, v, w, T, p, mut, F)
     integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
     real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
+    real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p, mut
     real(8), intent(inout), device                    :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
@@ -134,8 +136,8 @@ contains
     vy = u_x(dy(j),muy,v(i,j,k),v(i,j+1,k))
     wy = u_x(dy(j),muy,w(i,j,k),w(i,j+1,k))
     uy = u_x(dy(j),muy,u(i,j,k),u(i,j+1,k))
-    vz = u_y(dzi,dzi,muz1,muz2,v(i,j,k),v(i,j,k-1),v(i,j+1,k-1),v(i,j+1,k),v(i,j+1,k+1),v(i,j,k+1)) 
-    wz = u_y(dzi,dzi,muz1,muz2,w(i,j,k),w(i,j,k-1),w(i,j+1,k-1),w(i,j+1,k),w(i,j+1,k+1),w(i,j,k+1)) 
+    vz = u_y(dz(k-1),dz(k),muz1,muz2,v(i,j,k),v(i,j,k-1),v(i,j+1,k-1),v(i,j+1,k),v(i,j+1,k+1),v(i,j,k+1)) 
+    wz = u_y(dz(k-1),dz(k),muz1,muz2,w(i,j,k),w(i,j,k-1),w(i,j+1,k-1),w(i,j+1,k),w(i,j+1,k+1),w(i,j,k+1)) 
     ux = u_y(dx(i-1),dx(i),mux1,mux2,u(i,j,k),u(i-1,j,k),u(i-1,j+1,k),u(i,j+1,k),u(i+1,j+1,k),u(i+1,j,k)) 
     vx = u_y(dx(i-1),dx(i),mux1,mux2,v(i,j,k),v(i-1,j,k),v(i-1,j+1,k),v(i,j+1,k),v(i+1,j+1,k),v(i+1,j,k)) 
 
@@ -156,8 +158,8 @@ contains
       vy = u_x(dy(j),muy,v(i,j,k),v(i,j+1,k))
       wy = u_x(dy(j),muy,w(i,j,k),w(i,j+1,k))
       uy = u_x(dy(j),muy,u(i,j,k),u(i,j+1,k))
-      vz = u_y(dzi,dzi,muz1,muz2,v(i,j,k),v(i,j,k-1),v(i,j+1,k-1),v(i,j+1,k),v(i,j+1,k+1),v(i,j,k+1)) 
-      wz = u_y(dzi,dzi,muz1,muz2,w(i,j,k),w(i,j,k-1),w(i,j+1,k-1),w(i,j+1,k),w(i,j+1,k+1),w(i,j,k+1)) 
+      vz = u_y(dz(k-1),dz(k),muz1,muz2,v(i,j,k),v(i,j,k-1),v(i,j+1,k-1),v(i,j+1,k),v(i,j+1,k+1),v(i,j,k+1)) 
+      wz = u_y(dz(k-1),dz(k),muz1,muz2,w(i,j,k),w(i,j,k-1),w(i,j+1,k-1),w(i,j+1,k),w(i,j+1,k+1),w(i,j,k+1)) 
       ux = u_y(dx(i-1),dx(i),mux1,mux2,u(i,j,k),u(i-1,j,k),u(i-1,j+1,k),u(i,j+1,k),u(i+1,j+1,k),u(i+1,j,k)) 
       vx = u_y(dx(i-1),dx(i),mux1,mux2,v(i,j,k),v(i-1,j,k),v(i-1,j+1,k),v(i,j+1,k),v(i+1,j+1,k),v(i+1,j,k)) 
       ! sgs visc
@@ -180,10 +182,11 @@ contains
     & + tyz * 0.5d0 * (w(i,j,k) + w(i,j+1,k)) + kappa * (-T(i,j,k) + T(i,j+1,k)) * dy(j) + Hsgs)
   end subroutine calc_Fv
   
-  attributes(global) subroutine calc_Gv(nx, ny, nz, dx, dy, rho, u, v, w, T, p, mut, G)
+  attributes(global) subroutine calc_Gv(nx, ny, nz, dx, dy, dz, rho, u, v, w, T, p, mut, G)
     integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
+    real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p, mut
     real(8), intent(inout), device                    :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
@@ -209,9 +212,9 @@ contains
     endif
     kappa = Cp * muz / Pr
 
-    wz = u_x(dzi,muz,w(i,j,k),w(i,j,k+1)) 
-    uz = u_x(dzi,muz,u(i,j,k),u(i,j,k+1)) 
-    vz = u_x(dzi,muz,v(i,j,k),v(i,j,k+1)) 
+    wz = u_x(dz(k),muz,w(i,j,k),w(i,j,k+1)) 
+    uz = u_x(dz(k),muz,u(i,j,k),u(i,j,k+1)) 
+    vz = u_x(dz(k),muz,v(i,j,k),v(i,j,k+1)) 
     wx = u_y(dx(i-1),dx(i),mux1,mux2,w(i,j,k),w(i-1,j,k),w(i-1,j,k+1),w(i,j,k+1),w(i+1,j,k+1),w(i+1,j,k))
     ux = u_y(dx(i-1),dx(i),mux1,mux2,u(i,j,k),u(i-1,j,k),u(i-1,j,k+1),u(i,j,k+1),u(i+1,j,k+1),u(i+1,j,k))
     vy = u_y(dy(j-1),dy(j),muy1,muy2,v(i,j,k),v(i,j-1,k),v(i,j-1,k+1),v(i,j,k+1),v(i,j+1,k+1),v(i,j+1,k)) 
@@ -231,9 +234,9 @@ contains
       muy1 = 0.25d0 * (mut(i,j-1,k) + mut(i,j,k) + mut(i,j-1,k+1) + mut(i,j,k+1))
       muy2 = 0.25d0 * (mut(i,j,k) + mut(i,j+1,k) + mut(i,j,k+1) + mut(i,j+1,k+1))
 
-      wz = u_x(dzi,muz,w(i,j,k),w(i,j,k+1)) 
-      uz = u_x(dzi,muz,u(i,j,k),u(i,j,k+1)) 
-      vz = u_x(dzi,muz,v(i,j,k),v(i,j,k+1)) 
+      wz = u_x(dz(k),muz,w(i,j,k),w(i,j,k+1)) 
+      uz = u_x(dz(k),muz,u(i,j,k),u(i,j,k+1)) 
+      vz = u_x(dz(k),muz,v(i,j,k),v(i,j,k+1)) 
       wx = u_y(dx(i-1),dx(i),mux1,mux2,w(i,j,k),w(i-1,j,k),w(i-1,j,k+1),w(i,j,k+1),w(i+1,j,k+1),w(i+1,j,k))
       ux = u_y(dx(i-1),dx(i),mux1,mux2,u(i,j,k),u(i-1,j,k),u(i-1,j,k+1),u(i,j,k+1),u(i+1,j,k+1),u(i+1,j,k))
       vy = u_y(dy(j-1),dy(j),muy1,muy2,v(i,j,k),v(i,j-1,k),v(i,j-1,k+1),v(i,j,k+1),v(i,j+1,k+1),v(i,j+1,k)) 
@@ -255,7 +258,7 @@ contains
     G(i-offset,j-offset,k-offset+1,5) = G(i-offset,j-offset,k-offset+1,5) &
     & -(tzx * 0.5d0 * (u(i,j,k) + u(i,j,k+1)) &
     & + tzy * 0.5d0 * (v(i,j,k) + v(i,j,k+1)) &
-    & + tzz * 0.5d0 * (w(i,j,k) + w(i,j,k+1)) + kappa * (-T(i,j,k) + T(i,j,k+1)) * dzi + Hsgs)
+    & + tzz * 0.5d0 * (w(i,j,k) + w(i,j,k+1)) + kappa * (-T(i,j,k) + T(i,j,k+1)) * dz(k) + Hsgs)
   end subroutine calc_Gv
 end module calc_visc
 

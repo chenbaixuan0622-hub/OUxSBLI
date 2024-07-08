@@ -16,20 +16,24 @@ def plot_corr(x,Nx1,length,R11,R22):
   plt.savefig("data/lateral_corr.png")
   plt.close()
 
-def plot_pdf(x,pdf):
+def plot_pdf(x,pdf,name):
   plt.plot(figsize=(8,6))
   plt.plot(x,pdf)
-  plt.xlabel("x")
-  plt.ylabel("Density")
-  plt.savefig("data/pdf.png")
+  xlabel   = name
+  ylabel   = "PDF of " + name
+  filename = "data/" + name + ".png"
+  plt.xlabel(xlabel)
+  plt.ylabel(ylabel)
+  plt.savefig(filename)
   plt.close()
 
-def plot_velocity(x,y,u):
+def plot_velocity(x,y,u,title):
   plt.axis("equal")
   plt.axis("off")
   plt.contourf(x, y, u, cmap=plt.cm.jet, levels=100)
   plt.colorbar()
-  plt.show()
+  plt.savefig(title)
+  plt.close()
 
 '''
 def plot_fluxtuating_velocity(directory_path,vtk_files,Nx,Ny,Nz,x,y,z,umean,vmean,wmean): 

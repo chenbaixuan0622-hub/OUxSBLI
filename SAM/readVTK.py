@@ -4,7 +4,7 @@ import vtk
 from vtk.util import numpy_support
 
 def getGrid(file_path):
-  # make VTK Structured Grid Reader
+  # make VTK Rectilinear Grid Reader
   reader = vtk.vtkXMLRectilinearGridReader()
   reader.SetFileName(file_path)
   reader.Update()
@@ -17,7 +17,7 @@ def getGrid(file_path):
   return len(x), len(y), len(z), x, y, z
 
 def getVelocity(file_path,Nx,Ny,Nz):
-  # make VTK Structured Grid Reader
+  # make VTK Rectilinear Grid Reader
   reader = vtk.vtkXMLRectilinearGridReader()
   reader.SetFileName(file_path)
   reader.Update()
@@ -30,6 +30,18 @@ def getVelocity(file_path,Nx,Ny,Nz):
   v = np.reshape(V[:,1], [Nz,Ny,Nx])
   w = np.reshape(V[:,2], [Nz,Ny,Nx])
   return u, v, w
+
+def getPointData(file_path,Nx,Ny,Nz,name):
+  # make VTK Rectilinear Grid Reader
+  reader = vtk.vtkXMLRectilinearGridReader()
+  reader.SetFileName(file_path)
+  reader.Update()
+
+  # get dataset
+  Q = reader.GetOutput()
+  A1d = numpy_support.vtk_to_numpy(Q.GetPointData().GetArray(name))
+  A3d = np.reshape(A1d[:], [Nz,Ny,Nx])
+  return A3d
 
 def getMean(directory_path,vtk_files,Nx,Ny,Nz):
   # decleare

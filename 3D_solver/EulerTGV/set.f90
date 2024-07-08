@@ -10,14 +10,14 @@ contains
     x = x1 + (x1 + x2) * (/ (dble(i - 1) / dble(n - 1), i = 1, n) /)
   end function linspace
 
-  subroutine set_grid(nx,ny,nz,x,y,z,dx,dy)
+  subroutine set_grid(nx,ny,nz,x,y,z,dx,dy,dz)
     integer, intent(in)  :: nx, ny, nz
-    real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx), dy(ny)
+    real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx), dy(ny), dz(nz)
     integer i, j, k
     real(8) dx1, dy1, dz1
-    dx1 = Lx / dble(nx-1)
-    dy1 = Ly / dble(ny-1)
-    dz1 = Lz / dble(nz-1)
+    dx1 = Lx / dble(nx-4)
+    dy1 = Ly / dble(ny-4)
+    dz1 = Lz / dble(nz-4)
     x(1) = 0.d0
     do i = 1, nx-1
       dx(i) = dx1
@@ -28,8 +28,10 @@ contains
       dy(j) = dy1
       y(j+1) = y(j) + dy(j)
     enddo
-    do k = 1, nz
-      z(k) = dble(k-1) * dz1
+    z(1) = 0.d0
+    do k = 1, nz-1
+      dz(k) = dz1
+      z(k+1) = z(k) + dz(k)
     enddo
   end subroutine set_grid
   
@@ -38,32 +40,36 @@ contains
     real(8), intent(in)  :: xs(nx), ys(ny), zs(nz)
     real(8), intent(out) :: Q(nx,ny,nz,5)
     integer i, j, k
-    integer :: accuracy = 2!4
-    integer :: offset = 1!2
+    integer :: accuracy = 4
+    integer :: offset   = 2
     real(8) :: pi = 2.d0 * acos(0.d0)
     real(8) x(nx-accuracy), y(ny-accuracy), z(nz-accuracy)
-    x = linspace(0.d0, 2.d0 * pi * L0, nx-accuracy)
-    y = linspace(0.d0, 2.d0 * pi * L0, ny-accuracy)
-    z = linspace(0.d0, 2.d0 * pi * L0, nz-accuracy)
+    real(8) dx, dy, dz
+    dx = Lx / dble(nx-4)
+    dy = Ly / dble(ny-4)
+    dz = Lz / dble(nz-4)
+    x = linspace(0.5d0 * dx, 2.d0 * pi * L0 - 0.5d0 * dx, nx-accuracy)
+    y = linspace(0.5d0 * dy, 2.d0 * pi * L0 - 0.5d0 * dy, ny-accuracy)
+    z = linspace(0.5d0 * dz, 2.d0 * pi * L0 - 0.5d0 * dx, nz-accuracy)
     ! 2nd-order accuracy : offset = 1
     ! 4th-order accuracy : offset = 2
     do k = 1+offset, nz-offset
       do j = 1+offset, ny-offset
         do i = 1+offset, nx-offset
           ! rho
-          Q(i,j,k,1) = RHO0
+          Q(i,j,k,1) =  RHO0
           ! rho u
-          Q(i,j,k,2) = RHO0 * M0 * sin(x(i-offset)/L0) * cos(y(j-offset)/L0) * cos(z(k-offset)/L0)
+          Q(i,j,k,2) =  RHO0 * M0 * sin(x(i-offset) / L0) * cos(y(j-offset) / L0) * cos(z(k-offset) / L0)
           ! rho v
-          Q(i,j,k,3) = - RHO0 * M0 * cos(x(i-offset)/L0) * sin(y(j-offset)/L0) * cos(z(k-offset)/L0)
+          Q(i,j,k,3) = -RHO0 * M0 * cos(x(i-offset) / L0) * sin(y(j-offset) / L0) * cos(z(k-offset) / L0)
           ! rho w0
           Q(i,j,k,4) = 0.d0
           ! p / (gamma - 1) + 0.5 * (rhou ** 2 + rhov ** 2 ) / rho
           Q(i,j,k,5) = (1.d0/gamma+RHO0*(M0**2)*(cos(2.d0*x(i-offset)/L0)+cos(2.d0*y(j-offset)/L0))*(cos(2.d0*z(k-offset)/L0)+2.d0)/16.d0)&
-          &/(gamma-1.d0)+0.5d0*(Q(i,j,k,2)**2+Q(i,j,k,3)**2+Q(i,j,k,4)**2)/Q(i,j,k,1)
+                       / (gamma - 1.d0) + 0.5d0 * (Q(i,j,k,2)**2 + Q(i,j,k,3)**2 + Q(i,j,k,4)**2) / Q(i,j,k,1)
     enddo;enddo;enddo
-    call set_bc_init2(Q)
-    !call set_bc_init4(Q)
+    !call set_bc_init2(Q)
+    call set_bc_init4(Q)
   end subroutine set_init
   
   subroutine set_bc_init2(Q)
@@ -127,7 +133,7 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine set_bc(nx,ny,nz,Jacobian,Q)
+  subroutine set_bc2(nx,ny,nz,Jacobian,Q)
     integer, intent(in), value      :: nx, ny, nz
     real(8), intent(in), device     :: Jacobian(nx,ny)
     real(8), intent(inout), device  :: Q(nx,ny,nz,5)
@@ -164,9 +170,9 @@ contains
           Q(i,j,1,l) = Q(i,j,nz-1,l)
           Q(i,j,nz,l) = Q(i,j,2,l)
     enddo;enddo;enddo
-  end subroutine set_bc
+  end subroutine set_bc2
 
-  subroutine set_bc4(nx,ny,nz,Jacobian,Q)
+  subroutine set_bc(nx,ny,nz,Jacobian,Q)
     integer, intent(in), value      :: nx, ny, nz
     real(8), intent(in), device     :: Jacobian(nx,ny)
     real(8), intent(inout), device  :: Q(nx,ny,nz,5)
@@ -225,7 +231,7 @@ contains
           Q(i,j,nz-1,l) = Q(i,j,3,l)
           Q(i,j,nz,l) = Q(i,j,4,l)
     enddo;enddo;enddo
-  end subroutine set_bc4
+  end subroutine set_bc
 
   subroutine set_bc_mut(nx,ny,nz,mut)
     integer, intent(in), value     :: nx, ny, nz
