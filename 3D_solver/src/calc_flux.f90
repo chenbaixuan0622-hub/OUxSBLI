@@ -6,13 +6,13 @@ module calc_flux
   use calc_roe
   implicit none
   interface calc_E
-    module procedure calc_E_NoMUSCL, calc_E_MUSCL, calc_E_MUSCL_4th
+    module procedure calc_E_NoMUSCL, calc_E_wall, calc_E_MUSCL, calc_E_MUSCL_4th
   end interface
   interface calc_F
-    module procedure calc_F_NoMUSCL, calc_F_MUSCL, calc_F_MUSCL_4th
+    module procedure calc_F_NoMUSCL, calc_F_wall, calc_F_MUSCL, calc_F_MUSCL_4th
   end interface
   interface calc_G
-    module procedure calc_G_NoMUSCL, calc_G_MUSCL, calc_G_MUSCL_4th
+    module procedure calc_G_NoMUSCL, calc_G_wall, calc_G_MUSCL, calc_G_MUSCL_4th
   end interface
 contains
 !NoMUSCL!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -109,6 +109,140 @@ contains
       G(i-offset,j-offset,k,:) = KEEP2(3,rho2,p2,V2,Normal)
     endif
   end subroutine calc_G_NoMUSCL
+
+!calc SLAU at wall!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  
+  attributes(global) subroutine calc_E_wall(id_muscl, nx, ny, nz, rho, u, v, w, p, E)
+    real(kind=4), intent(in), value                   :: id_muscl    
+    integer, intent(in), value                        :: nx, ny, nz
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
+    real(8), intent(out), device                      :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
+    integer i, j, k
+    real(8), dimension(2)   :: rho2, p2
+    real(8), dimension(2,3) :: V2
+    real(8), dimension(4)   :: rho4, p4
+    real(8), dimension(4,3) :: V4
+    real(8), device         :: Normal3(3) = (/1.d0, 0.d0, 0.d0/)
+    real(8)                 :: Normal5(5) = (/0.d0, 1.d0, 0.d0, 0.d0, 0.d0/)
+    real(8)                 :: zero(5)    = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
+    real(8), dimension(5)   :: Q2, Q3, Q4, Q5, Ql, Qr
+    real(8) fdx, M, c
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
+    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
+    c = 0.5d0 * (sqrt(gamma * p(i,j,k) / rho(i,j,k)) + sqrt(gamma * p(i+1,j,k) / rho(i+1,j,k)))
+    M = sqrt(0.5d0 * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2 + u(i+1,j,k)**2 + v(i+1,j,k)**2 + w(i+1,j,k)**2)) / c
+    ! KEEP
+    if (2 <= i .and. i <= nx-2) then
+      rho4(:) = rho(i-1:i+2,j,k)
+      p4(:)   = p(i-1:i+2,j,k)
+      V4(:,1) = u(i-1:i+2,j,k)
+      V4(:,2) = v(i-1:i+2,j,k)
+      V4(:,3) = w(i-1:i+2,j,k)
+      !E(i,j-offset,k-offset,:) = KEEP4(1,rho4,p4,V4,Normal3)
+      E(i,j-offset,k-offset,:) = KEEP4_LowM(1,rho4,p4,V4,Normal3,M,c)
+    else
+      ! calc SLAU at wall
+      Q3 = (/rho(i,j,k),   u(i,j,k),   v(i,j,k),   w(i,j,k),   p(i,j,k)/) 
+      Q4 = (/rho(i+1,j,k), u(i+1,j,k), v(i+1,j,k), w(i+1,j,k), p(i+1,j,k)/) 
+      if (i == 1) then
+        Q5 = (/rho(i+2,j,k), u(i+2,j,k), v(i+2,j,k), w(i+2,j,k), p(i+2,j,k)/)
+        call Qlr_left(Q3,Q4,Q5,Ql,Qr)
+      elseif (i == nx) then
+        Q2 = (/rho(i-1,j,k), u(i-1,j,k), v(i-1,j,k), w(i-1,j,k), p(i-1,j,k)/)
+        call Qlr_right(Q2,Q3,Q4,Ql,Qr)
+      endif
+      E(i,j-offset,k-offset,:) = SLAU(1,Ql,Qr,Normal5,fdx)
+    endif
+  end subroutine calc_E_wall
+
+  attributes(global) subroutine calc_F_wall(id_muscl, nx, ny, nz, rho, u, v, w, p, F)
+    real(kind=4), intent(in), value                   :: id_muscl    
+    integer, intent(in), value                        :: nx, ny, nz
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
+    real(8), intent(out), device                      :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
+    integer i, j, k
+    real(8), dimension(2)   :: rho2, p2
+    real(8), dimension(2,3) :: V2
+    real(8), dimension(4)   :: rho4, p4
+    real(8), dimension(4,3) :: V4
+    real(8), device         :: Normal3(3) = (/0.d0, 1.d0, 0.d0/)
+    real(8)                 :: Normal5(5) = (/0.d0, 0.d0, 1.d0, 0.d0, 0.d0/)
+    real(8)                 :: zero(5)    = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
+    real(8), dimension(5)   :: Q2, Q3, Q4, Q5, Ql, Qr
+    real(8) fdy, M, c
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y
+    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
+    c = 0.5d0 * (sqrt(gamma * p(i,j,k) / rho(i,j,k)) + sqrt(gamma * p(i,j+1,k) / rho(i,j+1,k)))
+    M = sqrt(0.5d0 * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2 + u(i,j+1,k)**2 + v(i,j+1,k)**2 + w(i,j+1,k)**2)) / c
+    ! KEEP
+    if (2 <= j .and. j <= ny-2) then
+      rho4(:) = rho(i,j-1:j+2,k)
+      p4(:)   = p(i,j-1:j+2,k)
+      V4(:,1) = u(i,j-1:j+2,k)
+      V4(:,2) = v(i,j-1:j+2,k)
+      V4(:,3) = w(i,j-1:j+2,k)
+      !F(i-offset,j,k-offset,:) = KEEP4(2,rho4,p4,V4,Normal3)
+      F(i-offset,j,k-offset,:) = KEEP4_LowM(2,rho4,p4,V4,Normal3,M,c)
+    else
+      ! calc SLAU at wall
+      Q3 = (/rho(i,j,k),   u(i,j,k),   v(i,j,k),   w(i,j,k),   p(i,j,k)/) 
+      Q4 = (/rho(i,j+1,k), u(i,j+1,k), v(i,j+1,k), w(i,j+1,k), p(i,j+1,k)/) 
+      if (j == 1) then
+        Q5 = (/rho(i,j+2,k), u(i,j+2,k), v(i,j+2,k), w(i,j+2,k), p(i,j+2,k)/)
+        call Qlr_left(Q3,Q4,Q5,Ql,Qr)
+      elseif (j == ny) then
+        Q2 = (/rho(i,j-1,k), u(i,j-1,k), v(i,j-1,k), w(i,j-1,k), p(i,j-1,k)/)
+        call Qlr_right(Q2,Q3,Q4,Ql,Qr)
+      endif
+      F(i-offset,j,k-offset,:) = SLAU(2,Ql,Qr,Normal5,fdy)
+    endif
+  end subroutine calc_F_wall
+
+  attributes(global) subroutine calc_G_wall(id_muscl, nx, ny, nz, rho, u, v, w, p, G)
+    real(kind=4), intent(in), value                   :: id_muscl    
+    integer, intent(in), value                        :: nx, ny, nz
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
+    real(8), intent(out), device                      :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    integer i, j, k
+    real(8), dimension(2)   :: rho2, p2
+    real(8), dimension(2,3) :: V2
+    real(8), dimension(4)   :: rho4, p4
+    real(8), dimension(4,3) :: V4
+    real(8), device         :: Normal3(3) = (/0.d0, 0.d0, 1.d0/)
+    real(8)                 :: Normal5(5) = (/0.d0, 0.d0, 0.d0, 1.d0, 0.d0/)
+    real(8)                 :: zero(5)    = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
+    real(8), dimension(5)   :: Q2, Q3, Q4, Q5, Ql, Qr
+    real(8) fdz, M, c
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
+    k = (blockIdx%z-1)*blockDim%z + threadIdx%z
+    c = 0.5d0 * (sqrt(gamma * p(i,j,k) / rho(i,j,k)) + sqrt(gamma * p(i,j,k+1) / rho(i,j,k+1)))
+    M = sqrt(0.5d0 * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2 + u(i,j,k+1)**2 + v(i,j,k+1)**2 + w(i,j,k+1)**2)) / c
+    ! KEEP
+    if (2 <= k .and. k <= nz-2) then
+      rho4(:) = rho(i,j,k-1:k+2)
+      p4(:)   = p(i,j,k-1:k+2)
+      V4(:,1) = u(i,j,k-1:k+2)
+      V4(:,2) = v(i,j,k-1:k+2)
+      V4(:,3) = w(i,j,k-1:k+2)
+      !G(i-offset,j-offset,k,:) = KEEP4(3,rho4,p4,V4,Normal3)
+      G(i-offset,j-offset,k,:) = KEEP4_LowM(3,rho4,p4,V4,Normal3,M,c)
+    else
+      ! calc SLAU at wall
+      Q3 = (/rho(i,j,k),   u(i,j,k),   v(i,j,k),   w(i,j,k),   p(i,j,k)/) 
+      Q4 = (/rho(i,j,k+1), u(i,j,k+1), v(i,j,k+1), w(i,j,k+1), p(i,j,k+1)/) 
+      if (k == 1) then
+        Q5 = (/rho(i,j,k+2), u(i,j,k+2), v(i,j,k+2), w(i,j,k+2), p(i,j,k+2)/)
+        call Qlr_left(Q3,Q4,Q5,Ql,Qr)
+      elseif (k == nz) then
+        Q2 = (/rho(i,j,k-1), u(i,j,k-1), v(i,j,k-1), w(i,j,k-1), p(i,j,k-1)/)
+        call Qlr_right(Q2,Q3,Q4,Ql,Qr)
+      endif
+      G(i-offset,j-offset,k,:) = SLAU(3,Ql,Qr,Normal5,fdz)
+    endif
+  end subroutine calc_G_wall
 
 !MUSCL!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
