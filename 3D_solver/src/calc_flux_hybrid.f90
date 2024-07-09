@@ -42,7 +42,7 @@ contains
         if (i == 1) then
           Q5 = (/rho(i+2,j,k), u(i+2,j,k), v(i+2,j,k), w(i+2,j,k), p(i+2,j,k)/)
           call Qlr_left(Q3,Q4,Q5,Ql,Qr)
-        elseif (i == nx) then
+        else
           Q2 = (/rho(i-1,j,k), u(i-1,j,k), v(i-1,j,k), w(i-1,j,k), p(i-1,j,k)/)
           call Qlr_right(Q2,Q3,Q4,Ql,Qr)
         endif
@@ -122,7 +122,7 @@ contains
         if (j == 1) then
           Q5 = (/rho(i,j+2,k), u(i,j+2,k), v(i,j+2,k), w(i,j+2,k), p(i,j+2,k)/)
           call Qlr_left(Q3,Q4,Q5,Ql,Qr)
-        elseif (j == ny) then
+        else
           Q2 = (/rho(i,j-1,k), u(i,j-1,k), v(i,j-1,k), w(i,j-1,k), p(i,j-1,k)/)
           call Qlr_right(Q2,Q3,Q4,Ql,Qr)
         endif
@@ -201,7 +201,7 @@ contains
         if (k == 1) then
           Q5 = (/rho(i,j,k+2), u(i,j,k+2), v(i,j,k+2), w(i,j,k+2), p(i,j,k+2)/)
           call Qlr_left(Q3,Q4,Q5,Ql,Qr)
-        elseif (k == nz) then
+        else
           Q2 = (/rho(i,j,k-1), u(i,j,k-1), v(i,j,k-1), w(i,j,k-1), p(i,j,k-1)/)
           call Qlr_right(Q2,Q3,Q4,Ql,Qr)
         endif

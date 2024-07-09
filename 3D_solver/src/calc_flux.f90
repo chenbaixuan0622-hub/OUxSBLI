@@ -126,7 +126,7 @@ contains
     real(8)                 :: Normal5(5) = (/0.d0, 1.d0, 0.d0, 0.d0, 0.d0/)
     real(8)                 :: zero(5)    = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
     real(8), dimension(5)   :: Q2, Q3, Q4, Q5, Ql, Qr
-    real(8) fdx, M, c
+    real(8) M, c
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
@@ -139,8 +139,8 @@ contains
       V4(:,1) = u(i-1:i+2,j,k)
       V4(:,2) = v(i-1:i+2,j,k)
       V4(:,3) = w(i-1:i+2,j,k)
-      !E(i,j-offset,k-offset,:) = KEEP4(1,rho4,p4,V4,Normal3)
-      E(i,j-offset,k-offset,:) = KEEP4_LowM(1,rho4,p4,V4,Normal3,M,c)
+      E(i,j-offset,k-offset,:) = KEEP4(1,rho4,p4,V4,Normal3)
+      !E(i,j-offset,k-offset,:) = KEEP4_LowM(1,rho4,p4,V4,Normal3,M,c)
     else
       ! calc SLAU at wall
       Q3 = (/rho(i,j,k),   u(i,j,k),   v(i,j,k),   w(i,j,k),   p(i,j,k)/) 
@@ -148,11 +148,11 @@ contains
       if (i == 1) then
         Q5 = (/rho(i+2,j,k), u(i+2,j,k), v(i+2,j,k), w(i+2,j,k), p(i+2,j,k)/)
         call Qlr_left(Q3,Q4,Q5,Ql,Qr)
-      elseif (i == nx) then
+      else
         Q2 = (/rho(i-1,j,k), u(i-1,j,k), v(i-1,j,k), w(i-1,j,k), p(i-1,j,k)/)
         call Qlr_right(Q2,Q3,Q4,Ql,Qr)
       endif
-      E(i,j-offset,k-offset,:) = SLAU(1,Ql,Qr,Normal5,fdx)
+      E(i,j-offset,k-offset,:) = SLAU(1,Ql,Qr,Normal5,1.d0)
     endif
   end subroutine calc_E_wall
 
@@ -170,7 +170,7 @@ contains
     real(8)                 :: Normal5(5) = (/0.d0, 0.d0, 1.d0, 0.d0, 0.d0/)
     real(8)                 :: zero(5)    = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
     real(8), dimension(5)   :: Q2, Q3, Q4, Q5, Ql, Qr
-    real(8) fdy, M, c
+    real(8) M, c
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
@@ -183,8 +183,8 @@ contains
       V4(:,1) = u(i,j-1:j+2,k)
       V4(:,2) = v(i,j-1:j+2,k)
       V4(:,3) = w(i,j-1:j+2,k)
-      !F(i-offset,j,k-offset,:) = KEEP4(2,rho4,p4,V4,Normal3)
-      F(i-offset,j,k-offset,:) = KEEP4_LowM(2,rho4,p4,V4,Normal3,M,c)
+      F(i-offset,j,k-offset,:) = KEEP4(2,rho4,p4,V4,Normal3)
+      !F(i-offset,j,k-offset,:) = KEEP4_LowM(2,rho4,p4,V4,Normal3,M,c)
     else
       ! calc SLAU at wall
       Q3 = (/rho(i,j,k),   u(i,j,k),   v(i,j,k),   w(i,j,k),   p(i,j,k)/) 
@@ -192,11 +192,11 @@ contains
       if (j == 1) then
         Q5 = (/rho(i,j+2,k), u(i,j+2,k), v(i,j+2,k), w(i,j+2,k), p(i,j+2,k)/)
         call Qlr_left(Q3,Q4,Q5,Ql,Qr)
-      elseif (j == ny) then
+      else
         Q2 = (/rho(i,j-1,k), u(i,j-1,k), v(i,j-1,k), w(i,j-1,k), p(i,j-1,k)/)
         call Qlr_right(Q2,Q3,Q4,Ql,Qr)
       endif
-      F(i-offset,j,k-offset,:) = SLAU(2,Ql,Qr,Normal5,fdy)
+      F(i-offset,j,k-offset,:) = SLAU(2,Ql,Qr,Normal5,1.d0)
     endif
   end subroutine calc_F_wall
 
@@ -214,7 +214,7 @@ contains
     real(8)                 :: Normal5(5) = (/0.d0, 0.d0, 0.d0, 1.d0, 0.d0/)
     real(8)                 :: zero(5)    = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
     real(8), dimension(5)   :: Q2, Q3, Q4, Q5, Ql, Qr
-    real(8) fdz, M, c
+    real(8) M, c
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
@@ -227,8 +227,8 @@ contains
       V4(:,1) = u(i,j,k-1:k+2)
       V4(:,2) = v(i,j,k-1:k+2)
       V4(:,3) = w(i,j,k-1:k+2)
-      !G(i-offset,j-offset,k,:) = KEEP4(3,rho4,p4,V4,Normal3)
-      G(i-offset,j-offset,k,:) = KEEP4_LowM(3,rho4,p4,V4,Normal3,M,c)
+      G(i-offset,j-offset,k,:) = KEEP4(3,rho4,p4,V4,Normal3)
+      !G(i-offset,j-offset,k,:) = KEEP4_LowM(3,rho4,p4,V4,Normal3,M,c)
     else
       ! calc SLAU at wall
       Q3 = (/rho(i,j,k),   u(i,j,k),   v(i,j,k),   w(i,j,k),   p(i,j,k)/) 
@@ -236,11 +236,11 @@ contains
       if (k == 1) then
         Q5 = (/rho(i,j,k+2), u(i,j,k+2), v(i,j,k+2), w(i,j,k+2), p(i,j,k+2)/)
         call Qlr_left(Q3,Q4,Q5,Ql,Qr)
-      elseif (k == nz) then
+      else
         Q2 = (/rho(i,j,k-1), u(i,j,k-1), v(i,j,k-1), w(i,j,k-1), p(i,j,k-1)/)
         call Qlr_right(Q2,Q3,Q4,Ql,Qr)
       endif
-      G(i-offset,j-offset,k,:) = SLAU(3,Ql,Qr,Normal5,fdz)
+      G(i-offset,j-offset,k,:) = SLAU(3,Ql,Qr,Normal5,1.d0)
     endif
   end subroutine calc_G_wall
 
