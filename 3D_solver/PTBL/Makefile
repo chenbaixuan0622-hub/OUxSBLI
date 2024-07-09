@@ -1,6 +1,6 @@
-FC = mpifort
+FC = mpif90
 
-OUTPUT_OPTIN = -gpu=cc89 -cuda -acc -fast -Minfo=accel -lnvhpcwrapnvtx
+OUTPUT_OPTIN = -gpu=cc80 -cuda -acc -fast -Minfo=accel -lnvhpcwrapnvtx
 
 .SUFFIXES : .f90
 

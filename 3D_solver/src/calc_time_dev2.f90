@@ -74,7 +74,7 @@ contains
     real(8), allocatable, device :: QJ(:,:,:,:), QJ2(:,:,:,:), QJ3(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
     real(8), allocatable, device :: dx(:), xix(:), dy(:), etay(:), dz(:), zetaz(:), Jacobian(:,:,:), mut(:,:,:)
     ! for plot
-    real(4) :: ke0 = 1.d0, entropy0 = 1.d0
+    real(4) :: mass0 = 1.d0, ke0 = 1.d0, entropy0 = 1.d0
     ! for rescaling
     real(8), allocatable, device :: Qre(:,:,:,:)
     ! rescaling plane
@@ -100,7 +100,7 @@ contains
       enddo;enddo;enddo
   
       ! print initial condition
-      call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0,myrank+1)
+      call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),mass0,ke0,entropy0,myrank+1)
 
       ! copy on GPU
       QJ    = Q
@@ -199,7 +199,7 @@ contains
         call MPI_RECV(Q, nx*ny*nz*5, MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
         call nvtxEndRange
         call nvtxStartRange("print",6)
-        call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0,myrank)
+        call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),mass0,ke0,entropy0,myrank)
         call nvtxEndRange
       endif
     enddo
