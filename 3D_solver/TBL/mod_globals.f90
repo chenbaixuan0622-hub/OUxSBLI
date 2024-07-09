@@ -30,9 +30,9 @@ module mod_globals
   ! id_slau   ! kind2 slau  !
   !           ! kind4 sd    !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=4), parameter :: id_hybrid = 0
-  integer(kind=8), parameter :: id_muscl = 0
-  integer, parameter         :: id_scheme = 3
+  integer(kind=2), parameter :: id_hybrid = 0
+  real(kind=4), parameter    :: id_muscl = 0
+  integer, parameter         :: id_scheme = 1
   integer(kind=2), parameter :: id_slau = 0
   real(8), parameter         :: dp_max = 0.d0
 
@@ -43,18 +43,16 @@ module mod_globals
   integer, parameter :: nx = 257
   integer, parameter :: ny = 257
   integer, parameter :: nz = 65
-  real(8), parameter :: dz = Lz / dble(nz-1)
-  real(8), parameter :: dzi = 1.d0 / dz
 
   ! GPU
   type(dim3) :: blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/5,(nz-accuracy)/1)
   type(dim3) :: blocksF = dim3((nx-accuracy)/1,(ny-accuracy+1)/32,(nz-accuracy)/3)
   type(dim3) :: blocksG = dim3((nx-accuracy)/1,(ny-accuracy)/5,(nz-accuracy+1)/32)
-  type(dim3) :: blocks = dim3((nx-accuracy)/5,(ny-accuracy)/5,(nz-accuracy)/3)
+  type(dim3) :: blocks  = dim3((nx-accuracy)/5,(ny-accuracy)/5,(nz-accuracy)/3)
   type(dim3) :: threadsE = dim3(32,5,1)
   type(dim3) :: threadsF = dim3(1,32,3)
   type(dim3) :: threadsG = dim3(1,5,32)
-  type(dim3) :: threads = dim3(5,5,3)
+  type(dim3) :: threads  = dim3(5,5,3)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -67,12 +65,10 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_RungeKutta = 0
   integer(kind=2), parameter :: id_recal = 0
-  integer, parameter :: nt = 200
-  integer, parameter :: np = 1000
+  integer, parameter :: nt = 200!1!200
+  integer, parameter :: np = 100!1!1000
   real(8), parameter :: u0 = 506.8d0
   real(8), parameter :: dt = 5d-9!0.025d0 * (Lx / dble(nx-1)) / u0
-
-  real(8), parameter :: dtdz = dt / dz
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
@@ -92,8 +88,5 @@ module mod_globals
   real(8), parameter :: p0 = 14924.d0
   real(8), parameter :: T0 = 171.31d0
   real(8), parameter :: rho0 = p0 / (R * T0)
-
-  ! variables
-  real(8), allocatable :: Q(:,:,:,:)
 end module mod_globals
 
