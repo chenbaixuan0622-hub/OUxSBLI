@@ -1,0 +1,7 @@
+*.d
+*.vtr
+*.vtk
+*.mod
+*.o
+*.out
+
