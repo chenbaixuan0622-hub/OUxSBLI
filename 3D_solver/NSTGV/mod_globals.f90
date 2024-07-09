@@ -71,26 +71,26 @@ module mod_globals
   real(8), parameter :: R     = 287.03d0
 
   ! MUSCL
-  real(8), parameter :: k = 1.d0 / 3.d0
-  real(8), parameter :: b = (3.d0 - k) / (1.d0 - k)
-  real(8), parameter :: eps = 1.d0
+  real(8), parameter :: k     = 1.d0 / 3.d0
+  real(8), parameter :: b     = (3.d0 - k) / (1.d0 - k)
+  real(8), parameter :: eps   = 1.d0
   real(8), parameter :: omega = 4.d0
   real(8), parameter :: sigma = 2.d0
 
   ! initial condition
-  real(8), parameter :: Re = 1600.d0
-  real(8), parameter :: M0 = 0.1d0
-  real(8), parameter :: T = 530.d0 * 5.d0 / 9.d0 
-  real(8), parameter :: S = 111.d0
-  real(8), parameter :: mu0 = 1.716d-5 * (273.2d0 + S) / (T + S) * (T / 273.2d0)**1.5d0
-  real(8), parameter :: V0 = M0 * sqrt(gamma * R * T)
+  real(8), parameter :: Re   = 1600.d0
+  real(8), parameter :: M0   = 0.1d0
+  real(8), parameter :: T    = 530.d0 * 5.d0 / 9.d0 
+  real(8), parameter :: S    = 111.d0
+  real(8), parameter :: mu0  = 1.716d-5 * (273.2d0 + S) / (T + S) * (T / 273.2d0)**1.5d0
+  real(8), parameter :: V0   = M0 * sqrt(gamma * R * T)
   real(8), parameter :: RHO0 = mu0 * Re / (V0 * L0)
-  real(8), parameter :: p0 = RHO0 * R * T
+  real(8), parameter :: p0   = RHO0 * R * T
 
   real(8), parameter :: CFL = 0.03d0
-  real(8), parameter :: dt = CFL * (Lx / dble(nx-1)) / V0
-  real(8), parameter :: dtn= V0 * dt / L0
-  integer, parameter :: np = 100
-  integer, parameter :: nt = int(20.d0 / (dble(np) * dtn))
+  real(8), parameter :: dt  = CFL * (Lx / dble(nx-1)) / V0
+  real(8), parameter :: dtn = V0 * dt / L0
+  integer, parameter :: np  = 100
+  integer, parameter :: nt  = int(20.d0 / (dble(np) * dtn))
 end module mod_globals
 

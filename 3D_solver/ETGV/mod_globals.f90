@@ -34,11 +34,10 @@ module mod_globals
   real(8), parameter          :: dp_max = 0.d0
 
   ! mesh
-  real(8), parameter :: L0 = 1.d0
   real(8), parameter :: pi = acos(-1.d0)
-  real(8), parameter :: Lx = 2.d0 * pi * L0
-  real(8), parameter :: Ly = 2.d0 * pi * L0
-  real(8), parameter :: Lz = 2.d0 * pi * L0
+  real(8), parameter :: Lx = 2.d0 * pi
+  real(8), parameter :: Ly = 2.d0 * pi
+  real(8), parameter :: Lz = 2.d0 * pi
   integer, parameter :: nx = 66
   integer, parameter :: ny = 66
   integer, parameter :: nz = 66
@@ -64,9 +63,9 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter  :: id_recal = 0
   integer(kind=4), parameter  :: id_RungeKutta = 0
-  integer, parameter          :: nt = 200
+  integer, parameter          :: nt = 100
   integer, parameter          :: np = 200
-  real(8), parameter          :: dt = 0.01d0
+  real(8), parameter          :: dt = 0.02d0
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0

@@ -126,7 +126,7 @@ contains
     real(8)                 :: Normal5(5) = (/0.d0, 1.d0, 0.d0, 0.d0, 0.d0/)
     real(8)                 :: zero(5)    = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
     real(8), dimension(5)   :: Q2, Q3, Q4, Q5, Ql, Qr
-    real(8) fdx, M, c
+    real(8) M, c
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
@@ -152,7 +152,7 @@ contains
         Q2 = (/rho(i-1,j,k), u(i-1,j,k), v(i-1,j,k), w(i-1,j,k), p(i-1,j,k)/)
         call Qlr_right(Q2,Q3,Q4,Ql,Qr)
       endif
-      E(i,j-offset,k-offset,:) = SLAU(1,Ql,Qr,Normal5,fdx)
+      E(i,j-offset,k-offset,:) = SLAU(1,Ql,Qr,Normal5,1.d0)
     endif
   end subroutine calc_E_wall
 
@@ -170,7 +170,7 @@ contains
     real(8)                 :: Normal5(5) = (/0.d0, 0.d0, 1.d0, 0.d0, 0.d0/)
     real(8)                 :: zero(5)    = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
     real(8), dimension(5)   :: Q2, Q3, Q4, Q5, Ql, Qr
-    real(8) fdy, M, c
+    real(8) M, c
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
@@ -196,7 +196,7 @@ contains
         Q2 = (/rho(i,j-1,k), u(i,j-1,k), v(i,j-1,k), w(i,j-1,k), p(i,j-1,k)/)
         call Qlr_right(Q2,Q3,Q4,Ql,Qr)
       endif
-      F(i-offset,j,k-offset,:) = SLAU(2,Ql,Qr,Normal5,fdy)
+      F(i-offset,j,k-offset,:) = SLAU(2,Ql,Qr,Normal5,1.d0)
     endif
   end subroutine calc_F_wall
 
@@ -214,7 +214,7 @@ contains
     real(8)                 :: Normal5(5) = (/0.d0, 0.d0, 0.d0, 1.d0, 0.d0/)
     real(8)                 :: zero(5)    = (/0.d0, 0.d0, 0.d0, 0.d0, 0.d0/)
     real(8), dimension(5)   :: Q2, Q3, Q4, Q5, Ql, Qr
-    real(8) fdz, M, c
+    real(8) M, c
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
@@ -240,7 +240,7 @@ contains
         Q2 = (/rho(i,j,k-1), u(i,j,k-1), v(i,j,k-1), w(i,j,k-1), p(i,j,k-1)/)
         call Qlr_right(Q2,Q3,Q4,Ql,Qr)
       endif
-      G(i-offset,j-offset,k,:) = SLAU(3,Ql,Qr,Normal5,fdz)
+      G(i-offset,j-offset,k,:) = SLAU(3,Ql,Qr,Normal5,1.d0)
     endif
   end subroutine calc_G_wall
 
