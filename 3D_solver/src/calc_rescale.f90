@@ -1,7 +1,7 @@
 module calc_rescale
   use cudafor
   use mpi
-  use mod_globals, only : gamma , R, u0
+  use mod_globals, only : nt, dt, gamma , R, u0
 contains
   subroutine calc_mean(step,nx,ny,nz,Q,Um,Vm,Wm,pm,Tm)
     integer, intent(in)                       :: step, nx, ny, nz
@@ -60,6 +60,7 @@ contains
     real(8) ure, vre, wre, pre, Tre, rhore
     ! rescaled properties at inlet
     real(8) uin, vin, win, pin, Tin, rhoin
+    character(len=40) filename
 
     do l = 1, 5
       do k = 1, nz
@@ -86,7 +87,10 @@ contains
     endif
 
     if (bltre >= blt .and. myrank == 3 .and. step >= 1000) then
-      print *, "rescale", " blt=", real(bltre)
+      write(filename, "(a, i1.1, a)") "data/", int(myrank), "/blt.d"
+      open(10,file=filename, position="append")
+      write(10,"(2e12.4)") dble(nt*step)*dt, bltre
+      close(10)
       ! rescaling !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! calc fluctuating part   u'(x,y,z,t) = u(x,y,z,t) - U(x,y)
       ! U(x,y) average velocity in the spanwise direction and time
@@ -224,7 +228,10 @@ contains
     else
       ! cyclic boundary condition !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       if (myrank == 3) then
-        print *, "cyclic ", " blt=", real(bltre)
+        write(filename, "(a, i1.1, a)") "data/", int(myrank), "/blt.d"
+        open(10,file=filename, position="append")
+        write(10,"(2e12.4)") dble(nt*step)*dt, bltre
+        close(10)
       endif
       do l = 1, 5
         do k = 1, nz

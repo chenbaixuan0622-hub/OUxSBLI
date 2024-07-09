@@ -31,7 +31,7 @@ module mod_globals
   ! id_slau   ! kind2 slau  !
   !           ! kind4 sd    !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=4), parameter :: id_hybrid = 0
+  integer(kind=2), parameter :: id_hybrid = 0
   integer(kind=8), parameter :: id_muscl = 0
   integer, parameter         :: id_scheme = 3
   integer(kind=2), parameter :: id_slau = 0
@@ -60,8 +60,8 @@ module mod_globals
   !               ! kind4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_recal = 0
-  integer, parameter :: nt = 500
-  integer, parameter :: np = 30!100
+  integer, parameter :: nt = 100
+  integer, parameter :: np = 1000
   real(8), parameter :: u0 = 506.8d0
   real(8), parameter :: dt = 1d-8 ! Kolmogrov time scale is 2d-9
 

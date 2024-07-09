@@ -246,14 +246,14 @@ contains
       do k = 3, nz-2
         do j = 3, ny-1
           ! inlet 
-          !QJ(1,j,k,l)  = Qre(1,j,k,l)
-          !QJ(2,j,k,l)  = Qre(2,j,k,l)
+          QJ(1,j,k,l)  = Qre(1,j,k,l)
+          QJ(2,j,k,l)  = Qre(2,j,k,l)
           ! outlet
-          !QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
-          QJ(1,j,k,l) = QJ(nx-3,j,k,l)
-          QJ(2,j,k,l) = QJ(nx-2,j,k,l)
-          QJ(nx-1,j,k,l) = QJ(3,j,k,l)
-          QJ(nx,  j,k,l) = QJ(4,j,k,l)
+          QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
+          !QJ(1,j,k,l) = QJ(nx-3,j,k,l)
+          !QJ(2,j,k,l) = QJ(nx-2,j,k,l)
+          !QJ(nx-1,j,k,l) = QJ(3,j,k,l)
+          !QJ(nx,  j,k,l) = QJ(4,j,k,l)
     enddo;enddo;enddo
 
     ! Riemann boundary condition
@@ -323,14 +323,14 @@ contains
       do k = 3, nz-2
         do j = 2, ny-2
           ! inlet 
-          !QJ(1,j,k,l)  = Qre(1,j,k,l)
-          !QJ(2,j,k,l)  = Qre(2,j,k,l)
+          QJ(1,j,k,l)  = Qre(1,j,k,l)
+          QJ(2,j,k,l)  = Qre(2,j,k,l)
           ! outlet
-          !QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
-          QJ(1,j,k,l) = QJ(nx-3,j,k,l)
-          QJ(2,j,k,l) = QJ(nx-2,j,k,l)
-          QJ(nx-1,j,k,l) = QJ(3,j,k,l)
-          QJ(nx,  j,k,l) = QJ(4,j,k,l)
+          QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
+          !QJ(1,j,k,l) = QJ(nx-3,j,k,l)
+          !QJ(2,j,k,l) = QJ(nx-2,j,k,l)
+          !QJ(nx-1,j,k,l) = QJ(3,j,k,l)
+          !QJ(nx,  j,k,l) = QJ(4,j,k,l)
     enddo;enddo;enddo
 
     ! bottom
