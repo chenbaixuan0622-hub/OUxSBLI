@@ -122,7 +122,7 @@ contains
     real(8), allocatable, device  :: QJ(:,:,:,:), QJ2(:,:,:,:), QJ3(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
     real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), dz(:), zetaz(:), Jacobian(:,:,:), mut(:,:,:)
     ! for plot
-    real(4) :: ke0 = 1.d0, entropy0 = 1.d0
+    real(4) :: mass0 = 1.d0, ke0 = 1.d0, entropy0 = 1.d0
 
     ! check GPU
     stat = cudaSetDevice(0)
@@ -142,7 +142,7 @@ contains
       enddo;enddo;enddo
   
       ! print initial condition
-      call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
+      call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),mass0,ke0,entropy0)
 
       ! copy on GPU
       QJ    = Q
@@ -157,7 +157,8 @@ contains
     endif
 
     ! share necessary data
-    call MPI_BCAST(ke0, 1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
+    call MPI_BCAST(mass0,    1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
+    call MPI_BCAST(ke0,      1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
     call MPI_BCAST(entropy0, 1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
 
     do t2 = 1, np
@@ -194,7 +195,7 @@ contains
         call MPI_RECV(Q, nx*ny*nz*5, MPI_REAL8, 0, 0, MPI_COMM_WORLD, status, ierr)
         call nvtxEndRange
         call nvtxStartRange("print",6)
-        call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
+        call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),mass0,ke0,entropy0)
         call nvtxEndRange
       endif
     enddo
@@ -219,7 +220,7 @@ contains
     real(8), allocatable, device  :: QJ(:,:,:,:), QJs(:,:,:,:), Rs(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
     real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), dz(:), zetaz(:), Jacobian(:,:,:), mut(:,:,:)
     ! for plot
-    real(4) :: ke0 = 1.d0, entropy0 = 1.d0
+    real(4) :: mass0 = 1.d0, ke0 = 1.d0, entropy0 = 1.d0
 
     ! check GPU
     stat = cudaSetDevice(0)
@@ -238,7 +239,7 @@ contains
       enddo;enddo;enddo
 
       ! print initial condition
-      call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
+      call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),mass0,ke0,entropy0)
 
       ! copy on GPU
       QJ          = Q
@@ -254,7 +255,8 @@ contains
     endif
 
     ! share necessary data
-    call MPI_BCAST(ke0, 1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
+    call MPI_BCAST(mass0,    1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
+    call MPI_BCAST(ke0,      1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
     call MPI_BCAST(entropy0, 1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
 
     do t2 = 1, np
@@ -284,7 +286,7 @@ contains
         call MPI_SEND(Q, nx*ny*nz*5, MPI_REAL8, 1, 0, MPI_COMM_WORLD, ierr) 
       elseif (myrank == 1) then
         call MPI_RECV(Q, nx*ny*nz*5, MPI_REAL8, 0, 0, MPI_COMM_WORLD, status, ierr)
-        call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
+        call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),mass0,ke0,entropy0)
       endif
     enddo
 
@@ -308,7 +310,7 @@ contains
     real(8), allocatable, device  :: QJ(:,:,:,:), QJs(:,:,:,:), QJ4(:,:,:,:), R4(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
     real(8), allocatable, device  :: dx(:), xix(:), dy(:), etay(:), dz(:), zetaz(:), Jacobian(:,:,:), mut(:,:,:)
     ! for plot
-    real(4) :: ke0 = 1.d0, entropy0 = 1.d0
+    real(4) :: mass0 = 1.d0, ke0 = 1.d0, entropy0 = 1.d0
 
     ! check GPU
     stat = cudaSetDevice(0)
@@ -327,7 +329,7 @@ contains
       enddo;enddo;enddo
 
       ! print initial condition
-      call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
+      call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),mass0,ke0,entropy0)
 
       ! copy on GPU
       QJ    = Q
@@ -342,7 +344,8 @@ contains
     endif
 
     ! share necessary data
-    call MPI_BCAST(ke0, 1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
+    call MPI_BCAST(mass0,    1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
+    call MPI_BCAST(ke0,      1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
     call MPI_BCAST(entropy0, 1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
 
     do t2 = 1, np
@@ -398,7 +401,7 @@ contains
         call MPI_SEND(Q, nx*ny*nz*5, MPI_REAL8, 1, 0, MPI_COMM_WORLD, ierr) 
       elseif (myrank == 1) then
         call MPI_RECV(Q, nx*ny*nz*5, MPI_REAL8, 0, 0, MPI_COMM_WORLD, status, ierr)
-        call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),ke0,entropy0)
+        call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),mass0,ke0,entropy0)
       endif
     enddo
 

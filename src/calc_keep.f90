@@ -92,7 +92,7 @@ contains
     integer i
     RhoV(:) = RhoPhi(rho(:), V(:,id))
     ! add pressure gradient term
-    dp(:)   = (/-p(2) + p(3), -p(2) + p(4), -p(1) + p(3)/)
+    dp(:)   = -p(2) + p(3)
     RhoV(:) = RhoV(:) - (1.d0 - min(1.d0, M))**2 * dp(:) / c
 
     ! energy equation
