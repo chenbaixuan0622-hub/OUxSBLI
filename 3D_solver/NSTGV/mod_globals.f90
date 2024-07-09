@@ -41,18 +41,16 @@ module mod_globals
   integer, parameter :: nx = 130!66
   integer, parameter :: ny = 130!66
   integer, parameter :: nz = 130!66
-  real(8), parameter :: dz = Lz / dble(nz-1)
-  real(8), parameter :: dzi = 1.d0 / dz
 
   ! GPU
   type(dim3) :: blocksE = dim3((nx-accuracy+1)/3,(ny-accuracy)/8,(nz-accuracy)/8)
   type(dim3) :: blocksF = dim3((nx-accuracy)/8,(ny-accuracy+1)/3,(nz-accuracy)/8)
   type(dim3) :: blocksG = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy+1)/3)
-  type(dim3) :: blocks = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy)/8)
+  type(dim3) :: blocks  = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy)/8)
   type(dim3) :: threadsE = dim3(3,8,8)
   type(dim3) :: threadsF = dim3(8,3,8)
   type(dim3) :: threadsG = dim3(8,8,3)
-  type(dim3) :: threads = dim3(8,8,8)
+  type(dim3) :: threads  = dim3(8,8,8)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -64,13 +62,13 @@ module mod_globals
   !               ! kind=4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_recal = 0
-  integer(kind=2), parameter :: id_RungeKutta = 0
+  integer(kind=4), parameter :: id_RungeKutta = 0
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
-  real(8), parameter :: Pr = 0.71d0
-  real(8), parameter :: Prt = 0.9d0
-  real(8), parameter :: R = 287.03d0
+  real(8), parameter :: Pr    = 0.71d0
+  real(8), parameter :: Prt   = 0.9d0
+  real(8), parameter :: R     = 287.03d0
 
   ! MUSCL
   real(8), parameter :: k = 1.d0 / 3.d0
@@ -94,9 +92,5 @@ module mod_globals
   real(8), parameter :: dtn= V0 * dt / L0
   integer, parameter :: np = 100
   integer, parameter :: nt = int(20.d0 / (dble(np) * dtn))
-  real(8), parameter :: dtdz = dt / dz
-
-  ! variables
-  real(8), allocatable :: Q(:,:,:,:)
 end module mod_globals
 
