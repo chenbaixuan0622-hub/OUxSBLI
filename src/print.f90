@@ -1,6 +1,16 @@
 module print
   use mod_globals, only : nt, dt, gamma, R
   implicit none
+  
+  interface
+    subroutine print_mass(step,nx,ny,nz,rho,u,v,w,mass0,myrank)
+      integer, intent(in)                       :: step, nx, ny, nz
+      real(4), intent(in), dimension(nx,ny,nz)  :: rho, u, v, w
+      real(4), intent(inout)                    :: mass0
+      integer, intent(in), optional             :: myrank
+    end subroutine print_mass
+  end interface
+
   interface
     subroutine print_entropy(step,nx,ny,nz,rho,p,entropy0,myrank)
       integer, intent(in)                       :: step, nx, ny, nz
@@ -70,19 +80,19 @@ contains
   function mean1D(a) result(ans)
     real(4), intent(in) :: a(:)
     real(4) ans
-    ans = sum(a) / size(a)
+    ans = sum(a) / real(size(a))
   end function mean1D
 
   function mean2D(a) result(ans)
     real(4), intent(in) :: a(:,:)
     real(4) ans
-    ans = sum(a) / size(a)
+    ans = sum(a) / real(size(a))
   end function mean2D
 
   function mean3D(a) result(ans)
     real(4), intent(in) :: a(:,:,:)
     real(4) ans
-    ans = sum(a) / size(a)
+    ans = sum(a) / real(size(a))
   end function mean3D
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -172,6 +182,28 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+  subroutine print_mass(step,nx,ny,nz,rho,u,v,w,mass0,myrank)
+    integer, intent(in)                       :: step, nx, ny, nz
+    real(4), intent(in), dimension(nx,ny,nz)  :: rho, u, v, w
+    real(4), intent(inout)                    :: mass0
+    integer, intent(in), optional             :: myrank
+    real(4) mass, t
+    character(len=40) filename
+    mass = sum(rho(3:nx-2,3:ny-2,3:nz-2))
+    if (step == 0) then
+      mass0 = mass
+    endif
+    t = nt * step * dt
+    if (present(myrank)) then
+      write(filename, "(a, i1.1, a)") "data/",int(myrank),"/mass.d"
+      open(10,file=filename, position="append")
+    else
+      open(10,file="data/mass.d", position="append")
+    endif
+    write(10,"(2e12.4)") t, (mass0 - mass) / mass0
+    close(10)
+  end subroutine print_mass
+
   subroutine print_entropy(step,nx,ny,nz,rho,p,entropy0,myrank)
     integer, intent(in)                       :: step, nx, ny, nz
     real(4), intent(in), dimension(nx,ny,nz)  :: rho, p
@@ -179,8 +211,17 @@ contains
     integer, intent(in), optional             :: myrank
     real(4) entropy, t
     character(len=40) filename
-    entropy = sum(rho(3:nx-2,3:ny-2,3:nz-2) * &
-              log(p(3:nx-2,3:ny-2,3:nz-2) * rho(3:nx-2,3:ny-2,3:nz-2) ** (-gamma)))
+    integer i, j, k, accuracy, offset
+    accuracy = 4
+    offset   = 2
+    entropy = 0.e0
+    do k = 1+offset, nz-offset
+      do j = 1+offset, ny-offset
+        do i = 1+offset, nx-offset
+          entropy = entropy + rho(i,j,k) * log(p(i,j,k) * (rho(i,j,k)**real(-gamma)))
+    enddo;enddo;enddo
+    entropy = entropy / real((nx-accuracy) * (ny-accuracy) * (nz-accuracy))
+
     if (step == 0) then
       entropy0 = entropy
     endif
@@ -191,7 +232,7 @@ contains
     else
       open(10,file="data/entropy.d", position="append")
     endif
-    write(10,"(2(f9.4,1x))") t, (entropy0 - entropy) / entropy0
+    write(10,"(2e12.4)") t, (entropy0 - entropy) / entropy0
     close(10)
   end subroutine print_entropy
 
@@ -202,8 +243,17 @@ contains
     integer, intent(in), optional             :: myrank
     real(4) ke, t
     character(len=40) filename
-    ke = mean(0.5e0 * rho(3:nx-2,3:ny-2,3:nz-2) * &
-         (u(3:nx-2,3:ny-2,3:nz-2)**2 + v(3:nx-2,3:ny-2,3:nz-2)**2 + w(3:nx-2,3:ny-2,3:nz-2)**2))
+    integer i, j, k, accuracy, offset
+    accuracy = 4
+    offset   = 2
+    ke = 0.e0
+    do k = 1+offset, nz-offset
+      do j = 1+offset, ny-offset
+        do i = 1+offset, nx-offset
+          ke = ke + 0.5e0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2)
+    enddo;enddo;enddo
+    ke = ke / real((nx-accuracy) * (ny-accuracy) * (nz-accuracy))
+
     if (step == 0) then
       ke0 = ke
     endif
@@ -214,7 +264,7 @@ contains
     else
       open(10,file="data/kinetic_energy.d", position="append")
     endif
-    !write(10,"(2(f9.4,1x))") t, ke
+    !write(10,"(2e12.4)") t, ke
     write(10,"(2e12.4)") t, ke / ke0
     close(10)
   end subroutine print_KE
@@ -227,15 +277,24 @@ contains
     integer, intent(in), optional              :: myrank
     real(4) enstrophy, t
     character(len=40) filename
+    integer i, j, k, accuracy, offset
+    accuracy = 4
+    offset   = 2
     t = nt * step * dt
-    enstrophy = mean(0.5e0 * rho(:,:,:) * (omega(:,:,:,1)**2 + omega(:,:,:,2)**2 + omega(:,:,:,3)**2))
+    enstrophy = 0.e0
+    do k = 1+offset, nz-offset
+      do j = 1+offset, ny-offset
+        do i = 1+offset, nx-offset
+          enstrophy = enstrophy + 0.5e0 * rho(i,j,k) * (omega(i,j,k,1)**2 + omega(i,j,k,2)**2 + omega(i,j,k,3)**2)
+    enddo;enddo;enddo
+    enstrophy = enstrophy / real((nx-accuracy) * (ny-accuracy) * (nz-accuracy))
+
     if (present(myrank)) then
       write(filename, "(a, i1.1, a)") "data/",int(myrank),"/enstrophy.d"
       open(10,file=filename, position="append")
     else
       open(10,file="data/enstrophy.d", position="append")
     endif
-    !write(10,"(2(f9.4,1x))") t, enstrophy
     write(10,"(2e12.4)") t, enstrophy
     close(10)
   end subroutine print_enstrophy
@@ -419,13 +478,13 @@ contains
         rho(i,j) = Q(i,j,1)
         u(i,j) = Q(i,j,2) / rho(i,j)
         v(i,j) = Q(i,j,3) / rho(i,j)
-        p(i,j) = (gamma - 1.e0) * (Q(i,j,4) - 0.5e0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
+        p(i,j) = (real(gamma) - 1.e0) * (Q(i,j,4) - 0.5e0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
         rho1d(l) = rho(i,j)
         p1d(l)   = p(i,j)
         T1d(l)   = p1d(l) / (real(R) * rho1d(l))
         v1d(m)   = u(i,j)
         v1d(m+1) = v(i,j)
-        M1d(l)   = sqrt(v1d(m)**2 + v1d(m+1)**2) / sqrt(gamma * p1d(l) / rho1d(l))
+        M1d(l)   = sqrt(v1d(m)**2 + v1d(m+1)**2) / sqrt(real(gamma) * p1d(l) / rho1d(l))
         l = l + 1
         m = m + 2
     enddo;enddo
@@ -435,11 +494,11 @@ contains
     call print_xml(nx,ny,1,2,x,y,z,rho1d,p1d,T1d,M1d,v1d)
   end subroutine print_vtk_2D
   
-  subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,ke0,entropy0,myrank)
+  subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,mass0,ke0,entropy0,myrank)
     integer, intent(in)           :: step, nx, ny, nz
     real(4), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny,nz)
     real(4), intent(in)           :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(4), intent(inout)        :: ke0, entropy0
+    real(4), intent(inout)        :: mass0, ke0, entropy0
     integer, intent(in), optional :: myrank
     integer i, j, k, l, m, len
     real(4) dy
@@ -457,17 +516,17 @@ contains
       do j = 1, ny
         do i = 1, nx
           rho(i,j,k) = Jacobian(i,j,k) * QJ(i,j,k,1)
-          u(i,j,k) = Jacobian(i,j,k) * QJ(i,j,k,2) / rho(i,j,k)
-          v(i,j,k) = Jacobian(i,j,k) * QJ(i,j,k,3) / rho(i,j,k)
-          w(i,j,k) = Jacobian(i,j,k) * QJ(i,j,k,4) / rho(i,j,k)
-          p(i,j,k) = (gamma - 1.e0) * (Jacobian(i,j,k) * QJ(i,j,k,5) - 0.e0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
-          rho1d(l) = rho(i,j,k)
-          p1d(l)   = p(i,j,k)
-          T1d(l)   = p1d(l) / (real(R) * rho1d(l))
-          v1d(m)   = u(i,j,k)
-          v1d(m+1) = v(i,j,k)
-          v1d(m+2) = w(i,j,k)
-          M1d(l)   = sqrt(v1d(m)**2 + v1d(m+1)**2 + v1d(m+2)**2) / sqrt(gamma * p1d(l) / rho1d(l))
+          u(i,j,k)   = QJ(i,j,k,2) / QJ(i,j,k,1)
+          v(i,j,k)   = QJ(i,j,k,3) / QJ(i,j,k,1)
+          w(i,j,k)   = QJ(i,j,k,4) / QJ(i,j,k,1)
+          p(i,j,k)   = (real(gamma) - 1.e0) * (Jacobian(i,j,k) * QJ(i,j,k,5) - 0.5e0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
+          rho1d(l)   = rho(i,j,k)
+          p1d(l)     = p(i,j,k)
+          T1d(l)     = p1d(l) / (real(R) * rho1d(l))
+          v1d(m)     = u(i,j,k)
+          v1d(m+1)   = v(i,j,k)
+          v1d(m+2)   = w(i,j,k)
+          M1d(l)     = sqrt(v1d(m)**2 + v1d(m+1)**2 + v1d(m+2)**2) / sqrt(real(gamma) * p1d(l) / rho1d(l))
           l = l + 1
           m = m + 3
     enddo;enddo;enddo
@@ -489,6 +548,7 @@ contains
     enddo;enddo;enddo
     
     if (present(myrank)) then
+      call print_mass(step,nx,ny,nz,rho,u,v,w,mass0,myrank)
       call print_entropy(step,nx,ny,nz,rho,p,entropy0,myrank)
       call print_KE(step,nx,ny,nz,rho,u,v,w,ke0,myrank)
       call print_enstrophy(step,nx,ny,nz,real(x),real(y),real(z),rho,omega,myrank)
@@ -496,18 +556,19 @@ contains
       if (myrank == 3) then
         call print_boundary_layer(nx,ny,nz,real(y),u)
         dy = 1.e0 / (-y(1) + y(2))
-        Tw(:,:) = p(:,1,:) / (R * rho(:,1,:))
+        Tw(:,:) = p(:,1,:) / (real(R) * rho(:,1,:))
         call print_turbulent_boundary_layer(step,nx,ny,nz,dy,real(y),Tw,u,rho)
       endif
       write(filename, "(a, i1.1, a, i5.5, a)") "data/",int(myrank),"/Q",int(step),".vtr"
     else
+      call print_mass(step,nx,ny,nz,rho,u,v,w,mass0)
       call print_entropy(step,nx,ny,nz,rho,p,entropy0)
       call print_KE(step,nx,ny,nz,rho,u,v,w,ke0)
       call print_enstrophy(step,nx,ny,nz,real(x),real(y),real(z),rho,omega)
       call print_rms(step,nx,ny,nz,u,v,w,p)
       call print_boundary_layer(nx,ny,nz,real(y),u)
       dy = 1.e0 / (-y(1) + y(2))
-      Tw(:,:) = p(:,1,:) / (R * rho(:,1,:))
+      Tw(:,:) = p(:,1,:) / (real(R) * rho(:,1,:))
       call print_turbulent_boundary_layer(step,nx,ny,nz,dy,real(y),Tw,u,rho)
       write(filename, "(a, i5.5, a)") "data/Q",int(step),".vtr"
     endif
