@@ -139,8 +139,8 @@ contains
       V4(:,1) = u(i-1:i+2,j,k)
       V4(:,2) = v(i-1:i+2,j,k)
       V4(:,3) = w(i-1:i+2,j,k)
-      E(i,j-offset,k-offset,:) = KEEP4(1,rho4,p4,V4,Normal3)
-      !E(i,j-offset,k-offset,:) = KEEP4_LowM(1,rho4,p4,V4,Normal3,M,c)
+      !E(i,j-offset,k-offset,:) = KEEP4(1,rho4,p4,V4,Normal3)
+      E(i,j-offset,k-offset,:) = KEEP4_LowM(1,rho4,p4,V4,Normal3,M,c)
     else
       ! calc SLAU at wall
       Q3 = (/rho(i,j,k),   u(i,j,k),   v(i,j,k),   w(i,j,k),   p(i,j,k)/) 
@@ -183,8 +183,8 @@ contains
       V4(:,1) = u(i,j-1:j+2,k)
       V4(:,2) = v(i,j-1:j+2,k)
       V4(:,3) = w(i,j-1:j+2,k)
-      F(i-offset,j,k-offset,:) = KEEP4(2,rho4,p4,V4,Normal3)
-      !F(i-offset,j,k-offset,:) = KEEP4_LowM(2,rho4,p4,V4,Normal3,M,c)
+      !F(i-offset,j,k-offset,:) = KEEP4(2,rho4,p4,V4,Normal3)
+      F(i-offset,j,k-offset,:) = KEEP4_LowM(2,rho4,p4,V4,Normal3,M,c)
     else
       ! calc SLAU at wall
       Q3 = (/rho(i,j,k),   u(i,j,k),   v(i,j,k),   w(i,j,k),   p(i,j,k)/) 
@@ -227,8 +227,8 @@ contains
       V4(:,1) = u(i,j,k-1:k+2)
       V4(:,2) = v(i,j,k-1:k+2)
       V4(:,3) = w(i,j,k-1:k+2)
-      G(i-offset,j-offset,k,:) = KEEP4(3,rho4,p4,V4,Normal3)
-      !G(i-offset,j-offset,k,:) = KEEP4_LowM(3,rho4,p4,V4,Normal3,M,c)
+      !G(i-offset,j-offset,k,:) = KEEP4(3,rho4,p4,V4,Normal3)
+      G(i-offset,j-offset,k,:) = KEEP4_LowM(3,rho4,p4,V4,Normal3,M,c)
     else
       ! calc SLAU at wall
       Q3 = (/rho(i,j,k),   u(i,j,k),   v(i,j,k),   w(i,j,k),   p(i,j,k)/) 
