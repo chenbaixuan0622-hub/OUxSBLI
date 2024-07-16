@@ -27,11 +27,11 @@ module mod_globals
   ! id_slau   ! kind2 slau !
   !           ! kind4 sd   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=2), parameter  :: id_hybrid = 0
-  integer(kind=2), parameter  :: id_muscl = 0
+  integer(kind=4), parameter  :: id_hybrid = 0
+  integer(kind=2), parameter  :: id_muscl  = 0
   integer, parameter          :: id_scheme = 1
-  integer(kind=2), parameter  :: id_slau = 0
-  real(8), parameter          :: dp_max = 0.d0
+  integer(kind=2), parameter  :: id_slau   = 0
+  real(8), parameter          :: dp_max    = 0.d0
 
   ! mesh
   real(8), parameter :: pi = acos(-1.d0)
@@ -63,9 +63,9 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter  :: id_recal = 0
   integer(kind=4), parameter  :: id_RungeKutta = 0
-  integer, parameter          :: nt = 100
+  integer, parameter          :: nt = 200
   integer, parameter          :: np = 200
-  real(8), parameter          :: dt = 0.02d0
+  real(8), parameter          :: dt = 0.01d0
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
