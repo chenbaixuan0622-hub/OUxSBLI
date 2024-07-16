@@ -7,7 +7,7 @@ program main
   use set_coordinate
   use calc_time_dev
   implicit none
-  integer i, j, k
+  integer i, j, l
   real(8) t_start, t_end
   real(8), allocatable :: x(:), xix(:), dx(:), y(:), etay(:), dy(:), z(:), zetaz(:), dz(:), Jacobian(:,:,:)
   real(8), allocatable, pinned :: Q(:,:,:,:)
@@ -47,10 +47,10 @@ program main
 
   if (myrank == 0) then
     ! save data
-    do k = 1, nz
+    do l = 1, nz
       do j = 1, ny
         do i = 1, nx
-          Q(i,j,k,:) = Jacobian(i,j,k) * Q(i,j,k,:)
+          Q(i,j,l,:) = Jacobian(i,j,l) * Q(i,j,l,:)
     enddo;enddo;enddo
     open(10,file="recal/Q.dat",status="replace",action="write",form="unformatted",access="stream")
     write(10) Q

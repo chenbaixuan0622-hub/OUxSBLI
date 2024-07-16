@@ -7,21 +7,18 @@ module calc_time_dev
   use calc_physical_quantities
   use calc_steps
   use calc_hybrid
+  use calc_flux
+  use calc_flux_hybrid
   use calc_visc
   use calc_les
   use set
   use print
   implicit none
-  interface calc_EFG
-    module procedure calc_EFG_basic, calc_EFG_hybrid
-  end interface
   interface RungeKutta
     module procedure RungeKutta_3rd, RungeKutta_4th, RungeKutta_10th
   end interface
 contains
-  subroutine calc_EFG_basic(id_hybrid,nx,ny,nz,dx,dy,dz,Jacobian,QJ,mut,E,F,G)
-    use calc_flux
-    integer(kind=2), intent(in)                         :: id_hybrid
+  subroutine calc_EFG(nx,ny,nz,dx,dy,dz,Jacobian,QJ,mut,E,F,G)
     integer, intent(in), value                          :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device        :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device        :: dy ! 1 / dy
@@ -32,66 +29,26 @@ contains
     real(8), intent(out), device                        :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     real(8), intent(out), device                        :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device                        :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
-    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, T
+    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, T, fd
     integer stat
     call calc_quantities(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p,T)
 
-    call calc_E<<<blocksE,threadsE,1>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,E)
-    call calc_F<<<blocksF,threadsF,2>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,F)
-    call calc_G<<<blocksG,threadsG,3>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,G)
-
-    if (id_turbulence /= 0) then
-      call calc_mut<<<blocks,threads,4>>>(nx,ny,nz,rho,u,v,w,mut)
-      stat = cudaDeviceSynchronize()
-      call set_bc_mut(nx,ny,nz,mut)
+    if (kind(id_hybrid) == 2) then
+      call calc_E<<<blocksE,threadsE,1>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,E)
+      call calc_F<<<blocksF,threadsF,2>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,F)
+      call calc_G<<<blocksG,threadsG,3>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,G)
+    elseif (kind(id_hybrid) == 4) then
+      call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,dz,u,v,w,rho,p,fd)
+      call calc_E_hybrid<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
+      call calc_F_hybrid<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
+      call calc_G_hybrid<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
+    elseif (kind(id_hybrid) == 8) then
+      call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,dz,u,v,w,rho,p,fd)
+      call calc_E_weight<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
+      call calc_F_weight<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
+      call calc_G_weight<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
     endif
-
-    stat = cudaDeviceSynchronize()
-    if (id_visc == 1 .or. id_turbulence /= 0) then
-      call calc_Ev<<<blocksE,threadsE,1>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,T,p,mut,E)
-      call calc_Fv<<<blocksF,threadsF,2>>>(nx,ny,nz,dy,dx,dz,rho,u,v,w,T,p,mut,F)
-      call calc_Gv<<<blocksG,threadsG,3>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,T,p,mut,G)
-    endif
-    stat = cudaDeviceSynchronize()
-  end subroutine calc_EFG_basic
   
-  subroutine calc_EFG_hybrid(id_hybrid,nx,ny,nz,dx,dy,dz,Jacobian,QJ,mut,E,F,G)
-    use calc_flux_hybrid
-    integer(kind=4), intent(in)                         :: id_hybrid
-    integer, intent(in), value                          :: nx, ny, nz
-    real(8), intent(in), dimension(nx-1), device        :: dx ! 1 / dx
-    real(8), intent(in), dimension(ny-1), device        :: dy ! 1 / dy
-    real(8), intent(in), dimension(nz-1), device        :: dz ! 1 / dz
-    real(8), intent(in), dimension(nx,ny,nz), device    :: Jacobian
-    real(8), intent(in), dimension(nx,ny,nz,5), device  :: QJ ! Q / Jacobian
-    real(8), intent(inout), dimension(nx,ny,nz), device :: mut
-    real(8), intent(out), device                        :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
-    real(8), intent(out), device                        :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
-    real(8), intent(out), device                        :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
-    real(8), dimension(nx,ny,nz), device                                :: rho, u, v, w, p, T, fd
-    !real(8), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device :: E_upwind
-    !real(8), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device :: F_upwind
-    !real(8), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device :: G_upwind
-    integer stat
-
-    call calc_quantities_3D(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p,T)
-
-    !call calc_E<<<blocksE,threadsE>>>(id_muscl1,nx,ny,nz,rho,u,v,w,p,E)
-    !call calc_F<<<blocksF,threadsF>>>(id_muscl1,nx,ny,nz,rho,u,v,w,p,F)
-    !call calc_G<<<blocksG,threadsG>>>(id_muscl1,nx,ny,nz,rho,u,v,w,p,G)
-    !call calc_E<<<blocksE,threadsE>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,E_upwind)
-    !call calc_F<<<blocksF,threadsF>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,F_upwind)
-    !call calc_G<<<blocksG,threadsG>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,G_upwind)
-
-    call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,dz,u,v,w,rho,p,fd)
-    call calc_E_hybrid<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
-    call calc_F_hybrid<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
-    call calc_G_hybrid<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
-    !call calc_E_hybrid<<<blocksE,threadsE>>>(nx,ny,nz,u,v,w,fd,E_upwind,E)
-    !call calc_F_hybrid<<<blocksF,threadsF>>>(nx,ny,nz,u,v,w,fd,F_upwind,F)
-    !call calc_G_hybrid<<<blocksG,threadsG>>>(nx,ny,nz,u,v,w,fd,G_upwind,G)
-    !print *, trim(cudaGetErrorString(cudaGetLastError()))
-
     if (id_turbulence /= 0) then
       call calc_mut<<<blocks,threads,4>>>(nx,ny,nz,rho,u,v,w,mut)
       stat = cudaDeviceSynchronize()
@@ -105,7 +62,7 @@ contains
       call calc_Gv<<<blocksG,threadsG,3>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,T,p,mut,G)
     endif
     stat = cudaDeviceSynchronize()
-  end subroutine calc_EFG_hybrid
+  end subroutine calc_EFG
 
   subroutine RungeKutta_3rd(id_RungeKutta,myrank,nx,ny,nz,x,dx_cpu,xix_cpu,y,dy_cpu,etay_cpu,z,dz_cpu,zetaz_cpu,Jacobian_cpu,Q)
     integer(kind=2), intent(in) :: id_RungeKutta
@@ -166,18 +123,18 @@ contains
         do t1 = 1, nt
           call nvtxStartRange("calc 1step",1)
           call nvtxStartRange("calc flux",2)
-          call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJ,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJ,mut,E,F,G)
           call nvtxEndRange
           call nvtxStartRange("calc time dev",3)
           call calc_step(nx,ny,nz,1.d0,0.d0,dx,dy,dz,E,F,G,QJ,QJ2)
           call nvtxEndRange
           call set_bc(nx,ny,nz,Jacobian,QJ2)
 
-          call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJ2,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJ2,mut,E,F,G)
           call calc_step2(nx,ny,nz,0.75d0,0.25d0,0.25d0,1.d0,dx,dy,dz,E,F,G,QJ,QJ2,QJ3)
           call set_bc(nx,ny,nz,Jacobian,QJ3)
 
-          call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJ3,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJ3,mut,E,F,G)
           call calc_step3(nx,ny,nz,dx,dy,dz,E,F,G,QJ3,QJ)
           call set_bc(nx,ny,nz,Jacobian,QJ)
           call nvtxEndRange
@@ -262,19 +219,19 @@ contains
     do t2 = 1, np
       if (myrank == 0) then
         do t1 = 1, nt
-          call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJ,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJ,mut,E,F,G)
           call calc_step(nx,ny,nz,0.5d0,1.d0,dx,dy,dz,E,F,G,QJ,QJs,Rs) ! QJs = Q2
           call set_bc(nx,ny,nz,Jacobian,QJs)
 
-          call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
           call calc_step(nx,ny,nz,0.5d0,2.d0,dx,dy,dz,E,F,G,QJ,QJs,Rs) ! QJs = Q3
           call set_bc(nx,ny,nz,Jacobian,QJs)
 
-          call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
           call calc_step(nx,ny,nz,1.0d0,2.d0,dx,dy,dz,E,F,G,QJ,QJs,Rs) ! QJs = Q4
           call set_bc(nx,ny,nz,Jacobian,QJs)
 
-          call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
           call calc_step4(nx,ny,nz,dx,dy,dz,E,F,G,Rs,QJ)
           call set_bc(nx,ny,nz,Jacobian,QJ)
         enddo
@@ -352,44 +309,44 @@ contains
       if (myrank == 0) then
         do t1 = 1, nt
           QJs = QJ
-          call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
           call calc_step5(nx,ny,nz,1.d0/6.d0,dx,dy,dz,E,F,G,QJs)
           call set_bc(nx,ny,nz,Jacobian,QJs)
 
-          call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
           call calc_step5(nx,ny,nz,1.d0/6.d0,dx,dy,dz,E,F,G,QJs)
           call set_bc(nx,ny,nz,Jacobian,QJs)
 
-          call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
           call calc_step5(nx,ny,nz,1.d0/6.d0,dx,dy,dz,E,F,G,QJs)
           call set_bc(nx,ny,nz,Jacobian,QJs)
 
-          call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
           call calc_step5(nx,ny,nz,1.d0/6.d0,dx,dy,dz,E,F,G,QJs)
           call set_bc(nx,ny,nz,Jacobian,QJs)
           QJ4 = QJs
   
-          call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
           call calc_step2(nx,ny,nz,9.d0,6.d0,1.d0,15.d0,dx,dy,dz,E,F,G,QJ,QJ4,QJs,R4)
           call set_bc(nx,ny,nz,Jacobian,QJs)
 
-          call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
           call calc_step5(nx,ny,nz,1.d0/6.d0,dx,dy,dz,E,F,G,QJs)
           call set_bc(nx,ny,nz,Jacobian,QJs)
 
-          call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
           call calc_step5(nx,ny,nz,1.d0/6.d0,dx,dy,dz,E,F,G,QJs)
           call set_bc(nx,ny,nz,Jacobian,QJs)
 
-          call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
           call calc_step5(nx,ny,nz,1.d0/6.d0,dx,dy,dz,E,F,G,QJs)
           call set_bc(nx,ny,nz,Jacobian,QJs)
 
-          call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
           call calc_step5(nx,ny,nz,1.d0/6.d0,dx,dy,dz,E,F,G,QJs)
           call set_bc(nx,ny,nz,Jacobian,QJs)
 
-          call calc_EFG(id_hybrid,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
+          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G)
           call calc_step10(nx,ny,nz,dx,dy,dz,E,F,G,R4,QJ4,QJs,QJ)
           call set_bc(nx,ny,nz,Jacobian,QJ)
         enddo
