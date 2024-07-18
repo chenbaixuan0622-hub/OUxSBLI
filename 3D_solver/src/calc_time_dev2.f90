@@ -2,13 +2,12 @@ module calc_time_dev2
   use cudafor
   use mpi
   use nvtx
-  use mod_globals, only : accuracy, id_hybrid, id_muscl, id_visc, id_turbulence, nt, np, &
+  use mod_globals, only : accuracy, id_hybrid, id_muscl, id_visc, id_turbulence, rescaling, nt, np, &
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG
   use calc_physical_quantities
   use calc_steps
   use calc_hybrid
   use calc_flux
-  use calc_flux_hybrid
   use calc_visc
   use calc_les
   use calc_rescale
@@ -33,16 +32,12 @@ contains
     integer stat
     call calc_quantities(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p,T)
 
-    if (kind(id_hybrid) == 2) then
-      call calc_E<<<blocksE,threadsE,1>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,E)
-      call calc_F<<<blocksF,threadsF,2>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,F)
-      call calc_G<<<blocksG,threadsG,3>>>(id_muscl,nx,ny,nz,rho,u,v,w,p,G)
-    elseif (kind(id_hybrid) == 4) then
+    if (id_scheme == 2 .or. 4 <= id_scheme) then
       call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,dz,u,v,w,rho,p,fd)
-      call calc_E_hybrid<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
-      call calc_F_hybrid<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
-      call calc_G_hybrid<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
     endif
+    call calc_E<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,fd,E)
+    call calc_F<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
+    call calc_G<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
   
     if (id_turbulence /= 0) then
       call calc_mut<<<blocks,threads,4>>>(nx,ny,nz,rho,u,v,w,mut)
@@ -66,19 +61,19 @@ contains
     real(8), intent(in)    :: z(nz), dz_cpu(nz-1), zetaz_cpu(nz-1), Jacobian_cpu(nx,ny,nz)
     real(8), intent(inout) :: Q(nx,ny,nz,5)
     integer i, j, k, nre, t1, t2, itr, ilen, ierr, stat, request, status(MPI_STATUS_SIZE)
-    real(8), allocatable   :: Qre_CPU(:,:,:,:), Um(:,:), Vm(:,:), Wm(:,:), pm(:,:), Tm(:,:)
+    real(8), allocatable   :: Qre_CPU(:,:,:,:), Um(:,:), Vm(:,:), Wm(:,:), pm(:,:), Tm(:,:), sensor_cpu(:,:,:)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type(cudaDeviceProp)         :: prop
     type(dim3)                   :: blocksE, blocksF, blocksG, blocks
     type(dim3)                   :: threadsE, threadsF, threadsG, threads
     real(8), allocatable, device :: QJ(:,:,:,:), QJ2(:,:,:,:), QJ3(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
-    real(8), allocatable, device :: dx(:), xix(:), dy(:), etay(:), dz(:), zetaz(:), Jacobian(:,:,:), mut(:,:,:)
+    real(8), allocatable, device :: dx(:), xix(:), dy(:), etay(:), dz(:), zetaz(:), Jacobian(:,:,:), mut(:,:,:), sensor(:,:,:)
     ! for plot
     real(4) :: mass0 = 1.d0, ke0 = 1.d0, entropy0 = 1.d0
     ! for rescaling
     real(8), allocatable, device :: Qre(:,:,:,:)
     ! rescaling plane
-    nre = nx-4
+    nre = int(rescaling * nx)
 
     ! check GPU
     stat = cudaSetDevice(0)
@@ -86,9 +81,9 @@ contains
     ilen = verify(prop%name, ' ', .true.)
     print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", 0, ") is available"
 
-    allocate(QJ(nx,ny,nz,5),Qre_cpu(2,ny,nz,5))
+    allocate(QJ(nx,ny,nz,5),Qre_cpu(2,ny,nz,5),sensor_cpu(nx,ny,nz))
     if (mod(myrank,2) == 0) then
-      allocate(QJ2(nx,ny,nz,5),QJ3(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
+      allocate(QJ2(nx,ny,nz,5),QJ3(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5),sensor(nx,ny,nz))
       allocate(dx(nx-1),xix(nx-1),dy(ny-1),etay(ny-1),dz(nz-1),zetaz(nz-1),Jacobian(nx,ny,nz),mut(nx,ny,nz),Qre(2,ny,nz,5))
       call set_blocks_threads(myrank,nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads)
 
@@ -98,20 +93,22 @@ contains
           do i = 1, nx
             Q(i,j,k,:) = Q(i,j,k,:) / Jacobian_cpu(i,j,k)
       enddo;enddo;enddo
-  
+      sensor_cpu = 0.d0
+
       ! print initial condition
-      call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),mass0,ke0,entropy0,myrank+1)
+      call print_vtk(0,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),real(sensor_cpu),mass0,ke0,entropy0,myrank+1)
 
       ! copy on GPU
-      QJ    = Q
-      mut   = 0.d0
-      xix   = xix_cpu
-      etay  = etay_cpu
-      zetaz = zetaz_cpu
-      dx    = dx_cpu
-      dy    = dy_cpu
-      dz    = dz_cpu
+      QJ       = Q
+      mut      = 0.d0
+      xix      = xix_cpu
+      etay     = etay_cpu
+      zetaz    = zetaz_cpu
+      dx       = dx_cpu
+      dy       = dy_cpu
+      dz       = dz_cpu
       Jacobian = Jacobian_cpu
+      sensor   = sensor_cpu
     else
       allocate(Um(2,ny),Vm(2,ny),Wm(2,ny),pm(2,ny),Tm(2,ny))
     endif
@@ -190,26 +187,29 @@ contains
 
       ! send and recv device arrays
       if (mod(myrank,2) == 0) then
-        Q = QJ
+        Q          = QJ
+        sensor_cpu = sensor
         call nvtxStartRange("MPI_SEND",4)
-        call MPI_SEND(Q, nx*ny*nz*5, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr) 
+        call MPI_SEND(Q,          nx*ny*nz*5, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr) 
+        call MPI_SEND(sensor_cpu, nx*ny*nz,   MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr) 
         call nvtxEndRange
       else
         call nvtxStartRange("MPI_RECV",5)
-        call MPI_RECV(Q, nx*ny*nz*5, MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
+        call MPI_RECV(Q,          nx*ny*nz*5, MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
+        call MPI_RECV(sensor_cpu, nx*ny*nz,   MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
         call nvtxEndRange
         call nvtxStartRange("print",6)
-        call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),mass0,ke0,entropy0,myrank)
+        call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),real(sensor_cpu),mass0,ke0,entropy0,myrank)
         call nvtxEndRange
       endif
     enddo
     
     if (mod(myrank,2) == 0) then
-      deallocate(QJ2,QJ3,E,F,G,dx,xix,dy,etay,dz,zetaz,Jacobian,mut,Qre)
+      deallocate(QJ2,QJ3,E,F,G,dx,xix,dy,etay,dz,zetaz,Jacobian,mut,Qre,sensor)
     else
       deallocate(Um,Vm,Wm,pm,Tm)
     endif
-    deallocate(QJ,Qre_cpu)
+    deallocate(QJ,Qre_cpu,sensor_cpu)
   end subroutine RungeKutta
 end module calc_time_dev2
 

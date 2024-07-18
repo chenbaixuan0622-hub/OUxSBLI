@@ -34,43 +34,39 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer, parameter         :: id_scheme = 1
   integer, parameter         :: id_sensor = 3
-  real(8), parameter         :: threshold = 0.4d0
   integer(kind=2), parameter :: id_tvd = 0
 
   ! mesh
-  real(8), parameter :: L0 = 1.524d-3
-  real(8), parameter :: pi = acos(-1.d0)
-  real(8), parameter :: Lx = 2.d0 * pi * L0
-  real(8), parameter :: Ly = 2.d0 * pi * L0
-  real(8), parameter :: Lz = 2.d0 * pi * L0
-  integer, parameter :: nx = 130!66
-  integer, parameter :: ny = 130!66
-  integer, parameter :: nz = 130!66
+  integer, parameter :: nx = 514
+  integer, parameter :: ny = 10
+  integer, parameter :: nz = 10
 
   ! GPU
-  type(dim3) :: blocksE = dim3((nx-accuracy+1)/3,(ny-accuracy)/8,(nz-accuracy)/8)
-  type(dim3) :: blocksF = dim3((nx-accuracy)/8,(ny-accuracy+1)/3,(nz-accuracy)/8)
-  type(dim3) :: blocksG = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy+1)/3)
-  type(dim3) :: blocks  = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy)/8)
-  type(dim3) :: threadsE = dim3(3,8,8)
-  type(dim3) :: threadsF = dim3(8,3,8)
-  type(dim3) :: threadsG = dim3(8,8,3)
-  type(dim3) :: threads  = dim3(8,8,8)
+  type(dim3) :: blocksE = dim3((nx-accuracy+1)/27,(ny-accuracy)/8,(nz-accuracy)/1)
+  type(dim3) :: blocksF = dim3((nx-accuracy)/128,(ny-accuracy+1)/1,(nz-accuracy)/4)
+  type(dim3) :: blocksG = dim3((nx-accuracy)/128,(ny-accuracy)/4,(nz-accuracy+1)/1)
+  type(dim3) :: blocks  = dim3((nx-accuracy)/128,(ny-accuracy)/4,(nz-accuracy)/1)
+  type(dim3) :: threadsE = dim3(27,8,1)
+  type(dim3) :: threadsF = dim3(128,1,4)
+  type(dim3) :: threadsG = dim3(128,4,1)
+  type(dim3) :: threads  = dim3(128,4,1)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_RungeKutta ! kind=2 ! 3rd_TVD !
   !               ! kind=4 ! 4th     !
+  !               ! kind=8 ! 10step  !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_recal      ! kind=2 ! set 0   !
   !               ! kind=4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_recal = 0
-  integer(kind=4), parameter :: id_RungeKutta = 0
+  integer(kind=2), parameter :: id_RungeKutta = 0
+  integer, parameter         :: np = 100
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
-  real(8), parameter :: Pr    = 0.71d0
+  real(8), parameter :: Pr    = 0.75d0
   real(8), parameter :: Prt   = 0.9d0
   real(8), parameter :: R     = 287.03d0
 
@@ -82,19 +78,21 @@ module mod_globals
   real(8), parameter :: sigma = 2.d0
 
   ! initial condition
-  real(8), parameter :: Re   = 1600.d0
-  real(8), parameter :: M0   = 0.1d0
-  real(8), parameter :: T    = 530.d0 * 5.d0 / 9.d0 
-  real(8), parameter :: S    = 111.d0
-  real(8), parameter :: mu0  = 1.716d-5 * (273.2d0 + S) / (T + S) * (T / 273.2d0)**1.5d0
-  real(8), parameter :: V0   = M0 * sqrt(gamma * R * T)
-  real(8), parameter :: RHO0 = mu0 * Re / (V0 * L0)
-  real(8), parameter :: p0   = RHO0 * R * T
-
-  real(8), parameter :: CFL = 0.03d0
-  real(8), parameter :: dt  = CFL * (Lx / dble(nx-1)) / V0
-  real(8), parameter :: dtn = V0 * dt / L0
-  integer, parameter :: np  = 100
-  integer, parameter :: nt  = int(20.d0 / (dble(np) * dtn))
+  real(8), parameter :: T0   = 300.d0
+  real(8), parameter :: C    = 1.456d-6
+  real(8), parameter :: S    = 110.4d0
+  real(8), parameter :: mu0  = C * T0**1.5 / (T0 + S)
+  real(8), parameter :: Re   = 25000.d0
+  real(8), parameter :: rho0 = 1.293d0
+  real(8), parameter :: p0   = rho0 * R * T0
+  real(8), parameter :: rho1 = 0.125d0 * rho0
+  real(8), parameter :: p1   = 0.1d0 * p0
+  real(8), parameter :: Lx   = Re * mu0 / sqrt(rho0 * p0)
+  real(8), parameter :: Ly   = 0.1d0 * Lx
+  real(8), parameter :: Lz   = 0.1d0 * Lx
+  real(8), parameter :: CFL  = 0.1d0
+  real(8), parameter :: dt   = cfl * lX / (DBLE(NX-1) * SQRT(P0 / RHO0))
+  real(8), parameter :: endT = 0.2136d0 * Lx / sqrt(p0 / rho0)
+  integer, parameter :: nt   = int(endT / (dble(np) * dt))
 end module mod_globals
 
