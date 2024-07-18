@@ -105,12 +105,12 @@ contains
     integer i
     RhoV(:) = RhoPhi(rho(:), V(:,id))
     ! KEEP
-    !P_over_Rho(:) = p(:) / rho(:)
-    !RhoVIE(:)     = RhoPhiU(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
+    P_over_Rho(:) = p(:) / rho(:)
+    RhoVIE(:)     = RhoPhiU(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
 
     ! KEEP PE
-    Vm(:) = Phi(V(:,id))
-    RhoVIE(:) = RhoPhiU(Vm(:), p(:)) / (gamma - 1.d0)    
+    !Vm(:) = Phi(V(:,id))
+    !RhoVIE(:) = RhoPhiU(Vm(:), p(:)) / (gamma - 1.d0)    
 
     RhoVKE(:) = RhoUPhiPhi(RhoV(:), V(:,:))
     VP(:)     = PhiPsi(V(:,id), p(:))
