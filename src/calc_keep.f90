@@ -9,111 +9,136 @@ contains
     integer, intent(in), value                          :: id
     real(8), intent(in), dimension(2), device           :: rho, p
     real(8), intent(in), dimension(2,dimension), device :: V
-    real(8), intent(in), dimension(dimension), device   :: Normal
+    real(8), intent(in), dimension(dimension+2), device :: Normal
     real(8), dimension(dimension+2) :: F
-    real(8)                         :: Rho_m, P_m, PRho
-    real(8), dimension(dimension)   :: V_m, V1, V2
+    real(8)                         :: Rhom, Pm, PRho
+    real(8), dimension(dimension)   :: Vm, V1, V2
     V1(:) = V(1,:)
     V2(:) = V(2,:)
-    Rho_m = 0.5d0 * (rho(1) + rho(2))
-    ! contravariant velocity
-    V_m(:) = 0.5d0 * (V1(:) + V2(:)) * Normal(id)
-    P_m    = 0.5d0 * (p(1) + p(2))
-    PRho   = 0.5d0 * (p(1) / rho(1) + p(2) / rho(2))
-    F(1)   = Rho_m * V_m(id)
-    F(2:dimension+1) = F(1) * V_m(:) + P_m * Normal(:)
-    F(dimension+2)   = F(1) * PRho / (gamma - 1.d0) &
+    Rhom  = 0.5d0 * (rho(1) + rho(2))
+    Vm(:) = 0.5d0 * (V1(:) + V2(:))
+    Pm    = 0.5d0 * (p(1) + p(2))
+    PRho  = 0.5d0 * (p(1) / rho(1) + p(2) / rho(2))
+    F(1)  = Rhom * Vm(id)
+    F(2:dimension+1) = F(1) * Vm(:) + Pm * Normal(2:dimension+1)
+    !F(dimension+2)   = F(1) * PRho / (gamma - 1.d0) &
+    ! KEEPPE
+    F(dimension+2)   = Vm(id) * Pm / (gamma - 1.d0) &
     & + 0.5d0 * F(1) * vecsum(V1, V2) &
-    & + 0.5d0 * (V(1,id) * p(2) + V(2,id) * p(1)) * Normal(id)
+    & + 0.5d0 * (V(1,id) * p(2) + V(2,id) * p(1))
   end function KEEP2
 
-  attributes(device) function minmod(x,y) result(ans)
-    real(8), intent(in), value :: x, y
-    real(8) :: ans, sgn
-    sgn = dsign(1.d0, x)
-    ans = sgn * max(min(abs(x), sgn * y), 0.d0)
-  end function minmod
-
-  attributes(device) subroutine MUSCL3(k,a,al,ar)
-    real(8), intent(in), value  :: k
-    real(8), intent(in), device :: a(4)
-    real(8), intent(out)        :: al, ar
-    real(8) b, d1, d2, d3
-    b = (3.d0 - k) / (1.d0 - k)
-    d1 = -a(1) + a(2)
-    d2 = -a(2) + a(3)
-    d3 = -a(3) + a(4)
-    al = a(2) + 0.25d0 * ((1.d0 - k) * d1 + (1.d0 + k) * d2)
-    ar = a(3) - 0.25d0 * ((1.d0 - k) * d3 + (1.d0 + k) * d2)
-  end subroutine MUSCL3
-
-  attributes(device) function KEEP4(id,rho,p,V,Normal) result(F)
+  attributes(device) function KEEPUP(id,rho,p,V,rholr,plr,Vlr,Normal,sensor) result(F)
     integer, intent(in), value                          :: id
     real(8), intent(in), dimension(4), device           :: rho, p
     real(8), intent(in), dimension(4,dimension), device :: V
-    real(8), intent(in), dimension(dimension), device   :: Normal
+    real(8), intent(in), dimension(2), device           :: rholr, plr
+    real(8), intent(in), dimension(2,dimension), device :: Vlr
+    real(8), intent(in), dimension(dimension+2), device :: Normal
+    real(8), intent(in), value                          :: sensor
     real(8), dimension(4)           :: P_over_Rho
     real(8), dimension(dimension+2) :: F
     real(8), dimension(3)           :: Vm, RhoV, RhoVIE, RhoVKE, VP, Energy
     real(8), dimension(3,dimension) :: RhoVV_P
-    ! MUSCL interpolation
-    ! k = 0.d0 2nd-upwind + 1, k = 1.d0 / 3.d0 3rd
-    real(8) :: pr, pl, k = 1.d0 / 3.d0, b, d1, d2, d3
-    ! Van Albada limiter
-    real(8) :: s, eps = 1.d-4
     integer i
-    RhoV(:)       = RhoPhi(rho(:), V(:,id))
+    !real(8), dimension(dimension+2) :: F
+    !real(8)                         :: Rhom, Pm, PRho
+    ! upwind
+    !real(8) Vroe, dV(dimension)
+    ! SLAU
+    real(8) press, cl, cr, c, Mp, Mm, M, x, bp, bm, V1(dimension), V2(dimension)
+    ! SLAU pressure term
+    cl = sqrt(gamma * plr(1) / rholr(1))
+    cr = sqrt(gamma * plr(2) / rholr(2))
+    c  = 0.5d0 * (cl + cr)
+    V1 = Vlr(1,:)
+    V2 = Vlr(2,:)
+    Mp = V1(id) / c
+    Mm = V2(id) / c
+    if (abs(Mp) < 1.d0) then
+      bp = 0.25d0 * (2.d0 - Mp) * (Mp + 1.d0) ** 2
+    else
+      bp = 0.5d0 * (1.d0 + sign(1.d0, Mp))
+    endif
+    if (abs(Mm) < 1.d0) then
+      bm = 0.25d0 * (2.d0 + Mm) * (Mm - 1.d0) ** 2
+    else
+      bm = 0.5d0 * (1.d0 + sign(1.d0, -Mm))
+    endif
+    M = min(1.d0, sqrt(0.5d0 * q2(V1, V2)) / c)
+    x = (1.d0 - M)**2
+    !press = 0.5d0 * (plr(1) + plr(2) + (bp - bm) * (plr(1) - plr(2)) + (1.d0 - x) * (bp + bm - 1.d0) * (plr(1) + plr(2)))
+    press = 0.5d0 * (plr(1) + plr(2))
+
+    RhoV(:) = RhoPhi(rho(:), V(:,id))
     ! KEEP
-    P_over_Rho(:) = p(:) / rho(:)
-    RhoVIE(:)     = RhoPhiU(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
+    !P_over_Rho(:) = p(:) / rho(:)
+    !RhoVIE(:)     = RhoPhiU(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
 
     ! KEEP PE
-    !Vm(:) = Phi(V(:,id))
-    !RhoVIE(:) = RhoPhiU(Vm(:), p(:)) / (gamma - 1.d0)    
+    Vm(:) = Phi(V(:,id))
+    RhoVIE(:) = RhoPhiU(Vm(:), p(:)) / (gamma - 1.d0)    
 
-    ! MUSCL interpolation
-    b  = (3.d0 - k) / (1.d0 - k) 
-    d1 = -p(1) + p(2)
-    d2 = -p(2) + p(3)
-    d3 = -p(3) + p(4)
-    ! TVD minmod
-    !pl = p(2) + 0.25d0 * ((1.d0 - k) * minmod(d1, b * d2) + (1.d0 + k) * minmod(d2, b * d1))
-    !pr = p(3) - 0.25d0 * ((1.d0 - k) * minmod(d3, b * d2) + (1.d0 + k) * minmod(d2, b * d3))
-    ! TVD van Albada
-    !s  = (2.d0 * d1 * d2 + eps) / (d1**2 + d2**2 + eps)
-    !pl = p(2) + 0.25d0 * s * ((1.d0 - k * s) * d1 + (1.d0 + k * s) * d2)
-    !s  = (2.d0 * d2 * d3 + eps) / (d2**2 + d3**2 + eps)
-    !pr = p(3) - 0.25d0 * s * ((1.d0 - k * s) * d3 + (1.d0 + k * s) * d2)
-    ! nonTVD
-    pl = p(2) + 0.25d0 * ((1.d0 - k) * d1 + (1.d0 + k) * d2)
-    pr = p(3) - 0.25d0 * ((1.d0 - k) * d3 + (1.d0 + k) * d2)
-    
     RhoVKE(:) = RhoUPhiPhi(RhoV(:), V(:,:))
     VP(:)     = PhiPsi(V(:,id), p(:))
 
     Energy(:) = RhoVIE(:) + RhoVKE(:) + VP(:)
     F(1)      = Flux(RhoV(:))
     do i = 1, dimension
-      RhoVV_P(:,i) = RhoPhiU(RhoV(:), V(:,i)) + 0.5d0 * (pl + pr) * Normal(i)!Phi(p(:)) * Normal(i)
+      !RhoVV_P(:,i) = RhoPhiU(RhoV(:), V(:,i)) + Phi(p(:)) * Normal(i+1)
+      !F(i+1)       = Flux(RhoVV_P(:,i))
+      RhoVV_P(:,i) = RhoPhiU(RhoV(:), V(:,i))
+      F(i+1)       = Flux(RhoVV_P(:,i)) + press * Normal(i+1)
+    enddo
+    F(dimension+2) = Flux(Energy(:))
+  end function KEEPUP
+
+  attributes(device) function KEEP4(id,rho,p,V,Normal) result(F)
+    integer, intent(in), value                          :: id
+    real(8), intent(in), dimension(4), device           :: rho, p
+    real(8), intent(in), dimension(4,dimension), device :: V
+    real(8), intent(in), dimension(dimension+2), device :: Normal
+    real(8), dimension(4)           :: P_over_Rho
+    real(8), dimension(dimension+2) :: F
+    real(8), dimension(3)           :: Vm, RhoV, RhoVIE, RhoVKE, VP, Energy
+    real(8), dimension(3,dimension) :: RhoVV_P
+    integer i
+    RhoV(:) = RhoPhi(rho(:), V(:,id))
+    ! KEEP
+    !P_over_Rho(:) = p(:) / rho(:)
+    !RhoVIE(:)     = RhoPhiU(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
+
+    ! KEEP PE
+    Vm(:) = Phi(V(:,id))
+    RhoVIE(:) = RhoPhiU(Vm(:), p(:)) / (gamma - 1.d0)    
+
+    RhoVKE(:) = RhoUPhiPhi(RhoV(:), V(:,:))
+    VP(:)     = PhiPsi(V(:,id), p(:))
+
+    Energy(:) = RhoVIE(:) + RhoVKE(:) + VP(:)
+    F(1)      = Flux(RhoV(:))
+    do i = 1, dimension
+      RhoVV_P(:,i) = RhoPhiU(RhoV(:), V(:,i)) + Phi(p(:)) * Normal(i+1)
       F(i+1)       = Flux(RhoVV_P(:,i))
     enddo
     F(dimension+2) = Flux(Energy(:))
   end function KEEP4
 
-  attributes(device) function KEEPRho(id,rho,p,V,Normal,fd) result(F)
+  attributes(device) function KEEPRho(id,rho,p,V,Normal,rho2,p2,V2,sensor) result(F)
     integer, intent(in), value                          :: id
     real(8), intent(in), dimension(4), device           :: rho, p
     real(8), intent(in), dimension(4,dimension), device :: V
-    real(8), intent(in), dimension(dimension), device   :: Normal
-    real(8), intent(in), value                          :: fd
+    real(8), intent(in), dimension(dimension+2), device :: Normal
+    real(8), intent(in), dimension(2), device           :: rho2, p2
+    real(8), intent(in), dimension(2,dimension), device :: V2
+    real(8), intent(in), value                          :: sensor
     real(8), dimension(4)           :: P_over_Rho
     real(8), dimension(dimension+2) :: F, Ql, Qr, dQ
     real(8), dimension(3)           :: RhoV, RhoVIE, RhoVKE, VP, Energy
     real(8), dimension(3,dimension) :: RhoVV_P
     real(8), dimension(dimension)   :: Vl, Vr, V_ave
     integer i
-    real(8) rhol, rhor, rho_ave, pl, pr, Hl, Hr, H_ave, c_ave, el, er, mat(dimension+2,dimension+2)
-    real(8) :: k = 1.d0 / 3.d0
+    real(8) rho_ave, Hl, Hr, H_ave, c_ave, el, er, mat(dimension+2,dimension+2)
     RhoV(:) = RhoPhi(rho(:), V(:,id))
     ! energy equation
     P_over_Rho(:) = p(:) / rho(:)
@@ -124,37 +149,33 @@ contains
     Energy(:) = RhoVIE(:) + RhoVKE(:) + VP(:)
     F(1) = Flux(RhoV(:))
     do i = 1, dimension
-      RhoVV_P(:,i) = RhoPhiU(RhoV(:), V(:,i)) + Phi(p(:)) * Normal(i)
+      RhoVV_P(:,i) = RhoPhiU(RhoV(:), V(:,i)) + Phi(p(:)) * Normal(i+1)
       F(i+1)       = Flux(RhoVV_P(:,i))
     enddo
     F(dimension+2) = Flux(Energy(:))
 
-    ! Rho viscosity
-    call MUSCL3(k,rho,rhol,rhor)
-    call MUSCL3(k,p,pl,pr)
-    do i = 1, dimension
-      call MUSCL3(k,V(:,i),Vl(i),Vr(i))
-    enddo
-    el = pl / (gamma - 1.d0) + 0.5d0 * rhol * vecsum(Vl(:), Vl(:))
-    er = pr / (gamma - 1.d0) + 0.5d0 * rhor * vecsum(Vr(:), Vr(:))
-    Hl = (el + pl) / rhol
-    Hr = (er + pr) / rhor
+    Vl = V2(1,:)
+    Vr = V2(2,:)
+    el = p2(1) / (gamma - 1.d0) + 0.5d0 * rho2(1) * vecsum(Vl(:), Vl(:))
+    er = p2(2) / (gamma - 1.d0) + 0.5d0 * rho2(2) * vecsum(Vr(:), Vr(:))
+    Hl = (el + p2(1)) / rho2(1)
+    Hr = (er + p2(2)) / rho2(2)
 
-    rho_ave  = sqrt(rhol * rhor)
-    V_ave(:) = (sqrt(rhol) * Vl(:) + sqrt(rhor) * Vr(:)) / (sqrt(rhol) + sqrt(rhor))
-    H_ave    = (sqrt(rhol) * Hl    + sqrt(rhor) * Hr)    / (sqrt(rhol) + sqrt(rhor))
+    rho_ave  = sqrt(rho(1) * rho(2))
+    V_ave(:) = (sqrt(rho(1)) * Vl(:) + sqrt(rho(2)) * Vr(:)) / (sqrt(rho(1)) + sqrt(rho(2)))
+    H_ave    = (sqrt(rho(1)) * Hl    + sqrt(rho(2)) * Hr)    / (sqrt(rho(1)) + sqrt(rho(2)))
     c_ave    = sqrt((gamma - 1.d0) * (H_ave - 0.5d0 * vecsum(V_ave(:), V_ave(:))))
 
-    Ql(1)             = rhol
-    Ql(2:dimension+1) = rhol * Vl(:)
+    Ql(1)             = rho(1)
+    Ql(2:dimension+1) = rho(1) * Vl(:)
     Ql(dimension+2)   = el
-    Qr(1)             = rhor
-    Qr(2:dimension+1) = rhor * Vr(:)
+    Qr(1)             = rho(2)
+    Qr(2:dimension+1) = rho(2) * Vr(:)
     Qr(dimension+2)   = er
 
     !mat(:,:) = calc_AB(id, rho_ave, H_ave, c_ave, V_ave)
     dQ(:)    = Qr(:) - Ql(:)
-    F(:)     = F(:) - 0.5d0 * fd * cumatmul(mat(:,:), dQ(:))
+    F(:)     = F(:) - 0.5d0 * sensor * cumatmul(mat(:,:), dQ(:))
   end function KEEPRho
 end module calc_keep
 
