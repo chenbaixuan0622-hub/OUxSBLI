@@ -51,11 +51,11 @@ contains
     dt3 = minmod(d3, b * d2)
     dt4 = minmod(d2, b * d3)
     ! non TVD
-    !alr(1) = a(2) + 0.25d0 * ((1.d0 - k) * d1 + (1.d0 + k) * d2)
-    !alr(2) = a(3) - 0.25d0 * ((1.d0 - k) * d3 + (1.d0 + k) * d2)
+    !alr(1) = a(2) + 0.25d0 * eps * ((1.d0 - k) * d1 + (1.d0 + k) * d2)
+    !alr(2) = a(3) - 0.25d0 * eps * ((1.d0 - k) * d3 + (1.d0 + k) * d2)
     ! TVD
-    alr(1) = a(2) + 0.25d0 * ((1.d0 - k) * dt1 + (1.d0 + k) * dt2)
-    alr(2) = a(3) - 0.25d0 * ((1.d0 - k) * dt3 + (1.d0 + k) * dt4)
+    alr(1) = a(2) + 0.25d0 * eps * ((1.d0 - k) * dt1 + (1.d0 + k) * dt2)
+    alr(2) = a(3) - 0.25d0 * eps * ((1.d0 - k) * dt3 + (1.d0 + k) * dt4)
   end function MUSCL
 
   attributes(global) subroutine calc_E(nx, rho, u, p, E, sensor)
@@ -73,23 +73,24 @@ contains
       !sensor(i-1) = (1.d0 - Albada(rho4,p4,u4))
       !sensor(i-1) = Jameson(p4)
       !sensor(i-1) = Ducros(u4)
-      sensor(i-1) = Ducros(u4) * (1.d0 - Albada(rho4,p4,u4))
+      !sensor(i-1) = Ducros(u4) * (1.d0 - Albada(rho4,p4,u4))
+      sensor(i-1) = (1.d0 - Albada(rho4,p4,u4))
       if (id_tvd /= 0) then
-        rho2 = MUSCL(0.d0,rho4)
-        p2   = MUSCL(0.d0,p4)
-        u2   = MUSCL(0.d0,u4)
+        rho2 = MUSCL(sensor(i-1),rho4)
+        p2   = MUSCL(sensor(i-1),p4)
+        u2   = MUSCL(sensor(i-1),u4)
         if (id_scheme == 0) then
-          E(i,:) = KEEP2(rho2,p2,u2,sensor(i-1))
+          E(i,:) = KEEP2(rho2,p2,u2)
         elseif (id_scheme == 1) then
-          E(i,:) = KEP2(rho2,p2,u2,sensor(i-1))
+          E(i,:) = KEP2(rho2,p2,u2)
         elseif (id_scheme == 2) then
           E(i,:) = SLAU(rho2,p2,u2)
         endif
       else
         if (id_scheme == 0) then
-          E(i,:) = KEEP4(rho4,p4,u4,sensor(i-1))
+          E(i,:) = KEEP4(rho4,p4,u4)
         elseif (id_scheme == 1) then
-          E(i,:) = KEP4(rho4,p4,u4,sensor(i-1))
+          E(i,:) = KEP4(rho4,p4,u4)
         elseif (id_scheme == 2) then
           rho2   = rho4(2:3)
           p2     = p4(2:3)

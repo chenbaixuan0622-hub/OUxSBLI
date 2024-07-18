@@ -10,28 +10,30 @@ module mod_globals
   ! id_visc       ! 0 no-visc               !
   !               ! 1 visc                  !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_dim        ! 1 dimensional           !
-  !               ! 2 non-dimensional       !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_turbulence ! 0 laminar               !
   !               ! 1 Smagorinsky           !
   !               ! 2 selective_mixed_scale !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer, parameter :: id_turbulence = 0
-  !!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_scheme ! 1  KEEP    !
-  !           ! 2  Roe     !
-  !           ! 3  SLAU    !
-  !           ! 4  KEEPUP  !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_slau   ! kind2 slau !
-  !           ! kind4 sd   !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=4), parameter  :: id_hybrid = 0
-  integer(kind=2), parameter  :: id_muscl  = 0
-  integer, parameter          :: id_scheme = 1
-  integer(kind=2), parameter  :: id_slau   = 0
-  real(8), parameter          :: dp_max    = 0.d0
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_scheme ! 1  KEEP             !
+  !           ! 2  KEEP MUSCL       !
+  !           ! 3  SLAU             !
+  !           ! 4  KEEPUP           !
+  !           ! 5  Hybrid Weighted  !
+  !           ! 6  Hybrid threshold !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_sensor ! 1 Ducros            !
+  !           ! 2 Albada            !
+  !           ! 3 Ducros + Albada   !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_tvd    ! kind2 non TVD       !
+  !           ! kind4 minmod        !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  integer, parameter         :: id_scheme = 2
+  integer, parameter         :: id_sensor = 3
+  real(8), parameter         :: threshold = 0.4d0
+  integer(kind=2), parameter :: id_tvd = 0
 
   ! mesh
   real(8), parameter :: pi = acos(-1.d0)
@@ -63,9 +65,9 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter  :: id_recal = 0
   integer(kind=4), parameter  :: id_RungeKutta = 0
-  integer, parameter          :: nt = 200
-  integer, parameter          :: np = 200
-  real(8), parameter          :: dt = 0.01d0
+  integer, parameter          :: nt = 100!200
+  integer, parameter          :: np = 100!200
+  real(8), parameter          :: dt = 0.01d0!0.02d0!0.01d0
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
