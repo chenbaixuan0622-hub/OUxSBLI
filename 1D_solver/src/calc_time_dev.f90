@@ -1,9 +1,8 @@
 module calc_time_dev
   use cudafor
   use mpi
-  use mod_globals, only : accuracy, id_visc, nt, np, &
+  use mod_globals, only : gamma, accuracy, id_visc, nt, np, &
   & blocks, threads, blocksE, threadsE
-  use calc_physical_quantities
   use calc_steps
   use calc_flux
   use calc_visc
@@ -14,14 +13,20 @@ module calc_time_dev
     module procedure RungeKutta_3rd, RungeKutta_4th
   end interface
 contains
-  subroutine calc_EFG(nx,dx,QJ,E,sensor)
+  subroutine calc_EFG(nx,dx,Q,E,sensor)
     integer, intent(in), value                   :: nx
     real(8), intent(in), dimension(nx-1), device :: dx ! 1 / dx
-    real(8), intent(in), dimension(nx,3), device :: QJ ! Q / Jacobian
+    real(8), intent(in), dimension(nx,3), device :: Q
     real(8), intent(out), device                 :: E(nx-accuracy+1,3), sensor(nx-1)
     real(8), dimension(nx), device :: rho, u, p, T
-    integer stat
-    call calc_quantities(nx,QJ,rho,u,p,T)
+    integer stat, i
+    !$cuf kernel do(1)<<<*,*>>>
+    do i = 1, nx
+      rho(i) = Q(i,1)
+      u(i)   = Q(i,2) / rho(i)
+      p(i)   = (gamma - 1.d0) * (Q(i,3) - 0.5d0 * rho(i) * u(i)**2)
+      T(i)   = p(i) / (R * rho(i))
+    enddo
 
     call calc_E<<<blocksE,threadsE>>>(nx,rho,u,p,E,sensor)
 

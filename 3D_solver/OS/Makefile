@@ -1,6 +1,6 @@
-FC = mpif90#nvfortran
+FC = mpif90
 
-OUTPUT_OPTIN = -cuda -acc -fast -Minfo=accel -lnvhpcwrapnvtx
+OUTPUT_OPTIN = -gpu=cc89 -cuda -acc -fast -Minfo=accel -lnvhpcwrapnvtx
 
 .SUFFIXES : .f90
 
@@ -36,7 +36,7 @@ OBJ =	mod_globals.o \
       main.o
 
 a.out: $(OBJ)
-		$(FC) -cuda -acc -fast -Minfo -lnvhpcwrapnvtx -I./ $^
+		$(FC) -gpu=cc89 -cuda -acc -fast -Minfo -lnvhpcwrapnvtx -I./ $^
 
 $(TARGET): $(OBJ)
 		$(LINK.f) $^ $(LOADLIBES) $(LDLIBS) -o $@

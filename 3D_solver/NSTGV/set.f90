@@ -2,60 +2,75 @@ module set
   use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, RHO0, L0, M0, V0, p0, T, dtn
   implicit none
 contains
-  function linspace(x1, x2, n) result(x)
-    real(8), intent(in) :: x1, x2
-    integer, intent(in) :: n
-    integer i
-    real(8) x(n)
-    x = x1 + (x1 + x2) * (/ (dble(i - 1) / dble(n - 1), i = 1, n) /)
-  end function linspace
-
-  subroutine set_grid(nx,ny,nz,x,y,z,dx,dy,dz)
+  subroutine set_grid(nx,ny,nz,xc,yc,zc,dx,dy,dz)
     integer, intent(in)  :: nx, ny, nz
-    real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx), dy(ny), dz(nz)
+    real(8), intent(out) :: xc(nx), yc(ny), zc(nz), dx(nx), dy(ny), dz(nz)
+    real(8) dx1, dy1, dz1, x(nx+1), y(ny+1), z(nz+1)
     integer i, j, k
-    real(8) dx1, dy1, dz1
-    dx1 = Lx / dble(nx-5)
-    dy1 = Ly / dble(ny-5)
-    dz1 = Lz / dble(nz-5)
-    x(1) = 0.d0
-    do i = 1, nx-1
-      dx(i) = dx1
-      x(i+1) = x(i) + dx(i)
+    dx1 = Lx / dble(nx-4)
+    dy1 = Ly / dble(ny-4)
+    dz1 = Lz / dble(nz-4)
+    dx(:) = dx1
+    dy(:) = dy1
+    dz(:) = dz1
+    
+    ! x direction
+    do i = 3, nx-1
+      x(i) = dx1 * dble(i-3)
     enddo
-    y(1) = 0.d0
-    do j = 1, ny-1
-      dy(j) = dy1
-      y(j+1) = y(j) + dy(j)
+    x(1)    = x(3)    - 2.d0 * dx1
+    x(2)    = x(3)    - dx1
+    x(nx)   = x(nx-1) + dx1
+    x(nx+1) = x(nx-1) + 2.d0 * dx1
+    
+    ! y direction
+    do j = 3, ny-1
+      y(j) = dy1 * dble(j-3)
     enddo
-    z(1) = 0.d0
-    do k = 1, nz-1
-      dz(k) = dz1
-      z(k+1) = z(k) + dz(k)
+    y(1)    = y(3)    - 2.d0 * dy1
+    y(2)    = y(3)    - dy1
+    y(ny)   = y(ny-1) + dy1
+    y(ny+1) = y(ny-1) + 2.d0 * dy1
+
+    ! z direction
+    do k = 3, nz-1
+      z(k) = dz1 * dble(k-3)
+    enddo
+    z(1)    = z(3)    - 2.d0 * dz1
+    z(2)    = z(3)    - dz1
+    z(nz)   = z(nz-1) + dz1
+    z(nz+1) = z(nz-1) + 2.d0 * dz1
+  
+
+    ! cell centered
+    do i = 1, nx
+      xc(i) = 0.5d0 * (x(i) + x(i+1))
+    enddo
+    do j = 1, ny
+      yc(j) = 0.5d0 * (y(j) + y(j+1))
+    enddo
+    do k = 1, nz
+      zc(k) = 0.5d0 * (z(k) + z(k+1))
     enddo
   end subroutine set_grid
   
-  subroutine set_init(nx,ny,nz,xs,ys,zs,Q)
+  subroutine set_init(nx,ny,nz,x,y,z,Q)
     integer, intent(in)  :: nx, ny, nz
-    real(8), intent(in)  :: xs(nx), ys(ny), zs(nz)
+    real(8), intent(in)  :: x(nx), y(ny), z(nz)
     real(8), intent(out) :: Q(nx,ny,nz,5)
-    integer i, j, k
-    real(8) x(nx-4), y(ny-4), z(nz-4)
+    integer :: i, j, k, offset = 2
     real(8) RHO, p
-    x = linspace(0.d0, Lx, nx-4)
-    y = linspace(0.d0, Ly, ny-4)
-    z = linspace(0.d0, Lz, nz-4)
-    do k = 3, nz-2
-      do j = 3, ny-2
-        do i = 3, nx-2
-          p = p0+RHO0*(V0**2)*(cos(2.d0*x(i-1)/L0)+cos(2.d0*y(j-1)/L0))*(cos(2.d0*z(k-1)/L0)+2.d0)/16.d0
+    do k = 1+offset, nz-offset
+      do j = 1+offset, ny-offset
+        do i = 1+offset, nx-offset
+          p = p0+RHO0*(V0**2)*(cos(2.d0*x(i)/L0)+cos(2.d0*y(j)/L0))*(cos(2.d0*z(k)/L0)+2.d0)/16.d0
           RHO = p / (R * T)
           ! rho
           Q(i,j,k,1) = RHO
           ! rho u
-          Q(i,j,k,2) = RHO * V0 * sin(x(i-1)/L0) * cos(y(j-1)/L0) * cos(z(k-1)/L0)
+          Q(i,j,k,2) = RHO * V0 * sin(x(i)/L0) * cos(y(j)/L0) * cos(z(k)/L0)
           ! rho v
-          Q(i,j,k,3) = - RHO * V0 * cos(x(i-1)/L0) * sin(y(j-1)/L0) * cos(z(k-1)/L0)
+          Q(i,j,k,3) = - RHO * V0 * cos(x(i)/L0) * sin(y(j)/L0) * cos(z(k)/L0)
           ! rho w
           Q(i,j,k,4) = 0.d0
           ! p / (gamma - 1) + 0.5 * (rhou ** 2 + rhov ** 2 ) / rho

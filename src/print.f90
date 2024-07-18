@@ -1,5 +1,5 @@
 module print
-  use mod_globals, only : nt, dt, gamma, R
+  use mod_globals, only : nt, dt, gamma, R, Lx
   implicit none
   
   interface
@@ -330,6 +330,28 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+  subroutine print_1d(step,nx,ny,nz,x,y,z,rho,p,u,sensor)
+    integer, intent(in), value               :: step, nx, ny, nz
+    real(4), intent(in)                      :: x(nx), y(ny), z(nz)
+    real(4), intent(in), dimension(nx,ny,nz) :: rho, p, u, sensor
+    real(4) T, M, rho0, p0, T0
+    integer i, nyh, nzh
+    character(len=40) filename
+    nyh = int(0.5 * ny)
+    nzh = int(0.5 * nz)
+    rho0 = 1.293e0
+    T0   = 300.e0
+    p0   = rho0 * real(R) * T0
+    write(filename, "(a, i5.5, a)") "data/1d/Q", int(step), ".d"
+    open(10,file=filename)
+    do i = 1, nx
+      T = p(i,nyh,nzh) / (real(R) * rho(i,nyh,nzh))
+      M = u(i,nyh,nzh) / sqrt(real(gamma * R) * T)
+      write(10,"(7e12.4)") x(i) / Lx, rho(i,nyh,nzh) / rho0, u(i,nyh,nzh) / sqrt(p0 / rho0), p(i,nyh,nzh) / p0, T / T0, M, sensor(i,nyh,nzh)
+    enddo
+    close(10)
+  end subroutine print_1d
+
   function mu(T) result(ans)
     real(4), intent(in), value :: T
     real(4) :: ans
@@ -494,10 +516,10 @@ contains
     call print_xml(nx,ny,1,2,x,y,z,rho1d,p1d,T1d,M1d,v1d)
   end subroutine print_vtk_2D
   
-  subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,mass0,ke0,entropy0,myrank)
+  subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,sensor,mass0,ke0,entropy0,myrank)
     integer, intent(in)           :: step, nx, ny, nz
     real(4), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny,nz)
-    real(4), intent(in)           :: QJ(nx,ny,nz,5) ! Q / Jacobian
+    real(4), intent(in)           :: QJ(nx,ny,nz,5), sensor(nx,ny,nz) ! Q / Jacobian
     real(4), intent(inout)        :: mass0, ke0, entropy0
     integer, intent(in), optional :: myrank
     integer i, j, k, l, m, len
@@ -551,29 +573,31 @@ contains
       call print_mass(step,nx,ny,nz,rho,u,v,w,mass0,myrank)
       call print_entropy(step,nx,ny,nz,rho,p,entropy0,myrank)
       call print_KE(step,nx,ny,nz,rho,u,v,w,ke0,myrank)
-      call print_enstrophy(step,nx,ny,nz,real(x),real(y),real(z),rho,omega,myrank)
+      call print_enstrophy(step,nx,ny,nz,x,y,z,rho,omega,myrank)
       call print_rms(step,nx,ny,nz,u,v,w,p,myrank)
+      call print_1d(step,nx,ny,nz,x,y,z,rho,p,u,sensor)
       if (myrank == 3) then
-        call print_boundary_layer(nx,ny,nz,real(y),u)
+        call print_boundary_layer(nx,ny,nz,y,u)
         dy = 1.e0 / (-y(1) + y(2))
         Tw(:,:) = p(:,1,:) / (real(R) * rho(:,1,:))
-        call print_turbulent_boundary_layer(step,nx,ny,nz,dy,real(y),Tw,u,rho)
+        call print_turbulent_boundary_layer(step,nx,ny,nz,dy,y,Tw,u,rho)
       endif
       write(filename, "(a, i1.1, a, i5.5, a)") "data/",int(myrank),"/Q",int(step),".vtr"
     else
       call print_mass(step,nx,ny,nz,rho,u,v,w,mass0)
       call print_entropy(step,nx,ny,nz,rho,p,entropy0)
       call print_KE(step,nx,ny,nz,rho,u,v,w,ke0)
-      call print_enstrophy(step,nx,ny,nz,real(x),real(y),real(z),rho,omega)
+      call print_enstrophy(step,nx,ny,nz,x,y,z,rho,omega)
       call print_rms(step,nx,ny,nz,u,v,w,p)
-      call print_boundary_layer(nx,ny,nz,real(y),u)
+      call print_1d(step,nx,ny,nz,x,y,z,rho,p,u,sensor)
+      call print_boundary_layer(nx,ny,nz,y,u)
       dy = 1.e0 / (-y(1) + y(2))
       Tw(:,:) = p(:,1,:) / (real(R) * rho(:,1,:))
       call print_turbulent_boundary_layer(step,nx,ny,nz,dy,real(y),Tw,u,rho)
       write(filename, "(a, i5.5, a)") "data/Q",int(step),".vtr"
     endif
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
-    call print_xml(nx,ny,nz,3,real(x),real(y),real(z),rho1d,p1d,T1d,M1d,v1d,Qcriterion1d)
+    call print_xml(nx,ny,nz,3,x,y,z,rho1d,p1d,T1d,M1d,v1d,Qcriterion1d)
     
     deallocate(rho,u,v,w,p,div,omega,Qcriterion,Tw,rho1d,p1d,T1d,M1d,v1d,div1d,omega1d,Qcriterion1d)
   end subroutine print_vtk_3D

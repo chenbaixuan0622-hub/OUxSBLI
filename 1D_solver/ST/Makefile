@@ -16,7 +16,6 @@ vpath %f90 ../src:../../src
 OBJ =	mod_globals.o \
       set.o \
       calc_common_dim.o \
-      calc_physical_quantities.o \
       calc_sutherland.o \
       calc_visc.o \
       calc_common.o \
@@ -36,7 +35,6 @@ $(TARGET): $(OBJ)
 		$(LINK.f) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 set.o: mod_globals.mod
-calc_physical_quantities.o: mod_globals.mod
 calc_common.o: mod_globals.mod
 calc_term.o: calc_common_dim.mod
 calc_kep1d.o: mod_globals.mod calc_common_dim.mod calc_term.mod
@@ -44,7 +42,7 @@ calc_slau1d.o: mod_globals.mod
 calc_visc.o: mod_globals.mod calc_sutherland.mod
 calc_flux.o: mod_globals.mod calc_kep1d.mod calc_slau1d.mod
 calc_steps.o: mod_globals.mod
-calc_time_dev.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_flux.mod calc_visc.mod calc_steps.mod print1d.mod
+calc_time_dev.o: mod_globals.mod set.mod calc_flux.mod calc_visc.mod calc_steps.mod print1d.mod
 print1d.o: mod_globals.mod
 main1d.o: main1d.f90 mod_globals.mod set_coordinate.mod set.mod calc_time_dev.mod
 
