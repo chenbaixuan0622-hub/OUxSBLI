@@ -29,11 +29,17 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_tvd    ! kind2 non TVD       !
   !           ! kind4 minmod        !
+  !           ! kind8 MUSCL4th      !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer, parameter         :: id_scheme = 2
+  ! id_keep   ! kind2 KEEP          !
+  !           ! kind4 KEEPPE        !
+  !           ! kind8 KEP           !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  integer, parameter         :: id_scheme = 3
   integer, parameter         :: id_sensor = 3
   real(8), parameter         :: threshold = 0.4d0
-  integer(kind=2), parameter :: id_tvd = 0
+  integer(kind=4), parameter :: id_tvd = 0
+  integer(kind=2), parameter :: id_keep = 0
 
   ! mesh
   real(8), parameter :: pi = acos(-1.d0)
@@ -65,8 +71,8 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter  :: id_recal = 0
   integer(kind=4), parameter  :: id_RungeKutta = 0
-  integer, parameter          :: nt = 100!200
-  integer, parameter          :: np = 100!200
+  integer, parameter          :: nt = 200
+  integer, parameter          :: np = 200
   real(8), parameter          :: dt = 0.01d0!0.02d0!0.01d0
 
   ! physical properties
