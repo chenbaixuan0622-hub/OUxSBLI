@@ -70,5 +70,19 @@ contains
     phim = (d2 * d3 + d3**2) / (d2**2 + d3**2 + eps)
     phi  = min(phim, phip)
   end function Albada
+
+  attributes(device) function sigmoid(x) result(ans)
+    real(8), intent(in), value :: x
+    real(8) :: ans
+    ans = 0.5d0 * (tanh(10.d0 * (x - 0.5d0)) + 1.d0)
+  end function sigmoid
+
+  attributes(device) function wiggle_detector(phi) result(ans)
+    real(8), intent(in), device :: phi(4)
+    real(8) ans, phi1, phi2
+    phi1 = (-phi(1) + phi(2)) * (-phi(2) + phi(3))
+    phi2 = (-phi(3) + phi(4)) * (-phi(2) + phi(3))
+    ans  = 0.5d0 * (1.d0 - sign(1.d0, min(phi1, phi2)))
+  end function wiggle_detector
 end module calc_hybrid
 

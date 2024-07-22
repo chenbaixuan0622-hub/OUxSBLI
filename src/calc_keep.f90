@@ -4,8 +4,50 @@ module calc_keep
   use calc_term
   use calc_mat
   implicit none
+  interface Et
+    module procedure EtKEEP, EtKEEPPE, EtKEP
+  end interface
 contains
+  attributes(device) function EtKEEP(id_keep,id,C,rho,p,V1,V2) result(Et)
+    integer(kind=2), intent(in), value                :: id_keep
+    integer, intent(in), value                        :: id
+    real(8), intent(in), value                        :: C
+    real(8), intent(in), dimension(2), device         :: rho, p
+    real(8), intent(in), dimension(dimension), device :: V1, V2
+    real(8) :: IE, PV, KE, Et
+    IE = C * 0.5d0 * (p(1) / rho(1) + p(2) / rho(2)) / (gamma - 1.d0)
+    PV = 0.5d0 * (V1(id) * p(2) + V2(id) * p(1))
+    KE = 0.5d0 * C * vecsum(V1, V2)
+    Et = IE + PV + KE
+  end function EtKEEP
+
+  attributes(device) function EtKEEPPE(id_keep,id,C,rho,p,V1,V2) result(Et)
+    integer(kind=4), intent(in), value                :: id_keep
+    integer, intent(in), value                        :: id
+    real(8), intent(in), value                        :: C
+    real(8), intent(in), dimension(2), device         :: rho, p
+    real(8), intent(in), dimension(dimension), device :: V1, V2
+    real(8) :: IE, PV, KE, Et
+    IE = 0.25d0 * (V1(id) + V2(id)) * (p(1) + p(2)) / (gamma - 1.d0)
+    PV = 0.5d0 * (V1(id) * p(2) + V2(id) * p(1))
+    KE = 0.5d0 * C * vecsum(V1, V2)
+    Et = IE + PV + KE
+  end function EtKEEPPE
+
+  attributes(device) function EtKEP(id_keep,id,C,rho,p,V1,V2) result(Et)
+    integer(kind=8), intent(in), value                :: id_keep
+    integer, intent(in), value                        :: id
+    real(8), intent(in), value                        :: C
+    real(8), intent(in), dimension(2), device         :: rho, p
+    real(8), intent(in), dimension(dimension), device :: V1, V2
+    real(8) :: H, KE, Et
+    H  = C * 0.5d0 * gamma / (gamma - 1.d0) * (p(1) / rho(1) + p(2) / rho(2))
+    KE = 0.5d0 * C * vecsum(V1, V2)
+    Et = H + KE
+  end function EtKEP
+
   attributes(device) function KEEP2(id,rho,p,V,Normal) result(F)
+    use mod_globals, only : id_keep
     integer, intent(in), value                          :: id
     real(8), intent(in), dimension(2), device           :: rho, p
     real(8), intent(in), dimension(2,dimension), device :: V
@@ -15,17 +57,10 @@ contains
     real(8), dimension(dimension)   :: Vm, V1, V2
     V1(:) = V(1,:)
     V2(:) = V(2,:)
-    Rhom  = 0.5d0 * (rho(1) + rho(2))
     Vm(:) = 0.5d0 * (V1(:) + V2(:))
-    Pm    = 0.5d0 * (p(1) + p(2))
-    PRho  = 0.5d0 * (p(1) / rho(1) + p(2) / rho(2))
-    F(1)  = Rhom * Vm(id)
-    F(2:dimension+1) = F(1) * Vm(:) + Pm * Normal(2:dimension+1)
-    !F(dimension+2)   = F(1) * PRho / (gamma - 1.d0) &
-    ! KEEPPE
-    F(dimension+2)   = Vm(id) * Pm / (gamma - 1.d0) &
-    & + 0.5d0 * F(1) * vecsum(V1, V2) &
-    & + 0.5d0 * (V(1,id) * p(2) + V(2,id) * p(1))
+    F(1)  = 0.5d0 * (rho(1) + rho(2)) * Vm(id)
+    F(2:dimension+1) = F(1) * Vm(:) + 0.5d0 * (p(1) + p(2)) * Normal(2:dimension+1)
+    F(dimension+2) = Et(id_keep,id,F(1),rho,p,V1,V2)
   end function KEEP2
 
   attributes(device) function KEEPUP(id,rho,p,V,rholr,plr,Vlr,Normal,sensor) result(F)
@@ -72,12 +107,12 @@ contains
 
     RhoV(:) = RhoPhi(rho(:), V(:,id))
     ! KEEP
-    !P_over_Rho(:) = p(:) / rho(:)
-    !RhoVIE(:)     = RhoPhiU(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
+    P_over_Rho(:) = p(:) / rho(:)
+    RhoVIE(:)     = RhoPhiU(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
 
     ! KEEP PE
-    Vm(:) = Phi(V(:,id))
-    RhoVIE(:) = RhoPhiU(Vm(:), p(:)) / (gamma - 1.d0)    
+    !Vm(:) = Phi(V(:,id))
+    !RhoVIE(:) = RhoPhiU(Vm(:), p(:)) / (gamma - 1.d0)    
 
     RhoVKE(:) = RhoUPhiPhi(RhoV(:), V(:,:))
     VP(:)     = PhiPsi(V(:,id), p(:))
