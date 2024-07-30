@@ -1,6 +1,23 @@
+import numpy as np
 import os
 import matplotlib.pyplot as plt
-import readVTK
+
+def plot_causality(uu,title):
+  x = np.linspace(1, 3, len(uu[:,0]))
+  y = np.linspace(1, 3, len(uu[0,:]))
+  x, y = np.meshgrid(x,y)
+  plt.contourf(x, y, np.transpose(uu), cmap=plt.cm.jet, levels=100)
+  plt.colorbar()
+  plt.savefig(title)
+  plt.close()
+
+def plot_hist(x,px,filename):
+  X = []
+  for i in range(1, len(x)):
+    X.append(0.5e0 * (x[i-1] + x[i]))
+  plt.bar(X, px)
+  plt.savefig(filename)
+  plt.close()
 
 def plot_corr(x,Nx1,length,R11,R22):
   plt.plot(figsize=(8,6))
@@ -16,18 +33,7 @@ def plot_corr(x,Nx1,length,R11,R22):
   plt.savefig("data/lateral_corr.png")
   plt.close()
 
-def plot_pdf(x,pdf,name):
-  plt.plot(figsize=(8,6))
-  plt.plot(x,pdf)
-  xlabel   = name
-  ylabel   = "PDF of " + name
-  filename = "data/" + name + ".png"
-  plt.xlabel(xlabel)
-  plt.ylabel(ylabel)
-  plt.savefig(filename)
-  plt.close()
-
-def plot_velocity(x,y,u,title):
+def plot_scalar(x,y,u,title):
   plt.axis("equal")
   plt.axis("off")
   plt.contourf(x, y, u, cmap=plt.cm.jet, levels=100)
@@ -36,15 +42,11 @@ def plot_velocity(x,y,u,title):
   plt.close()
 
 '''
-def plot_fluxtuating_velocity(directory_path,vtk_files,Nx,Ny,Nz,x,y,z,umean,vmean,wmean): 
-  # plot fluctuating velocity
+#def plot_fluxtuating_velocity(directory_path,vtk_files,Nx,Ny,Nz,x,y,z,umean,vmean,wmean): 
   i = 0
   for vtk_file in vtk_files:
-    # get path
     file_path = os.path.join(directory_path, vtk_file)
     u, v, w = readVTK.getVelocity(file_path,Nx,Ny,Nz)
-
-    # plot
     plt.axis("equal")
     plt.axis("off")
     plt.contourf(x, y, (u[0,:,:] - umean[0,:,:]), cmap=plt.cm.jet, levels=100)

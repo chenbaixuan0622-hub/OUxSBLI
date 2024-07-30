@@ -2,7 +2,7 @@ module calc_time_dev
   use cudafor
   use mpi
   use nvtx
-  use mod_globals, only : accuracy, id_scheme, id_visc, id_turbulence, nt, np, &
+  use mod_globals, only : accuracy, id_scheme, id_visc, id_turbulence, id_rescale, nt, np, nre, &
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG
   use calc_physical_quantities
   use calc_steps
@@ -10,6 +10,7 @@ module calc_time_dev
   use calc_flux
   use calc_visc
   use calc_les
+  use calc_rescale
   use set
   use print
   implicit none
@@ -47,7 +48,7 @@ contains
     endif
 
     stat = cudaDeviceSynchronize()
-    if (id_visc == 1 .or. id_turbulence /= 0) then
+    if (1 <= id_visc .or. id_turbulence /= 0) then
       call calc_Ev<<<blocksE,threadsE,1>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,T,p,mut,E)
       call calc_Fv<<<blocksF,threadsF,2>>>(nx,ny,nz,dy,dx,dz,rho,u,v,w,T,p,mut,F)
       call calc_Gv<<<blocksG,threadsG,3>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,T,p,mut,G)
@@ -168,6 +169,8 @@ contains
     integer i, j, k, t1, t2, itr, ierr, ilen, stat, status(MPI_STATUS_SIZE)
     real(8), dimension(nx,ny,nz)    :: mut_cpu, sensor_cpu
     real(8), dimension(nx,ny,nz,3)  :: Vmean_cpu
+    ! rescale !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    real(8), allocatable :: Qre_cpu(:,:,:,:), Um(:,:), Vm(:,:), Wm(:,:), pm(:,:), Tm(:,:)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type(cudaDeviceProp)          :: prop
     real(8), allocatable, device  :: QJ(:,:,:,:), QJs(:,:,:,:), Rs(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
@@ -214,26 +217,79 @@ contains
     call MPI_BCAST(ke0,      1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
     call MPI_BCAST(entropy0, 1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
 
+    ! rescale
+    allocate(Qre_cpu(2,ny,nz,5),Um(2,ny),Vm(2,ny),Wm(2,ny),pm(2,ny),Tm(2,ny))
+
     do t2 = 1, np
-      if (myrank == 0) then
-        do t1 = 1, nt
+      do t1 = 1, nt
+        if (myrank == 0) then
+          if (kind(id_rescale) == 4) then
+            Qre_cpu(:,:,:,:) = QJ(nre+1:nre+2,:,:,:)
+            call MPI_SEND(Qre_cpu, 10*ny*nz, MPI_REAL, 1, 0, MPI_COMM_WORLD, ierr)
+          endif
           call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJ,mut,E,F,G,sensor)
           call calc_step(nx,ny,nz,0.5d0,1.d0,dx,dy,dz,E,F,G,QJ,QJs,Rs) ! QJs = Q2
+          if (kind(id_rescale) == 4) then
+            call MPI_RECV(Qre_cpu, 10*ny*nz, MPI_REAL8, 1, 0, MPI_COMM_WORLD, status, ierr)
+          endif
           call set_bc(nx,ny,nz,Jacobian,QJs)
+        elseif (myrank == 1 .and. kind(id_rescale) == 4) then
+          call MPI_RECV(Qre_cpu, 10*ny*nz, MPI_REAL8, 0, 0, MPI_COMM_WORLD, status, ierr)
+          call set_rescale(t1+(t2-1)*nt,nx,ny,nz,nre,2.d-3,y,Jacobian_cpu,Um,Vm,Wm,pm,Tm,Qre_cpu)
+          call MPI_SEND(Qre_cpu, 10*ny*nz, MPI_REAL8, 0, 0, MPI_COMM_WORLD, ierr)
+        endif
 
+        if (myrank == 0) then
+          if (kind(id_rescale) == 4) then
+            Qre_cpu(:,:,:,:) = QJ(nre+1:nre+2,:,:,:)
+            call MPI_SEND(Qre_cpu, 10*ny*nz, MPI_REAL, 1, 0, MPI_COMM_WORLD, ierr)
+          endif
           call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G,sensor)
           call calc_step(nx,ny,nz,0.5d0,2.d0,dx,dy,dz,E,F,G,QJ,QJs,Rs) ! QJs = Q3
+          if (kind(id_rescale) == 4) then
+            call MPI_RECV(Qre_cpu, 10*ny*nz, MPI_REAL8, 1, 0, MPI_COMM_WORLD, status, ierr)
+          endif
           call set_bc(nx,ny,nz,Jacobian,QJs)
+        elseif (myrank == 1 .and. kind(id_rescale) == 4) then
+          call MPI_RECV(Qre_cpu, 10*ny*nz, MPI_REAL8, 0, 0, MPI_COMM_WORLD, status, ierr)
+          call set_rescale(t1+(t2-1)*nt,nx,ny,nz,nre,2.d-3,y,Jacobian_cpu,Um,Vm,Wm,pm,Tm,Qre_cpu)
+          call MPI_SEND(Qre_cpu, 10*ny*nz, MPI_REAL8, 0, 0, MPI_COMM_WORLD, ierr)
+        endif
 
+        if (myrank == 0) then
+          if (kind(id_rescale) == 4) then
+            Qre_cpu(:,:,:,:) = QJ(nre+1:nre+2,:,:,:)
+            call MPI_SEND(Qre_cpu, 10*ny*nz, MPI_REAL, 1, 0, MPI_COMM_WORLD, ierr)
+          endif
           call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G,sensor)
           call calc_step(nx,ny,nz,1.0d0,2.d0,dx,dy,dz,E,F,G,QJ,QJs,Rs) ! QJs = Q4
+          if (kind(id_rescale) == 4) then
+            call MPI_RECV(Qre_cpu, 10*ny*nz, MPI_REAL8, 1, 0, MPI_COMM_WORLD, status, ierr)
+          endif
           call set_bc(nx,ny,nz,Jacobian,QJs)
+        elseif (myrank == 1 .and. kind(id_rescale) == 4) then
+          call MPI_RECV(Qre_cpu, 10*ny*nz, MPI_REAL8, 0, 0, MPI_COMM_WORLD, status, ierr)
+          call set_rescale(t1+(t2-1)*nt,nx,ny,nz,nre,2.d-3,y,Jacobian_cpu,Um,Vm,Wm,pm,Tm,Qre_cpu)
+          call MPI_SEND(Qre_cpu, 10*ny*nz, MPI_REAL8, 0, 0, MPI_COMM_WORLD, ierr)
+        endif
 
+        if (myrank == 0) then
+          if (kind(id_rescale) == 4) then
+            Qre_cpu(:,:,:,:) = QJ(nre+1:nre+2,:,:,:)
+            call MPI_SEND(Qre_cpu, 10*ny*nz, MPI_REAL, 1, 0, MPI_COMM_WORLD, ierr)
+          endif
           call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G,sensor)
           call calc_step4(nx,ny,nz,dx,dy,dz,E,F,G,Rs,QJ)
+          if (kind(id_rescale) == 4) then
+            call MPI_RECV(Qre_cpu, 10*ny*nz, MPI_REAL8, 1, 0, MPI_COMM_WORLD, status, ierr)
+          endif
           call set_bc(nx,ny,nz,Jacobian,QJ)
-        enddo
-      endif
+        elseif (myrank == 1 .and. kind(id_rescale) == 4) then
+          call MPI_RECV(Qre_cpu, 10*ny*nz, MPI_REAL8, 0, 0, MPI_COMM_WORLD, status, ierr)
+          call set_rescale(t1+(t2-1)*nt,nx,ny,nz,nre,2.d-3,y,Jacobian_cpu,Um,Vm,Wm,pm,Tm,Qre_cpu)
+          call MPI_SEND(Qre_cpu, 10*ny*nz, MPI_REAL8, 0, 0, MPI_COMM_WORLD, ierr)
+        endif
+      enddo
 
       ! send and recv device arrays
       if (myrank == 0) then
@@ -251,6 +307,7 @@ contains
     if (myrank == 0) then
       deallocate(QJ,QJs,Rs,E,F,G,dx,xix,dy,etay,dz,zetaz,Jacobian,mut,sensor)
     endif
+    deallocate(Qre_cpu,Um,Vm,Wm,pm,Tm)
   end subroutine RungeKutta_4th
 end module calc_time_dev
 

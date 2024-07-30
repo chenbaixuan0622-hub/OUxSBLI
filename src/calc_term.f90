@@ -18,12 +18,12 @@ contains
   attributes(device) function Phi6(a) result(ans)
     real(8), intent(in), dimension(6), device :: a
     real(8), dimension(6) :: ans
-    ans(1) = 0.5d0 * (ph(3) + psi(4))
-    ans(2) = 0.5d0 * (ph(3) + psi(5))
-    ans(3) = 0.5d0 * (ph(2) + psi(4))
-    ans(4) = 0.5d0 * (ph(3) + psi(6))
-    ans(5) = 0.5d0 * (ph(2) + psi(5))
-    ans(6) = 0.5d0 * (ph(1) + psi(4))
+    ans(1) = 0.5d0 * (a(3) + a(4))
+    ans(2) = 0.5d0 * (a(3) + a(5))
+    ans(3) = 0.5d0 * (a(2) + a(4))
+    ans(4) = 0.5d0 * (a(3) + a(6))
+    ans(5) = 0.5d0 * (a(2) + a(5))
+    ans(6) = 0.5d0 * (a(1) + a(4))
   end function Phi6
 
   !KEEP 4th!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

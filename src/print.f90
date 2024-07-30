@@ -264,8 +264,7 @@ contains
     else
       open(10,file="data/kinetic_energy.d", position="append")
     endif
-    !write(10,"(2e12.4)") t, ke
-    write(10,"(2e12.4)") t, ke / ke0
+    write(10,"(3e12.4)") t, ke, ke / ke0
     close(10)
   end subroutine print_KE
 

@@ -1,12 +1,5 @@
 import numpy as np
 from numba import jit
-from scipy.stats import gaussian_kde
-
-def PDF(data):
-  range = np.linspace(min(data), max(data), 1000)
-  kde   = gauusian_kde(data)
-  pdf   = kde(range)
-  return range, pdf
 
 @jit(nopython=True, cache=True, fastmath=True)
 def unit_vector(r1,r2):
@@ -78,4 +71,75 @@ def integral_scale(x,R11,R22):
     L11 += 0.5e0 * (R11[i] + R11[i+1]) * dx 
     L22 += 0.5e0 * (R22[i] + R22[i+1]) * dx
   return L11, L22
+
+@jit(nopython=True, cache=True, fastmath=True)
+def blt(y,u):
+  d  = 0.e0
+  u0 = np.mean(u[:,-1,:])
+  for j in range(len(y)):
+    if np.mean(u[:,j,:]) >= 0.99e0 * u0:
+      d = y[j] - (-y[j-1] + y[j]) * (np.mean(u[:,j,:]) - 0.99e0 * u0) \
+      / (-np.mean(u[:,j-1,:]) + np.mean(u[:,j,:]) + 1.e-20)
+  return d
+
+@jit(nopython=True, cache=True, fastmath=True)
+def Sutherland(T):
+  mu0  = 1.716e-5
+  T0   = 273.2e0
+  S    = 111.e0
+  nu   = mu0 * ((T0 + S) / (np.mean(T) + S)) * (np.mean(T) / T0)**1.5
+  return nu
+
+# calc yplus, uplus
+@jit(nopython=True, cache=True, fastmath=True)
+def non_dim_tbl(Q,x,y,z):
+  # Q[rho,u,v,w,p]
+  R    = 287.03e0
+  rhow = np.mean(Q[0,:,0,:])
+  nu   = Sutherland(Q[4,:,0,:] / (R * Q[0,:,0,:])) / rhow
+  dudy = np.mean(-Q[1,:,0,:] + Q[1,:,1,:]) / (-y[0] + y[1])
+  tw   = rhow * nu * dudy
+  ut   = np.sqrt(tw / rhow)
+  nx   = len(x)
+  ny   = len(y)
+  nz   = len(z)
+  Qp   = np.zeros((5,nz,ny,nx), dtype=np.float32)
+  Qvd  = np.zeros((3,nz,ny,nx), dtype=np.float32)
+  xp   = ut * x[:] / nu
+  yp   = ut * y[:] / nu
+  zp   = ut * z[:] / nu
+  Qp[0,:,0,:] = 1.e0
+  Qp[1,:,0,:] = Q[1,:,0,:] / ut
+  Qp[2,:,0,:] = Q[2,:,0,:] / ut
+  Qp[3,:,0,:] = Q[3,:,0,:] / ut
+  Qp[4,:,0,:] = Q[4,:,0,:] / (rhow * ut**2)
+  for k in range(nz):
+    for j in range(1,ny):
+      for i in range(nx):
+        # van Driest transformation
+        uvd = Q[1,k,j-1,i] + np.sqrt(Q[0,k,j,i] / rhow) * (-Q[1,k,j-1,i] + Q[1,k,j,i])
+        vvd = Q[2,k,j-1,i] + np.sqrt(Q[0,k,j,i] / rhow) * (-Q[2,k,j-1,i] + Q[2,k,j,i])
+        wvd = Q[3,k,j-1,i] + np.sqrt(Q[0,k,j,i] / rhow) * (-Q[3,k,j-1,i] + Q[3,k,j,i])
+        Qp[0,k,j,i]  = Q[0,k,j,i] / rhow
+        Qp[1,k,j,i]  = Q[1,k,j,i] / ut
+        Qp[2,k,j,i]  = Q[2,k,j,i] / ut
+        Qp[3,k,j,i]  = Q[3,k,j,i] / ut
+        Qp[4,k,j,i]  = Q[4,k,j,i] / (rhow * ut**2)
+        Qvd[0,k,j,i] = uvd / ut
+        Qvd[1,k,j,i] = vvd / ut
+        Qvd[2,k,j,i] = wvd / ut
+  return xp, yp, zp, Qp, Qvd
+
+# calc point-wise turbulent kinetic energy
+@jit(nopython=True, cache=True, fastmath=True)
+def TKE(u,v,w,U,V,W,tke):
+  u2 = 0.e0
+  v2 = 0.e0
+  w2 = 0.e0
+  for t in range(len(u)):
+    u2 += (u[t] - U)**2
+    v2 += (v[t] - V)**2
+    w2 += (w[t] - W)**2
+  tke += 0.5e0 * (u2 + v2 + w2)
+  return tke
 
