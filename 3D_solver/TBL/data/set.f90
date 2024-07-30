@@ -39,12 +39,14 @@ contains
     !write(*,*) eta, f, df
   end subroutine calc_Blasius
 
-  subroutine set_grid(x,y,z,dx,dy)
-    real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1)
+  subroutine set_grid(nx,ny,nz,x,y,z,dx,dy,dz)
+    integer, intent(in)   :: nx, ny, nz
+    real(8), intent(out)  :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     integer i, j, k
-    real(8) :: dx1 = Lx / dble(nx-1)
-    real(8) :: dy1 = Ly / dble(ny-1)
-    real(8) :: dz1 = Lz / dble(nz-1)
+    real(8) dx1, dy1, dz1
+    dx1 = Lx / dble(nx-1)
+    dy1 = Ly / dble(ny-1)
+    dz1 = Lz / dble(nz-1)
     x(1) = 0.d0
     do i = 1, nx-1
       dx(i) = dx1
@@ -58,17 +60,18 @@ contains
       y(j+1) = y(j) + dy(j)
     enddo
 
-    do k = 1, nz
-      z(k) = dble(k-1) * dz1
+    z(1) = 0.d0
+    do k = 1, nz-1
+      dz(k) = dz1
+      z(k+1) = z(k) + dz(k)
     enddo
   end subroutine set_grid
 
-  subroutine set_init(xs,ys,zs,Q,Vin)
+  subroutine set_init(nx,ny,nz,xs,ys,zs,Q)
+    integer, intent(in)                         :: nx, ny, nz
     real(8), intent(in)                         :: xs(nx), ys(ny), zs(nz)
     real(8), intent(out), dimension(nx,ny,nz,5) :: Q
-    real(8), intent(in), dimension(ny,2)        :: Vin
     integer i, j, k
-    integer :: No = int(0.25 * nx)
     real(8) :: d = 0.2d0 * 1.d-3
     real(8) :: d1= 2.d-3
     real(8) :: eta, rho, u, v, w, T, p_wall
@@ -108,12 +111,11 @@ contains
     Q(:,1,:,5) = p_wall / (gamma - 1.d0)
   end subroutine set_init
   
-  subroutine set_bc(id_accuracy,Jacobian,QJ)
-    integer(kind=2), intent(in), value  :: id_accuracy
-    real(8), intent(in), device         :: Jacobian(nx,ny)
-    real(8), intent(inout), device      :: QJ(nx,ny,nz,5) ! Q / Jacobian
+  subroutine set_bc(nx,ny,nz,Jacobian,QJ)
+    integer, intent(in), value      :: nx, ny, nz
+    real(8), intent(in), device     :: Jacobian(nx,ny)
+    real(8), intent(inout), device  :: QJ(nx,ny,nz,5) ! Q / Jacobian
     integer i, j, k, l
-    integer :: No = int(0.25 * nx)
     real(8) :: p_wall
     ! Riemann invariants
     real(8) :: pin, cin, vin, Rp, Rm, rhob, vb, cb, pb
@@ -180,8 +182,9 @@ contains
     enddo;enddo;enddo
   end subroutine set_bc
 
-  subroutine set_bc_mut(mut)
-    real(8), intent(inout), device :: mut(nx,ny,nz)
+  subroutine set_bc_mut(nx,ny,nz,mut)
+    integer, intent(in), value      :: nx, ny, nz
+    real(8), intent(inout), device  :: mut(nx,ny,nz)
     integer i, j, k
     !$cuf kernel do(2) <<<*,*>>>
     do k = 1, nz

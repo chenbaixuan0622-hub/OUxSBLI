@@ -32,25 +32,30 @@ module mod_globals
   ! id_sensor ! 1 Ducros            !
   !           ! 2 Albada            !
   !           ! 3 Ducros + Albada   !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_tvd    ! kind2 non TVD       !
-  !           ! kind4 minmod        !
-  !           ! kind8 MUSCL4th      !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_keep   ! kind2 KEEP          !
-  !           ! kind4 KEEPPE        !
-  !           ! kind8 KEP           !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_slau   ! kind2 SLAU          !
-  !           ! kind4 HR-SLAU2      !
-  !           ! kind8 VHR-SLAU2     !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer, parameter         :: id_scheme = 3
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_accuracy ! kind2 2nd           !
+  !             ! kind4 4th           !
+  !             ! kind8 6th           !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_tvd      ! kind2 non TVD       !
+  !             ! kind4 minmod        !
+  !             ! kind8 MUSCL4th      !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_keep     ! kind2 KEEP          !
+  !             ! kind4 KEEPPE        !
+  !             ! kind8 KEP           !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_slau     ! kind2 SLAU          !
+  !             ! kind4 HR-SLAU2      !
+  !             ! kind8 VHR-SLAU2     !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  integer, parameter         :: id_scheme = 1
   integer, parameter         :: id_sensor = 1
   real(8), parameter         :: threshold = 0.4d0
+  integer(kind=4), parameter :: id_accuracy = 0
   integer(kind=2), parameter :: id_tvd  = 0
-  integer(kind=2), parameter :: id_keep = 0
-  integer(kind=8), parameter :: id_slau = 0
+  integer(kind=8), parameter :: id_keep = 0
+  integer(kind=2), parameter :: id_slau = 0
 
   ! mesh
   real(8), parameter :: L0 = 1.524d-3
