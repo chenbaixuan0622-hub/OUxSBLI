@@ -158,27 +158,27 @@ contains
         QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
     enddo;enddo
 
+    ! inlet
     if (kind(id_rescale) == 4) then
       QJ(1:2,:,2:nz-1,:) = Qre(1:2,:,2:nz-1,:)
-      !$cuf kernel do(3)<<<*,*>>>
-      do l = 1, 5
-        do k = 2, nz-1
-          do j = 1, ny
-            QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
-      enddo;enddo;enddo
     else
       !$cuf kernel do(3)<<<*,*>>>
       do l = 1, 5
         do k = 2, nz-1
           do j = 1, ny
-            ! inlet
             QJ(1,j,k,l) = QJ(nx-3,j,k,l)
             QJ(2,j,k,l) = QJ(nx-2,j,k,l)
-            ! outlet
-            QJ(nx-1,j,k,l) = QJ(3,j,k,l)
-            QJ(nx,j,k,l)   = QJ(4,j,k,l)
       enddo;enddo;enddo
     endif
+
+    !$cuf kernel do(3)<<<*,*>>>
+    do l = 1, 5
+      do k = 2, nz-1
+        do j = 1, ny
+          ! outlet
+          QJ(nx-1,j,k,l) = QJ(3,j,k,l)
+          QJ(nx,j,k,l) = QJ(4,j,k,l)
+    enddo;enddo;enddo
 
     ! cyclic
     !$cuf kernel do(3)<<<*,*>>>
