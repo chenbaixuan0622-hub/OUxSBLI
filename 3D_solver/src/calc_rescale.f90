@@ -91,6 +91,7 @@ contains
       ! rescaling !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! calc fluctuating part   u'(x,y,z,t) = u(x,y,z,t) - U(x,y)
       ! U(x,y) average velocity in the spanwise direction and time
+      write(*,*) "rescale"
       do k = 1, nz
         do j = 1, ny
           do i = 1, 2 ! 2 rescaleing planes are required for 4th-order accuracy flux
@@ -223,6 +224,7 @@ contains
             Qre(i,j,k,5) = (pin / (gamma - 1.d0) + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) / Jacobian(i,j,k)
       enddo;enddo;enddo
     else
+      write(*,*) "cyclic"
       ! cyclic boundary condition !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       do l = 1, 5
         do k = 1, nz

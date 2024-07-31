@@ -96,9 +96,9 @@ module mod_globals
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
-  real(8), parameter :: Pr    = 0.71d0
-  real(8), parameter :: Prt   = 0.9d0
-  real(8), parameter :: R     = 287.03d0
+  real(8), parameter :: Pr = 0.71d0
+  real(8), parameter :: Prt = 0.9d0
+  real(8), parameter :: R = 287.03d0
 
   ! MUSCL
   real(8), parameter :: k = 1.d0 / 3.d0
