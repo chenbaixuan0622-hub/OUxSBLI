@@ -1,48 +1,35 @@
 module calc_slau
-  use mod_globals, only : id_slau, dimension, dp_max
-  use calc_common
+  use mod_globals, only : dimension, gamma
   use calc_common_dim
-  use calc_physical_quantities
+  use calc_hybrid
   implicit none
-  interface f_slau
-    module procedure sd_slau, basic_slau
-  end interface
+  interface SLAU
+    module procedure SLAU1, HRSLAU2, VHRSLAU2
+  end interface SLAU
 contains
-  attributes(device) function basic_slau(id_slau,p,dp,dp_max,V,c,x) result(fslau)
-    integer(kind=2), intent(in), value :: id_slau
-    real(8), intent(in), value :: p, dp, dp_max, V, c, x
-    real(8) fslau
-    fslau = x
-  end function basic_slau
+  attributes(device) subroutine SLAU_common(id,rho,p,V,c,Mp,Mm,bp,bm,dp,Vtp,Vtm,Vl,Vr,phil,phir)
+    integer, intent(in), value                           :: id
+    real(8), intent(in), dimension(2), device            :: rho, p
+    real(8), intent(in), device                          :: V(2,dimension)
+    real(8), intent(out)                                 :: c, Mp, Mm, bp, bm, dp, Vtp, Vtm
+    real(8), intent(out), dimension(dimension), device   :: Vl, Vr
+    real(8), intent(out), dimension(dimension+2), device :: phil, phir
+    real(8) cl, cr, g, Vt, el, er
+    cl  = sqrt(gamma * p(1) / rho(1))
+    cr  = sqrt(gamma * p(2) / rho(2))
+    c   = 0.5d0 * (cl + cr)
 
-  attributes(device) function sd_slau(id_slau,p,dp,dp_max,V,c,x) result(fslau)
-    integer(kind=4), intent(in), value :: id_slau
-    real(8), intent(in), value :: p, dp, dp_max, V, c, x
-    real(8) :: Csd1 = 0.1d0
-    real(8) :: Csd2 = 10.d0
-    real(8) fslau, M, theta
-    M = V / c
-    theta = min(1.d0, ((Csd2 * abs(dp) / p + Csd1) / (abs(dp_max) / p + Csd1))**2)
-    fslau = theta * 0.5d0 * (abs(M + 1.d0) + abs(M - 1.d0) - 2.d0 * abs(M))
-  end function sd_slau
+    Vl  = V(1,:)
+    Vr  = V(2,:)
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    Mp  = Vl(id) / c
+    Mm  = Vr(id) / c
+    
+    g   = -max(min(Mp, 0.d0), -1.d0) * min(max(Mm, 0.d0), 1.d0)
+    Vt  = (rho(1) * abs(Vl(id)) + rho(2) * abs(Vr(id))) / (rho(1) + rho(2))
+    Vtp = (1.d0 - g) * Vt + g * abs(Vl(id))
+    Vtm = (1.d0 - g) * Vt + g * abs(Vr(id))
 
-  attributes(device) subroutine calc_quantities_AUSM(pl,pr,rhol,rhor,Vl,Vr,el,er,Hl,Hr,cl,cr)
-    real(8), intent(in), value :: pl, pr, rhol, rhor
-    real(8), intent(in), dimension(dimension), device :: Vl, Vr
-    real(8), intent(out) :: el, er, Hl, Hr, cl, cr
-    el = energy(pl,rhol,Vl(:))
-    er = energy(pr,rhor,Vr(:))
-    Hl = ENTHALPY(el,pl,rhol)
-    Hr = ENTHALPY(er,pr,rhor)
-    cl = speed_of_sound(pl,rhol)
-    cr = speed_of_sound(pr,rhor)
-  end subroutine calc_quantities_AUSM
-
-  attributes(device) subroutine calc_beta(Mp,Mm,bp,bm)
-    real(8), intent(in), value :: Mp, Mm
-    real(8), intent(out) :: bp, bm
     if (abs(Mp) < 1.d0) then
       bp = 0.25d0 * (2.d0 - Mp) * (Mp + 1.d0) ** 2
     else
@@ -53,83 +40,77 @@ contains
     else
       bm = 0.5d0 * (1.d0 + sign(1.d0, -Mm))
     endif
-  end subroutine calc_beta
+    dp = -p(1) + p(2)
 
-  attributes(device) function flux_AUSM(mass,pressure,Hl,Hr,fd,Vl,Vr,Normal) result(F)
-    real(8), intent(in), value                          :: mass, pressure, Hl, Hr, fd
-    real(8), intent(in), dimension(dimension), device   :: Vl, Vr
-    real(8), intent(in), dimension(dimension+2), device :: Normal
-    real(8), dimension(dimension+2) :: F, phil, phir
-    phil(1) = 1.d0
+    el = p(1) / (gamma - 1.d0) + 0.5d0 * rho(1) * vecsum(Vl(:), Vl(:))
+    er = p(2) / (gamma - 1.d0) + 0.5d0 * rho(2) * vecsum(Vr(:), Vr(:))
+
+    phil(1)             = 1.d0
     phil(2:dimension+1) = Vl(:)
-    phil(dimension+2) = Hl
-    phir(1) = 1.d0
+    phil(dimension+2)   = (el + p(1)) / rho(1)
+    phir(1)             = 1.d0
     phir(2:dimension+1) = Vr(:)
-    phir(dimension+2) = Hr
-    !F(:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:)) + pressure * Normal(:)
-    F(:) = 0.5d0 * mass * (phil(:) + phir(:)) - 0.5d0 * min(1.d0, 5.d0 * fd) * abs(mass) * (phir(:) - phil(:)) + pressure * Normal(:)
- end function flux_AUSM
+    phir(dimension+2)   = (er + p(2)) / rho(2)
+  end subroutine SLAU_common
 
-  attributes(device) function SLAU(id_dim,Ql,Qr,Normal,fd) result(F)
-    integer, intent(in), value                          :: id_dim
-    real(8), intent(in), dimension(dimension+2), device :: Ql, Qr, Normal
-    real(8), intent(in), value                          :: fd
-    real(8) rhol, rhor, pl, pr, el, er, Hl, Hr, cl, cr, c
-    real(8) Vp, Vm, Vt, Vtp, Vtm, Mp, Mm, M, x, fslau, g, p, dp, mass, bp, bm, Pressure
-    real(8), dimension(dimension) :: Vl, Vr, xy
-    real(8), dimension(dimension+2) :: F
-
-    call set_q(Ql,Qr,rhol,rhor,pl,pr,Vl,Vr)
-    call calc_quantities_AUSM(pl,pr,rhol,rhor,Vl,Vr,el,er,Hl,Hr,cl,cr)
-
-    c = 0.5d0 * (cl + cr)
-    ! contravariant velocity
-    xy = Normal(2:dimension+1)
-    Vp = vecsum(Vl, xy)
-    Vm = vecsum(Vr, xy)
-    !Vp = Vl(id_dim)
-    !Vm = Vr(id_dim)
-    Mp = Vp / c
-    Mm = Vm / c
+  attributes(device) function SLAU1(id_slau,id,rho,p,V,Norm,HR,sensor) result(F)
+    integer(kind=2), intent(in), value                  :: id_slau
+    integer, intent(in), value                          :: id
+    real(8), intent(in), dimension(2), device           :: rho, p
+    real(8), intent(in), dimension(2,dimension), device :: V
+    real(8), intent(in), dimension(dimension+2), device :: Norm
+    real(8), intent(in), value, optional                :: HR, sensor
+    real(8) c, Vl(dimension), Vr(dimension), Mp, Mm, M, x
+    real(8) Vtp, Vtm, dp, bp, bm, mass, pres
+    real(8), dimension(dimension+2) :: F, phil, phir
+    call SLAU_common(id,rho,p,V,c,Mp,Mm,bp,bm,dp,Vtp,Vtm,Vl,Vr,phil,phir)
     M = min(1.d0, sqrt(0.5d0 * q2(Vl(:), Vr(:))) / c)
     x = (1.d0 - M) ** 2
-    g = -max(min(Mp, 0.d0), -1.d0) * min(max(Mm, 0.d0), 1.d0)
-    Vt = (rhol * abs(Vp) + rhor * abs(Vm)) / (rhol + rhor)
-    Vtp = (1.d0 - g) * Vt + g * abs(Vp)
-    Vtm = (1.d0 - g) * Vt + g * abs(Vm)
-    dp = pr - pl
-    call calc_beta(Mp,Mm,bp,bm)
-    p = 0.5d0 * (pl + pr)
-    fslau = f_slau(id_slau,p,dp,dp_max,Vt,c,x)
-    ! mass flux
-    mass = 0.5d0 * (rhol * (Vl(id_dim) + Vtp) + rhor * (Vr(id_dim) - Vtm) - fslau * dp / c)
-    ! pressure flux
-    Pressure = 0.5d0 * (pl + pr + (bp - bm) * (pl - pr) + (1.d0 - x) * (bp + bm - 1.d0) * (pl + pr))
-    F(:) = flux_AUSM(mass,Pressure,Hl,Hr,1.d0,Vl,Vr,Normal)
-  end function SLAU
 
-  attributes(device) function simpleSLAU(id_dim,Ql,Qr,Normal,fd) result(F)
-    integer, intent(in), value                          :: id_dim
-    real(8), intent(in), dimension(dimension+2), device :: Ql, Qr, Normal
-    real(8), intent(in), value                          :: fd
-    real(8) rhol, rhor, pl, pr, el, er, Hl, Hr, cl, cr
-    real(8) Vp, Vm, Vt, mass, bp, bm, Pressure
-    real(8), dimension(dimension)   :: Vl, Vr, xy
-    real(8), dimension(dimension+2) :: F
+    mass = 0.5d0 * (rho(1) * (Vl(id) + Vtp) + rho(2) * (Vr(id) - Vtm) - x * dp / c)
+    pres = 0.5d0 * (p(1) + p(2) + (bp - bm) * (-dp) + (1.d0 - x) * (bp + bm - 1.d0) * (p(1) + p(2)))
+    F(:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:)) + pres * Norm(:)
+  end function SLAU1
 
-    call set_q(Ql,Qr,rhol,rhor,pl,pr,Vl,Vr)
-    call calc_quantities_AUSM(pl,pr,rhol,rhor,Vl,Vr,el,er,Hl,Hr,cl,cr)
+  attributes(device) function HRSLAU2(id_slau,id,rho,p,V,Norm,HR,sensor) result(F)
+    integer(kind=4), intent(in), value                  :: id_slau
+    integer, intent(in), value                          :: id
+    real(8), intent(in), dimension(2), device           :: rho, p
+    real(8), intent(in), dimension(2,dimension), device :: V
+    real(8), intent(in), dimension(dimension+2), device :: Norm
+    real(8), intent(in), value                          :: HR
+    real(8), intent(in), value, optional                :: sensor
+    real(8) c, Vl(dimension), Vr(dimension), Mp, Mm, M, x
+    real(8) Vtp, Vtm, dp, bp, bm, mass, pres, V2
+    real(8), dimension(dimension+2) :: F, phil, phir
+    call SLAU_common(id,rho,p,V,c,Mp,Mm,bp,bm,dp,Vtp,Vtm,Vl,Vr,phil,phir)
+    V2 = sqrt(0.5d0 * q2(Vl(:), Vr(:)))
+    M  = min(1.d0, V2 / c)
+    x  = (1.d0 - M) ** 2
 
-    Vp = Vl(id_dim)
-    Vm = Vr(id_dim)
-    Vt = (rhol * abs(Vp) + rhor * abs(Vm)) / (rhol + rhor)
-    ! mass flux
-    mass = 0.5d0 * (rhol * Vl(id_dim) + rhor * Vr(id_dim) - Vt * (rhor - rhol))
-    ! pressure flux
-    bp = 0.5d0 * (1.d0 + sign(1.d0,  Vp)) 
-    bm = 0.5d0 * (1.d0 + sign(1.d0, -Vm))
-    Pressure = bp * pl + bm * pr
-    F(:) = flux_AUSM(mass,Pressure,Hl,Hr,fd,Vl,Vr,Normal)
-  end function simpleSLAU
+    mass = 0.5d0 * (rho(1) * (Vl(id) + Vtp) + rho(2) * (Vr(id) - Vtm) - x * dp / c)
+    pres = 0.5d0 * (p(1) + p(2) + (bp - bm) * (-dp) + HR * V2 * (bp + bm - 1.d0) * 0.5d0 * (rho(1) + rho(2)) * c)
+    F(:) = 0.5d0 * ((mass + abs(mass)) * phil(:) + (mass - abs(mass)) * phir(:)) + pres * Norm(:)
+  end function HRSLAU2
+
+  attributes(device) function VHRSLAU2(id_slau,id,rho,p,V,Norm,HR,sensor) result(F)
+    integer(kind=8), intent(in), value                  :: id_slau
+    integer, intent(in), value                          :: id
+    real(8), intent(in), dimension(2), device           :: rho, p
+    real(8), intent(in), dimension(2,dimension), device :: V
+    real(8), intent(in), dimension(dimension+2), device :: Norm
+    real(8), intent(in), value                          :: HR, sensor
+    real(8) c, Vl(dimension), Vr(dimension), Mp, Mm, M, x
+    real(8) Vtp, Vtm, dp, bp, bm, mass, pres, V2
+    real(8), dimension(dimension+2) :: F, phil, phir
+    call SLAU_common(id,rho,p,V,c,Mp,Mm,bp,bm,dp,Vtp,Vtm,Vl,Vr,phil,phir)
+    V2 = sqrt(0.5d0 * q2(Vl(:), Vr(:)))
+    M  = min(1.d0, V2 / c)
+    x   = (1.d0 - M) ** 2
+
+    mass = 0.5d0 * (rho(1) * (Vl(id) + Vtp) + rho(2) * (Vr(id) - Vtm) - x * dp / c)
+    pres = 0.5d0 * (p(1) + p(2) + (bp - bm) * (-dp) + HR * V2 * (bp + bm - 1.d0) * 0.5d0 * (rho(1) + rho(2)) * c)
+    F(:) = 0.5d0 * (mass * (phil(:) + phir(:)) - sigmoid(sensor) * abs(mass) * (phir(:) - phil(:))) + pres * Norm(:)
+  end function VHRSLAU2
 end module calc_slau
 

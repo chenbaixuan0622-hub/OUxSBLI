@@ -1,5 +1,5 @@
 module set
-  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, rho0, u0, p0, T0, M0
+  use mod_globals, only : id_rescale, nx, ny, nz, nre, Lx, Ly, Lz, gamma, R, rho0, u0, p0, T0, M0
   implicit none
 contains
   subroutine calc_Blasius(eta,d,u,v)
@@ -36,12 +36,11 @@ contains
     enddo
     u = u0 * df
     v = 0.d0!0.5d0 * (nu0 / d) * (min(eta,8.8d0) * df - f)
-    !write(*,*) eta, f, df
   end subroutine calc_Blasius
 
-  subroutine set_grid(nx,ny,nz,x,y,z,dx,dy)
+  subroutine set_grid(nx,ny,nz,x,y,z,dx,dy,dz)
     integer, intent(in)   :: nx, ny, nz
-    real(8), intent(out)  :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1)
+    real(8), intent(out)  :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     integer i, j, k
     real(8) dx1, dy1, dz1
     dx1 = Lx / dble(nx-1)
@@ -60,16 +59,17 @@ contains
       y(j+1) = y(j) + dy(j)
     enddo
 
-    do k = 1, nz
-      z(k) = dble(k-1) * dz1
+    z(1) = 0.d0
+    do k = 1, nz-1
+      dz(k) = dz1
+      z(k+1) = z(k) + dz(k)
     enddo
   end subroutine set_grid
 
-  subroutine set_init(nx,ny,nz,xs,ys,zs,Q,Vin)
+  subroutine set_init(nx,ny,nz,xs,ys,zs,Q)
     integer, intent(in)                         :: nx, ny, nz
     real(8), intent(in)                         :: xs(nx), ys(ny), zs(nz)
     real(8), intent(out), dimension(nx,ny,nz,5) :: Q
-    real(8), intent(in), dimension(ny,2)        :: Vin
     integer i, j, k
     real(8) :: d = 0.2d0 * 1.d-3
     real(8) :: d1= 2.d-3
@@ -110,10 +110,11 @@ contains
     Q(:,1,:,5) = p_wall / (gamma - 1.d0)
   end subroutine set_init
   
-  subroutine set_bc(nx,ny,nz,Jacobian,QJ)
+  subroutine set_bc(nx,ny,nz,Jacobian,QJ,Qre)
     integer, intent(in), value      :: nx, ny, nz
     real(8), intent(in), device     :: Jacobian(nx,ny)
     real(8), intent(inout), device  :: QJ(nx,ny,nz,5) ! Q / Jacobian
+    real(8), intent(in)             :: Qre(2,ny,nz,5)
     integer i, j, k, l
     real(8) :: p_wall
     ! Riemann invariants
@@ -157,17 +158,27 @@ contains
         QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
     enddo;enddo
 
-    !$cuf kernel do(3)<<<*,*>>>
-    do l = 1, 5
-      do k = 2, nz-1
-        do j = 1, ny
-          ! inlet
-          QJ(1,j,k,l) = QJ(nx-3,j,k,l)
-          QJ(2,j,k,l) = QJ(nx-2,j,k,l)
-          ! outlet
-          QJ(nx-1,j,k,l) = QJ(3,j,k,l)
-          QJ(nx,j,k,l) = QJ(4,j,k,l)
-    enddo;enddo;enddo
+    if (kind(id_rescale) == 4) then
+      QJ(1:2,:,2:nz-1,:) = Qre(1:2,:,2:nz-1,:)
+      !$cuf kernel do(3)<<<*,*>>>
+      do l = 1, 5
+        do k = 2, nz-1
+          do j = 1, ny
+            QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
+      enddo;enddo;enddo
+    else
+      !$cuf kernel do(3)<<<*,*>>>
+      do l = 1, 5
+        do k = 2, nz-1
+          do j = 1, ny
+            ! inlet
+            QJ(1,j,k,l) = QJ(nx-3,j,k,l)
+            QJ(2,j,k,l) = QJ(nx-2,j,k,l)
+            ! outlet
+            QJ(nx-1,j,k,l) = QJ(3,j,k,l)
+            QJ(nx,j,k,l)   = QJ(4,j,k,l)
+      enddo;enddo;enddo
+    endif
 
     ! cyclic
     !$cuf kernel do(3)<<<*,*>>>

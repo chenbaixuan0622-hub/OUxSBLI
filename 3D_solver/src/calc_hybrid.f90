@@ -7,7 +7,7 @@ contains
     integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
-    real(8), intent(in), value                        :: dz ! 1 / dz
+    real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
     real(8), intent(in), dimension(nx,ny,nz), device  :: u, v, w, rho, p
     real(8), intent(out), dimension(nx,ny,nz), device :: fd
     integer i, j, k
@@ -23,9 +23,9 @@ contains
     dudy = (-u(i,j-1,k) + u(i,j+1,k)) * 0.25d0 * (dy(j-1) + dy(j))
     dvdy = (-v(i,j-1,k) + v(i,j+1,k)) * 0.25d0 * (dy(j-1) + dy(j))
     dwdy = (-w(i,j-1,k) + w(i,j+1,k)) * 0.25d0 * (dy(j-1) + dy(j))
-    dudz = (-u(i,j,k-1) + u(i,j,k+1)) * 0.5d0 * dz
-    dvdz = (-v(i,j,k-1) + v(i,j,k+1)) * 0.5d0 * dz
-    dwdz = (-w(i,j,k-1) + w(i,j,k+1)) * 0.5d0 * dz
+    dudz = (-u(i,j,k-1) + u(i,j,k+1)) * 0.25d0 * (dz(k-1) + dz(k))
+    dvdz = (-v(i,j,k-1) + v(i,j,k+1)) * 0.25d0 * (dz(k-1) + dz(k))
+    dwdz = (-w(i,j,k-1) + w(i,j,k+1)) * 0.25d0 * (dz(k-1) + dz(k))
     div = dudx + dvdy + dwdz
     rot(1) = dwdy - dvdz
     rot(2) = dudz - dwdx
@@ -55,103 +55,34 @@ contains
     endif
   end subroutine calc_Ducros
 
-  !attributes(global) subroutine calc_E_hybrid(nx,ny,nz,u,v,w,fd,E_upwind,E)
-    !integer, intent(in), value                                                          :: nx, ny, nz
-    !real(8), intent(in), dimension(nx,ny,nz), device                                    :: u, v, w, fd
-    !real(8), intent(in), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device     :: E_upwind
-    !real(8), intent(inout), dimension(nx-accuracy+1,ny-accuracy,nz-accuracy,5), device  :: E
-    ! Albada
-    !real(8) d1, d2, d3, phi_p, phi_m, phi, E_tvd(5)
-    !integer i, j, k
-    !real(8) fdx
-    !i = (blockIdx%x-1)*blockDim%x + threadIdx%x
-    !j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
-    !k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
-    !if (2 <= i) then
-    !  d1 = -e(i-1,j,k) / rho(i-1,j,k) + e(i,j,k) / rho(i,j,k)
-    !else
-    !  d1  = 0.d0
-    !endif
-    !d2 = -e(i,j,k) / rho(i,j,k) + e(i+1,j,k) / rho(i+1,j,k)
-    !if (i <= nx-2) then
-    !  d3 = -e(i+1,j,k) / rho(i+1,j,k) + e(i+2,j,k) / rho(i+2,j,k)
-    !else
-    !  d3 = 0.d0
-    !endif
-    !phi_p = (d2 * d1 + d1**2) / (d2**2 + d1**2 + eps)
-    !phi_m = (d2 * d3 + d3**2) / (d2**2 + d3**2 + eps)
-    !phi = min(phi_p, phi_m)
-    !E_tvd(:) = phi * E_keep(i-offset+1,j-offset,k-offset,:) + (1.d0 - phi) * E_upwind(i-offset+1,j-offset,k-offset,:)
+  attributes(device) function Albada(rho,p,V) result(phi)
+    real(8), intent(in), dimension(4), device   :: rho, p
+    real(8), intent(in), dimension(4,3), device :: V
+    integer i
+    real(8) :: e(4), d1, d2, d3, phim, phip, phi, eps = 1.d-16
+    do i = 1, 4
+      e(i)  = p(i) / (gamma - 1.d0) + 0.5d0 * rho(i) * (V(i,1)**2 + V(i,2)**2 + V(i,3)**2)
+    enddo
+    d1   = -e(1) / rho(1) + e(2) / rho(2)
+    d2   = -e(2) / rho(2) + e(3) / rho(3)
+    d3   = -e(3) / rho(3) + e(4) / rho(4)
+    phip = (d2 * d1 + d1**2) / (d2**2 + d1**2 + eps)
+    phim = (d2 * d3 + d3**2) / (d2**2 + d3**2 + eps)
+    phi  = min(phim, phip)
+  end function Albada
 
-    !fdx = max(fd(i,j,k), fd(i+1,j,k))
-    !E(i-offset+1,j-offset,k-offset,:) = (1.d0 - fdx) * E(i-offset+1,j-offset,k-offset,:) &
-    !& + fdx * E_upwind(i-offset+1,j-offset,k-offset,:)
-  !end subroutine calc_E_hybrid
-  
-  !attributes(global) subroutine calc_F_hybrid(nx,ny,nz,u,v,w,fd,F_upwind,F)
-    !integer, intent(in), value                                                          :: nx, ny, nz
-    !real(8), intent(in), dimension(nx,ny,nz), device                                    :: u, v, w, fd
-    !real(8), intent(in), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device     :: F_upwind
-    !real(8), intent(inout), dimension(nx-accuracy,ny-accuracy+1,nz-accuracy,5), device  :: F
-    ! Albada
-    !real(8) d1, d2, d3, phi_p, phi_m, phi, F_tvd(5)
-    !integer i, j, k
-    !real(8) fdy
-    !i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
-    !j = (blockIdx%y-1)*blockDim%y + threadIdx%y
-    !k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
-    !if (2 <= j) then
-    !  d1 = -e(i,j-1,k) / rho(i,j-1,k) + e(i,j,k) / rho(i,j,k)
-    !else
-    !  d1  = 0.d0
-    !endif
-    !d2 = -e(i,j,k) / rho(i,j,k) + e(i,j+1,k) / rho(i,j+1,k)
-    !if (j <= ny-2) then
-    !  d3 = -e(i,j+1,k) / rho(i,j+1,k) + e(i,j+2,k) / rho(i,j+2,k)
-    !else
-    !  d3 = 0.d0
-    !endif
-    !phi_p = (d2 * d1 + d1**2) / (d2**2 + d1**2 + eps)
-    !phi_m = (d2 * d3 + d3**2) / (d2**2 + d3**2 + eps)
-    !phi = min(phi_p, phi_m)
-    !F_tvd(:) = phi * F_keep(i-offset,j-offset+1,k-offset,:) + (1.d0 - phi) * F_upwind(i-offset,j-offset+1,k-offset,:)
+  attributes(device) function sigmoid(x) result(ans)
+    real(8), intent(in), value :: x
+    real(8) :: ans
+    ans = 0.5d0 * (tanh(10.d0 * (x - 0.5d0)) + 1.d0)
+  end function sigmoid
 
-    !fdy = max(fd(i,j,k), fd(i,j+1,k))
-    !F(i-offset,j-offset+1,k-offset,:) = (1.d0 - fdy) * F(i-offset,j-offset+1,k-offset,:) &
-    !& + fdy * F_upwind(i-offset,j-offset+1,k-offset,:)
- ! end subroutine calc_F_hybrid
-
-  !attributes(global) subroutine calc_G_hybrid(nx,ny,nz,u,v,w,fd,G_upwind,G)
-    !integer, intent(in), value                                                          :: nx, ny, nz
-    !real(8), intent(in), dimension(nx,ny,nz), device                                    :: u, v, w, fd
-    !real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device     :: G_upwind
-    !real(8), intent(inout), dimension(nx-accuracy,ny-accuracy,nz-accuracy+1,5), device  :: G
-    ! Albada
-    !real(8) d1, d2, d3, phi_p, phi_m, phi, G_tvd(5)
-    !integer i, j, k
-    !real(8) fdz
-    !i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
-    !j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
-    !k = (blockIdx%z-1)*blockDim%z + threadIdx%z
-    !if (2 <= k) then
-    !  d1 = -e(i,j,k-1) / rho(i,j,k-1) + e(i,j,k) / rho(i,j,k)
-    !else
-    !  d1  = 0.d0
-    !endif
-    !d2 = -e(i,j,k) / rho(i,j,k) + e(i,j,k+1) / rho(i,j,k+1)
-    !if (k <= nz-2) then
-    !  d3 = -e(i,j,k+1) / rho(i,j,k+1) + e(i,j,k+2) / rho(i,j,k+2)
-    !else
-    !  d3 = 0.d0
-    !endif
-    !phi_p = (d2 * d1 + d1**2) / (d2**2 + d1**2 + eps)
-    !phi_m = (d2 * d3 + d3**2) / (d2**2 + d3**2 + eps)
-    !phi = min(phi_p, phi_m)
-    !G_tvd(:) = phi * G_keep(i-offset,j-offset,k-offset+1,:) + (1.d0 - phi) * G_upwind(i-offset,j-offset,k-offset+1,:)
-    
-    !fdz = max(fd(i,j,k), fd(i,j,k+1))
-    !G(i-offset,j-offset,k-offset+1,:) = (1.d0 - fdz) * G(i-offset,j-offset,k-offset+1,:) &
-    !& + fdz * G_upwind(i-offset,j-offset,k-offset+1,:)
-  !end subroutine calc_G_hybrid
+  attributes(device) function wiggle_detector(phi) result(ans)
+    real(8), intent(in), device :: phi(4)
+    real(8) ans, phi1, phi2
+    phi1 = (-phi(1) + phi(2)) * (-phi(2) + phi(3))
+    phi2 = (-phi(3) + phi(4)) * (-phi(2) + phi(3))
+    ans  = 0.5d0 * (1.d0 - sign(1.d0, min(phi1, phi2)))
+  end function wiggle_detector
 end module calc_hybrid
 

@@ -1,0 +1,6 @@
+rm *.mod *.o *.out
+rm -rf data
+mkdir data
+mkdir data/1
+mkdir data/3
+

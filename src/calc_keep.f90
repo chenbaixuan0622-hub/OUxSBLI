@@ -4,212 +4,328 @@ module calc_keep
   use calc_term
   use calc_mat
   implicit none
+  interface Et2
+    module procedure EtKEEP2, EtKEEPPE2, EtKEP2
+  end interface
+
+  interface Et4
+    module procedure EtKEEP4, EtKEEPPE4, EtKEP4
+  end interface
+
+  interface Et6
+    module procedure EtKEEP6, EtKEEPPE6, EtKEP6
+  end interface
 contains
+  !KEEP energy!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! 2nd-order accuracy !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  attributes(device) function EtKEEP2(id_keep,id,C,rho,p,V1,V2) result(Et)
+    integer(kind=2), intent(in), value                :: id_keep
+    integer, intent(in), value                        :: id
+    real(8), intent(in), value                        :: C
+    real(8), intent(in), dimension(2), device         :: rho, p
+    real(8), intent(in), dimension(dimension), device :: V1, V2
+    real(8) :: IE, PV, KE, Et
+    IE = C * 0.5d0 * (p(1) / rho(1) + p(2) / rho(2)) / (gamma - 1.d0)
+    PV = 0.5d0 * (V1(id) * p(2) + V2(id) * p(1))
+    KE = 0.5d0 * C * vecsum(V1, V2)
+    Et = IE + PV + KE
+  end function EtKEEP2
+
+  attributes(device) function EtKEEPPE2(id_keep,id,C,rho,p,V1,V2) result(Et)
+    integer(kind=4), intent(in), value                :: id_keep
+    integer, intent(in), value                        :: id
+    real(8), intent(in), value                        :: C
+    real(8), intent(in), dimension(2), device         :: rho, p
+    real(8), intent(in), dimension(dimension), device :: V1, V2
+    real(8) :: IE, PV, KE, Et
+    IE = 0.25d0 * (V1(id) + V2(id)) * (p(1) + p(2)) / (gamma - 1.d0)
+    PV = 0.5d0 * (V1(id) * p(2) + V2(id) * p(1))
+    KE = 0.5d0 * C * vecsum(V1, V2)
+    Et = IE + PV + KE
+  end function EtKEEPPE2
+
+  attributes(device) function EtKEP2(id_keep,id,C,rho,p,V1,V2) result(Et)
+    integer(kind=8), intent(in), value                :: id_keep
+    integer, intent(in), value                        :: id
+    real(8), intent(in), value                        :: C
+    real(8), intent(in), dimension(2), device         :: rho, p
+    real(8), intent(in), dimension(dimension), device :: V1, V2
+    real(8) :: H, KE, Et
+    H  = C * 0.5d0 * gamma / (gamma - 1.d0) * (p(1) / rho(1) + p(2) / rho(2))
+    KE = 0.5d0 * C * vecsum(V1, V2)
+    Et = H + KE
+  end function EtKEP2
+
+  ! 4th-order accuracy !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  attributes(device) function  EtKEEP4(id_keep,id,rho,p,V,RhoV) result(Et)
+    integer(kind=2), intent(in), value                  :: id_keep
+    integer, intent(in), value                          :: id
+    real(8), intent(in), dimension(4), device           :: rho, p
+    real(8), intent(in), dimension(4,dimension), device :: V
+    real(8), intent(in), dimension(3), device           :: RhoV
+    real(8), dimension(4) :: P_over_Rho
+    real(8), dimension(3) :: RhoVIE, RhoVKE, VP, Et
+    P_over_Rho(:) = p(:) / rho(:)
+    RhoVIE(:)     = RhoPhiU4(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
+    RhoVKE(:)     = RhoUPhiPhi4(RhoV(:), V(:,:))
+    VP(:)         = PhiPsi4(V(:,id), p(:))
+    Et(:)         = RhoVIE(:) + RhoVKE(:) + VP(:)
+  end function EtKEEP4
+
+  attributes(device) function EtKEEPPE4(id_keep,id,rho,p,V,RhoV) result(Et)
+    integer(kind=4), intent(in), value                  :: id_keep
+    integer, intent(in), value                          :: id
+    real(8), intent(in), dimension(4), device           :: rho, p
+    real(8), intent(in), dimension(4,dimension), device :: V
+    real(8), intent(in), dimension(3), device           :: RhoV
+    real(8), dimension(3) :: Vm, RhoVIE, RhoVKE, VP, Et
+    Vm(:)     = Phi4(V(:,id))
+    RhoVIE(:) = RhoPhiU4(Vm(:), p(:)) / (gamma - 1.d0)    
+    RhoVKE(:) = RhoUPhiPhi4(RhoV(:), V(:,:))
+    VP(:)     = PhiPsi4(V(:,id), p(:))
+    Et(:)     = RhoVIE(:) + RhoVKE(:) + VP(:)
+  end function EtKEEPPE4
+
+  attributes(device) function EtKEP4(id_keep,id,rho,p,V,RhoV) result(Et)
+    integer(kind=8), intent(in), value                  :: id_keep
+    integer, intent(in), value                          :: id
+    real(8), intent(in), dimension(4), device           :: rho, p
+    real(8), intent(in), dimension(4,dimension), device :: V
+    real(8), intent(in), dimension(3), device           :: RhoV
+    real(8), dimension(3) :: RhoVH, RhoVKE, Et
+    real(8), dimension(4) :: P_over_Rho
+    integer i
+    P_over_Rho(:) = p(:) / rho(:)
+    RhoVH(:)      = RhoPhiU4(RhoV(:), P_over_Rho(:)) * gamma / (gamma - 1.d0)
+    RhoVKE(:)     = RhoUPhiPhi4(RhoV(:), V(:,:))
+    Et(:)         = RhoVH(:) + RhoVKE(:)
+  end function EtKEP4
+
+  ! 6th-order accuracy !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  attributes(device) function  EtKEEP6(id_keep,id,rho,p,V,RhoV) result(Et)
+    integer(kind=2), intent(in), value                  :: id_keep
+    integer, intent(in), value                          :: id
+    real(8), intent(in), dimension(6), device           :: rho, p
+    real(8), intent(in), dimension(6,dimension), device :: V
+    real(8), intent(in), dimension(6), device           :: RhoV
+    real(8), dimension(6) :: P_over_Rho
+    real(8), dimension(6) :: RhoVIE, RhoVKE, VP, Et
+    P_over_Rho(:) = p(:) / rho(:)
+    RhoVIE(:)     = RhoPhiU6(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
+    RhoVKE(:)     = RhoUPhiPhi6(RhoV(:), V(:,:))
+    VP(:)         = PhiPsi6(V(:,id), p(:))
+    Et(:)         = RhoVIE(:) + RhoVKE(:) + VP(:)
+  end function EtKEEP6
+
+  attributes(device) function EtKEEPPE6(id_keep,id,rho,p,V,RhoV) result(Et)
+    integer(kind=4), intent(in), value                  :: id_keep
+    integer, intent(in), value                          :: id
+    real(8), intent(in), dimension(6), device           :: rho, p
+    real(8), intent(in), dimension(6,dimension), device :: V
+    real(8), intent(in), dimension(6), device           :: RhoV
+    real(8), dimension(6) :: Vm, RhoVIE, RhoVKE, VP, Et
+    Vm(:)     = Phi6(V(:,id))
+    RhoVIE(:) = RhoPhiU6(Vm(:), p(:)) / (gamma - 1.d0)    
+    RhoVKE(:) = RhoUPhiPhi6(RhoV(:), V(:,:))
+    VP(:)     = PhiPsi6(V(:,id), p(:))
+    Et(:)     = RhoVIE(:) + RhoVKE(:) + VP(:)
+  end function EtKEEPPE6
+
+  attributes(device) function EtKEP6(id_keep,id,rho,p,V,RhoV) result(Et)
+    integer(kind=8), intent(in), value                  :: id_keep
+    integer, intent(in), value                          :: id
+    real(8), intent(in), dimension(6), device           :: rho, p
+    real(8), intent(in), dimension(6,dimension), device :: V
+    real(8), intent(in), dimension(6), device           :: RhoV
+    real(8), dimension(6) :: RhoVH, RhoVKE, Et
+    real(8), dimension(6) :: P_over_Rho
+    integer i
+    P_over_Rho(:) = p(:) / rho(:)
+    RhoVH(:)      = RhoPhiU6(RhoV(:), P_over_Rho(:)) * gamma / (gamma - 1.d0)
+    RhoVKE(:)     = RhoUPhiPhi6(RhoV(:), V(:,:))
+    Et(:)         = RhoVH(:) + RhoVKE(:)
+  end function EtKEP6
+
+  !KEEP main!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
   attributes(device) function KEEP2(id,rho,p,V,Normal) result(F)
+    use mod_globals, only : id_keep
     integer, intent(in), value                          :: id
     real(8), intent(in), dimension(2), device           :: rho, p
     real(8), intent(in), dimension(2,dimension), device :: V
-    real(8), intent(in), dimension(dimension), device   :: Normal
+    real(8), intent(in), dimension(dimension+2), device :: Normal
     real(8), dimension(dimension+2) :: F
-    real(8)                         :: Rho_m, P_m, PRho
-    real(8), dimension(dimension)   :: V_m, V1, V2
+    real(8), dimension(dimension)   :: Vm, V1, V2
     V1(:) = V(1,:)
     V2(:) = V(2,:)
-    Rho_m = 0.5d0 * (rho(1) + rho(2))
-    ! contravariant velocity
-    V_m(:) = 0.5d0 * (V1(:) + V2(:)) * Normal(id)
-    P_m = 0.5d0 * (p(1) + p(2))
-    PRho = 0.5d0 * (p(1) / rho(1) + p(2) / rho(2))
-    F(1) = Rho_m * V_m(id)
-    F(2:dimension+1) = F(1) * V_m(:) + P_m * Normal(:)
-    F(dimension+2) = F(1) * PRho / (gamma - 1.d0) &
-    & + 0.5d0 * F(1) * vecsum(V1, V2) &
-    & + 0.5d0 * (V(1,id) * p(2) + V(2,id) * p(1)) * Normal(id)
+    Vm(:) = 0.5d0 * (V1(:) + V2(:))
+    F(1)  = 0.5d0 * (rho(1) + rho(2)) * Vm(id)
+    F(2:dimension+1) = F(1) * Vm(:) + 0.5d0 * (p(1) + p(2)) * Normal(2:dimension+1)
+    F(dimension+2) = Et2(id_keep,id,F(1),rho,p,V1,V2)
   end function KEEP2
 
   attributes(device) function KEEP4(id,rho,p,V,Normal) result(F)
+    use mod_globals, only : id_keep
     integer, intent(in), value                          :: id
     real(8), intent(in), dimension(4), device           :: rho, p
     real(8), intent(in), dimension(4,dimension), device :: V
-    real(8), intent(in), dimension(dimension), device   :: Normal
-    real(8), dimension(4)           :: P_over_Rho
+    real(8), intent(in), dimension(dimension+2), device :: Normal
     real(8), dimension(dimension+2) :: F
-    real(8), dimension(3)           :: V_m, RhoV, RhoVIE, RhoVKE, VP, Energy
+    real(8), dimension(3)           :: RhoV, Energy
     real(8), dimension(3,dimension) :: RhoVV_P
     integer i
-    RhoV(:) = RhoPhi(rho(:), V(:,id))
-    ! energy equation
-    P_over_Rho(:) = p(:) / rho(:)
-    !V_m(:) = Phi(V(:,id))
-    RhoVIE(:) = RhoPhiU(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
-    RhoVKE(:) = RhoUPhiPhi(RhoV(:), V(:,:))
-    VP(:) = PhiPsi(V(:,id), p(:))
-
-    Energy(:) = RhoVIE(:) + RhoVKE(:) + VP(:)
-    F(1) = Flux(RhoV(:))
+    RhoV(:) = RhoPhi4(rho(:), V(:,id))
+    F(1)    = Flux4(RhoV(:))
     do i = 1, dimension
-      RhoVV_P(:,i) = RhoPhiU(RhoV(:), V(:,i)) + Phi(p(:)) * Normal(i)
-      F(i+1) = Flux(RhoVV_P(:,i))
+      RhoVV_P(:,i) = RhoPhiU4(RhoV(:), V(:,i)) + Phi4(p(:)) * Normal(i+1)
+      F(i+1)       = Flux4(RhoVV_P(:,i))
     enddo
-    F(dimension+2) = Flux(Energy(:))
+    Energy(:) =  Et4(id_keep,id,rho,p,V,RhoV)
+    F(dimension+2) = Flux4(Energy(:))
   end function KEEP4
 
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-  attributes(device) function KEEPFVS2(id,rho,p,V,Normal,fd) result(F)
+  attributes(device) function KEEP6(id,rho,p,V,Normal) result(F)
+    use mod_globals, only : id_keep
     integer, intent(in), value                          :: id
-    real(8), intent(in), dimension(2), device           :: rho, p
-    real(8), intent(in), dimension(2,dimension), device :: V
-    real(8), intent(in), dimension(dimension), device   :: Normal
-    real(8), intent(in), value                          :: fd
+    real(8), intent(in), dimension(6), device           :: rho, p
+    real(8), intent(in), dimension(6,dimension), device :: V
+    real(8), intent(in), dimension(dimension+2), device :: Normal
     real(8), dimension(dimension+2) :: F
-    real(8)                         :: C, IE, KE, PG, PD
-    real(8), dimension(dimension)   :: V1, V2, M
-    real(8) Rho_m, P_m, PRho
-    real(8), device :: V_m(dimension)
-    ! FVS
-    real(8) e1, e2, H1, H2, c1, c2, cave, uave, Mach
-    real(8), dimension(dimension+2), device             :: Q1, Q2
-    real(8), dimension(dimension+2,dimension+2), device :: A1, A2
-    V1(:) = V(1,:)
-    V2(:) = V(2,:)
-    ! mass convection
-    !C = 0.25d0 * (rho(1) + rho(2)) * (V1(id) + V2(id))
-    ! momentum convection
-    !M(:) = C * 0.5d0 * (V1(:) + V2(:))
-    ! internal energy
-    !IE = C * (p(1) / rho(1) + p(2) / rho(2)) / (2.d0 * (gamma - 1.d0))
-    ! kinetic energy
-    !KE = C * 0.5d0 * vecsum(V1, V2)
-    ! pressure gradient
-    !PG = 0.5d0 * (p(1) + p(2))
-    ! pressure diffusion
-    !PD = 0.5d0 * (V1(id) * p(2) + V2(id) * p(1))
-    !F(1) = C
-    !F(2:dimension+1) = M(:) + PG * Normal(:)
-    !F(dimension+2) = IE + KE + PD
-    Rho_m = 0.5d0 * (rho(1) + rho(2))
-    ! contravariant velocity
-    V_m(:) = 0.5d0 * (V1(:) + V2(:)) * Normal(id)
-    P_m = 0.5d0 * (p(1) + p(2))
-    PRho = 0.5d0 * (p(1) / rho(1) + p(2) / rho(2))
-    F(1) = Rho_m * V_m(id)
-    F(2:dimension+1) = F(1) * V_m(:) + P_m * Normal(:)
-    F(dimension+2) = V_m(id) * P_m / (gamma - 1.d0) &
-    & + 0.5d0 * F(1) * vecsum(V1, V2) &
-    & + 0.5d0 * (V(1,id) * p(2) + V(2,id) * p(1)) * Normal(id)
-    ! Flux Vector Spliting
-    e1 = p(1) / (gamma - 1.d0) + 0.5d0 * rho(1) * vecsum(V1(:), V1(:))
-    e2 = p(2) / (gamma - 1.d0) + 0.5d0 * rho(2) * vecsum(V2(:), V2(:))
-    H1 = e1 + p(1) 
-    H2 = e2 + p(2)
-    c1 = sqrt(gamma * p(1) / rho(1))
-    c2 = sqrt(gamma * p(2) / rho(2))
-    cave = (sqrt(rho(1)) * c1     + sqrt(rho(2)) * c2)     / (sqrt(rho(1)) + sqrt(rho(2)))
-    uave = (sqrt(rho(1)) * V1(id) + sqrt(rho(2)) * V2(id)) / (sqrt(rho(1)) + sqrt(rho(2)))
-    Mach = abs(uave) / cave
-    A1(:,:) = calc_AB(id,rho(1),H1,c1,V1(:))
-    A2(:,:) = calc_AB(id,rho(2),H2,c2,V2(:))
-    Q1(1) = rho(1)
-    Q2(1) = rho(2)
-    Q1(2:dimension+1) = rho(1) * V1(:)
-    Q2(2:dimension+1) = rho(2) * V2(:)
-    Q1(dimension+2) = e1
-    Q2(dimension+2) = e2
-    F(:) = F(:) - 0.5d0 * min(1.d0, Mach**2) * fd * (cumatmul(A2(:,:), Q2(:)) - cumatmul(A1(:,:), Q1(:)))
-  end function KEEPFVS2
+    real(8), dimension(6)           :: RhoV, Energy
+    real(8), dimension(6,dimension) :: RhoVV_P
+    integer i
+    RhoV(:) = RhoPhi6(rho(:), V(:,id))
+    F(1)    = Flux6(RhoV(:))
+    do i = 1, dimension
+      RhoVV_P(:,i) = RhoPhiU6(RHoV(:), V(:,i)) + Phi6(p(:)) * Normal(i+1)
+      F(i+1)       = Flux6(RhoVV_P(:,i))
+    enddo
+    Energy(:) = Et6(id_keep,id,rho,p,V,RhoV)
+    F(dimension+2) = Flux6(Energy(:))
+  end function KEEP6
 
-  attributes(device) function KEEPFVS4(id,rho,p,V,Normal,fd) result(F)
+  !end KEEP main!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  attributes(device) function KEEPUP(id,rho,p,V,rholr,plr,Vlr,Normal,sensor) result(F)
     integer, intent(in), value                          :: id
     real(8), intent(in), dimension(4), device           :: rho, p
     real(8), intent(in), dimension(4,dimension), device :: V
-    real(8), intent(in), dimension(dimension), device   :: Normal
-    real(8), intent(in), value                          :: fd
+    real(8), intent(in), dimension(2), device           :: rholr, plr
+    real(8), intent(in), dimension(2,dimension), device :: Vlr
+    real(8), intent(in), dimension(dimension+2), device :: Normal
+    real(8), intent(in), value                          :: sensor
     real(8), dimension(4)           :: P_over_Rho
     real(8), dimension(dimension+2) :: F
-    real(8), dimension(3)           :: RhoV, RhoVIE, RhoVKE, VP, Energy
+    real(8), dimension(3)           :: Vm, RhoV, RhoVIE, RhoVKE, VP, Energy
     real(8), dimension(3,dimension) :: RhoVV_P
     integer i
-    ! FVS
-    real(8) e1, e2, H1, H2, c1, c2, cave, uave, Mach
-    real(8), dimension(dimension), device               :: V1, V2
-    real(8), dimension(dimension+2), device             :: Q1, Q2
-    real(8), dimension(dimension+2,dimension+2), device :: A1, A2
-    RhoV(:) = RhoPhi(rho(:), V(:,id))
-    ! energy equation
+    !real(8), dimension(dimension+2) :: F
+    !real(8)                         :: Rhom, Pm, PRho
+    ! upwind
+    !real(8) Vroe, dV(dimension)
+    ! SLAU
+    real(8) press, cl, cr, c, Mp, Mm, M, x, bp, bm, V1(dimension), V2(dimension)
+    ! SLAU pressure term
+    cl = sqrt(gamma * plr(1) / rholr(1))
+    cr = sqrt(gamma * plr(2) / rholr(2))
+    c  = 0.5d0 * (cl + cr)
+    V1 = Vlr(1,:)
+    V2 = Vlr(2,:)
+    Mp = V1(id) / c
+    Mm = V2(id) / c
+    if (abs(Mp) < 1.d0) then
+      bp = 0.25d0 * (2.d0 - Mp) * (Mp + 1.d0) ** 2
+    else
+      bp = 0.5d0 * (1.d0 + sign(1.d0, Mp))
+    endif
+    if (abs(Mm) < 1.d0) then
+      bm = 0.25d0 * (2.d0 + Mm) * (Mm - 1.d0) ** 2
+    else
+      bm = 0.5d0 * (1.d0 + sign(1.d0, -Mm))
+    endif
+    M = min(1.d0, sqrt(0.5d0 * q2(V1, V2)) / c)
+    x = (1.d0 - M)**2
+    !press = 0.5d0 * (plr(1) + plr(2) + (bp - bm) * (plr(1) - plr(2)) + (1.d0 - x) * (bp + bm - 1.d0) * (plr(1) + plr(2)))
+    press = 0.5d0 * (plr(1) + plr(2))
+
+    RhoV(:) = RhoPhi4(rho(:), V(:,id))
+    ! KEEP
     P_over_Rho(:) = p(:) / rho(:)
-    RhoVIE(:) = RhoPhiU(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
-    RhoVKE(:) = RhoUPhiPhi(RhoV(:), V(:,:))
-    VP(:) = PhiPsi(V(:,id), p(:))
+    RhoVIE(:)     = RhoPhiU4(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
+
+    ! KEEP PE
+    !Vm(:) = Phi(V(:,id))
+    !RhoVIE(:) = RhoPhiU(Vm(:), p(:)) / (gamma - 1.d0)    
+
+    RhoVKE(:) = RhoUPhiPhi4(RhoV(:), V(:,:))
+    VP(:)     = PhiPsi4(V(:,id), p(:))
 
     Energy(:) = RhoVIE(:) + RhoVKE(:) + VP(:)
-    F(1) = Flux(RhoV(:))
+    F(1)      = Flux4(RhoV(:))
     do i = 1, dimension
-      RhoVV_P(:,i) = RhoPhiU(RhoV(:), V(:,i)) + Phi(p(:)) * Normal(i)
-      F(i+1) = Flux(RhoVV_P(:,i))
+      !RhoVV_P(:,i) = RhoPhiU(RhoV(:), V(:,i)) + Phi(p(:)) * Normal(i+1)
+      !F(i+1)       = Flux(RhoVV_P(:,i))
+      RhoVV_P(:,i) = RhoPhiU4(RhoV(:), V(:,i))
+      F(i+1)       = Flux4(RhoVV_P(:,i)) + press * Normal(i+1)
     enddo
-    F(dimension+2) = Flux(Energy(:))
-    ! Flux Vector Spliting
-    V1(:) = V(2,:)
-    V2(:) = V(3,:)
-    e1 = p(2) / (gamma - 1.d0) + 0.5d0 * rho(2) * vecsum(V1(:), V1(:))
-    e2 = p(3) / (gamma - 1.d0) + 0.5d0 * rho(3) * vecsum(V2(:), V2(:))
-    H1 = e1 + p(2)
-    H2 = e2 + p(3)
-    c1 = sqrt(gamma * p(2) / rho(2))
-    c2 = sqrt(gamma * p(3) / rho(3))
-    cave = (sqrt(rho(2)) * c1     + sqrt(rho(3)) * c2)     / (sqrt(rho(2)) + sqrt(rho(3)))
-    uave = (sqrt(rho(2)) * V1(id) + sqrt(rho(3)) * V2(id)) / (sqrt(rho(2)) + sqrt(rho(3)))
-    Mach = abs(uave) / cave
-    A1(:,:) = calc_AB(id,rho(2),H1,c1,V1(:))
-    A2(:,:) = calc_AB(id,rho(3),H2,c2,V2(:))
-    Q1(1) = rho(2)
-    Q2(1) = rho(3)
-    Q1(2:dimension+1) = rho(2) * V(2,:)
-    Q2(2:dimension+1) = rho(3) * V(3,:)
-    Q1(dimension+2) = e1
-    Q2(dimension+2) = e2
-    F(:) = F(:) - 0.5d0 * min(1.d0, Mach**2) * fd * (cumatmul(A2(:,:), Q2(:)) - cumatmul(A1(:,:), Q1(:)))
-  end function KEEPFVS4
-
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-  attributes(device) function KEEPUP(id,rho,p,V,Normal,Ma) result(F)
-    integer, intent(in), value                          :: id
-    real(8), intent(in), dimension(2), device           :: rho, p
-    real(8), intent(in), dimension(2,dimension), device :: V
-    real(8), intent(in), dimension(dimension), device   :: Normal
-    real(8), intent(in), value                          :: Ma
-    real(8), dimension(dimension+2) :: F
-    real(8)                         :: C, IE, KE, PG, PD, uave, phi, psi
-    real(8), dimension(dimension)   :: V1, V2, M
-    V1(:) = V(1,:)
-    V2(:) = V(2,:)
-    uave = (sqrt(rho(1)) * V1(id) + sqrt(rho(2)) * V2(id)) / (sqrt(rho(1)) + sqrt(rho(2)))
-    ! blend central and upwind
-    phi = 0.5d0
-    psi = 0.d0!min(1.d0, Ma)
-    ! mass convection
-    C = 0.5d0 * (phi * (rho(1) * V1(id) + rho(2) * V2(id)) + (1.d0 - phi) * (rho(1) * V2(id) + rho(2) * V1(id)) &
-    & - psi * abs(uave) * (-rho(1) + rho(2)))
-    ! momentum convection
-    M(:) = 0.5d0 * (C * (V1(:) + V2(:)) - psi * abs(C) * (-V1(:) + V2(:)))
-    ! internal energy
-    IE = (C * (p(1) / rho(1) + p(2) / rho(2)) - psi * abs(C) * (-p(1) / rho(1) + p(2) / rho(2))) / (2.d0 * (gamma - 1.d0))
-    ! kinetic energy
-    KE = (1.d0 - psi) * C * 0.5d0 * vecsum(V1, V2) &
-    & + 0.25d0 * psi * (C * (vecsum(V1, V1) + vecsum(V2,V2)) - abs(C) * (-vecsum(V1, V1) + vecsum(V2, V2)))
-    ! pressure gradient
-    PG = 0.5d0 * (p(1) + p(2))
-    !PG = 0.5d0 * ((p(1) + p(2)) - psi * (-p(1) + p(2)) * C / abs(C))
-    ! pressure diffusion
-    PD = 0.5d0 * (V1(id) * p(2) + V2(id) * p(1))
-    !PD = 0.5d0 * ((1.d0 - psi) * (V1(id) * p(2) + V2(id) * p(1)) &
-    !& + psi * (V1(id) * p(1) + V2(id) * p(2) - (-V1(id) * p(1) + V2(id) * p(2)) * C / abs(C)))
-
-    F(1) = C
-    F(2:dimension+1) = M(:) + PG * Normal(:)
-    F(dimension+2) = IE + KE + PD
+    F(dimension+2) = Flux4(Energy(:))
   end function KEEPUP
+
+  attributes(device) function KEEPRho(id,rho,p,V,Normal,rho2,p2,V2,sensor) result(F)
+    integer, intent(in), value                          :: id
+    real(8), intent(in), dimension(4), device           :: rho, p
+    real(8), intent(in), dimension(4,dimension), device :: V
+    real(8), intent(in), dimension(dimension+2), device :: Normal
+    real(8), intent(in), dimension(2), device           :: rho2, p2
+    real(8), intent(in), dimension(2,dimension), device :: V2
+    real(8), intent(in), value                          :: sensor
+    real(8), dimension(4)           :: P_over_Rho
+    real(8), dimension(dimension+2) :: F, Ql, Qr, dQ
+    real(8), dimension(3)           :: RhoV, RhoVIE, RhoVKE, VP, Energy
+    real(8), dimension(3,dimension) :: RhoVV_P
+    real(8), dimension(dimension)   :: Vl, Vr, V_ave
+    integer i
+    real(8) rho_ave, Hl, Hr, H_ave, c_ave, el, er, mat(dimension+2,dimension+2)
+    RhoV(:) = RhoPhi4(rho(:), V(:,id))
+    ! energy equation
+    P_over_Rho(:) = p(:) / rho(:)
+    RhoVIE(:)     = RhoPhiU4(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
+    RhoVKE(:)     = RhoUPhiPhi4(RhoV(:), V(:,:))
+    VP(:)         = PhiPsi4(V(:,id), p(:))
+
+    Energy(:) = RhoVIE(:) + RhoVKE(:) + VP(:)
+    F(1) = Flux4(RhoV(:))
+    do i = 1, dimension
+      RhoVV_P(:,i) = RhoPhiU4(RhoV(:), V(:,i)) + Phi4(p(:)) * Normal(i+1)
+      F(i+1)       = Flux4(RhoVV_P(:,i))
+    enddo
+    F(dimension+2) = Flux4(Energy(:))
+
+    Vl = V2(1,:)
+    Vr = V2(2,:)
+    el = p2(1) / (gamma - 1.d0) + 0.5d0 * rho2(1) * vecsum(Vl(:), Vl(:))
+    er = p2(2) / (gamma - 1.d0) + 0.5d0 * rho2(2) * vecsum(Vr(:), Vr(:))
+    Hl = (el + p2(1)) / rho2(1)
+    Hr = (er + p2(2)) / rho2(2)
+
+    rho_ave  = sqrt(rho(1) * rho(2))
+    V_ave(:) = (sqrt(rho(1)) * Vl(:) + sqrt(rho(2)) * Vr(:)) / (sqrt(rho(1)) + sqrt(rho(2)))
+    H_ave    = (sqrt(rho(1)) * Hl    + sqrt(rho(2)) * Hr)    / (sqrt(rho(1)) + sqrt(rho(2)))
+    c_ave    = sqrt((gamma - 1.d0) * (H_ave - 0.5d0 * vecsum(V_ave(:), V_ave(:))))
+
+    Ql(1)             = rho(1)
+    Ql(2:dimension+1) = rho(1) * Vl(:)
+    Ql(dimension+2)   = el
+    Qr(1)             = rho(2)
+    Qr(2:dimension+1) = rho(2) * Vr(:)
+    Qr(dimension+2)   = er
+
+    !mat(:,:) = calc_AB(id, rho_ave, H_ave, c_ave, V_ave)
+    dQ(:)    = Qr(:) - Ql(:)
+    F(:)     = F(:) - 0.5d0 * sensor * cumatmul(mat(:,:), dQ(:))
+  end function KEEPRho
 end module calc_keep
 

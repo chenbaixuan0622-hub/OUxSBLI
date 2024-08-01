@@ -1,6 +1,5 @@
 module set
-  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, u0, T0, &
-  & beta, theta, M0, Ms, Ms2, a1, rho0, rho2, p0, p2, u1, u2, v1, v2, u_magnitude, ux, uy
+  use mod_globals, only : id_rescale, nx, ny, nz, nre, Lx, Ly, Lz, gamma, R, rho0, u0, p0, T0, M0
   implicit none
 contains
   subroutine calc_Blasius(eta,d,u,v)
@@ -36,12 +35,12 @@ contains
       endif
     enddo
     u = u0 * df
-    v = 0.d0
+    v = 0.d0!0.5d0 * (nu0 / d) * (min(eta,8.8d0) * df - f)
   end subroutine calc_Blasius
 
-  subroutine set_grid(nx,ny,nz,x,y,z,dx,dy)
+  subroutine set_grid(nx,ny,nz,x,y,z,dx,dy,dz)
     integer, intent(in)   :: nx, ny, nz
-    real(8), intent(out)  :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1)
+    real(8), intent(out)  :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     integer i, j, k
     real(8) dx1, dy1, dz1
     dx1 = Lx / dble(nx-1)
@@ -55,12 +54,15 @@ contains
 
     y(1) = 0.d0
     do j = 1, ny-1
-      dy(j) = max(0.125d0, 2.d0 * dble(j)/dble(ny)) * dy1
+      dy(j) = max(0.05d0, 2.d0 * dble(j)/dble(ny)) * dy1
+      !dy(j) = dy1
       y(j+1) = y(j) + dy(j)
     enddo
 
-    do k = 1, nz
-      z(k) = dble(k-1) * dz1
+    z(1) = 0.d0
+    do k = 1, nz-1
+      dz(k) = dz1
+      z(k+1) = z(k) + dz(k)
     enddo
   end subroutine set_grid
 
@@ -68,21 +70,20 @@ contains
     integer, intent(in)                         :: nx, ny, nz
     real(8), intent(in)                         :: xs(nx), ys(ny), zs(nz)
     real(8), intent(out), dimension(nx,ny,nz,5) :: Q
-    integer i, j, k, No
+    integer i, j, k
     real(8) :: d = 0.2d0 * 1.d-3
     real(8) :: d1= 2.d-3
     real(8) :: eta, rho, u, v, w, T, p_wall
     ! random
     real(8) :: std, ustd, Tstd
-    No = int(0.35 * nx)
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
           eta = ys(j) / d
           call calc_Blasius(eta,d,u,v)
           if (ys(j) <= d1) then
-            call random_number(std)
-            std = 2.d0 * std - 1.d0
+            call random_number(std)   ! 0 <= std <= 1
+            std = 2.d0 * std - 1.d0   !-1 <= std <= 1
           else
             std = 0.d0
           endif
@@ -100,16 +101,6 @@ contains
           Q(i,j,k,5) = p0 / (gamma - 1.d0) + 0.5d0 * (Q(i,j,k,2)**2 + Q(i,j,k,3)**2 + Q(i,j,k,4)**2) / Q(i,j,k,1)
     enddo;enddo;enddo
 
-    ! oblique shock
-    do k = 2, nz-1
-      do i = No+1, nx
-        Q(i,ny,k,1) = rho2
-        Q(i,ny,k,2) = rho2 * ux
-        Q(i,ny,k,3) = rho2 * uy
-        Q(i,ny,k,4) = 0.d0
-        Q(i,ny,k,5) = p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)
-    enddo;enddo
-
     ! bottom
     Q(:,1,:,1) = Q(:,2,:,1)
     Q(:,1,:,2) = 0.d0
@@ -119,39 +110,21 @@ contains
     Q(:,1,:,5) = p_wall / (gamma - 1.d0)
   end subroutine set_init
   
-  subroutine set_bc(nx,ny,nz,Jacobian,QJ)
-    integer, intent(in), value          :: nx, ny, nz
-    real(8), intent(in), device         :: Jacobian(nx,ny)
-    real(8), intent(inout), device      :: QJ(nx,ny,nz,5)
-    integer i, j, k, l, No, Nre
+  subroutine set_bc(nx,ny,nz,Jacobian,QJ,Qre)
+    integer, intent(in), value      :: nx, ny, nz
+    real(8), intent(in), device     :: Jacobian(nx,ny)
+    real(8), intent(inout), device  :: QJ(nx,ny,nz,5) ! Q / Jacobian
+    real(8), intent(in)             :: Qre(2,ny,nz,5)
+    integer i, j, k, l
     real(8) :: p_wall
     ! Riemann invariants
     real(8) :: pin, cin, vin, Rp, Rm, rhob, vb, cb, pb
     real(8) :: v0 = 0.d0
     real(8) :: c0 = sqrt(gamma * p0 / rho0)
-    No = int(0.35 * nx)
-    Nre = int(0.3 * nx)
-    !$cuf kernel do<<<*,*>>>
-    do k = 2, nz-1
-      do j = 2, ny-1
-        ! inlet
-        QJ(1,j,k,1) = QJ(Nre,j,k,1)
-        QJ(1,j,k,2) = QJ(Nre,j,k,2)
-        QJ(1,j,k,3) = QJ(Nre,j,k,3)
-        QJ(1,j,k,4) = QJ(Nre,j,k,4)
-        QJ(1,j,k,5) = QJ(Nre,j,k,5)
-        ! outlet
-        QJ(nx,j,k,1) = QJ(nx-1,j,k,1)
-        QJ(nx,j,k,2) = QJ(nx-1,j,k,2)
-        QJ(nx,j,k,3) = QJ(nx-1,j,k,3)
-        QJ(nx,j,k,4) = QJ(nx-1,j,k,4)
-        QJ(nx,j,k,5) = QJ(nx-1,j,k,5)
-    enddo;enddo
-
-    ! Riemann boundary condition
     !$cuf kernel do(2)<<<*,*>>>
     do k = 2, nz-1
-      do i = 1, No
+      do i = 2, nx-1
+        ! top
         ! Riemann invariants
         pin = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) / QJ(i,ny-1,k,1)) &
         & * Jacobian(i,ny-1)
@@ -169,23 +142,13 @@ contains
         cb = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
         pb = (rhob * cb**2) / gamma
         QJ(i,ny,k,5) = (pb / (gamma - 1.d0)) / Jacobian(i,ny)  + 0.5d0 * (QJ(i,ny,k,2)**2 + QJ(i,ny,k,3)**2 + QJ(i,ny,k,4)**2) / QJ(i,ny,k,1)
-    enddo;enddo
 
-    ! oblique shock
-    !$cuf kernel do(2)<<<*,*>>>
-    do k = 2, nz-1
-      do i = No+1, nx
-        QJ(i,ny,k,1) = rho2 / Jacobian(i,ny)
-        QJ(i,ny,k,2) = rho2 * ux / Jacobian(i,ny)
-        QJ(i,ny,k,3) = rho2 * uy / Jacobian(i,ny)
-        QJ(i,ny,k,4) = 0.d0
-        QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(i,ny)
-    enddo;enddo
-
-    ! bottom
-    !$cuf kernel do(2)<<<*,*>>>
-    do k = 2, nz-1
-      do i = 1, nx
+        ! Neumann boundary condition
+        !QJ(i,ny,k,1) = rhob
+        !QJ(i,ny,k,2) = QJ(i,ny-1,k,2)
+        !QJ(i,ny,k,3) = QJ(i,ny-1,k,3)
+        !QJ(i,ny,k,4) = QJ(i,ny-1,k,4)
+        !QJ(i,ny,k,5) = QJ(i,ny-1,k,5)
         ! NoSlip
         QJ(i,1,k,1) = QJ(i,2,k,1)
         QJ(i,1,k,2) = 0.d0
@@ -194,6 +157,28 @@ contains
         p_wall = (gamma - 1.d0) * (QJ(i,2,k,5) - 0.5d0 * (QJ(i,2,k,2)**2 + QJ(i,2,k,3)**2 + QJ(i,2,k,4)**2) / QJ(i,2,k,1))
         QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
     enddo;enddo
+
+    ! inlet
+    if (kind(id_rescale) == 4) then
+      QJ(1:2,:,2:nz-1,:) = Qre(1:2,:,2:nz-1,:)
+    else
+      !$cuf kernel do(3)<<<*,*>>>
+      do l = 1, 5
+        do k = 2, nz-1
+          do j = 1, ny
+            QJ(1,j,k,l) = QJ(nx-3,j,k,l)
+            QJ(2,j,k,l) = QJ(nx-2,j,k,l)
+      enddo;enddo;enddo
+    endif
+
+    !$cuf kernel do(3)<<<*,*>>>
+    do l = 1, 5
+      do k = 2, nz-1
+        do j = 1, ny
+          ! outlet
+          QJ(nx-1,j,k,l) = QJ(3,j,k,l)
+          QJ(nx,j,k,l) = QJ(4,j,k,l)
+    enddo;enddo;enddo
 
     ! cyclic
     !$cuf kernel do(3)<<<*,*>>>

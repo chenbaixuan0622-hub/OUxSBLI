@@ -41,9 +41,9 @@ contains
     v = 0.d0
   end subroutine calc_Blasius
 
-  subroutine set_grid(myrank,nx,ny,nz,x,y,z,dx,dy)
+  subroutine set_grid(myrank,nx,ny,nz,x,y,z,dx,dy,dz)
     integer, intent(in)   :: myrank, nx, ny, nz
-    real(8), intent(out)  :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1)
+    real(8), intent(out)  :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     integer i, j, k, ierr, status(MPI_STATUS_SIZE)
     real(8) dx1, dy1, dz1, dx2, dy2, dz2
     dy1 = Ly1 / dble(256)
@@ -63,6 +63,7 @@ contains
 
       dz1 = Lz1 / dble(nz-1)
       do k = 1, nz
+        dz(k) = dz1
         z(k) = dble(k-1) * dz1
       enddo
     elseif (myrank ==2) then
@@ -87,6 +88,7 @@ contains
       
       dz2 = Lz2 / dble(nz-1)
       do k = 1, nz
+        dz(k) = dz2
         z(k) = dble(k-1) * dz2
       enddo
     endif
@@ -237,7 +239,7 @@ contains
 
   subroutine set_bc1(nx,ny,nz,Jacobian,QJ)
     integer, intent(in), value     :: nx, ny, nz
-    real(8), intent(in), device    :: Jacobian(nx,ny)
+    real(8), intent(in), device    :: Jacobian(nx,ny,nz)
     real(8), intent(inout), device :: QJ(nx,ny,nz,5)
     integer i, j, k, l, No, Nre
     real(8) :: p_wall
@@ -265,32 +267,32 @@ contains
       do i = 1, No
         ! Riemann invariants
         pin = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) / QJ(i,ny-1,k,1)) &
-        & * Jacobian(i,ny-1)
-        cin = sqrt(gamma * pin / (QJ(i,ny-1,k,1) * Jacobian(i,ny-1)))
+        & * Jacobian(i,ny-1,k)
+        cin = sqrt(gamma * pin / (QJ(i,ny-1,k,1) * Jacobian(i,ny-1,k)))
         vin = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
         Rp = vin + 2.d0 * cin / (gamma - 1.d0)
         Rm = v0  - 2.d0 * c0  / (gamma - 1.d0)
         vb = v0 + (0.5d0 * (Rp + Rm) - v0)
 
-        rhob = QJ(i,ny-1,k,1) * Jacobian(i,ny-1)
-        QJ(i,ny,k,1) = rhob / Jacobian(i,ny)
+        rhob = QJ(i,ny-1,k,1) * Jacobian(i,ny-1,k)
+        QJ(i,ny,k,1) = rhob / Jacobian(i,ny,k)
         QJ(i,ny,k,2) = QJ(i,ny-1,k,1) * u0 
         QJ(i,ny,k,3) = QJ(i,ny-1,k,1) * vb
         QJ(i,ny,k,4) = 0.d0
         cb = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
         pb = (rhob * cb**2) / gamma
-        QJ(i,ny,k,5) = (pb / (gamma - 1.d0)) / Jacobian(i,ny)  + 0.5d0 * (QJ(i,ny,k,2)**2 + QJ(i,ny,k,3)**2 + QJ(i,ny,k,4)**2) / QJ(i,ny,k,1)
+        QJ(i,ny,k,5) = (pb / (gamma - 1.d0)) / Jacobian(i,ny,k)  + 0.5d0 * (QJ(i,ny,k,2)**2 + QJ(i,ny,k,3)**2 + QJ(i,ny,k,4)**2) / QJ(i,ny,k,1)
     enddo;enddo
 
     ! oblique shock
     !$cuf kernel do(2)<<<*,*>>>
     do k = 3, nz-2
       do i = No+1, nx
-        QJ(i,ny,k,1) = rho2 / Jacobian(i,ny)
-        QJ(i,ny,k,2) = rho2 * ux / Jacobian(i,ny)
-        QJ(i,ny,k,3) = rho2 * uy / Jacobian(i,ny)
+        QJ(i,ny,k,1) = rho2 / Jacobian(i,ny,k)
+        QJ(i,ny,k,2) = rho2 * ux / Jacobian(i,ny,k)
+        QJ(i,ny,k,3) = rho2 * uy / Jacobian(i,ny,k)
         QJ(i,ny,k,4) = 0.d0
-        QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(i,ny)
+        QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(i,ny,k)
     enddo;enddo
 
     ! cyclic
@@ -310,21 +312,21 @@ contains
       do k = 1, nz
         do j = 1, ny
           do i = 1, nx
-            Q(i,j,k,l) = QJ(i,j,k,l) * Jacobian(i,j)
+            Q(i,j,k,l) = QJ(i,j,k,l) * Jacobian(i,j,k)
     enddo;enddo;enddo;enddo
     call GPU_SENDRECV(0,nx,ny,nz,Q,Qd)
     !$cuf kernel do(3)<<<*,*>>>
     do l = 1, 5
       do k = 1, nz
         do i = 1, nx
-          QJ(i,1,k,l) = Qd(i,1,k,l) / Jacobian(i,1)
-          QJ(i,2,k,l) = Qd(i,2,k,l) / Jacobian(i,2)
+          QJ(i,1,k,l) = Qd(i,1,k,l) / Jacobian(i,1,k)
+          QJ(i,2,k,l) = Qd(i,2,k,l) / Jacobian(i,2,k)
     enddo;enddo;enddo
   end subroutine set_bc1
 
   subroutine set_bc2(nx,ny,nz,Jacobian,QJ)
     integer, intent(in), value          :: nx, ny, nz
-    real(8), intent(in), device         :: Jacobian(nx,ny)
+    real(8), intent(in), device         :: Jacobian(nx,ny,nz)
     real(8), intent(inout), device      :: QJ(nx,ny,nz,5)
     integer i, j, k, l, Nre
     real(8) :: p_wall
@@ -371,15 +373,15 @@ contains
       do k = 1, nz
         do j = 1, ny
           do i = 1, nx
-            Q(i,j,k,l) = QJ(i,j,k,l) * Jacobian(i,j)
+            Q(i,j,k,l) = QJ(i,j,k,l) * Jacobian(i,j,k)
     enddo;enddo;enddo;enddo
     call GPU_SENDRECV(2,nx,ny,nz,Q,Qd)
     !$cuf kernel do(3)<<<*,*>>>
     do l = 1, 5
       do k = 1, nz
         do i = 1, nx
-          QJ(i,ny-1,k,l) = Qd(i,1,k,l) / Jacobian(i,ny-1)
-          QJ(i,ny,k,l)   = Qd(i,2,k,l) / Jacobian(i,ny)
+          QJ(i,ny-1,k,l) = Qd(i,1,k,l) / Jacobian(i,ny-1,k)
+          QJ(i,ny,k,l)   = Qd(i,2,k,l) / Jacobian(i,ny,k)
     enddo;enddo;enddo
   end subroutine set_bc2
 
