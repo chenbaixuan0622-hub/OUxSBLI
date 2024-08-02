@@ -1,5 +1,5 @@
 module set
-  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, rho0, u0, p0, T0, M0
+  use mod_globals, only : id_rescale, nx, ny, nz, nre, Lx, Ly, Lz, gamma, R, rho0, u0, p0, T0, M0
   implicit none
 contains
   subroutine calc_Blasius(eta,d,u,v)
@@ -36,7 +36,6 @@ contains
     enddo
     u = u0 * df
     v = 0.d0!0.5d0 * (nu0 / d) * (min(eta,8.8d0) * df - f)
-    !write(*,*) eta, f, df
   end subroutine calc_Blasius
 
   subroutine set_grid(nx,ny,nz,x,y,z,dx,dy,dz)
@@ -111,10 +110,11 @@ contains
     Q(:,1,:,5) = p_wall / (gamma - 1.d0)
   end subroutine set_init
   
-  subroutine set_bc(nx,ny,nz,Jacobian,QJ)
+  subroutine set_bc(nx,ny,nz,Jacobian,QJ,Qre)
     integer, intent(in), value      :: nx, ny, nz
     real(8), intent(in), device     :: Jacobian(nx,ny)
     real(8), intent(inout), device  :: QJ(nx,ny,nz,5) ! Q / Jacobian
+    real(8), intent(in), device     :: Qre(2,ny,nz,5)
     integer i, j, k, l
     real(8) :: p_wall
     ! Riemann invariants
@@ -158,17 +158,30 @@ contains
         QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
     enddo;enddo
 
-    !$cuf kernel do(3)<<<*,*>>>
-    do l = 1, 5
-      do k = 2, nz-1
-        do j = 1, ny
-          ! inlet
-          QJ(1,j,k,l) = QJ(nx-3,j,k,l)
-          QJ(2,j,k,l) = QJ(nx-2,j,k,l)
-          ! outlet
-          QJ(nx-1,j,k,l) = QJ(3,j,k,l)
-          QJ(nx,j,k,l) = QJ(4,j,k,l)
-    enddo;enddo;enddo
+    if (kind(id_rescale) == 4) then
+      !$cuf kernel do(3)<<<*,*>>>
+      do l = 1, 5
+        do k = 2, nz-1
+          do j = 1, ny
+            ! inlet
+            QJ(1,j,k,l) = Qre(1,j,k,l)
+            QJ(2,j,k,l) = Qre(2,j,k,l)
+            ! outlet
+            QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
+      enddo;enddo;enddo
+    else
+      !$cuf kernel do(3)<<<*,*>>>
+      do l = 1, 5
+        do k = 2, nz-1
+          do j = 1, ny
+            ! inlet
+            QJ(1,j,k,l) = QJ(nx-3,j,k,l)
+            QJ(2,j,k,l) = QJ(nx-2,j,k,l)
+            ! outlet
+            QJ(nx-1,j,k,l) = QJ(3,j,k,l)
+            QJ(nx,j,k,l)   = QJ(4,j,k,l)
+      enddo;enddo;enddo
+    endif
 
     ! cyclic
     !$cuf kernel do(3)<<<*,*>>>
@@ -178,7 +191,7 @@ contains
           QJ(i,j,1,l) = QJ(i,j,nz-3,l)
           QJ(i,j,2,l) = QJ(i,j,nz-2,l)
           QJ(i,j,nz-1,l) = QJ(i,j,3,l)
-          QJ(i,j,nz,l) = QJ(i,j,4,l)
+          QJ(i,j,nz,l)   = QJ(i,j,4,l)
     enddo;enddo;enddo
   end subroutine set_bc
 

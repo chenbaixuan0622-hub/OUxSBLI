@@ -35,7 +35,7 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_tvd      ! kind2 non TVD       !
   !             ! kind4 minmod        !
-  !             ! kind8 MUSCL4th      !
+  !             ! kind8 post limiter  !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_keep     ! kind2 KEEP          !
   !             ! kind4 KEEPPE        !
@@ -51,7 +51,7 @@ module mod_globals
   integer, parameter         :: id_scheme   = 5
   integer, parameter         :: id_sensor   = 1
   real(8), parameter         :: threshold   = 0.4d0
-  integer(kind=4), parameter :: id_accuracy = 0
+  integer(kind=8), parameter :: id_accuracy = 0
   integer(kind=4), parameter :: id_tvd      = 0
   integer(kind=2), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
@@ -88,8 +88,8 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=4), parameter :: id_RungeKutta = 0
   integer(kind=2), parameter :: id_recal = 0
-  integer, parameter :: nt  = 1!50
-  integer, parameter :: np  = 1!2000
+  integer, parameter :: nt  = 20!50
+  integer, parameter :: np  = 10!2000
   real(8), parameter :: u0  = 506.8d0
   real(8), parameter :: CFL = 0.1d0
   real(8), parameter :: dt  = CFL * Lx / (dble(nx-1) * u0)
