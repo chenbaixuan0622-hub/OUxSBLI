@@ -1,6 +1,4 @@
 module calc_rescale
-  use cudafor
-  use mpi
   use mod_globals, only : nt, dt, gamma , R, u0
 contains
   subroutine calc_mean(step,nx,ny,nz,Q,Um,Vm,Wm,pm,Tm)
@@ -43,7 +41,7 @@ contains
     real(8), intent(in)                     :: Jacobian(nx,ny,nz)
     real(8), intent(inout), dimension(2,ny) :: Um, Vm, Wm, pm, Tm
     real(8), intent(inout)                  :: Qre(2,ny,nz,5) ! Q / J
-    integer i, j, jj, k, l, nranks, ierr
+    integer i, j, jj, k, l
     real(8) :: mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0
     real(8) bltre1, bltre2, bltre, taure, utre, utin, beta, mu, nu, ady, ade 
     ! mean properties at rescaling plane
@@ -70,8 +68,6 @@ contains
     enddo;enddo;enddo;enddo
 
     call calc_mean(step,nx,ny,nz,Qre,Um,Vm,Wm,pm,Tm)
-
-    call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
 
     ! check boundary layer thickness at rescaling plane
     bltre = 0.d0
@@ -209,7 +205,7 @@ contains
 
       ! re-introducing
       do k = 2, nz-1
-        do j = 2, ny-1
+        do j = 1, ny
           do i = 1, 2
             uin   = (Umin(i,j,k) + ufin(i,j,k)) * (1.d0 - weight(j)) + (Umout(i,j,k) + ufout(i,j,k)) * weight(j)
             vin   = (Vmin(i,j,k) + vfin(i,j,k)) * (1.d0 - weight(j)) + (Vmout(i,j,k) + vfout(i,j,k)) * weight(j)
