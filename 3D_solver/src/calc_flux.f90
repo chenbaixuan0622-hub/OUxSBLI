@@ -124,14 +124,14 @@ contains
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     elseif (id_scheme == 5) then
       call calc_6points(1.d0,1.d0,1.d0,k,rho,p,V,rho2,p2,V2)
-      F = (1.d0 - sensor) * KEEP4(id,rho4,p4,V4,Normal) &
+      F = (1.d0 - sensor) * KEEP6(id,rho,p,V,Normal) &
           + sensor * SLAU(id_slau,id,rho2,p2,V2,Normal,wiggle,sensor)
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !Hybrid threshold!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     elseif (id_scheme == 6) then
       if (sensor < threshold) then
-        F = KEEP4(id,rho4,p4,V4,Normal)
+        F = KEEP6(id,rho,p,V,Normal)
       else
         call calc_6points(1.d0,1.d0,1.d0,k,rho,p,V,rho2,p2,V2)
         F = SLAU(id_slau,id,rho2,p2,V2,Normal,wiggle,sensor)
@@ -141,7 +141,7 @@ contains
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     elseif (id_scheme == 7) then
       call calc_6points(1.d0,1.d0,1.d0,k,rho,p,V,rho2,p2,V2)
-      F = (1.d0 - sigmoid(sensor)) * KEEP4(id,rho4,p4,V4,Normal) &
+      F = (1.d0 - sigmoid(sensor)) * KEEP6(id,rho,p,V,Normal) &
           + sigmoid(sensor) * SLAU(id_slau,id,rho2,p2,V2,Normal,wiggle,sensor)
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !KEEP Rho!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
