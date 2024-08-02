@@ -1,6 +1,5 @@
-module calc_rescale
+module calc_rescale2
   use cudafor
-  use mpi
   use mod_globals, only : nt, dt, gamma , R, u0
 contains
   subroutine calc_mean(step,nx,ny,nz,Q,Um,Vm,Wm,pm,Tm)
@@ -43,7 +42,7 @@ contains
     real(8), intent(in)                     :: Jacobian(nx,ny,nz)
     real(8), intent(inout), dimension(2,ny) :: Um, Vm, Wm, pm, Tm
     real(8), intent(inout)                  :: Qre(2,ny,nz,5) ! Q / J
-    integer i, j, jj, k, l, nranks, ierr, check_blt, rescale
+    integer i, j, jj, k, l, ierr, check_blt, rescale
     real(8) :: mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0
     real(8) bltre1, bltre2, bltre, taure, utre, utin, beta, mu, nu, ady, ade 
     ! mean properties at rescaling plane
@@ -71,18 +70,9 @@ contains
 
     call calc_mean(step,nx,ny,nz,Qre,Um,Vm,Wm,pm,Tm)
 
-    call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
-    if (4 <= nranks) then
-      if (myrank == 3) then
-        check_blt = 1
-      endif
-    else
-      check_blt = 1
-    endif
-
     ! check boundary layer thickness at rescaling plane
     bltre = 0.d0
-    if (check_blt == 1) then
+    if (myrank == 3) then
       do j = 2, ny
         if (Um(1,j) >= 0.99d0 * u0 .and. Um(2,j) >= 0.99d0 * u0) then
           bltre1 = y(j) - (-y(j-1) + y(j)) * (Um(1,j) - 0.99d0 * u0) / (-Um(1,j-1) + Um(1,j) + 1.d-20)
@@ -96,17 +86,7 @@ contains
       enddo
     endif
 
-    if (4 <= nranks) then
-      if (bltre >= blt .and. myrank == 3 .and. step >= 1000) then
-        rescale = 1
-      endif
-    else
-      if (bltre >= blt .and. step >= 1000) then
-        rescale = 1
-      endif
-    endif
-
-    if (rescale == 1) then
+    if (bltre >= blt .and. step >= 1000) then
       ! rescaling !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! calc fluctuating part   u'(x,y,z,t) = u(x,y,z,t) - U(x,y)
       ! U(x,y) average velocity in the spanwise direction and time
@@ -252,5 +232,5 @@ contains
       enddo;enddo;enddo
     endif
   end subroutine set_rescale
-end module calc_rescale
+end module calc_rescale2
 

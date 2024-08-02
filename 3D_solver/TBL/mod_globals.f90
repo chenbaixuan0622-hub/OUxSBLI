@@ -65,7 +65,7 @@ module mod_globals
   integer, parameter :: ny = 257
   integer, parameter :: nz = 129!65
 
-  integer, parameter :: nre = int(0.5 * nx)
+  integer, parameter :: nre = nx-4
 
   ! GPU
   type(dim3) :: blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/5,(nz-accuracy)/1)
