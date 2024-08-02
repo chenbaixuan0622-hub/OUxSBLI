@@ -4,9 +4,14 @@ module calc_muscl
     module procedure minmod2, minmod3
   end interface
 
-  interface MUSCL
-    module procedure MUSCL3rdnonTVD, MUSCL3rdMinmod, MUSCL4th
+  interface MUSCL3rd
+    module procedure MUSCL3rdnonTVD, MUSCL3rdMinmod, MUSCL3rdpost
   end interface
+  
+  interface MUSCL4th
+    module procedure MUSCL4thnonTVD, MUSCL4thTVD, MUSCL4thpost
+  end interface
+
 contains
   attributes(device) function minmod2(x,y) result(ans)
     real(8), intent(in), value :: x, y
@@ -22,12 +27,12 @@ contains
     ans = sgn * max(min(abs(x), sgn * y, sgn * z), 0.d0)
   end function minmod3
 
-  attributes(device) function d33(sigma,d1,d2,d3) result(ans)
-    real(8), intent(in), value :: sigma, d1, d2, d3 
+  attributes(device) function d33(d1,d2,d3) result(ans)
+    real(8), intent(in), value :: d1, d2, d3 
     real(8) :: ans, da, db, dc
-    da = minmod(d1, sigma * d2, sigma * d3)
-    db = minmod(d2, sigma * d1, sigma * d3)
-    dc = minmod(d3, sigma * d1, sigma * d2)
+    da = minmod(d1, 2.d0 * d2, 2.d0 * d3)
+    db = minmod(d2, 2.d0 * d1, 2.d0 * d3)
+    dc = minmod(d3, 2.d0 * d1, 2.d0 * d2)
     ans = da - 2.d0 * db + dc
   end function d33
 
@@ -55,33 +60,82 @@ contains
     alr(2) = a3 - 0.25d0 * eps * ((1.d0 - k) * dt3 + (1.d0 + K) * dt4)
   end function MUSCL3rdMinmod
 
-  attributes(device) function MUSCL4th(id_tvd,eps,k,a2,a3,d) result(alr)
+  attributes(device) function MUSCL3rdpost(id_tvd,eps,k,a2,a3,d) result(alr)
     integer(kind=8), intent(in), value :: id_tvd
     real(8), intent(in), value         :: eps, k, a2, a3
+    real(8), intent(in), device        :: d(3)
+    real(8) alr(2), au(2), al(2), phi
+    integer(kind=2) :: id2
+    integer(kind=4) :: id4
+    integer i
+    au  = MUSCL3rdnonTVD(id2,eps,k,a2,a3,d)
+    al  = MUSCL3rdMinmod(id4,eps,k,a2,a3,d)
+    do i = 1, 2
+      if (min(a2, a3) < au(i) .and. au(i) < max(a2, a3)) then
+        phi = 1.d0
+      else
+        phi = 0.d0
+      endif
+      alr(i) = phi * au(i) + (1.d0 - phi) * al(i)
+    enddo
+  end function MUSCL3rdpost
+
+  attributes(device) function MUSCL4thnonTVD(id_tvd,a2,a3,d) result(alr)
+    integer(kind=2), intent(in), value :: id_tvd
+    real(8), intent(in), value         :: a2, a3
     real(8), intent(in), device        :: d(5)
-    real(8) delta1, delta2, delta3, dpl, dml, dpr, dmr, alr(2)
-    real(8) :: sigma = 2.d0, w = 4.d0
-    delta1 = d(2) - eps * d33(sigma, d(1), d(2), d(3)) / 6.d0
-    delta2 = d(3) - eps * d33(sigma, d(2), d(3), d(4)) / 6.d0
-    delta3 = d(4) - eps * d33(sigma, d(3), d(4), d(5)) / 6.d0
-    dpl    = minmod(delta1, w * delta2)
-    dml    = minmod(delta2, w * delta1)
-    alr(1) = a2 + (dml + 2.d0 * dpl) / 6.d0
-    dpr    = minmod(delta3, w * delta2)
-    dmr    = minmod(delta2, w * delta3)
-    alr(2) = a3 - (dpr + 2.d0 * dmr) / 6.d0
-  end function MUSCL4th
+    real(8) :: phi = 1.d0 / 30.d0, d2(4), d3(3), alr(2)
+    d2(:)  = - d(1:4) +  d(2:5)
+    d3(:)  = -d2(1:3) + d2(2:4)
+    alr(1) = a2 + (2.d0 * d(2) - 12.d0 * phi * d3(1) &
+                  + 4.d0 * d(3) - (1.d0 - 12.d0 * phi) * d3(2)) / 12.d0
+    alr(2) = a3 - (4.d0 * d(3) - (1.d0 - 12.d0 * phi) * d3(2) &
+                  + 2.d0 * d(4) - 12.d0 * phi * d3(3)) / 12.d0
+  end function MUSCL4thnonTVD
+
+  attributes(device) function MUSCL4thTVD(id_tvd,a2,a3,d) result(alr)
+    integer(kind=4), intent(in), value :: id_tvd
+    real(8), intent(in), value         :: a2, a3
+    real(8), intent(in), device        :: d(5)
+    real(8) delta1, delta2, delta3, dl, dr, alr(2)
+    delta1 = d(2) - d33(d(1), d(2), d(3)) / 6.d0
+    delta2 = d(3) - d33(d(2), d(3), d(4)) / 6.d0
+    delta3 = d(4) - d33(d(3), d(4), d(5)) / 6.d0
+    dl     = minmod(delta1, 4.d0 * delta2)
+    dr     = minmod(delta2, 4.d0 * delta1)
+    alr(1) = a2 + (dl + 2.d0 * dr) / 6.d0
+    dl     = minmod(delta2, 4.d0 * delta3)
+    dr     = minmod(delta3, 4.d0 * delta2)
+    alr(2) = a3 - (dr + 2.d0 * dl) / 6.d0
+  end function MUSCL4thTVD
+
+  attributes(device) function MUSCL4thpost(id_tvd,a2,a3,d) result(alr)
+    integer(kind=8), intent(in), value :: id_tvd
+    real(8), intent(in), value         :: a2, a3
+    real(8), intent(in), device        :: d(5)
+    real(8) alr(2), au(2), al(2), phi
+    integer(kind=2) :: id2
+    integer(kind=4) :: id4
+    integer i
+    au  = MUSCL4thnonTVD(id2,a2,a3,d)
+    al  = MUSCL4thTVD(id4,a2,a3,d)
+    do i = 1, 2
+      if (min(a2, a3) < au(i) .and. au(i) < max(a2, a3)) then
+        phi = 1.d0
+      else
+        phi = 0.d0
+      endif
+      alr(i) = phi * au(i) + (1.d0 - phi) * al(i)
+    enddo
+  end function MUSCL4thpost
 
   attributes(device) function delta4(eps,k,a) result(alr)
     use mod_globals, only : id_tvd
     real(8), intent(in), value  :: eps, k
     real(8), intent(in), device :: a(4)
     real(8) :: alr(2), d(3)
-    integer i
-    do i = 1, 3
-      d(i) = -a(i) + a(i+1)
-    enddo
-    alr  = MUSCL(id_tvd,eps,k,a(2),a(3),d)
+    d(:) = -a(1:3) + a(2:4)
+    alr  = MUSCL3rd(id_tvd,eps,k,a(2),a(3),d)
   end function delta4
 
   attributes(device) function delta6(eps,k,a) result(alr)
@@ -89,11 +143,8 @@ contains
     real(8), intent(in), value  :: eps, k
     real(8), intent(in), device :: a(6)
     real(8) :: alr(2), d(5)
-    integer i
-    do i = 1, 5
-      d(i) = -a(i) + a(i+1)
-    enddo
-    alr  = MUSCL(id_tvd,eps,k,a(3),a(4),d)
+    d(:) = -a(1:5) + a(2:6)
+    alr  = MUSCL4th(id_tvd,a(3),a(4),d)
   end function delta6
 
   attributes(device) subroutine calc_4points(eps1,eps2,eps3,k,rho,p,V,rho2,p2,V2)

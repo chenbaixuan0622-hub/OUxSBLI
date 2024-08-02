@@ -51,7 +51,7 @@ module mod_globals
   integer, parameter         :: id_scheme   = 1
   integer, parameter         :: id_sensor   = 1
   real(8), parameter         :: threshold   = 0.4d0
-  integer(kind=4), parameter :: id_accuracy = 0
+  integer(kind=8), parameter :: id_accuracy = 0
   integer(kind=2), parameter :: id_tvd      = 0
   integer(kind=2), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
@@ -65,7 +65,7 @@ module mod_globals
   integer, parameter :: ny = 257
   integer, parameter :: nz = 129!65
 
-  integer, parameter :: nre = int(0.5 * nx)
+  integer, parameter :: nre = nx-4
 
   ! GPU
   type(dim3) :: blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/5,(nz-accuracy)/1)
@@ -96,9 +96,9 @@ module mod_globals
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
-  real(8), parameter :: Pr = 0.71d0
-  real(8), parameter :: Prt = 0.9d0
-  real(8), parameter :: R = 287.03d0
+  real(8), parameter :: Pr    = 0.71d0
+  real(8), parameter :: Prt   = 0.9d0
+  real(8), parameter :: R     = 287.03d0
 
   ! MUSCL
   real(8), parameter :: k = 1.d0 / 3.d0
