@@ -1,10 +1,10 @@
 module mod_globals
   use cudafor
   implicit none
-  integer, parameter                       :: dimension = 3
-  integer, parameter                       :: accuracy = 2 
-  integer, parameter                       :: offset = accuracy / 2
-  integer, parameter                       :: id_visc = 1 
+  integer, parameter :: dimension = 3
+  integer, parameter :: accuracy = 2 
+  integer, parameter :: offset = accuracy / 2
+  integer, parameter :: id_visc = 2 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! 0 no-visc               !
   !               ! 1 visc                  !
@@ -88,8 +88,8 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=4), parameter :: id_RungeKutta = 0
   integer(kind=2), parameter :: id_recal = 0
-  integer, parameter :: nt  = 20!50
-  integer, parameter :: np  = 10!2000
+  integer, parameter :: nt  = 50
+  integer, parameter :: np  = 2000
   real(8), parameter :: u0  = 506.8d0
   real(8), parameter :: CFL = 0.1d0
   real(8), parameter :: dt  = CFL * Lx / (dble(nx-1) * u0)
@@ -101,23 +101,24 @@ module mod_globals
   real(8), parameter :: R     = 287.03d0
 
   ! MUSCL
-  real(8), parameter :: k = 1.d0 / 3.d0
-  real(8), parameter :: b = (3.d0 - k) / (1.d0 - k)
+  real(8), parameter :: k     = 1.d0 / 3.d0
+  real(8), parameter :: b     = (3.d0 - k) / (1.d0 - k)
   real(8), parameter :: omega = 4.d0
   real(8), parameter :: sigma = 2.d0
-  real(8), parameter :: eps = 1.d0
+  real(8), parameter :: eps   = 1.d0
 
   ! initial condition
-  real(8), parameter :: M0 = 1.9d0
-  real(8), parameter :: p0 = 14924.d0
-  real(8), parameter :: T0 = 171.31d0
+  real(8), parameter :: M0   = 1.9d0
+  real(8), parameter :: p0   = 14924.d0
+  real(8), parameter :: T0   = 171.31d0
   real(8), parameter :: beta = dacos(-1.d0) * 37.2d0 / 180.d0
-  real(8), parameter :: Ms = M0 * dsin(beta)
-  real(8), parameter :: Ms2 = Ms**2
+  real(8), parameter :: Ms   = M0 * dsin(beta)
+  real(8), parameter :: Ms2  = Ms**2
   real(8), parameter :: theta = datan(2.d0 * (1.d0 / dtan(beta)) * (Ms2 - 1.d0) / (M0**2 * (gamma + dcos(2.d0 * beta)) + 2.d0))
   real(8), parameter :: rho0 = p0 / (R * T0)
-  real(8), parameter :: rho2 = rho0 * (gamma + 1.d0) * Ms2 / ((gamma - 1.d0) / (M0**2 * (gamma + dcos(2.d0 * beta)) + 2.d0))
-  real(8), parameter :: p2 = p0 * (1.d0 + 2.d0 * gamma * (Ms2 - 1.d0) / (gamma + 1.d0))
+  real(8), parameter :: T2   = T0 * (1.d0 + 2.d0 * (gamma - 1.d0) * (Ms2 - 1.d0) * (1.d0 + gamma * Ms2) / (Ms2 * (gamma + 1.d0)**2))
+  real(8), parameter :: p2   = p0 * (1.d0 + 2.d0 * gamma * (Ms2 - 1.d0) / (gamma + 1.d0))
+  real(8), parameter :: rho2 = p2 / (R * T2)
   real(8), parameter :: u1 = u0 * dsin(beta)
   real(8), parameter :: v1 = u0 * dcos(beta)
   real(8), parameter :: a1 = u0 / M0

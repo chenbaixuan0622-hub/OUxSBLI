@@ -2,6 +2,7 @@ import os
 import numpy as np
 import vtk
 from vtk.util import numpy_support
+from tqdm import tqdm
 
 def gridInfo(data_directory):
   file_path = os.path.join(data_directory, "x.npy")
@@ -54,34 +55,30 @@ def getScalar(file_path,Nx,Ny,Nz,name):
   return np.float32(a)
 
 def getMeanVector(directory_path,vtk_files,Nx,Ny,Nz,name):
-  # decleare
-  umean = np.zeros((Nz,Ny,Nx), dtype=np.float32)
-  vmean = np.zeros((Nz,Ny,Nx), dtype=np.float32)
-  wmean = np.zeros((Nz,Ny,Nx), dtype=np.float32)
+  um = np.zeros((Nz,Ny,Nx), dtype=np.float32)
+  vm = np.zeros((Nz,Ny,Nx), dtype=np.float32)
+  wm = np.zeros((Nz,Ny,Nx), dtype=np.float32)
 
-  # calc mean velocity
-  n = 1.e0
-  for vtk_file in vtk_files:
-    # get path
+  for vtk_file in tqdm(vtk_files):
     file_path = os.path.join(directory_path, vtk_file)
-    u, v, w = getVector(file_path,Nx,Ny,Nz,name)
-    umean = ((n - 1.e0) * umean + u) / n
-    vmean = ((n - 1.e0) * vmean + v) / n
-    wmean = ((n - 1.e0) * wmean + w) / n
-    n += 1.e0
-  return umean, vmean, wmean
+    u, v, w   = getVector(file_path,Nx,Ny,Nz,name)
+    um += u
+    vm += v
+    wm += w
+  n  = float(len(vtk_files))
+  um = um / n
+  vm = vm / n
+  wm = wm / n
+  return um, vm, wm
 
 def getMeanScalar(directory_path,vtk_files,Nx,Ny,Nz,name):
-  # decleare
-  amean = np.zeros((Nz,Ny,Nx), dtype=np.float32)
+  am = np.zeros((Nz,Ny,Nx), dtype=np.float32)
 
-  # calc mean velocity
-  n = 1.e0
-  for vtk_file in vtk_files:
-    # get path
+  for vtk_file in tqdm(vtk_files):
     file_path = os.path.join(directory_path, vtk_file)
-    a = getScalar(file_path,Nx,Ny,Nz,name)
-    amean = ((n - 1.e0) * amean + a) / n
-    n += 1.e0
-  return amean
+    a  = getScalar(file_path,Nx,Ny,Nz,name)
+    am += a
+  n  = float(len(vtk_files))
+  am = am / n
+  return am
 
