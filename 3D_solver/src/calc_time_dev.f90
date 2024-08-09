@@ -30,7 +30,7 @@ contains
     real(8), intent(out), device                        :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device                        :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     real(8), intent(out), dimension(nx,ny,nz), device   :: sensor
-    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, T, fd
+    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, T, fd, qc2
     integer stat
     call calc_quantities(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p,T)
     
@@ -41,17 +41,17 @@ contains
     call calc_F<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,fd,F)
     call calc_G<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,fd,G)
   
+    qc2 = 0.d0
     if (id_turbulence /= 0) then
-      call calc_mut<<<blocks,threads,4>>>(nx,ny,nz,rho,u,v,w,mut)
-      stat = cudaDeviceSynchronize()
+      call calc_mut<<<blocks,threads>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,mut,qc2)
       call set_bc_mut(nx,ny,nz,mut)
     endif
 
     stat = cudaDeviceSynchronize()
     if (1 <= id_visc .or. id_turbulence /= 0) then
-      call calc_Ev<<<blocksE,threadsE,1>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,T,p,mut,E)
-      call calc_Fv<<<blocksF,threadsF,2>>>(nx,ny,nz,dy,dx,dz,rho,u,v,w,T,p,mut,F)
-      call calc_Gv<<<blocksG,threadsG,3>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,T,p,mut,G)
+      call calc_Ev<<<blocksE,threadsE,1>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,T,p,mut,qc2,E)
+      call calc_Fv<<<blocksF,threadsF,2>>>(nx,ny,nz,dy,dx,dz,rho,u,v,w,T,p,mut,qc2,F)
+      call calc_Gv<<<blocksG,threadsG,3>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,T,p,mut,qc2,G)
     endif
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG
@@ -322,15 +322,13 @@ contains
 
       ! send and recv device arrays
       if (myrank == 0) then
-        Q = QJ
+        Q          = QJ
         sensor_cpu = sensor
-        call MPI_ISEND(Q,          nx*ny*nz*5, MPI_REAL8, 1, 0, MPI_COMM_WORLD, ireq,  ierr) 
-        call MPI_ISEND(sensor_cpu, nx*ny*nz,   MPI_REAL8, 1, 1, MPI_COMM_WORLD, ireq2, ierr) 
+        call MPI_SEND(Q,          nx*ny*nz*5, MPI_REAL8, 1, 0, MPI_COMM_WORLD, ierr) 
+        call MPI_SEND(sensor_cpu, nx*ny*nz,   MPI_REAL8, 1, 1, MPI_COMM_WORLD, ierr) 
       elseif (myrank == 1) then
-        call MPI_IRECV(Q,          nx*ny*nz*5, MPI_REAL8, 0, 0, MPI_COMM_WORLD, ireq,  ierr)
-        call MPI_IRECV(sensor_cpu, nx*ny*nz,   MPI_REAL8, 0, 1, MPI_COMM_WORLD, ireq2, ierr)
-        call MPI_WAIT(ireq,  istat, ierr)
-        call MPI_WAIT(ireq2, istat, ierr)
+        call MPI_RECV(Q,          nx*ny*nz*5, MPI_REAL8, 0, 0, MPI_COMM_WORLD, istat, ierr)
+        call MPI_RECV(sensor_cpu, nx*ny*nz,   MPI_REAL8, 0, 1, MPI_COMM_WORLD, istat, ierr)
         call print_vtk(t2,nx,ny,nz,real(x),real(y),real(z),real(Jacobian_cpu),real(Q),real(sensor_cpu),mass0,ke0,entropy0)
       endif
     enddo
