@@ -54,7 +54,7 @@ contains
 
     y(1) = 0.d0
     do j = 1, ny-1
-      dy(j) = min(1.d0, max(0.5d0, dble(j)/dble(128))) * dy1
+      dy(j) = min(1.d0, max(0.25d0, dble(j)/dble(128))) * dy1
       y(j+1) = y(j) + dy(j)
     enddo
 
@@ -195,11 +195,13 @@ contains
         do k = 2, nz-1
           do j = 1, ny
             ! inlet
-            QJ(1,j,k,l) = QJ(nx-3,j,k,l)
-            QJ(2,j,k,l) = QJ(nx-2,j,k,l)
+            QJ(1,j,k,l) = QJ(nx-5,j,k,l)
+            QJ(2,j,k,l) = QJ(nx-4,j,k,l)
+            QJ(3,j,k,l) = QJ(nx-3,j,k,l)
             ! outlet
-            QJ(nx-1,j,k,l) = QJ(3,j,k,l)
-            QJ(nx,j,k,l)   = QJ(4,j,k,l)
+            QJ(nx-2,j,k,l) = QJ(4,j,k,l)
+            QJ(nx-1,j,k,l) = QJ(5,j,k,l)
+            QJ(nx,j,k,l)   = QJ(6,j,k,l)
       enddo;enddo;enddo
     endif
 
@@ -208,10 +210,12 @@ contains
     do l = 1, 5
       do j = 1, ny
         do i = 1, nx
-          QJ(i,j,1,l) = QJ(i,j,nz-3,l)
-          QJ(i,j,2,l) = QJ(i,j,nz-2,l)
-          QJ(i,j,nz-1,l) = QJ(i,j,3,l)
-          QJ(i,j,nz,l) = QJ(i,j,4,l)
+          QJ(i,j,1,l) = QJ(i,j,nz-5,l)
+          QJ(i,j,2,l) = QJ(i,j,nz-4,l)
+          QJ(i,j,3,l) = QJ(i,j,nz-3,l)
+          QJ(i,j,nz-2,l) = QJ(i,j,4,l)
+          QJ(i,j,nz-1,l) = QJ(i,j,5,l)
+          QJ(i,j,nz,l)   = QJ(i,j,6,l)
     enddo;enddo;enddo
   end subroutine set_bc
 
