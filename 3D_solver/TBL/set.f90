@@ -54,7 +54,7 @@ contains
 
     y(1) = 0.d0
     do j = 1, ny-1
-      dy(j) = min(1.d0, max(0.25d0, dble(j)/dble(128))) * dy1
+      dy(j) = min(1.d0, max(0.125d0, dble(j)/dble(128))) * dy1
       y(j+1) = y(j) + dy(j)
     enddo
 
@@ -121,7 +121,7 @@ contains
     real(8) :: v0 = 0.d0
     real(8) :: c0 = sqrt(gamma * p0 / rho0)
     !$cuf kernel do(2)<<<*,*>>>
-    do k = 2, nz-1
+    do k = 3, nz-2
       do i = 2, nx-1
         ! top
         ! Riemann invariants
@@ -160,7 +160,7 @@ contains
     if (kind(id_rescale) == 4) then
       !$cuf kernel do(3)<<<*,*>>>
       do l = 1, 5
-        do k = 2, nz-1
+        do k = 3, nz-2
           do j = 1, ny
             ! inlet
             QJ(1,j,k,l) = Qre(1,j,k,l)
@@ -171,7 +171,7 @@ contains
     else
       !$cuf kernel do(3)<<<*,*>>>
       do l = 1, 5
-        do k = 2, nz-1
+        do k = 3, nz-2
           do j = 1, ny
             ! inlet
             QJ(1,j,k,l) = QJ(nx-5,j,k,l)
@@ -201,10 +201,9 @@ contains
   subroutine set_bc_mut(nx,ny,nz,mut)
     integer, intent(in), value      :: nx, ny, nz
     real(8), intent(inout), device  :: mut(nx,ny,nz)
-    real(8) mut_cpu(nx,ny,nz)
     integer i, j, k
     !$cuf kernel do(2) <<<*,*>>>
-    do k = 3, nz-2
+    do k = 4, nz-3
       do j = 2, ny-1
         ! inlet
         mut(1,j,k)  = mut(2,j,k)
@@ -213,7 +212,7 @@ contains
     enddo;enddo
 
     !$cuf kernel do(2) <<<*,*>>>
-    do k = 3, nz-2
+    do k = 4, nz-3
       do i = 1, nx
         ! wall
         mut(i,1,k) = 0.d0
@@ -225,20 +224,13 @@ contains
     do j = 1, ny
       do i = 1, nx
         ! span
-        mut(i,j,1)    = mut(i,j,nz-3)
-        mut(i,j,2)    = mut(i,j,nz-2)
-        mut(i,j,nz-1) = mut(i,j,3)
-        mut(i,j,nz)   = mut(i,j,4)
+        mut(i,j,1)    = mut(i,j,nz-5)
+        mut(i,j,2)    = mut(i,j,nz-4)
+        mut(i,j,3)    = mut(i,j,nz-3)
+        mut(i,j,nz-2) = mut(i,j,4)
+        mut(i,j,nz-1) = mut(i,j,5)
+        mut(i,j,nz)   = mut(i,j,6)
     enddo;enddo
-
-    mut_cpu = mut
-    do k = 2, nz-1
-      do j = 2, ny-1
-        do i = 2, nx-1
-          if (mut_cpu(i,j,k) /= mut_cpu(i,j,k)) then
-            write(*,*) i, j, k, mut_cpu(i,j,k)
-          endif
-    enddo;enddo;enddo
   end subroutine set_bc_mut
 end module set
 
