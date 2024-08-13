@@ -44,7 +44,7 @@ contains
     integer i, j, k
     real(8) dx1, dy1, dz1
     dx1 = Lx / dble(nx-1)
-    dy1 = 12.d-3 / dble(256)
+    dy1 = 10.d-3 / dble(256)
     dz1 = Lz / dble(nz-1)
     x(1) = 0.d0
     do i = 1, nx-1
@@ -54,7 +54,7 @@ contains
 
     y(1) = 0.d0
     do j = 1, ny-1
-      dy(j) = min(1.d0, max(0.25d0, dble(j)/dble(128))) * dy1
+      dy(j) = min(1.2d0, max(0.05d0, dble(j)/dble(128))) * dy1
       y(j+1) = y(j) + dy(j)
     enddo
 
