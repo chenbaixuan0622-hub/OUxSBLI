@@ -1,19 +1,18 @@
 module mod_globals
   use cudafor
   implicit none
-  integer, parameter :: dimension = 3
-  integer, parameter :: accuracy = 2 
-  integer, parameter :: offset = accuracy / 2
-  integer, parameter :: id_visc = 2 
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_visc       ! 0 no-visc               !
-  !               ! 1 visc                  !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_turbulence ! 0 laminar               !
-  !               ! 1 Smagorinsky           !
-  !               ! 2 selective_mixed_scale !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer, parameter :: id_turbulence = 0
+  integer, parameter :: dimension     = 3
+  integer, parameter :: accuracy      = 2 
+  integer, parameter :: offset        = accuracy / 2
+  integer, parameter :: id_visc       = 2 
+  integer, parameter :: id_turbulence = 1
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_visc       ! 0 no-visc         !
+  !               ! 1 visc 2nd        !
+  !               ! 2 visc 4th        !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_turbulence ! 0 laminar         !
+  !               ! 1 SMS             !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_scheme   ! 1  KEEP4th          !
   !             ! 2  KEEP MUSCL       !
@@ -52,7 +51,7 @@ module mod_globals
   integer, parameter         :: id_sensor   = 1
   real(8), parameter         :: threshold   = 0.4d0
   integer(kind=8), parameter :: id_accuracy = 0
-  integer(kind=4), parameter :: id_tvd      = 0
+  integer(kind=8), parameter :: id_tvd      = 0
   integer(kind=2), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
   integer(kind=4), parameter :: id_rescale  = 0
@@ -88,8 +87,8 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=4), parameter :: id_RungeKutta = 0
   integer(kind=2), parameter :: id_recal = 0
-  integer, parameter :: nt  = 50
-  integer, parameter :: np  = 2000
+  integer, parameter :: nt  = 100
+  integer, parameter :: np  = 500
   real(8), parameter :: u0  = 506.8d0
   real(8), parameter :: CFL = 0.1d0
   real(8), parameter :: dt  = CFL * Lx / (dble(nx-1) * u0)
@@ -99,13 +98,6 @@ module mod_globals
   real(8), parameter :: Pr    = 0.71d0
   real(8), parameter :: Prt   = 0.9d0
   real(8), parameter :: R     = 287.03d0
-
-  ! MUSCL
-  real(8), parameter :: k     = 1.d0 / 3.d0
-  real(8), parameter :: b     = (3.d0 - k) / (1.d0 - k)
-  real(8), parameter :: omega = 4.d0
-  real(8), parameter :: sigma = 2.d0
-  real(8), parameter :: eps   = 1.d0
 
   ! initial condition
   real(8), parameter :: M0   = 1.9d0

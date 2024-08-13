@@ -5,7 +5,7 @@ contains
   attributes(device) function interpolation6(a) result(ans)
     real(8), intent(in), device :: a(6)
     real(8) ans(3)
-    ans(:) = 0.0625d0 * (9.d0 * (a(2:4) + a(3:5)) - (a(1:3) + a(4:6)))
+    ans(:) = 0.0625d0 * (-a(1:3) + 9.d0 * (a(2:4) + a(3:5)) -a(4:6))
   end function interpolation6
 
   attributes(device) function dx6(a, dx) result(ans)
@@ -109,7 +109,7 @@ contains
     real(8), intent(inout), device                    :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
-    real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx, txxsgs = 0.d0, txysgs = 0.d0, txzsgs = 0.d0, Hsgs = 0.d0
+    real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx, mutx, H(4), txxsgs = 0.d0, txysgs = 0.d0, txzsgs = 0.d0, Hsgs = 0.d0
     ! 4th-order accuracy
     real(8), dimension(6,5), device :: u651, v651, u615, w615
     real(8), dimension(6), device   :: T6, u6, v6, w6
@@ -123,7 +123,7 @@ contains
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
 
-    if (id_visc ==2 .and. 3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-3) then
+    if (id_visc ==2 .and. 3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
       u651(:,:) = u(i-2:i+3,j-2:j+2,k)
       v651(:,:) = v(i-2:i+3,j-2:j+2,k)
       u615(:,:) = u(i-2:i+3,j,k-2:k+2)
@@ -144,6 +144,15 @@ contains
       call tauxy4(mu(:), uy3(:), vx3(:), v6(:), txy, vtxy)
       call tauxy4(mu(:), wx3(:), uz3(:), w6(:), txz, wtxz)
       kTx = heat_conduction6(mu(:), T6(:), dx(i))
+      if (id_turbulence /= 0) then
+        mutx   = 0.0625d0 * (-mut(i-1,j,k) + 9.d0 * (mut(i,j,k) + mut(i+1,j,k)) -mut(i+2,j,k))
+        txxsgs = 2.d0 * mutx * (2.d0 * ux3(2) - vy3(2) - wz3(2)) / 3.d0
+        txysgs = mutx * (uy3(2) + vx3(2))
+        txzsgs = mutx * (wx3(2) + uz3(2))
+        H(:)   = (gamma * p(i-1:i+2,j,k) / (rho(i-1:i+2,j,k) * (gamma - 1.d0))) &
+                 + 0.5d0 * (u(i-1:i+2,j,k)**2 + v(i-1:i+2,j,k)**2 + w(i-1:i+2,j,k)**2) + qc2(i-1:i+2,j,k)
+        Hsgs   = -mutx * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) / 3.d0) * dx(i) / Prt
+      endif
     else
       T233(:,:,:) = T(i:i+1,j-1:j+1,k-1:k+1)
       u231(:,:)   = u(i:i+1,j-1:j+1,k)
@@ -173,6 +182,26 @@ contains
       vtxy        = 0.5d0 * (v2(1) + v2(2)) * txy
       wtxz        = 0.5d0 * (w2(1) + w2(2)) * txz
       kTx         = Cp * mx * (-Tx(1) + Tx(2)) * dx(i) / Pr
+      if (id_turbulence /= 0) then
+        mx     = 0.5d0 * (mut(i,j,k) + mut(i+1,j,k))
+        my(:)  = (/0.25d0 * (mut(i,j-1,k) + mut(i,j,k) + mut(i+1,j-1,k) + mut(i+1,j,k)), &
+                   0.25d0 * (mut(i,j,k) + mut(i,j+1,k) + mut(i+1,j,k) + mut(i+1,j+1,k))/)
+        mz(:)  = (/0.25d0 * (mut(i,j,k-1) + mut(i,j,k) + mut(i+1,j,k-1) + mut(i+1,j,k)), &
+                   0.25d0 * (mut(i,j,k) + mut(i,j,k+1) + mut(i+1,j,k) + mut(i+1,j,k+1))/)
+        mux    = mx * (-u2(1) + u2(2)) * dx(i)
+        mvx    = mx * (-v2(1) + v2(2)) * dx(i)
+        mwx    = mx * (-w2(1) + w2(2)) * dx(i)
+        muy    = dy23(my(:), u231(:,:), dy(j))
+        mvy    = dy23(my(:), v231(:,:), dy(j))
+        muz    = dy23(mz(:), u213(:,:), dz(k))
+        mwz    = dy23(mz(:), w213(:,:), dz(k))
+        txxsgs = 2.d0 * (2.d0 * mux - mvy - mwz) / 3.d0
+        txysgs = muy + mvx
+        txzsgs = mwx + muz
+        H(2:3) = (gamma * p(i:i+1,j,k) / (rho(i:i+1,j,k) * (gamma - 1.d0))) &
+                 + 0.5d0 * (u2(:)**2 + v2(:)**2 + w2(:)**2) + qc2(i:i+1,j,k)
+        Hsgs   = -mx * (-H(2) + H(3)) * dx(i) / Prt
+      endif
     endif
 
     E(i-offset+1,j-offset,k-offset,2) = E(i-offset+1,j-offset,k-offset,2) - (txx+txxsgs)
@@ -192,7 +221,7 @@ contains
     real(8), intent(inout), device                    :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
-    real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy, tyxsgs = 0.d0, tyysgs = 0.d0, tyzsgs = 0.d0, Hsgs = 0.d0
+    real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy, muty, H(4), tyxsgs = 0.d0, tyysgs = 0.d0, tyzsgs = 0.d0, Hsgs = 0.d0
     ! 4th-order accuracy
     real(8), dimension(5,6), device :: u561, v561
     real(8), dimension(6,5), device :: v165, w165
@@ -208,7 +237,7 @@ contains
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset - 1
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
 
-    if (id_visc == 2 .and. 3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-3) then
+    if (id_visc == 2 .and. 3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-2) then
       u561(:,:) = u(i-2:i+2,j-2:j+3,k)
       v561(:,:) = v(i-2:i+2,j-2:j+3,k)
       v165(:,:) = v(i,j-2:j+3,k-2:k+2)
@@ -229,6 +258,15 @@ contains
       call tauxx4(mu(:), vy3(:), wz3(:), ux3(:), v6(:), tyy, vtyy)
       call tauxy4(mu(:), vz3(:), wy3(:), w6(:), tyz, wtyz)
       kTy = heat_conduction6(mu(:), T6(:), dy(j))
+      if (id_turbulence /= 0) then
+        muty   = 0.0625d0 * (-mut(i,j-1,k) + 9.d0 * (mut(i,j,k) + mut(i,j+1,k)) -mut(i,j+2,k))
+        tyxsgs = muty * (uy3(2) + vx3(2))
+        tyysgs = 2.d0 * muty * (2.d0 * vy3(2) - ux3(2) - wz3(2)) / 3.d0
+        tyzsgs = muty * (vz3(2) + wy3(2))
+        H(:)   = (gamma * p(i,j-1:j+2,k) / (rho(i,j-1:j+2,k) * (gamma - 1.d0))) &
+                 + 0.5d0 * (u(i,j-1:j+2,k)**2 + v(i,j-1:j+2,k)**2 + w(i,j-1:j+2,k)**2) + qc2(i,j-1:j+2,k)
+        Hsgs   = -muty * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) / 3.d0) * dy(j) / Prt
+      endif
     else
       T323(:,:,:) = T(i-1:i+1,j:j+1,k-1:k+1)
       u321(:,:)   = u(i-1:i+1,j:j+1,k)
@@ -258,6 +296,26 @@ contains
       vtyy        = 0.5d0 * (v2(1) + v2(2)) * tyy
       wtyz        = 0.5d0 * (w2(1) + w2(2)) * tyz
       kTy         = Cp * my * (-Ty(1) + Ty(2)) * dy(j) / Pr
+      if (id_turbulence /= 0) then
+        my     = 0.5d0 * (mut(i,j,k) + mut(i,j+1,k))
+        mz(:)  = (/0.25d0 * (mut(i,j,k-1) + mut(i,j,k) + mut(i,j+1,k-1) + mut(i,j+1,k)), &
+                   0.25d0 * (mut(i,j,k) + mut(i,j,k+1) + mut(i,j+1,k) + mut(i,j+1,k+1))/)
+        mx(:)  = (/0.25d0 * (mut(i-1,j,k) + mut(i,j,k) + mut(i-1,j+1,k) + mut(i,j+1,k)), &
+                   0.25d0 * (mut(i,j,k) + mut(i+1,j,k) + mut(i,j+1,k) + mut(i+1,j+1,k))/)
+        muy    = my * (-u2(1) + u2(2)) * dy(j)
+        mvy    = my * (-v2(1) + v2(2)) * dy(j)
+        mwy    = my * (-w2(1) + w2(2)) * dy(j)
+        mvz    = dy23(mz(:), v123(:,:), dz(k))
+        mwz    = dy23(mz(:), w123(:,:), dz(k))
+        mux    = dy32(mx(:), u321(:,:), dx(i))
+        mvx    = dy32(mx(:), v321(:,:), dx(i))
+        tyxsgs = muy + mvx
+        tyysgs = 2.d0 * (2.d0 * mvy - mwz - mux) / 3.d0
+        tyzsgs = mvz + mwy
+        H(2:3) = (gamma * p(i,j:j+1,k) / (rho(i,j:j+1,k) * (gamma - 1.d0))) &
+                 + 0.5d0 * (u2(:)**2 + v2(:)**2 + w2(:)**2) + qc2(i,j:j+1,k)
+        Hsgs   = -my * (-H(2) + H(3)) * dy(j) / Prt
+      endif
     endif
 
     F(i-offset,j-offset+1,k-offset,2) = F(i-offset,j-offset+1,k-offset,2) - (tyx+tyxsgs)
@@ -277,7 +335,7 @@ contains
     real(8), intent(inout), device                    :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
-    real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz, tzxsgs = 0.d0, tzysgs = 0.d0, tzzsgs = 0.d0, Hsgs = 0.d0
+    real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz, mutz, H(4), tzxsgs = 0.d0, tzysgs = 0.d0, tzzsgs = 0.d0, Hsgs = 0.d0
     ! 4th-order accuracy
     real(8), dimension(5,6), device :: u516, w516, v156, w156
     real(8), dimension(6), device   :: T6, u6, v6, w6
@@ -291,7 +349,7 @@ contains
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset - 1
     
-    if (id_visc == 2 .and. 3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-3) then
+    if (id_visc == 2 .and. 3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-3) then
       u516(:,:) = u(i-2:i+2,j,k-2:k+3)
       w516(:,:) = w(i-2:i+2,j,k-2:k+3)
       v156(:,:) = v(i,j-2:j+2,k-2:k+3)
@@ -312,6 +370,15 @@ contains
       call tauxy4(mu(:), vz3(:), wy3(:), v6(:), tzy, vtzy)
       call tauxx4(mu(:), wz3(:), ux3(:), vy3(:), w6(:), tzz, wtzz)
       kTz = heat_conduction6(mu(:), T6(:), dz(k))
+      if (id_turbulence /= 0) then
+        mutz   = 0.0625d0 * (-mut(i,j,k-1) + 9.d0 * (mut(i,j,k) + mut(i,j,k+1)) -mut(i,j,k+2))
+        tzxsgs = mutz * (wx3(2) + uz3(2))
+        tzysgs = mutz * (vz3(2) + wy3(2))
+        tzzsgs = 2.d0 * mutz * (2.d0 * wz3(2) - ux3(2) - vy3(2)) / 3.d0
+        H(:)   = (gamma * p(i,j,k-1:k+2) / (rho(i,j,k-1:k+2) * (gamma - 1.d0))) &
+                 + 0.5d0 * (u(i,j,k-1:k+2)**2 + v(i,j,k-1:k+2)**2 + w(i,j,k-1:k+2)**2) + qc2(i,j,k-1:k+2)
+        Hsgs   = -mutz * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) / 3.d0) * dz(k) / Prt
+      endif
     else
       T332(:,:,:) = T(i-1:i+1,j-1:j+1,k:k+1)
       u312(:,:)   = u(i-1:i+1,j,k:k+1)
@@ -341,6 +408,26 @@ contains
       vtzy        = 0.5d0 * (v2(1) + v2(2)) * tzy
       wtzz        = 0.5d0 * (w2(1) + w2(2)) * tzz
       kTz         = Cp * mz * (-Tz(1) + Tz(2)) * dz(k) / Pr
+      if (id_turbulence /= 0) then
+        mz     = 0.5d0 * (mut(i,j,k) + mut(i,j,k+1))
+        mx(:)  = (/0.25d0 * (mut(i-1,j,k) + mut(i,j,k) + mut(i-1,j,k+1) + mut(i,j,k+1)), &
+                   0.25d0 * (mut(i,j,k) + mut(i+1,j,k) + mut(i,j,k+1) + mut(i+1,j,k+1))/)
+        my(:)  = (/0.25d0 * (mut(i,j-1,k) + mut(i,j,k) + mut(i,j-1,k+1) + mut(i,j,k+1)), &
+                   0.25d0 * (mut(i,j,k) + mut(i,j+1,k) + mut(i,j,k+1) + mut(i,j+1,k+1))/)
+        muz    = mz * (-u2(1) + u2(2)) * dz(k)
+        mvz    = mz * (-v2(1) + v2(2)) * dz(k)
+        mwz    = mz * (-w2(1) + w2(2)) * dz(k)
+        mwx    = dy32(mx(:), w312(:,:), dx(i))
+        mux    = dy32(mx(:), u312(:,:), dx(i))
+        mvy    = dy32(my(:), v132(:,:), dy(j))
+        mwy    = dy32(my(:), w132(:,:), dy(j))
+        tzxsgs = mwx + muz
+        tzysgs = mvz + mwy
+        tzzsgs = 2.d0 * (2.d0 * mwz - mux - mvy) / 3.d0
+        H(2:3) = (gamma * p(i,j,k:k+1) / (rho(i,j,k:k+1) * (gamma - 1.d0))) &
+                 + 0.5d0 * (u2(:)**2 + v2(:)**2 + w2(:)**2) + qc2(i,j,k:k+1)
+        Hsgs   = -mz * (-H(2) + H(3)) * dz(k) / Prt
+      endif
     endif
 
     G(i-offset,j-offset,k-offset+1,2) = G(i-offset,j-offset,k-offset+1,2) - (tzx+tzxsgs)
