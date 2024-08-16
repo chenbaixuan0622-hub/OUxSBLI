@@ -44,7 +44,7 @@ contains
     integer i, j, k
     real(8) dx1, dy1, dz1
     dx1 = Lx / dble(nx-1)
-    dy1 = Ly / dble(ny-1)
+    dy1 = 10.d-3 / dble(256)
     dz1 = Lz / dble(nz-1)
     x(1) = 0.d0
     do i = 1, nx-1
@@ -54,8 +54,7 @@ contains
 
     y(1) = 0.d0
     do j = 1, ny-1
-      dy(j) = max(0.05d0, 2.d0 * dble(j)/dble(ny)) * dy1
-      !dy(j) = dy1
+      dy(j) = min(1.d0, max(0.125d0, dble(j)/dble(128))) * dy1
       y(j+1) = y(j) + dy(j)
     enddo
 
@@ -114,7 +113,7 @@ contains
     integer, intent(in), value      :: nx, ny, nz
     real(8), intent(in), device     :: Jacobian(nx,ny)
     real(8), intent(inout), device  :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(in)             :: Qre(2,ny,nz,5)
+    real(8), intent(in), device     :: Qre(2,ny,nz,5)
     integer i, j, k, l
     real(8) :: p_wall
     ! Riemann invariants
@@ -122,7 +121,7 @@ contains
     real(8) :: v0 = 0.d0
     real(8) :: c0 = sqrt(gamma * p0 / rho0)
     !$cuf kernel do(2)<<<*,*>>>
-    do k = 2, nz-1
+    do k = 3, nz-2
       do i = 2, nx-1
         ! top
         ! Riemann invariants
@@ -159,24 +158,29 @@ contains
     enddo;enddo
 
     if (kind(id_rescale) == 4) then
-      QJ(1:2,:,2:nz-1,:) = Qre(1:2,:,2:nz-1,:)
       !$cuf kernel do(3)<<<*,*>>>
       do l = 1, 5
-        do k = 2, nz-1
+        do k = 3, nz-2
           do j = 1, ny
+            ! inlet
+            QJ(1,j,k,l) = Qre(1,j,k,l)
+            QJ(2,j,k,l) = Qre(2,j,k,l)
+            ! outlet
             QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
       enddo;enddo;enddo
     else
       !$cuf kernel do(3)<<<*,*>>>
       do l = 1, 5
-        do k = 2, nz-1
+        do k = 3, nz-2
           do j = 1, ny
             ! inlet
-            QJ(1,j,k,l) = QJ(nx-3,j,k,l)
-            QJ(2,j,k,l) = QJ(nx-2,j,k,l)
+            QJ(1,j,k,l) = QJ(nx-5,j,k,l)
+            QJ(2,j,k,l) = QJ(nx-4,j,k,l)
+            QJ(3,j,k,l) = QJ(nx-3,j,k,l)
             ! outlet
-            QJ(nx-1,j,k,l) = QJ(3,j,k,l)
-            QJ(nx,j,k,l)   = QJ(4,j,k,l)
+            QJ(nx-2,j,k,l) = QJ(4,j,k,l)
+            QJ(nx-1,j,k,l) = QJ(5,j,k,l)
+            QJ(nx,j,k,l)   = QJ(6,j,k,l)
       enddo;enddo;enddo
     endif
 
@@ -185,10 +189,12 @@ contains
     do l = 1, 5
       do j = 1, ny
         do i = 1, nx
-          QJ(i,j,1,l) = QJ(i,j,nz-3,l)
-          QJ(i,j,2,l) = QJ(i,j,nz-2,l)
-          QJ(i,j,nz-1,l) = QJ(i,j,3,l)
-          QJ(i,j,nz,l) = QJ(i,j,4,l)
+          QJ(i,j,1,l) = QJ(i,j,nz-5,l)
+          QJ(i,j,2,l) = QJ(i,j,nz-4,l)
+          QJ(i,j,3,l) = QJ(i,j,nz-3,l)
+          QJ(i,j,nz-2,l) = QJ(i,j,4,l)
+          QJ(i,j,nz-1,l) = QJ(i,j,5,l)
+          QJ(i,j,nz,l)   = QJ(i,j,6,l)
     enddo;enddo;enddo
   end subroutine set_bc
 
@@ -197,16 +203,16 @@ contains
     real(8), intent(inout), device  :: mut(nx,ny,nz)
     integer i, j, k
     !$cuf kernel do(2) <<<*,*>>>
-    do k = 1, nz
-      do j = 1, ny
+    do k = 4, nz-3
+      do j = 2, ny-1
         ! inlet
-        mut(1,j,k) = mut(2,j,k)
+        mut(1,j,k)  = mut(2,j,k)
         ! outlet
         mut(nx,j,k) = mut(nx-1,j,k)
     enddo;enddo
 
     !$cuf kernel do(2) <<<*,*>>>
-    do k = 1, nz
+    do k = 4, nz-3
       do i = 1, nx
         ! wall
         mut(i,1,k) = 0.d0
@@ -218,8 +224,12 @@ contains
     do j = 1, ny
       do i = 1, nx
         ! span
-        mut(i,j,1) = mut(i,j,2)
-        mut(i,j,nz) = mut(i,j,nz-1)
+        mut(i,j,1)    = mut(i,j,nz-5)
+        mut(i,j,2)    = mut(i,j,nz-4)
+        mut(i,j,3)    = mut(i,j,nz-3)
+        mut(i,j,nz-2) = mut(i,j,4)
+        mut(i,j,nz-1) = mut(i,j,5)
+        mut(i,j,nz)   = mut(i,j,6)
     enddo;enddo
   end subroutine set_bc_mut
 end module set

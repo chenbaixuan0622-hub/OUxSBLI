@@ -18,20 +18,20 @@ module mod_globals
   !               ! 2 selective_mixed_scale !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer, parameter :: id_turbulence = 0
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_scheme ! 1  KEEP4th          !
-  !           ! 2  KEEP MUSCL       !
-  !           ! 3  SLAU             !
-  !           ! 4  KEEPUP           !
-  !           ! 5  Hybrid Weighted  !
-  !           ! 6  Hybrid threshold !
-  !           ! 7  Hybrid Sigmoid   !
-  !           ! 8  KEEP + Rho       !
-  !           ! 9  KEEP2nd          !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_sensor ! 1 Ducros            !
-  !           ! 2 Albada            !
-  !           ! 3 Ducros + Albada   !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_scheme ! 1  KEEP4th            !
+  !           ! 2  KEEP MUSCL         !
+  !           ! 3  SLAU               !
+  !           ! 4  KEEPUP             !
+  !           ! 5  Hybrid Weighted    !
+  !           ! 6  Hybrid threshold   !
+  !           ! 7  Hybrid Sigmoid     !
+  !           ! 8  KEEP + Rho         !
+  !           ! 9  KEEP2nd            !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_sensor ! 1 Ducros              !
+  !           ! 2 Albada              !
+  !           ! 3 Ducros + Albada     !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_accuracy ! kind2 2nd           !
   !             ! kind4 4th           !
@@ -49,13 +49,17 @@ module mod_globals
   !             ! kind4 HR-SLAU2      !
   !             ! kind8 VHR-SLAU2     !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer, parameter         :: id_scheme = 1
-  integer, parameter         :: id_sensor = 1
-  real(8), parameter         :: threshold = 0.4d0
+  ! id_rescale  ! kind2 off           !
+  !             ! kind4 on            !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  integer, parameter         :: id_scheme   = 1
+  integer, parameter         :: id_sensor   = 1
+  real(8), parameter         :: threshold   = 0.4d0
   integer(kind=4), parameter :: id_accuracy = 0
-  integer(kind=2), parameter :: id_tvd  = 0
-  integer(kind=8), parameter :: id_keep = 0
-  integer(kind=2), parameter :: id_slau = 0
+  integer(kind=2), parameter :: id_tvd      = 0
+  integer(kind=2), parameter :: id_keep     = 0
+  integer(kind=2), parameter :: id_slau     = 0
+  integer(kind=2), parameter :: id_rescale  = 0
 
   ! mesh
   real(8), parameter :: L0 = 1.524d-3
@@ -66,6 +70,8 @@ module mod_globals
   integer, parameter :: nx = 130!66
   integer, parameter :: ny = 130!66
   integer, parameter :: nz = 130!66
+
+  integer, parameter :: nre = nx-4
 
   ! GPU
   type(dim3) :: blocksE = dim3((nx-accuracy+1)/3,(ny-accuracy)/8,(nz-accuracy)/8)

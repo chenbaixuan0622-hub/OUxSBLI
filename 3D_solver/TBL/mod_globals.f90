@@ -1,13 +1,14 @@
 module mod_globals
   use cudafor
   implicit none
-  integer, parameter                       :: dimension = 3
-  integer, parameter                       :: accuracy = 2 
-  integer, parameter                       :: offset = accuracy / 2
-  integer, parameter                       :: id_visc = 1 
+  integer, parameter :: dimension = 3
+  integer, parameter :: accuracy = 2 
+  integer, parameter :: offset = accuracy / 2
+  integer, parameter :: id_visc = 2 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! 0 no-visc               !
-  !               ! 1 visc                  !
+  !               ! 1 visc 2nd              !
+  !               ! 2 visc 4th              !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_turbulence ! 0 laminar               !
   !               ! 1 Smagorinsky           !
@@ -51,7 +52,7 @@ module mod_globals
   integer, parameter         :: id_scheme   = 1
   integer, parameter         :: id_sensor   = 1
   real(8), parameter         :: threshold   = 0.4d0
-  integer(kind=4), parameter :: id_accuracy = 0
+  integer(kind=8), parameter :: id_accuracy = 0
   integer(kind=2), parameter :: id_tvd      = 0
   integer(kind=2), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
@@ -65,7 +66,7 @@ module mod_globals
   integer, parameter :: ny = 257
   integer, parameter :: nz = 129!65
 
-  integer, parameter :: nre = int(0.5 * nx)
+  integer, parameter :: nre = nx-4
 
   ! GPU
   type(dim3) :: blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/5,(nz-accuracy)/1)

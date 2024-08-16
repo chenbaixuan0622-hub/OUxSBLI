@@ -1,11 +1,10 @@
 module mod_globals
   use cudafor
   implicit none
-  integer, parameter                       :: dimension = 3
-  integer, parameter                       :: accuracy = 2 
-  integer(kind=2**(accuracy/2)), parameter :: id_accuracy = 1
-  integer, parameter                       :: offset = accuracy / 2
-  integer, parameter                       :: id_visc = 1 
+  integer, parameter :: dimension = 3
+  integer, parameter :: accuracy = 2 
+  integer, parameter :: offset = accuracy / 2
+  integer, parameter :: id_visc = 1 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! 0 no-visc               !
   !               ! 1 visc                  !
@@ -15,26 +14,48 @@ module mod_globals
   !               ! 2 selective_mixed_scale !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer, parameter :: id_turbulence = 0
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_hybrid ! kind2 off   !
-  !           ! kind4 on    !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_muscl  ! kind2 no    !
-  !           ! kind4 3rd   !
-  !           ! kind8 4th   !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_scheme ! 1  KEEP     !
-  !           ! 2  Roe      !
-  !           ! 3  SLAU     !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_slau   ! kind2 slau  !
-  !           ! kind4 sd    !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=4), parameter :: id_hybrid = 0
-  integer(kind=8), parameter :: id_muscl = 0
-  integer, parameter         :: id_scheme = 3
-  integer(kind=2), parameter :: id_slau = 0
-  real(8), parameter         :: dp_max = 0.d0
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_scheme   ! 1  KEEP4th          !
+  !             ! 2  KEEP MUSCL       !
+  !             ! 3  SLAU             !
+  !             ! 4  KEEPUP           !
+  !             ! 5  Hybrid Weighted  !
+  !             ! 6  Hybrid threshold !
+  !             ! 7  Hybrid Sigmoid   !
+  !             ! 8  KEEP + Rho       !
+  !             ! 9  KEEP2nd          !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_sensor   ! 1 Ducros            !
+  !             ! 2 Albada            !
+  !             ! 3 Ducros + Albada   !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_accuracy ! kind2 2nd           !
+  !             ! kind4 4th           !
+  !             ! kind8 6th           !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_tvd      ! kind2 non TVD       !
+  !             ! kind4 minmod        !
+  !             ! kind8 MUSCL4th      !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_keep     ! kind2 KEEP          !
+  !             ! kind4 KEEPPE        !
+  !             ! kind8 KEP           !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_slau     ! kind2 SLAU          !
+  !             ! kind4 HR-SLAU2      !
+  !             ! kind8 VHR-SLAU2     !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_rescale  ! kind2 off           !
+  !             ! kind4 on            !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  integer, parameter         :: id_scheme   = 7
+  integer, parameter         :: id_sensor   = 1
+  real(8), parameter         :: threshold   = 0.4d0
+  integer(kind=8), parameter :: id_accuracy = 0
+  integer(kind=8), parameter :: id_tvd      = 0
+  integer(kind=2), parameter :: id_keep     = 0
+  integer(kind=4), parameter :: id_slau     = 0
+  integer(kind=4), parameter :: id_rescale  = 0
 
   ! mesh
   real(8), parameter :: Lx1 = 48d-3
@@ -48,9 +69,8 @@ module mod_globals
   integer, parameter :: nz1 = 65
   integer, parameter :: nx2 = 513
   integer, parameter :: ny2 = 65
-  integer, parameter :: nz2  = 65
-  real(8), parameter :: dz  = Lz / dble(nz1-1)
-  real(8), parameter :: dzi = 1.d0 / dz
+  integer, parameter :: nz2 = 65
+  integer, parameter :: nre = int(0.3 * nx1)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -58,17 +78,17 @@ module mod_globals
   !               ! kind4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_recal = 0
-  integer, parameter :: nt = 500
-  integer, parameter :: np = 100
-  real(8), parameter :: u0 = 506.8d0
-  real(8), parameter :: dt = 1d-8!0.1d0 * (Lx / dble(nx-1)) / u0
-
-  real(8), parameter :: dtdz = dt / dz
+  integer, parameter :: nt  = 1!500
+  integer, parameter :: np  = 1!100
+  real(8), parameter :: u0  = 506.8d0
+  real(8), parameter :: CFL = 0.1d0
+  real(8), parameter :: dt  = CFL * Lx1 / (dble(nx1-1) * u0)
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
   real(8), parameter :: Pr = 0.71d0
   real(8), parameter :: Prt = 0.9d0
+  real(8), parameter :: R = 287.03d0
 
   ! MUSCL
   real(8), parameter :: k = 1.d0 / 3.d0
@@ -78,7 +98,6 @@ module mod_globals
   real(8), parameter :: eps = 1.d0
 
   ! initial condition
-  real(8), parameter :: R = 287.03d0
   real(8), parameter :: M0 = 1.9d0
   real(8), parameter :: p0 = 14924.d0
   real(8), parameter :: T0 = 171.31d0

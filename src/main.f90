@@ -59,6 +59,7 @@ program main
   endif
 
   deallocate(Q,x,xix,dx,y,etay,dy,z,zetaz,dz,Jacobian)
+  call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   call MPI_FINALIZE(ierr)
 end program main
 
