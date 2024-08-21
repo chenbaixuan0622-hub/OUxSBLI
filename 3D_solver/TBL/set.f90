@@ -54,7 +54,7 @@ contains
 
     y(1) = 0.d0
     do j = 1, ny-1
-      dy(j) = min(1.d0, max(0.125d0, dble(j)/dble(128))) * dy1
+      dy(j) = min(1.d0, max(0.05d0, dble(j)/dble(128))) * dy1
       y(j+1) = y(j) + dy(j)
     enddo
 
