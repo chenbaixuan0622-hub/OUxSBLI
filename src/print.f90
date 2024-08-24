@@ -1,5 +1,5 @@
 module print
-  use mod_globals, only : nt, dt, gamma, R, Lx
+  use mod_globals, only : nt, dt, step_offset, gamma, R, Lx
   implicit none
   
   interface
@@ -581,7 +581,7 @@ contains
         Tw(:,:) = p(:,1,:) / (real(R) * rho(:,1,:))
         call print_turbulent_boundary_layer(step,nx,ny,nz,dy,y,Tw,u,rho)
       endif
-      write(filename, "(a, i1.1, a, i5.5, a)") "data/",int(myrank),"/Q",int(step),".vtr"
+      write(filename, "(a, i1.1, a, i5.5, a)") "data/",int(myrank),"/Q",int(step+step_offset),".vtr"
     else
       call print_mass(step,nx,ny,nz,rho,u,v,w,mass0)
       call print_entropy(step,nx,ny,nz,rho,p,entropy0)
