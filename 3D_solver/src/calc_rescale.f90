@@ -43,7 +43,7 @@ contains
     real(8), intent(inout)                  :: Qre(2,ny,nz,5) ! Q / J
     integer i, j, jj, k, l
     real(8) :: mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0
-    real(8) bltre1, bltre2, bltre, taure, utre, utin, beta, mu, nu, ady, ade 
+    real(8) t, bltre1, bltre2, bltre, taure, utre, utin, beta, mu, nu, ady, ade 
     ! mean properties at rescaling plane
     ! fluctuating properties at rescaling plane
     real(8), dimension(2,ny,nz) :: ufre, vfre, wfre, pfre, Tfre
@@ -59,6 +59,9 @@ contains
     ! rescaled properties at inlet
     real(8) uin, vin, win, pin, Tin, rhoin
     character(len=40) filename
+    write(filename, "(a)") "data/rescaling.d"
+
+    t = nt * step * dt
 
     do l = 1, 5
       do k = 1, nz
@@ -87,7 +90,9 @@ contains
       ! rescaling !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! calc fluctuating part   u'(x,y,z,t) = u(x,y,z,t) - U(x,y)
       ! U(x,y) average velocity in the spanwise direction and time
-      write(*,*) "rescale"
+      open(10, file=filename, position="append")
+      write(10, "(1e12.4, a)") t, "rescale"
+      close(10)
       do k = 1, nz
         do j = 1, ny
           do i = 1, 2 ! 2 rescaleing planes are required for 4th-order accuracy flux
@@ -220,7 +225,9 @@ contains
             Qre(i,j,k,5) = (pin / (gamma - 1.d0) + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) / Jacobian(i,j,k)
       enddo;enddo;enddo
     else
-      write(*,*) "cyclic"
+      open(10, file=filename, position="append")
+      write(10, "(1e12.4, a)") t, "cyclic"
+      close(10)
       ! cyclic boundary condition !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       do l = 1, 5
         do k = 1, nz
