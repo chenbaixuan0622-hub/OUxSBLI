@@ -250,11 +250,12 @@ contains
     enddo;enddo
   end subroutine set_bc_init6
 
-  subroutine set_bc(nx,ny,nz,Jacobian,Q)
+  subroutine set_bc(nx,ny,nz,Jacobian,Q,Qre)
     use mod_globals, only : id_accuracy
     integer, intent(in), value      :: nx, ny, nz
-    real(8), intent(in), device     :: Jacobian(nx,ny)
+    real(8), intent(in), device     :: Jacobian(nx,ny,nz)
     real(8), intent(inout), device  :: Q(nx,ny,nz,5)
+    real(8), intent(in), device     :: Qre(2,ny,nz,5)
     integer i, j, k, l
     if (kind(id_accuracy) == 2) then
       !$cuf kernel do(3)<<<*,*>>>
