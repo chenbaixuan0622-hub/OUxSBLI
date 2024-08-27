@@ -44,7 +44,7 @@ contains
     qc2 = 0.d0
     if (id_turbulence /= 0) then
       call calc_mut<<<blocks,threads>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,mut,qc2)
-      call set_bc_mut(nx,ny,nz,mut)
+      call set_bc_mut(nx,ny,nz,mut,qc2)
     endif
 
     stat = cudaDeviceSynchronize()
