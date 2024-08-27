@@ -1,7 +1,7 @@
 module set
   use cudafor
   use mpi
-  use mod_globals, only : Lx1, Ly1, Lx2, Ly2, Lz, gamma, R, u0, T0, &
+  use mod_globals, only : Lx1, Ly1, Lz1, Lx2, Ly2, Lz2, gamma, R, u0, T0, &
   & beta, theta, M0, Ms, Ms2, a1, rho0, rho2, p0, p2, u1, u2, v1, v2, u_magnitude, ux, uy
   implicit none
 contains
@@ -41,11 +41,11 @@ contains
     v = 0.d0
   end subroutine calc_Blasius
 
-  subroutine set_grid(myrank,nx,ny,nz,x,y,z,dx,dy)
+  subroutine set_grid(myrank,nx,ny,nz,x,y,z,dx,dy,dz)
     integer, intent(in)   :: myrank, nx, ny, nz
-    real(8), intent(out)  :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1)
+    real(8), intent(out)  :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     integer i, j, k, ierr, status(MPI_STATUS_SIZE)
-    real(8) dx1, dy1, dx2, dy2, dz
+    real(8) dx1, dy1, dz1, dx2, dy2, dz2
     dy1 = Ly1 / dble(256)
     if (myrank == 0) then
       dx1 = Lx1 / dble(nx-1)
@@ -53,6 +53,13 @@ contains
       do i = 1, nx-1
         dx(i) = dx1
         x(i+1) = x(i) + dx(i)
+      enddo
+    
+      dz1 = Lz1 / dble(nz-1)
+      z(1) = 0.d0
+      do k = 1, nz-1
+        dz(k) = dz1
+        z(k+1) = z(k) + dz(k)
       enddo
 
       call MPI_RECV(y(1), 1, MPI_REAL8, 2, 0, MPI_COMM_WORLD, status, ierr)
@@ -68,11 +75,17 @@ contains
         x(i+1) = x(i) + dx(i)
       enddo
 
+      dz2 = Lz2 / dble(nz-1)
+      z(1) = 0.d0
+      do k = 1, nz-1
+        dz(k) = dz2
+        z(k+1) = z(k) + dz(k)
+      enddo
+
       y(1) = 0.d0
       do j = 1, ny-3
         dy(j) = min(1.d0, max(0.5d0, dble(j) / dble(ny-3))) * dy1
         y(j+1) = y(j) + dy(j)
-        print *, dy1, dy(j)
       enddo
       dy(ny-2) = dy1
       y(ny-1) = y(ny-2) + dy1
@@ -80,11 +93,6 @@ contains
       y(ny) = y(ny-1) + dy1
       call MPI_SEND(y(ny-1), 1, MPI_REAL8, 0, 0, MPI_COMM_WORLD, ierr)
     endif
-
-    dz = Lz / dble(nz-1)
-    do k = 1, nz
-      z(k) = dble(k-1) * dz
-    enddo
   end subroutine set_grid
 
   subroutine set_init(myrank,nx,ny,nz,xs,ys,zs,Q)
@@ -188,9 +196,10 @@ contains
     deallocate(Qp1,Qp2)
   end subroutine
 
-  subroutine set_bc1(nx,ny,nz,Jacobian,QJ)
+  subroutine set_bc1(nx,ny,nz,Jacobian,Qre,QJ)
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: Jacobian(nx,ny)
+    real(8), intent(in), device    :: Qre(2,ny,nz,5)
     real(8), intent(inout), device :: QJ(nx,ny,nz,5)
     integer i, j, k, l, No, Nre
     real(8) :: p_wall
@@ -200,13 +209,13 @@ contains
     real(8) :: c0 = sqrt(gamma * p0 / rho0)
     real(8), device :: Qd(nx,2,nz,5)
     No = int(0.35 * nx)
-    Nre = int(0.3 * nx)
     !$cuf kernel do<<<*,*>>>
     do l = 1, 5
       do k = 3, nz-2
         do j = 3, ny-1
           ! inlet
-          QJ(1,j,k,l)  = QJ(Nre,j,k,l)
+          QJ(1,j,k,l)  = Qre(1,j,k,l)
+          QJ(2,j,k,l)  = Qre(2,j,k,l)
           ! outlet
           QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
     enddo;enddo;enddo
@@ -267,20 +276,21 @@ contains
     enddo;enddo;enddo
   end subroutine set_bc1
 
-  subroutine set_bc2(nx,ny,nz,Jacobian,QJ)
-    integer, intent(in), value          :: nx, ny, nz
-    real(8), intent(in), device         :: Jacobian(nx,ny)
-    real(8), intent(inout), device      :: QJ(nx,ny,nz,5)
-    integer i, j, k, l, Nre
+  subroutine set_bc2(nx,ny,nz,Jacobian,Qre,QJ)
+    integer, intent(in), value     :: nx, ny, nz
+    real(8), intent(in), device    :: Jacobian(nx,ny)
+    real(8), intent(in), device    :: Qre(2,ny,nz,5)
+    real(8), intent(inout), device :: QJ(nx,ny,nz,5)
+    integer i, j, k, l
     real(8) :: p_wall
     real(8), device :: Qd(nx,2,nz,5)
-    Nre = int(0.3 * nx)
     !$cuf kernel do<<<*,*>>>
     do l = 1, 5
       do k = 3, nz-2
         do j = 2, ny-2
           ! inlet
-          QJ(1,j,k,l) = QJ(Nre,j,k,l)
+          QJ(1,j,k,l) = Qre(1,j,k,l)
+          QJ(2,j,k,l) = Qre(2,j,k,l)
           ! outlet
           QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
     enddo;enddo;enddo

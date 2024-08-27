@@ -1,6 +1,4 @@
 module calc_rescale
-  use cudafor
-  use mpi
   use mod_globals, only : nt, dt, gamma , R, u0
 contains
   subroutine calc_mean(step,nx,ny,nz,Q,Um,Vm,Wm,pm,Tm)
@@ -28,24 +26,24 @@ contains
     ! time direction
     do j = 1, ny
       do i = 1, 2
-        Um(i,j) = usum(i,j) / dble(nz) !((dble(step) - 1.d0) * Um(i,j) + usum(i,j) / dble(nz)) / dble(step)
-        Vm(i,j) = vsum(i,j) / dble(nz) !((dble(step) - 1.d0) * Vm(i,j) + vsum(i,j) / dble(nz)) / dble(step)
-        Wm(i,j) = wsum(i,j) / dble(nz) !((dble(step) - 1.d0) * Wm(i,j) + wsum(i,j) / dble(nz)) / dble(step)
-        pm(i,j) = psum(i,j) / dble(nz) !((dble(step) - 1.d0) * pm(i,j) + psum(i,j) / dble(nz)) / dble(step)
-        Tm(i,j) = Tsum(i,j) / dble(nz) !((dble(step) - 1.d0) * Tm(i,j) + Tsum(i,j) / dble(nz)) / dble(step)
+        Um(i,j) = usum(i,j) / dble(nz)
+        Vm(i,j) = vsum(i,j) / dble(nz)
+        Wm(i,j) = wsum(i,j) / dble(nz)
+        pm(i,j) = psum(i,j) / dble(nz)
+        Tm(i,j) = Tsum(i,j) / dble(nz)
     enddo;enddo
   end subroutine calc_mean
 
-  subroutine set_rescale(step,myrank,nx,ny,nz,nre,blt,y,Jacobian,Um,Vm,Wm,pm,Tm,Qre)
-    integer, intent(in)                     :: step, myrank, nx, ny, nz, nre
+  subroutine set_rescale(step,nx,ny,nz,nre,blt,y,Jacobian,Um,Vm,Wm,pm,Tm,Qre)
+    integer, intent(in)                     :: step, nx, ny, nz, nre
     real(8), intent(in)                     :: blt
     real(8), intent(in)                     :: y(ny)
     real(8), intent(in)                     :: Jacobian(nx,ny,nz)
     real(8), intent(inout), dimension(2,ny) :: Um, Vm, Wm, pm, Tm
     real(8), intent(inout)                  :: Qre(2,ny,nz,5) ! Q / J
-    integer i, j, jj, k, l, ierr, status(MPI_STATUS_SIZE)
+    integer i, j, jj, k, l
     real(8) :: mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0
-    real(8) bltre1, bltre2, bltre, taure, utre, utin, beta, mu, nu, ady, ade 
+    real(8) t, bltre1, bltre2, bltre, taure, utre, utin, beta, mu, nu, ady, ade 
     ! mean properties at rescaling plane
     ! fluctuating properties at rescaling plane
     real(8), dimension(2,ny,nz) :: ufre, vfre, wfre, pfre, Tfre
@@ -61,6 +59,9 @@ contains
     ! rescaled properties at inlet
     real(8) uin, vin, win, pin, Tin, rhoin
     character(len=40) filename
+    write(filename, "(a)") "data/rescaling.d"
+
+    t = nt * step * dt
 
     do l = 1, 5
       do k = 1, nz
@@ -72,28 +73,26 @@ contains
     call calc_mean(step,nx,ny,nz,Qre,Um,Vm,Wm,pm,Tm)
 
     ! check boundary layer thickness at rescaling plane
-    if (myrank == 3) then
-      do j = 2, ny
-        if (Um(1,j) >= 0.99d0 * u0 .and. Um(2,j) >= 0.99d0 * u0) then
-          bltre1 = y(j) - (-y(j-1) + y(j)) * (Um(1,j) - 0.99d0 * u0) / (-Um(1,j-1) + Um(1,j) + 1.d-20)
-          bltre2 = y(j) - (-y(j-1) + y(j)) * (Um(2,j) - 0.99d0 * u0) / (-Um(2,j-1) + Um(2,j) + 1.d-20)
-          ! ensure bltre is not NaN
-          if (bltre1 == bltre1 .and. bltre2 == bltre2) then
-            bltre = 0.5d0 * (bltre1 + bltre2)
-            exit
-          endif
+    bltre = 0.d0
+    do j = 2, ny
+      if (Um(1,j) >= 0.99d0 * u0 .and. Um(2,j) >= 0.99d0 * u0) then
+        bltre1 = y(j) - (-y(j-1) + y(j)) * (Um(1,j) - 0.99d0 * u0) / (-Um(1,j-1) + Um(1,j) + 1.d-20)
+        bltre2 = y(j) - (-y(j-1) + y(j)) * (Um(2,j) - 0.99d0 * u0) / (-Um(2,j-1) + Um(2,j) + 1.d-20)
+        ! ensure bltre is not NaN
+        if (bltre1 == bltre1 .and. bltre2 == bltre2) then
+          bltre = 0.5d0 * (bltre1 + bltre2)
+          exit
         endif
-      enddo
-    endif
+      endif
+    enddo
 
-    if (bltre >= blt .and. myrank == 3 .and. step >= 1000) then
-      write(filename, "(a, i1.1, a)") "data/", int(myrank), "/blt.d"
-      open(10,file=filename, position="append")
-      write(10,"(2e12.4)") dble(nt*step)*dt, bltre
-      close(10)
+    if (bltre > blt .and. step >= 1000) then
       ! rescaling !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! calc fluctuating part   u'(x,y,z,t) = u(x,y,z,t) - U(x,y)
       ! U(x,y) average velocity in the spanwise direction and time
+      open(10, file=filename, position="append")
+      write(10, "(1e12.4, a)") t, "rescale"
+      close(10)
       do k = 1, nz
         do j = 1, ny
           do i = 1, 2 ! 2 rescaleing planes are required for 4th-order accuracy flux
@@ -211,7 +210,7 @@ contains
 
       ! re-introducing
       do k = 2, nz-1
-        do j = 2, ny-1
+        do j = 1, ny
           do i = 1, 2
             uin   = (Umin(i,j,k) + ufin(i,j,k)) * (1.d0 - weight(j)) + (Umout(i,j,k) + ufout(i,j,k)) * weight(j)
             vin   = (Vmin(i,j,k) + vfin(i,j,k)) * (1.d0 - weight(j)) + (Vmout(i,j,k) + vfout(i,j,k)) * weight(j)
@@ -226,13 +225,10 @@ contains
             Qre(i,j,k,5) = (pin / (gamma - 1.d0) + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) / Jacobian(i,j,k)
       enddo;enddo;enddo
     else
+      open(10, file=filename, position="append")
+      write(10, "(1e12.4, a)") t, "cyclic"
+      close(10)
       ! cyclic boundary condition !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      if (myrank == 3) then
-        write(filename, "(a, i1.1, a)") "data/", int(myrank), "/blt.d"
-        open(10,file=filename, position="append")
-        write(10,"(2e12.4)") dble(nt*step)*dt, bltre
-        close(10)
-      endif
       do l = 1, 5
         do k = 1, nz
           do j = 1, ny

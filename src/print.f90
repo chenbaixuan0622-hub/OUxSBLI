@@ -1,5 +1,5 @@
 module print
-  use mod_globals, only : nt, dt, gamma, R, Lx
+  use mod_globals, only : nt, dt, step_offset, gamma, R, Lx
   implicit none
   
   interface
@@ -264,8 +264,7 @@ contains
     else
       open(10,file="data/kinetic_energy.d", position="append")
     endif
-    !write(10,"(2e12.4)") t, ke
-    write(10,"(2e12.4)") t, ke / ke0
+    write(10,"(3e12.4)") t, ke, ke / ke0
     close(10)
   end subroutine print_KE
 
@@ -582,7 +581,7 @@ contains
         Tw(:,:) = p(:,1,:) / (real(R) * rho(:,1,:))
         call print_turbulent_boundary_layer(step,nx,ny,nz,dy,y,Tw,u,rho)
       endif
-      write(filename, "(a, i1.1, a, i5.5, a)") "data/",int(myrank),"/Q",int(step),".vtr"
+      write(filename, "(a, i1.1, a, i5.5, a)") "data/",int(myrank),"/Q",int(step+step_offset),".vtr"
     else
       call print_mass(step,nx,ny,nz,rho,u,v,w,mass0)
       call print_entropy(step,nx,ny,nz,rho,p,entropy0)
