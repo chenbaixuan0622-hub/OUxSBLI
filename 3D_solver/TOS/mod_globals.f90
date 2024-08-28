@@ -4,7 +4,7 @@ module mod_globals
   integer, parameter :: dimension     = 3
   integer, parameter :: accuracy      = 2 
   integer, parameter :: offset        = accuracy / 2
-  integer, parameter :: id_visc       = 2 
+  integer, parameter :: id_visc       = 1 
   integer, parameter :: id_turbulence = 1
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! 0 no-visc         !
@@ -47,10 +47,10 @@ module mod_globals
   ! id_rescale  ! kind2 off           !
   !             ! kind4 on            !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer, parameter         :: id_scheme   = 5
+  integer, parameter         :: id_scheme   = 1
   integer, parameter         :: id_sensor   = 1
   real(8), parameter         :: threshold   = 0.4d0
-  integer(kind=8), parameter :: id_accuracy = 0
+  integer(kind=4), parameter :: id_accuracy = 0
   integer(kind=4), parameter :: id_tvd      = 0
   integer(kind=2), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
@@ -87,9 +87,9 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=4), parameter :: id_RungeKutta = 0
   integer(kind=4), parameter :: id_recal = 0
-  integer, parameter :: step_offset = 50
+  integer, parameter :: step_offset = 180
   integer, parameter :: nt  = 50
-  integer, parameter :: np  = 50
+  integer, parameter :: np  = 20
   real(8), parameter :: u0  = 506.8d0
   real(8), parameter :: CFL = 0.1d0
   real(8), parameter :: dt  = CFL * Lx / (dble(nx-1) * u0)
