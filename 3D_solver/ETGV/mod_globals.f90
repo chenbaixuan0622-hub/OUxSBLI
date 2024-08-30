@@ -5,6 +5,7 @@ module mod_globals
   integer, parameter :: accuracy  = 2 
   integer, parameter :: offset    = accuracy / 2
   integer, parameter :: id_visc   = 0
+  integer, parameter :: id_av     = 0
   integer, parameter :: id_turbulence = 0
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! 0 no-visc         !
@@ -34,7 +35,7 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_tvd      ! kind2 non TVD       !
   !             ! kind4 minmod        !
-  !             ! kind8 MUSCL4th      !
+  !             ! kind8 post lim      !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_keep     ! kind2 KEEP          !
   !             ! kind4 KEEPPE        !
@@ -47,7 +48,7 @@ module mod_globals
   ! id_rescale  ! kind2 off           !
   !             ! kind4 on            !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer, parameter         :: id_scheme   = 1
+  integer, parameter         :: id_scheme   = 6
   integer, parameter         :: id_sensor   = 1
   real(8), parameter         :: threshold   = 0.4d0
   integer(kind=8), parameter :: id_accuracy = 0
@@ -103,8 +104,8 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter  :: id_recal = 0
   integer(kind=4), parameter  :: id_RungeKutta = 0
-  integer, parameter          :: nt = 20!200
-  integer, parameter          :: np = 200
+  integer, parameter          :: nt = 200!1
+  integer, parameter          :: np = 10!200
   real(8), parameter          :: dt = 0.01d0!0.02d0
 
   ! physical properties
