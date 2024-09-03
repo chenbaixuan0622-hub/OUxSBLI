@@ -333,20 +333,16 @@ contains
     integer, intent(in), value               :: step, nx, ny, nz
     real(4), intent(in)                      :: x(nx), y(ny), z(nz)
     real(4), intent(in), dimension(nx,ny,nz) :: rho, p, u, sensor
-    real(4) T, M, rho0, p0, T0
+    real(4) T
     integer i, nyh, nzh
     character(len=40) filename
     nyh = int(0.5 * ny)
     nzh = int(0.5 * nz)
-    rho0 = 1.293e0
-    T0   = 300.e0
-    p0   = rho0 * real(R) * T0
     write(filename, "(a, i5.5, a)") "data/1d/Q", int(step), ".d"
     open(10,file=filename)
     do i = 1, nx
-      T = p(i,nyh,nzh) / (real(R) * rho(i,nyh,nzh))
-      M = u(i,nyh,nzh) / sqrt(real(gamma * R) * T)
-      write(10,"(7e12.4)") x(i) / Lx, rho(i,nyh,nzh) / rho0, u(i,nyh,nzh) / sqrt(p0 / rho0), p(i,nyh,nzh) / p0, T / T0, M, sensor(i,nyh,nzh)
+      T = p(i,nyh,nzh) / (rho(i,nyh,nzh) * R)
+      write(10,"(7e12.4)") x(i) / Lx, rho(i,nyh,nzh), u(i,nyh,nzh), p(i,nyh,nzh), T, sensor(i,nyh,nzh)
     enddo
     close(10)
   end subroutine print_1d
