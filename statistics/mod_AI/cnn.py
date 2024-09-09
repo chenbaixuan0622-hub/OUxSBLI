@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 #from group.p4m import RotatedConv1, RotatedConv, RotatedTConv, GPReLU, GSequential, Gdown, GBatchNorm2d, GMaxPool2d
-from block import BasicBlock, DenseBlock
 
 class ResNet(nn.Module):
   def __init__(self, block, layers, num_classes=1000):

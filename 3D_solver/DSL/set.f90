@@ -57,29 +57,27 @@ contains
   end subroutine set_grid
   
   subroutine set_init(nx,ny,nz,x,y,z,Q)
-    use mod_globals, only : M0, rho0, p0, T0, u0, Rc, beta
+    use mod_globals, only : pi, M0, rho0, u0, d1, d2
     integer, intent(in)  :: nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
     real(8), intent(out) :: Q(nx,ny,nz,5)
     integer i, j
-    real(8) xc, yc, ex, T, rho, u, v, p
-    real(8) :: Cp = R * gamma / (gamma - 1.d0)
-    xc = x(int(nx/2))
-    yc = y(int(ny/2))
+    real(8) :: Cp = R * gamma / (gamma - 1.d0), p = 1.d0 / (gamma * M0**2)
     do j = 1, ny
       do i = 1, nx
-        ex  = exp(-0.5d0 * ((x(i) - xc)**2 + (y(j) - yc)**2) / (Rc**2))
-        T   = T0 - 0.5d0 * (u0 * beta)**2 / Cp * ex**2
-        rho = rho0 * (T / T0)**(1.d0  / (gamma - 1.d0))
-        u   = u0 * (1.d0 - beta * (y(j) - yc) / Rc * ex)
-        v   = u0 *         beta * (x(i) - xc) / Rc * ex
-        p   = rho * R * T
-        Q(i,j,:,1) = rho
-        Q(i,j,:,2) = rho * u
-        Q(i,j,:,3) = rho * v
-        Q(i,j,:,4) = 0.d0
-        ! p / (gamma - 1) + 0.5 * (rhou ** 2 + rhov ** 2 ) / rho
-        Q(i,j,:,5) = p / (gamma - 1.d0) + 0.5d0 * rho * (u**2 + v**2)
+        if (y(j) <= pi) then
+          Q(i,j,:,1) = rho0
+          Q(i,j,:,2) = u0 * tanh((y(j) - 0.5d0 * pi) / d1)
+          Q(i,j,:,3) = d2 * sin(x(i))
+          Q(i,j,:,4) = 0.d0
+          Q(i,j,:,5) = p / (gamma - 1.d0) + 0.5d0 * (Q(i,j,:,2)**2 + Q(i,j,:,3)**2) / Q(i,j,:,1)
+        else
+          Q(i,j,:,1) = rho0
+          Q(i,j,:,2) = u0 * tanh((1.5d0 * pi - y(j)) / d1)
+          Q(i,j,:,3) = d2 * sin(x(i))
+          Q(i,j,:,4) = 0.d0
+          Q(i,j,:,5) = p / (gamma - 1.d0) + 0.5d0 * (Q(i,j,:,2)**2 + Q(i,j,:,3)**2) / Q(i,j,:,1)
+        endif
     enddo;enddo
   end subroutine set_init
   
