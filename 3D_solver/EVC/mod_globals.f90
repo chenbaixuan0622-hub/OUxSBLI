@@ -5,6 +5,7 @@ module mod_globals
   integer, parameter :: accuracy  = 2 
   integer, parameter :: offset    = accuracy / 2
   integer, parameter :: id_visc   = 0
+  integer, parameter :: id_av     = 0
   integer, parameter :: id_turbulence = 0
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! 0 no-visc         !
@@ -49,7 +50,7 @@ module mod_globals
   integer, parameter         :: id_scheme   = 1
   integer, parameter         :: id_sensor   = 1
   real(8), parameter         :: threshold   = 0.4d0
-  integer(kind=4), parameter :: id_accuracy = 0
+  integer(kind=8), parameter :: id_accuracy = 0
   integer(kind=2), parameter :: id_tvd      = 0
   integer(kind=2), parameter :: id_keep     = 0
   integer(kind=2), parameter :: id_slau     = 0
@@ -59,8 +60,8 @@ module mod_globals
   real(8), parameter :: Lx = 0.1d0
   real(8), parameter :: Ly = 0.1d0
   real(8), parameter :: Lz = 0.01d0
-  integer, parameter :: nx = 130!65
-  integer, parameter :: ny = 130!65
+  integer, parameter :: nx = 66
+  integer, parameter :: ny = 66
   integer, parameter :: nz = 7
   integer, parameter :: nre = nx-4
 
@@ -83,14 +84,12 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter  :: id_recal = 0
   integer(kind=4), parameter  :: id_RungeKutta = 0
-  integer, parameter          :: nt = 1
-  integer, parameter          :: np = 10
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
   real(8), parameter :: Pr    = 0.71d0
   real(8), parameter :: Prt   = 0.9d0
-  real(8), parameter :: R     = 287.03d0
+  real(8), parameter :: R     = 287.15d0
 
   ! initial condition
   real(8), parameter :: M0   = 0.05d0
@@ -100,7 +99,10 @@ module mod_globals
   real(8), parameter :: T0   = 300.d0
   real(8), parameter :: u0   = M0 * sqrt(gamma * R * T0)
   real(8), parameter :: rho0 = p0 / (R * T0)
-  real(8), parameter :: CFL  = 0.1d0
+  real(8), parameter :: CFL  = 0.05d0
   real(8), parameter :: dt   = CFL * Lx / (dble(nx-1) * u0)
+  real(8), parameter :: T    = 50.d0 * Lx / u0
+  integer, parameter :: np   = 500
+  integer, parameter :: nt   = int(T / (dble(np) * dt))
 end module mod_globals
 

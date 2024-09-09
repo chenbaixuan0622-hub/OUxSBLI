@@ -2,42 +2,78 @@ module set
   use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, dtn
   implicit none
 contains
-  subroutine set_grid(nx,ny,nz,x,y,z,dx,dy,dz)
+  subroutine set_grid(nx,ny,nz,xc,yc,zc,dx,dy,dz)
     integer, intent(in)  :: nx, ny, nz
-    real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx), dy(ny), dz(nz)
+    real(8), intent(out) :: xc(nx), yc(ny), zc(nz), dx(nx-1), dy(ny-1), dz(nz-1)
+    real(8) x(nx+1), y(ny+1), z(nz+1)
     integer i, j, k
-    dx(:) = Lx / dble(nx-1)
-    dy(:) = Ly / dble(ny-1)
-    dz(:) = Lz / dble(nz-1)
+    dx(:) = Lx / dble(nx-6)
+    dy(:) = Ly / dble(ny-6)
+    dz(:) = Lz / dble(nz-6)
+
+    ! x direction
+    do i = 4, nx-2
+      x(i) = dx(1) * dble(i-4)
+    enddo
+    x(1)    = x(4)    - 3.d0 * dx(1)
+    x(2)    = x(4)    - 2.d0 * dx(1)
+    x(3)    = x(4)    - dx(1)
+    x(nx-1) = x(nx-2) + dx(1)
+    x(nx)   = x(nx-2) + 2.d0 * dx(1)
+    x(nx+1) = x(nx-2) + 3.d0 * dx(1)
+
+    ! y direction
+    do j = 4, ny-2
+      y(j) = dy(1) * dble(j-4)
+    enddo
+    y(1)    = y(4)    - 3.d0 * dy(1)
+    y(2)    = y(4)    - 2.d0 * dy(1)
+    y(3)    = y(4)    - dy(1)
+    y(ny-1) = y(ny-2) + dy(1)
+    y(ny)   = y(ny-2) + 2.d0 * dy(1)
+    y(ny+1) = y(ny-2) + 3.d0 * dy(1)
+
+    ! z direction
+    do k = 4, nz-2
+      z(k) = dz(1) * dble(k-4)
+    enddo
+    z(1)    = z(4)    - 3.d0 * dz(1)
+    z(2)    = z(4)    - 2.d0 * dz(1)
+    z(3)    = z(4)    - dz(1)
+    z(nz-1) = z(nz-2) + dz(1)
+    z(nz)   = z(nz-2) + 2.d0 * dz(1)
+    z(nz+1) = z(nz-2) + 3.d0 * dz(1)
+
+    ! cell centered
     do i = 1, nx
-      x(i) = dx(1) * dble(i-1)
+      xc(i) = 0.5d0 * (x(i) + x(i+1))
     enddo
     do j = 1, ny
-      y(j) = dy(1) * dble(j-1)
+      yc(j) = 0.5d0 * (y(j) + y(j+1))
     enddo
     do k = 1, nz
-      z(k) = dz(1) * dble(k-1)
+      zc(k) = 0.5d0 * (z(k) + z(k+1))
     enddo
   end subroutine set_grid
   
   subroutine set_init(nx,ny,nz,x,y,z,Q)
-    use mod_globals, only : M0, beta, p0, T0, u0, rho0, Rc 
+    use mod_globals, only : M0, rho0, p0, T0, u0, Rc, beta
     integer, intent(in)  :: nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
     real(8), intent(out) :: Q(nx,ny,nz,5)
     integer i, j
-    real(8) rho, u, v, p, T, r2, xc, yc
+    real(8) xc, yc, ex, T, rho, u, v, p
     real(8) :: Cp = R * gamma / (gamma - 1.d0)
     xc = x(int(nx/2))
     yc = y(int(ny/2))
     do j = 1, ny
       do i = 1, nx
-        r2  = ((x(i) - xc)**2 + (y(j) - yc)**2) / (Rc**2)
-        u   = u0 * (1.d0 - beta * (y(j) - yc) * exp(-0.5d0 * r2) / Rc)
-        v   = u0 *         beta * (x(i) - xc) * exp(-0.5d0 * r2) / Rc
-        T   = T0 - 0.5d0 * (u0 * beta)**2 * exp(-0.5d0 * r2) / Cp
-        rho = rho0 * (T / T0)**(1.d0 / (gamma - 1.d0))
-        p   = p0 * (T / T0)**(gamma / (gamma - 1.d0))
+        ex  = exp(-0.5d0 * ((x(i) - xc)**2 + (y(j) - yc)**2) / (Rc**2))
+        T   = T0 - 0.5d0 * (u0 * beta)**2 / Cp * ex**2
+        rho = rho0 * (T / T0)**(1.d0  / (gamma - 1.d0))
+        u   = u0 * (1.d0 - beta * (y(j) - yc) / Rc * ex)
+        v   = u0 *         beta * (x(i) - xc) / Rc * ex
+        p   = rho * R * T
         Q(i,j,:,1) = rho
         Q(i,j,:,2) = rho * u
         Q(i,j,:,3) = rho * v
