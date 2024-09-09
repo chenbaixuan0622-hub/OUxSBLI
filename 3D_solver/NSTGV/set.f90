@@ -427,15 +427,17 @@ contains
     endif
   end subroutine set_bc
 
-  subroutine set_bc_mut(nx,ny,nz,mut)
+  subroutine set_bc_mut(nx,ny,nz,mut,qc2)
     integer, intent(in), value     :: nx, ny, nz
-    real(8), intent(inout), device :: mut(nx,ny,nz)
+    real(8), intent(inout), device :: mut(nx,ny,nz), qc2(nx,ny,nz)
     integer i, j, k
     !$cuf kernel do(2) <<<*,*>>>
     do k = 2, nz-1
       do j = 2, ny-1
         mut(1,j,k) = mut(nx-1,j,k)
         mut(nx,j,k) = mut(2,j,k)
+        qc2(1,j,k) = qc2(nx-1,j,k)
+        qc2(nx,j,k) = qc2(2,j,k)
     enddo;enddo
 
     !$cuf kernel do(2) <<<*,*>>>
@@ -443,6 +445,8 @@ contains
       do i = 2, nx-1
         mut(i,1,k) = mut(i,ny-1,k)
         mut(i,ny,k) = mut(i,2,k)
+        qc2(i,1,k) = qc2(i,ny-1,k)
+        qc2(i,ny,k) = qc2(i,2,k)
     enddo;enddo
 
     !$cuf kernel do(1) <<<*,*>>>
@@ -451,6 +455,10 @@ contains
       mut(nx,1,k) = mut(2,ny-1,k)
       mut(1,ny,k) = mut(nx-1,2,k)
       mut(nx,ny,k) = mut(2,2,k)
+      qc2(1,1,k) = qc2(nx-1,ny-1,k)
+      qc2(nx,1,k) = qc2(2,ny-1,k)
+      qc2(1,ny,k) = qc2(nx-1,2,k)
+      qc2(nx,ny,k) = qc2(2,2,k)
     enddo
 
     !$cuf kernel do(2) <<<*,*>>>
@@ -458,6 +466,8 @@ contains
       do i = 1, nx
         mut(i,j,1) = mut(i,j,nz-1)
         mut(i,j,nz) = mut(i,j,2)
+        qc2(i,j,1) = qc2(i,j,nz-1)
+        qc2(i,j,nz) = qc2(i,j,2)
     enddo;enddo
   end subroutine set_bc_mut
 end module set
