@@ -87,7 +87,7 @@ contains
           else
             std = 0.d0
           endif
-          ustd = 0.2d0 * u * std
+          ustd = 0.1d0 * u * std
           u = u + ustd
           v = v + 0.5d0 * ustd
           w = 0.5d0 * ustd
@@ -168,15 +168,15 @@ contains
         QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
     enddo;enddo
 
-    !$cuf kernel do(2)<<<*,*>>>
-    do k = 1, nz
-      do i = No, nx
-        QJ(i,ny,k,1) = rho2 / Jacobian(i,ny,k)
-        QJ(i,ny,k,2) = rho2 * ux / Jacobian(i,ny,k)
-        QJ(i,ny,k,3) = rho2 * uy / Jacobian(i,ny,k)
-        QJ(i,ny,k,4) = 0.d0
-        QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(i,ny,k)
-    enddo;enddo
+    !!$cuf kernel do(2)<<<*,*>>>
+    !do k = 1, nz
+    !  do i = No, nx
+    !    QJ(i,ny,k,1) = rho2 / Jacobian(i,ny,k)
+    !    QJ(i,ny,k,2) = rho2 * ux / Jacobian(i,ny,k)
+    !    QJ(i,ny,k,3) = rho2 * uy / Jacobian(i,ny,k)
+    !    QJ(i,ny,k,4) = 0.d0
+    !    QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(i,ny,k)
+    !enddo;enddo
 
     !$cuf kernel do(3)<<<*,*>>>
     do l = 1, 5
@@ -203,17 +203,19 @@ contains
     enddo;enddo;enddo
   end subroutine set_bc
 
-  subroutine set_bc_mut(nx,ny,nz,mut)
+  subroutine set_bc_mut(nx,ny,nz,mut,qc2)
     integer, intent(in), value      :: nx, ny, nz
-    real(8), intent(inout), device  :: mut(nx,ny,nz)
+    real(8), intent(inout), device  :: mut(nx,ny,nz), qc2(nx,ny,nz)
     integer i, j, k
     !$cuf kernel do(2) <<<*,*>>>
     do k = 4, nz-3
       do j = 2, ny-1
         ! inlet
         mut(1,j,k)  = mut(nre+1,j,k)
+        qc2(1,j,k)  = qc2(nre+1,j,k)
         ! outlet
         mut(nx,j,k) = mut(nx-1,j,k)
+        qc2(nx,j,k) = qc2(nx-1,j,k)
     enddo;enddo
 
     !$cuf kernel do(2) <<<*,*>>>
@@ -221,8 +223,10 @@ contains
       do i = 1, nx
         ! wall
         mut(i,1,k) = 0.d0
+        qc2(i,1,k) = 0.d0
         ! top
         mut(i,ny,k) = mut(i,ny-1,k)
+        qc2(i,ny,k) = qc2(i,ny-1,k)
     enddo;enddo
 
     !$cuf kernel do(2) <<<*,*>>>
@@ -235,6 +239,12 @@ contains
         mut(i,j,nz-2) = mut(i,j,4)
         mut(i,j,nz-1) = mut(i,j,5)
         mut(i,j,nz)   = mut(i,j,6)
+        qc2(i,j,1)    = qc2(i,j,nz-5)
+        qc2(i,j,2)    = qc2(i,j,nz-4)
+        qc2(i,j,3)    = qc2(i,j,nz-3)
+        qc2(i,j,nz-2) = qc2(i,j,4)
+        qc2(i,j,nz-1) = qc2(i,j,5)
+        qc2(i,j,nz)   = qc2(i,j,6)
     enddo;enddo
   end subroutine set_bc_mut
 end module set
