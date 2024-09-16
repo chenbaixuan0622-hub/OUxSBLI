@@ -20,9 +20,12 @@ from mod.mod_read import getGrid, getVector, getScalar
 from mod.mod_turb_stat import tau_2d
 
 
-Q_directory = "../../../../../media/user/HD-EDS-E/hatayama/TBL/TBL20240819_KEEP6thVisc4th"
+Q_directory = "../../../../../mnt/data1/TBL20240819_KEEP6thVisc4th"
 Q_files     = [f for f in os.listdir(Q_directory) if f.endswith("vtr")]
 num_files   = len(Q_files)
+
+AI_directory = os.path.join(Q_directory, "AI")
+os.makedirs(AI_directory, exist_ok = True)
 
 # read grid information
 first_path = os.path.join(Q_directory, Q_files[0])
@@ -30,8 +33,10 @@ Nx, Ny, Nz, x, y, z = getGrid(first_path)
 yp_path = os.path.join(Q_directory, "yp.npy")
 yp      = np.load(yp_path)
 
+# teaching_data (viscous layer)
 yp1 = 5
-yp2 = 100
+# test_data (log layer)
+yp2 = 7
 
 # calc yp
 for j in range(Ny):
@@ -54,14 +59,13 @@ nz = 32
 device       = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 net_instance = UNet(FourierBlock, [64,32,16,8]).to(device)
 net          = torch.jit.script(net_instance).to(device)
-criterion    = nn.MSELoss()
+criterion    = nn.L1Loss()#nn.MSELoss()
 optimizer    = optim.Adam(net.parameters())
-epoch        = 50
-batchsize    = 100
+epoch        = 20
 print(net)
 print("Device: {}".format(device))
 
-num_split = 500
+num_split = 100
 
 um_path = os.path.join(Q_directory, "um.npy"  )
 vm_path = os.path.join(Q_directory, "vm.npy"  )
@@ -69,18 +73,17 @@ wm_path = os.path.join(Q_directory, "wm.npy"  )
 um = np.load(um_path)
 vm = np.load(vm_path)
 wm = np.load(wm_path)
-kp = np.zeros((num_files // num_split,Nz,2,Nx), dtype=np.float32)
-teaching_data = np.zeros((num_files // num_split * Nz // nz * Nx // nx, 1, nz, nx), dtype=np.float32)
-test_data     = np.zeros((num_files // num_split * Nz // nz * Nx // nx, 1, nz, nx), dtype=np.float32)
+n1 = nz * np.floor(Nz / nz).astype(int)
+n2 = nx * np.floor(Nx / nx).astype(int)
+kp = np.zeros((num_files // num_split,2,n1,n2), dtype=np.float32)
 
 for i in range(num_split):
-  '''
-  # load NN parameters
-  pdir_path = os.path.join("./data/", str(i-1))
-  if os.path.isfile(os.path.join(pdir_path, "model.pth")):
-    net.load_state_dict(torch.load(os.path.join(pdir_path, "model.pth")))
+  filename  = "model" + str(i-1) + ".pth"
+  file_path = os.path.join(AI_directory, filename)
+
+  if os.path.isfile(file_path):
+    net.load_state_dict(torch.load(file_path))
     print("load previous parameters")
-  '''
 
   start = int(num_files / num_split) * i
   end   = int(num_files / num_split) * (i + 1)
@@ -93,41 +96,50 @@ for i in range(num_split):
     file_path = os.path.join(Q_directory, Q_file)
     Q[0,:,:,:]                         = getScalar(file_path, Nx, Ny, Nz, "rho")
     Q[1,:,:,:], Q[2,:,:,:], Q[3,:,:,:] = getVector(file_path, Nx, Ny, Nz, "velocity")
-    Q[4,:,:,:]                         = getScalar(file_path, Nx, Ny, Nz,"p")
+    Q[4,:,:,:]                         = getScalar(file_path, Nx, Ny, Nz, "p")
     tau, _ = tau_2d(Q, x, y, z)
+    ut = np.sqrt(np.mean(tau) / np.mean(Q[0,:,0,:]))
 
-    kp[itr,:,0,:] = 0.5e0 * ((Q[1,:,Ny_target1,:] - um[:,Ny_target1,:])**2 \
-                           + (Q[2,:,Ny_target1,:] - vm[:,Ny_target1,:])**2 \
-                           + (Q[3,:,Ny_target1,:] - wm[:,Ny_target1,:])**2) / tau**2
-    kp[itr,:,1,:] = 0.5e0 * ((Q[1,:,Ny_target2,:] - um[:,Ny_target2,:])**2 \
-                           + (Q[2,:,Ny_target2,:] - vm[:,Ny_target2,:])**2 \
-                           + (Q[3,:,Ny_target2,:] - wm[:,Ny_target2,:])**2) / tau**2
+    kp[itr,0,:,:] = 0.5e0 * ((Q[1,:n1,Ny_target1,:n2] - um[:n1,Ny_target1,:n2])**2 \
+                           + (Q[2,:n1,Ny_target1,:n2] - vm[:n1,Ny_target1,:n2])**2 \
+                           + (Q[3,:n1,Ny_target1,:n2] - wm[:n1,Ny_target1,:n2])**2) / ut**2
+    kp[itr,1,:,:] = 0.5e0 * ((Q[1,:n1,Ny_target2,:n2] - um[:n1,Ny_target2,:n2])**2 \
+                           + (Q[2,:n1,Ny_target2,:n2] - vm[:n1,Ny_target2,:n2])**2 \
+                           + (Q[3,:n1,Ny_target2,:n2] - wm[:n1,Ny_target2,:n2])**2) / ut**2
 
     itr += 1
 
-  itr = 0
-  for l in range(num_files // num_split):
-    for k in range(0, Nz // nz, nz):
-      for i in range(0, Nx // nx, nx):
-        teaching_data[itr,0,:,:] = kp[l,k:k+nz,0,i:i+nx]
-        test_data[itr,0,:,:]     = kp[l,k:k+nz,1,i:i+nx]
-        itr += 1
-
-  del Q
+  teaching_data = kp[:,0,:,:].reshape([-1,1,nz,nx])
+  test_data     = kp[:,1,:,:].reshape([-1,1,nz,nx])
   
-  '''
+  print(len(teaching_data))
+  print(len(test_data))
+
+  # normalize data
+  teaching_mean = np.mean(teaching_data)
+  test_mean     = np.mean(test_data)
+  teaching_std  = np.std(teaching_data)
+  test_std      = np.std(test_data)
+  teaching_data = (teaching_data - teaching_mean) / teaching_std
+  test_data     = (test_data     - test_mean)     / test_std
+  
+  del Q
+
+  batchsize = min(len(teaching_data[:,0,0,0]), 200)
+
   # dataset is torch tensor
   dataset                     = Dataset(teaching_data, test_data)
   train_dataset, test_dataset = train_test_split(dataset, test_size=0.3, shuffle=False)
 
   # make dataloader
-  plot_Dataset(x,y,train_dataset[50],dir_path)
+  #plot_Dataset(1e3*x[:nx],1e3*z[:nz],train_dataset[10],AI_directory)
   train_batch, test_batch = divide_into_batch(train_dataset,test_dataset,batchsize)
 
   net, train_loss_list, test_loss_list = trainNN(net,device,optimizer,criterion,train_batch,test_batch,epoch)
-  plot_loss(epoch,train_loss_list,test_loss_list,dir_path)
-  torch.save(net.state_dict(), os.path.join(dir_path, 'model.pth'))
+  plot_loss(epoch,train_loss_list,test_loss_list,AI_directory,i)
+  filename = "model" + str(i) + ".pth"
+  torch.save(net.state_dict(), os.path.join(AI_directory, filename))
 
-  plot_result(x,y,net,device,test_batch,dir_path,'p','Q')
-  '''
+  plot_result(1e3*x[:nx],1e3*z[:nz],net,device,test_batch,AI_directory,'kp_log','kp_vis',i,\
+  teaching_mean,test_mean,teaching_std,test_std)
 

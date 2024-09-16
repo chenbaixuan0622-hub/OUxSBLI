@@ -57,16 +57,17 @@ contains
   end subroutine set_grid
   
   subroutine set_init(nx,ny,nz,x,y,z,Q)
-    use mod_globals, only : u1, rho1, u2, rho2, p, amp
+    use mod_globals, only : id_accuracy, u1, rho1, u2, rho2, p, amp
     integer, intent(in)  :: nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
     real(8), intent(out) :: Q(nx,ny,nz,5)
-    integer i, j, k
+    integer i, j, k, offset
     real(8) :: v, w, pi = acos(-1.d0)
-    do k = 1, nz
+    offset = 3
+    do k = 1+offset, nz-offset
       w = amp * sin(2.d0 * pi * z(k) / Lz)
-      do j = 1, ny
-        do i = 1, nx
+      do j = 1+offset, ny-offset
+        do i = 1+offset, nx-offset
           v = amp * sin(2.d0 * pi * x(i) / Lx)
           if (y(j) > 0.75d0 * Lx .or. y(j) < 0.25d0 * Lx) then
             Q(i,j,k,1) = rho1
@@ -82,8 +83,39 @@ contains
             Q(i,j,k,5) = p / (gamma - 1.d0) + 0.5d0 * rho2 * (u2**2 + v**2 + w**2)
           endif
     enddo;enddo;enddo
+    call set_bc_init6(Q)
   end subroutine set_init
   
+  subroutine set_bc_init6(Q)
+    real(8), intent(inout) :: Q(nx,ny,nz,5)
+    integer i, j, k
+
+    do k = 4, nz-3
+      do j = 4, ny-3
+        Q(1:3,j,k,:) = Q(nx-5:nx-3,j,k,:)
+        Q(nx-2:nx,j,k,:) = Q(4:6,j,k,:)
+    enddo;enddo
+
+    do k = 4, nz-3
+      do i = 4, nx-3
+        Q(i,1:3,k,:) = Q(i,ny-5:ny-3,k,:)
+        Q(i,ny-2:ny,k,:) = Q(i,4:6,k,:)
+    enddo;enddo
+
+    do k = 4, nz-3
+      Q(1:3,1:3,k,:) = Q(nx-5:nx-3,ny-5:ny-3,k,:)
+      Q(nx-2:nx,1:3,k,:) = Q(4:6,ny-5:ny-3,k,:)
+      Q(1:3,ny-2:ny,k,:) = Q(nx-5:nx-3,4:6,k,:)
+      Q(nx-2:nx,ny-2:ny,k,:) = Q(4:6,4:6,k,:)
+    enddo
+
+    do j = 1, ny
+      do i = 1, nx
+        Q(i,j,1:3,:) = Q(i,j,nz-5:nz-3,:)
+        Q(i,j,nz-2:nz,:) = Q(i,j,4:6,:)
+    enddo;enddo
+  end subroutine set_bc_init6
+
   subroutine set_bc(nx,ny,nz,Jacobian,Q,Qre)
     integer, intent(in), value      :: nx, ny, nz
     real(8), intent(in), device     :: Jacobian(nx,ny,nz)
