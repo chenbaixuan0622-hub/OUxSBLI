@@ -1,5 +1,5 @@
 module print
-  use mod_globals, only : nt, dt, step_offset, gamma, R, Lx
+  use mod_globals, only : id_accuracy, nt, np, dt, step_offset, gamma, R, Lx
   implicit none
   
   interface
@@ -204,9 +204,17 @@ contains
     real(8) entropy, t
     character(len=40) filename
     integer i, j, k, accuracy, offset
-    accuracy = 4
-    offset   = 2
-    entropy = 0.e0
+    if (kind(id_accuracy) == 8) then
+      accuracy = 6
+      offset   = accuracy / 2
+    elseif (kind(id_accuracy) == 4) then
+      accuracy = 4
+      offset   = accuracy / 2
+    else
+      accuracy = 2
+      offset   = accuracy / 2
+    endif
+    entropy = 0.d0
     do k = 1+offset, nz-offset
       do j = 1+offset, ny-offset
         do i = 1+offset, nx-offset
@@ -236,13 +244,21 @@ contains
     real(8) ke, t
     character(len=40) filename
     integer i, j, k, accuracy, offset
-    accuracy = 4
-    offset   = 2
-    ke = 0.e0
+    if (kind(id_accuracy) == 8) then
+      accuracy = 6
+      offset   = accuracy / 2
+    elseif (kind(id_accuracy) == 4) then
+      accuracy = 4
+      offset   = accuracy / 2
+    else
+      accuracy = 2
+      offset   = accuracy / 2
+    endif
+    ke = 0.d0
     do k = 1+offset, nz-offset
       do j = 1+offset, ny-offset
         do i = 1+offset, nx-offset
-          ke = ke + 0.5e0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2)
+          ke = ke + 0.5d0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2)
     enddo;enddo;enddo
     ke = ke / dble((nx-accuracy) * (ny-accuracy) * (nz-accuracy))
 
@@ -269,14 +285,22 @@ contains
     real(8) enstrophy, t
     character(len=40) filename
     integer i, j, k, accuracy, offset
-    accuracy = 4
-    offset   = 2
+    if (kind(id_accuracy) == 8) then
+      accuracy = 6
+      offset   = accuracy / 2
+    elseif (kind(id_accuracy) == 4) then
+      accuracy = 4
+      offset   = accuracy / 2
+    else
+      accuracy = 2
+      offset   = accuracy / 2
+    endif
     t = nt * step * dt
-    enstrophy = 0.e0
+    enstrophy = 0.d0
     do k = 1+offset, nz-offset
       do j = 1+offset, ny-offset
         do i = 1+offset, nx-offset
-          enstrophy = enstrophy + 0.5e0 * rho(i,j,k) * (omega(i,j,k,1)**2 + omega(i,j,k,2)**2 + omega(i,j,k,3)**2)
+          enstrophy = enstrophy + 0.5d0 * rho(i,j,k) * (omega(i,j,k,1)**2 + omega(i,j,k,2)**2 + omega(i,j,k,3)**2)
     enddo;enddo;enddo
     enstrophy = enstrophy / dble((nx-accuracy) * (ny-accuracy) * (nz-accuracy))
 
@@ -312,7 +336,7 @@ contains
 
   function mu(T) result(ans)
     real(8), intent(in), value :: T
-    real(8) :: ans, mu0 = 1.716e-5, T0 = 273.2e0, S = 111.e0
+    real(8) :: ans, mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0
     ans = mu0 * ((T0 + S) / (T + S)) * (T / T0)**1.5
   end function mu
   
@@ -326,10 +350,10 @@ contains
     real(8) rhow, nuw, dudy, tw, ut, uvd
     real(8), dimension(ny) :: yplus, uplus
     rhow = mean(rho(:,1,:))
-    nuw = mu(mean(T(:,:))) / rhow
-    dudy = dy * mean(-u(:,1,:) + u(:,2,:))
-    tw = rhow * nuw * dudy
-    ut = sqrt(tw / rhow)
+    nuw  = mu(mean(T(:,:))) / rhow
+    dudy = dy * mean(-u(:,2,:) + u(:,3,:))
+    tw   = rhow * nuw * dudy
+    ut   = sqrt(tw / rhow)
     open(10,file="data/yplus.d",action="write")
     yplus(1) = ut * y(1) / nuw
     uplus(1) = mean(u(:,1,:)) / ut
@@ -343,7 +367,7 @@ contains
     close(10)
     ! tau
     open(10,file="data/tau.d", position="append")
-    write(10,"(2(f9.4,1x))") nt * dt * step, tw
+    write(10,"(3(f9.4,1x))") nt * dt * step, tw, ut
     close(10)
   end subroutine print_turbulent_boundary_layer
 
@@ -442,7 +466,7 @@ contains
     real(8), intent(in), optional         :: T(nx,ny)
     integer i, j, l, m
     real(8), dimension(nx,ny) :: rho, u, v, p
-    real(8) :: z(1) = 0.e0
+    real(8) :: z(1) = 0.d0
     real(8), dimension(nx*ny)   :: rho1d, p1d, T1d, M1d
     real(8), dimension(2*nx*ny) :: v1d
     character(len=40) filename
@@ -455,7 +479,7 @@ contains
         rho(i,j) = Q(i,j,1)
         u(i,j) = Q(i,j,2) / rho(i,j)
         v(i,j) = Q(i,j,3) / rho(i,j)
-        p(i,j) = (gamma - 1.e0) * (Q(i,j,4) - 0.5e0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
+        p(i,j) = (gamma - 1.d0) * (Q(i,j,4) - 0.5d0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
         rho1d(l) = rho(i,j)
         p1d(l)   = p(i,j)
         T1d(l)   = p1d(l) / (R * rho1d(l))
@@ -471,10 +495,11 @@ contains
     call print_xml(nx,ny,1,2,real(x),real(y),real(z),real(rho1d),real(p1d),real(T1d),real(M1d),real(v1d))
   end subroutine print_vtk_2D
   
-  subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,sensor,mass0,ke0,entropy0,myrank)
+  subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,sensor,rhom,pm,Tm,Mm,vm,mass0,ke0,entropy0,myrank)
     integer, intent(in)           :: step, nx, ny, nz
     real(8), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny,nz)
     real(8), intent(in)           :: QJ(nx,ny,nz,5), sensor(nx,ny,nz) ! Q / Jacobian
+    real(8), intent(inout)        :: rhom(nx*ny*nz), pm(nx*ny*nz), Tm(nx*ny*nz), Mm(nx*ny*nz), vm(3*nx*ny*nz)
     real(8), intent(inout)        :: mass0, ke0, entropy0
     integer, intent(in), optional :: myrank
     integer i, j, k, l, m, len
@@ -496,7 +521,7 @@ contains
           u(i,j,k)   = QJ(i,j,k,2) / QJ(i,j,k,1)
           v(i,j,k)   = QJ(i,j,k,3) / QJ(i,j,k,1)
           w(i,j,k)   = QJ(i,j,k,4) / QJ(i,j,k,1)
-          p(i,j,k)   = (gamma - 1.e0) * (Jacobian(i,j,k) * QJ(i,j,k,5) - 0.5e0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
+          p(i,j,k)   = (gamma - 1.d0) * (Jacobian(i,j,k) * QJ(i,j,k,5) - 0.5d0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
           rho1d(l)   = rho(i,j,k)
           p1d(l)     = p(i,j,k)
           T1d(l)     = p1d(l) / (R * rho1d(l))
@@ -504,6 +529,13 @@ contains
           v1d(m+1)   = v(i,j,k)
           v1d(m+2)   = w(i,j,k)
           M1d(l)     = sqrt(v1d(m)**2 + v1d(m+1)**2 + v1d(m+2)**2) / sqrt(gamma * p1d(l) / rho1d(l))
+          rhom(l)    = rhom(l) + rho1d(l)
+          pm(l)      = pm(l)   + p1d(l)
+          Tm(l)      = Tm(l)   + T1d(l)
+          Mm(l)      = Mm(l)   + M1d(l)
+          vm(m)      = vm(m)   + v1d(m)
+          vm(m+1)    = vm(m+1) + v1d(m+1)
+          vm(m+2)    = vm(m+2) + v1d(m+2)
           l = l + 1
           m = m + 3
     enddo;enddo;enddo
@@ -532,7 +564,7 @@ contains
       call print_1d(step,nx,ny,nz,x,y,z,rho,p,u,sensor)
       if (myrank == 3) then
         call print_boundary_layer(nx,ny,nz,y,u)
-        dy = 1.e0 / (-y(1) + y(2))
+        dy = 1.d0 / (-y(1) + y(2))
         Tw(:,:) = p(:,1,:) / (R * rho(:,1,:))
         call print_turbulent_boundary_layer(step,nx,ny,nz,dy,y,Tw,u,rho)
       endif
@@ -544,14 +576,25 @@ contains
       call print_enstrophy(step,nx,ny,nz,x,y,z,rho,omega)
       call print_1d(step,nx,ny,nz,x,y,z,rho,p,u,sensor)
       call print_boundary_layer(nx,ny,nz,y,u)
-      dy = 1.e0 / (-y(1) + y(2))
+      dy = 1.d0 / (-y(2) + y(3))
       Tw(:,:) = p(:,1,:) / (R * rho(:,1,:))
       call print_turbulent_boundary_layer(step,nx,ny,nz,dy,y,Tw,u,rho)
       write(filename, "(a, i5.5, a)") "data/Q",int(step),".vtr"
     endif
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
     call print_xml(nx,ny,nz,3,real(x),real(y),real(z),real(rho1d),real(p1d),real(T1d),real(M1d),real(v1d),real(Qcriterion1d))
-    
+   
+    if (step == np) then
+      rhom(:) = rhom(:) / dble(np)
+      pm(:)   = pm(:)   / dble(np)
+      Tm(:)   = Tm(:)   / dble(np)
+      Mm(:)   = Mm(:)   / dble(np)
+      vm(:)   = vm(:)   / dble(np)
+      write(filename, "(a)") "data/Qmean.vtr"
+      open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
+      call print_xml(nx,ny,nz,3,real(x),real(y),real(z),real(rhom),real(pm),real(Tm),real(Mm),real(vm))
+    endif
+
     deallocate(rho,u,v,w,p,div,omega,Qcriterion,Tw,rho1d,p1d,T1d,M1d,v1d,div1d,omega1d,Qcriterion1d)
   end subroutine print_vtk_3D
 end module print

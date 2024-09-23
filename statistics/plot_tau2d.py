@@ -28,17 +28,14 @@ Q[4,:,:,:]                         = getScalar(Q_path, Nx, Ny, Nz, 'p'       )
 # tw[nz,nx], ut[nz,nx]
 tw, ut = tau_2d(Q, x, y, z)
 
-print(np.mean(tw))
-
 X, Z = np.meshgrid(x, z)
 plt.contourf(1.e3 * X, 1.e3 * Z, tw, cmap="turbo")
 plt.colorbar()
 plt.savefig("tw2d.png")
-plt.show()
+plt.close()
 
 tw1d = np.mean(tw, axis=0)
-print(np.shape(tw1d))
 plt.plot(1.e3 * x, tw1d)
 plt.savefig("tw1d.png")
-plt.show()
+plt.close()
 
