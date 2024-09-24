@@ -28,10 +28,10 @@ program main
 
   if (myrank == 0) then
     if (kind(id_recal) == 4) then
-      write(*,*) "simulation restarted"
       open(10,file="recal/Q.dat",action="read",form="unformatted",access="stream")
       read(10) Q
       close(10)
+      write(*,*) "simulation restarted"
     elseif (kind(id_recal) == 2) then
       write(*,*) "set initial condition"
       call set_init(nx,ny,nz,x,y,z,Q)

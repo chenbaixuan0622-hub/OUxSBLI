@@ -47,7 +47,7 @@ module mod_globals
   ! id_rescale  ! kind2 off           !
   !             ! kind4 on            !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer, parameter         :: id_scheme   = 3
+  integer, parameter         :: id_scheme   = 5
   integer, parameter         :: id_sensor   = 1
   real(8), parameter         :: threshold   = 0.4d0
   integer(kind=8), parameter :: id_accuracy = 0
@@ -60,9 +60,9 @@ module mod_globals
   real(8), parameter :: Lx = 1.d0
   real(8), parameter :: Ly = 1.d0
   real(8), parameter :: Lz = 1.d0
-  integer, parameter :: nx = 130
-  integer, parameter :: ny = 130
-  integer, parameter :: nz = 130
+  integer, parameter :: nx = 258!130
+  integer, parameter :: ny = 258!130
+  integer, parameter :: nz = 258!130
   integer, parameter :: nre = nx-4
 
   type(dim3) :: blocksE = dim3((nx-accuracy+1)/1,(ny-accuracy)/32,(nz-accuracy)/8)
@@ -98,9 +98,9 @@ module mod_globals
   real(8), parameter :: rho2 = 2.d0
   real(8), parameter :: p    = 2.5d0
   real(8), parameter :: amp  = 0.01d0
-  real(8), parameter :: CFL  = 0.01d0
+  real(8), parameter :: CFL  = 0.05d0
   real(8), parameter :: dt   = CFL * Lx / (dble(nx-1) * abs(u1))
-  real(8), parameter :: T    = 1.d0
+  real(8), parameter :: T    = 5.d0
   integer, parameter :: np   = 100
   integer, parameter :: nt   = int(T / (dble(np) * dt))
 end module mod_globals
