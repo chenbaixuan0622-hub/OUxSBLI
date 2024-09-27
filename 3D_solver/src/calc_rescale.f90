@@ -1,5 +1,5 @@
 module calc_rescale
-  use mod_globals, only : nt, dt, gamma , R, u0
+  use mod_globals, only : nt, dt, gamma , R, u0, strat_rescale
 contains
   subroutine calc_mean(step,nx,ny,nz,Q,Um,Vm,Wm,pm,Tm)
     integer, intent(in)                       :: step, nx, ny, nz
@@ -79,14 +79,16 @@ contains
         bltre1 = y(j) - (-y(j-1) + y(j)) * (Um(1,j) - 0.99d0 * u0) / (-Um(1,j-1) + Um(1,j) + 1.d-20)
         bltre2 = y(j) - (-y(j-1) + y(j)) * (Um(2,j) - 0.99d0 * u0) / (-Um(2,j-1) + Um(2,j) + 1.d-20)
         ! ensure bltre is not NaN
-        if (bltre1 == bltre1 .and. bltre2 == bltre2) then
-          bltre = 0.5d0 * (bltre1 + bltre2)
+        !if (bltre1 == bltre1 .and. bltre2 == bltre2) then
+        !  bltre = 0.5d0 * (bltre1 + bltre2)
+        if (bltre1 == bltre1) then
+          bltre = bltre1
           exit
         endif
       endif
     enddo
 
-    if (bltre > blt .and. step >= 1000) then
+    if (bltre > blt .and. step >= start_rescale) then
       ! rescaling !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! calc fluctuating part   u'(x,y,z,t) = u(x,y,z,t) - U(x,y)
       ! U(x,y) average velocity in the spanwise direction and time
