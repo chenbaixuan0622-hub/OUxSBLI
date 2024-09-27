@@ -6,7 +6,7 @@ module mod_globals
   integer, parameter :: offset    = accuracy / 2
   integer, parameter :: id_visc   = 2
   integer, parameter :: id_av     = 0
-  integer, parameter :: id_turbulence = 1
+  integer, parameter :: id_turbulence = 0
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! 0 no-visc         !
   !               ! 1 visc 2nd        !
@@ -43,30 +43,35 @@ module mod_globals
   !             ! kind4 HR-SLAU2      !
   !             ! kind8 VHR-SLAU2     !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! slau_wall   ! kind2 off           !
+  !             ! kind4 on            !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_rescale  ! kind2 off           !
   !             ! kind4 on            !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  real(2), parameter         :: id_scheme   = 0
+  integer(2), parameter      :: id_scheme   = 0
   integer, parameter         :: id_sensor   = 1
   real(8), parameter         :: threshold   = 0.4d0
   integer(kind=4), parameter :: id_accuracy = 0
   integer(kind=2), parameter :: id_tvd      = 0
   integer(kind=2), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
+  integer(kind=4), parameter :: slau_wall   = 0
   integer(kind=4), parameter :: id_rescale  = 0
+  integer, parameter         :: start_rescale = 1000
 
   ! mesh
   real(8), parameter :: Lx = 20d-3 ! 10 delta
   real(8), parameter :: Ly = 8d-3  !  4 delta
   real(8), parameter :: Lz = 4d-3  !  2 delta
   ! LES
-  integer, parameter :: nx = 257   ! xp = 10   0.04   mm
-  integer, parameter :: ny = 257   ! yp = 0.5, 0.002  mm
-  integer, parameter :: nz = 129   ! zp = 5    0.0156 mm
+  !integer, parameter :: nx = 257   ! xp = 10   0.04   mm
+  !integer, parameter :: ny = 257   ! yp = 0.5, 0.002  mm
+  !integer, parameter :: nz = 129   ! zp = 5    0.0156 mm
   ! DNS
-  !integer, parameter :: nx = 513 ! xp = 10   0.04   mm
-  !integer, parameter :: ny = 257 ! yp = 0.5, 0.002  mm
-  !integer, parameter :: nz = 257 ! zp = 5    0.0156 mm
+  integer, parameter :: nx = 513 ! xp = 10   0.04   mm
+  integer, parameter :: ny = 257 ! yp = 0.5, 0.002  mm
+  integer, parameter :: nz = 257 ! zp = 5    0.0156 mm
 
   integer, parameter :: nre = nx-4
 
@@ -84,14 +89,14 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_RungeKutta ! kind2 ! 3rd_TVD !
   !               ! kind4 ! 4th     !
-  !               ! kind8 ! 10step  !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_recal      ! kind2 ! set 0   !
   !               ! kind4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=4), parameter :: id_RungeKutta = 0
   integer(kind=2), parameter :: id_recal      = 0
-  real(8), parameter :: endT = 5.d-3
+  integer, parameter         :: step_offset   = 0
+  real(8), parameter :: endT = 0.5d-3
   integer, parameter :: np   = 100!1000
   real(8), parameter :: u0   = 506.8d0
   real(8), parameter :: CFL  = 0.1d0
