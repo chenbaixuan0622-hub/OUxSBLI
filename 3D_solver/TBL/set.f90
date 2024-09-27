@@ -54,6 +54,9 @@ contains
 
     y(1) = 0.d0
     do j = 1, ny-1
+      ! LES
+      !dy(j) = min(1.d0, max(0.1d0, dble(j)/dble(128))) * dy1
+      ! DNS
       dy(j) = min(1.d0, max(0.05d0, dble(j)/dble(128))) * dy1
       y(j+1) = y(j) + dy(j)
     enddo
@@ -164,7 +167,7 @@ contains
           do j = 1, ny
             ! inlet
             QJ(1,j,k,l) = Qre(1,j,k,l)
-            QJ(2,j,k,l) = Qre(2,j,k,l)
+            !QJ(2,j,k,l) = Qre(2,j,k,l)
             ! outlet
             QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
       enddo;enddo;enddo
