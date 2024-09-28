@@ -84,51 +84,54 @@ def blt(y,u):
 
 @jit(nopython=True, cache=True, fastmath=True)
 def Sutherland(T):
-  mu0  = 1.716e-5
-  T0   = 273.2e0
-  S    = 111.e0
-  nu   = mu0 * ((T0 + S) / (np.mean(T) + S)) * (np.mean(T) / T0)**1.5
-  return nu
+  mu0 = 1.716e-5
+  T0  = 273.2e0
+  S   = 111.e0
+  mu  = mu0 * ((T0 + S) / (T + S)) * (T / T0)**1.5
+  return mu
 
-# calc yplus, uplus
 @jit(nopython=True, cache=True, fastmath=True)
-def non_dim_tbl(Q,x,y,z):
+def non_dim_tbl(Q, x, y, z):
   # Q[rho,u,v,w,p]
   R    = 287.03e0
-  rhow = np.mean(Q[0,:,0,:])
-  nu   = Sutherland(Q[4,:,0,:] / (R * Q[0,:,0,:])) / rhow
-  dudy = np.mean(-Q[1,:,0,:] + Q[1,:,1,:]) / (-y[0] + y[1])
-  tw   = rhow * nu * dudy
-  ut   = np.sqrt(tw / rhow)
   nx   = len(x)
   ny   = len(y)
   nz   = len(z)
+  rhow = np.zeros(nx, dtype=np.float32)
+  mu   = np.zeros(nx, dtype=np.float32)
+  nu   = np.zeros(nx, dtype=np.float32)
+  dudy = np.zeros(nx, dtype=np.float32)
+  tw   = np.zeros(nx, dtype=np.float32)
+  ut   = np.zeros(nx, dtype=np.float32)
   Qp   = np.zeros((5,nz,ny,nx), dtype=np.float32)
   Qvd  = np.zeros((3,nz,ny,nx), dtype=np.float32)
-  xp   = ut * x[:] / nu
-  yp   = ut * y[:] / nu
-  zp   = ut * z[:] / nu
-  Qp[0,:,0,:] = 1.e0
-  Qp[1,:,0,:] = Q[1,:,0,:] / ut
-  Qp[2,:,0,:] = Q[2,:,0,:] / ut
-  Qp[3,:,0,:] = Q[3,:,0,:] / ut
-  Qp[4,:,0,:] = Q[4,:,0,:] / (rhow * ut**2)
+  for i in range(nx):
+    rhow[i] = np.mean(Q[0,:,0,i])
+    mu[i]   = Sutherland(np.mean(Q[4,:,0,i]) / (R * np.mean(Q[0,:,0,i])))
+    nu[i]   = mu[i] / rhow[i]
+    dudy[i] = np.mean(-Q[1,:,0,i] + Q[1,:,2,i]) / (-y[0] + y[2])
+    tw[i]   = mu[i] * dudy[i]
+    ut[i]   = np.sqrt(tw[i] / rhow[i])
+    Qp[0,:,0,i] = Q[0,:,0,i] / rhow[i]
+    Qp[1,:,0,i] = Q[1,:,0,i] / ut[i]
+    Qp[2,:,0,i] = Q[2,:,0,i] / ut[i]
+    Qp[3,:,0,i] = Q[3,:,0,i] / ut[i]
+    Qp[4,:,0,i] = Q[4,:,0,i] / (rhow[i] * ut[i]**2)
+  yp = np.mean(ut) * y[:] / np.mean(nu)
   for k in range(nz):
     for j in range(1,ny):
       for i in range(nx):
+        Qp[0,k,j,i]   = Q[0,k,j,i]   / rhow[i]
+        Qp[1:3,k,j,i] = Q[1:3,k,j,i] / ut[i]
+        Qp[4,k,j,i]   = Q[4,k,j,i]   / (rhow[i] * ut[i]**2)
         # van Driest transformation
-        uvd = Q[1,k,j-1,i] + np.sqrt(Q[0,k,j,i] / rhow) * (-Q[1,k,j-1,i] + Q[1,k,j,i])
-        vvd = Q[2,k,j-1,i] + np.sqrt(Q[0,k,j,i] / rhow) * (-Q[2,k,j-1,i] + Q[2,k,j,i])
-        wvd = Q[3,k,j-1,i] + np.sqrt(Q[0,k,j,i] / rhow) * (-Q[3,k,j-1,i] + Q[3,k,j,i])
-        Qp[0,k,j,i]  = Q[0,k,j,i] / rhow
-        Qp[1,k,j,i]  = Q[1,k,j,i] / ut
-        Qp[2,k,j,i]  = Q[2,k,j,i] / ut
-        Qp[3,k,j,i]  = Q[3,k,j,i] / ut
-        Qp[4,k,j,i]  = Q[4,k,j,i] / (rhow * ut**2)
-        Qvd[0,k,j,i] = uvd / ut
-        Qvd[1,k,j,i] = vvd / ut
-        Qvd[2,k,j,i] = wvd / ut
-  return xp, yp, zp, Qp, Qvd
+        uvd = Q[1,k,j-1,i] + np.sqrt(Q[0,k,j,i] / rhow[i]) * (-Q[1,k,j-1,i] + Q[1,k,j,i])
+        vvd = Q[2,k,j-1,i] + np.sqrt(Q[0,k,j,i] / rhow[i]) * (-Q[2,k,j-1,i] + Q[2,k,j,i])
+        wvd = Q[3,k,j-1,i] + np.sqrt(Q[0,k,j,i] / rhow[i]) * (-Q[3,k,j-1,i] + Q[3,k,j,i])
+        Qvd[0,k,j,i] = uvd / ut[i]
+        Qvd[1,k,j,i] = vvd / ut[i]
+        Qvd[2,k,j,i] = wvd / ut[i]
+  return yp, tw, Qp, Qvd
 
 # calc point-wise turbulent kinetic energy
 @jit(nopython=True, cache=True, fastmath=True)

@@ -1,5 +1,5 @@
 module calc_visc
-  use mod_globals, only : accuracy, offset, id_visc, id_turbulence, gamma, R, Pr, Prt
+  use mod_globals, only : accuracy, offset, id_visc, id_turbulence, id_av, gamma, R, Pr, Prt
   implicit none
 contains
   attributes(device) function interpolation6(a) result(ans)
@@ -96,20 +96,35 @@ contains
   end function heat_conduction6
 
 
+  !artificial viscosity!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  
+  attributes(device) function av_vonNeumann(sensor, rho, u, p) result(q)
+    use mod_globals, only : threshold
+    real(8), intent(in), value                :: sensor
+    real(8), intent(in), dimension(2), device :: rho, u, p
+    real(8) du, c, q
+    du = (-u(1) + u(2))
+    if (sensor > threshold .and. du < 0.d0) then
+      c = 0.5d0 * (sqrt(gamma * p(1) / rho(1)) + sqrt(gamma * p(2) / rho(2)))
+      q = 0.6d0 * 0.5d0 * (-(rho(1) + rho(2)) * c * du + (gamma + 1.d0) * du**2)
+    else
+      q = 0.d0
+    endif
+  end function av_vonNeumann
+
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-
-  attributes(global) subroutine calc_Ev(nx, ny, nz, dx, dy, dz, rho, u, v, w, T, p, mut, qc2, E)
+  attributes(global) subroutine calc_Ev(nx, ny, nz, dx, dy, dz, rho, u, v, w, T, p, mut, qc2, sensor, E)
     use calc_sutherland, only : mu6, mu2, mu23
     integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
     real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p, mut, qc2
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p, mut, qc2, sensor
     real(8), intent(inout), device                    :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
-    real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx, mutx, H(4), txxsgs = 0.d0, txysgs = 0.d0, txzsgs = 0.d0, Hsgs = 0.d0
+    real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx, mutx, H(4), txxsgs = 0.d0, txysgs = 0.d0, txzsgs = 0.d0, Hsgs = 0.d0, q = 0.d0
     ! 4th-order accuracy
     real(8), dimension(6,5), device :: u651, v651, u615, w615
     real(8), dimension(6), device   :: T6, u6, v6, w6
@@ -119,6 +134,9 @@ contains
     real(8), dimension(2,3), device    :: u231, v231, u213, w213, Ty, Tz
     real(8), dimension(2), device      :: Tx, u2, v2, w2, my, mz
     real(8) mx, mux, mvx, mwx, muy, mvy, muz, mwz
+    ! artificial viscosity
+    real(8), dimension(2), device :: rho2, p2
+    real(8) sensorx
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset - 1
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
@@ -203,25 +221,32 @@ contains
         Hsgs   = -mx * (-H(2) + H(3)) * dx(i) / Prt
       endif
     endif
+    !if (id_av /= 0) then
+    !  rho2    = rho(i:i+1,j,k)
+    !  u2      =   u(i:i+1,j,k)
+    !  p2      =   p(i:i+1,j,k)
+    !  sensorx = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
+    !  q       = av_vonNeumann(sensorx, rho2, u2, p2)
+    !endif
 
-    E(i-offset+1,j-offset,k-offset,2) = E(i-offset+1,j-offset,k-offset,2) - (txx+txxsgs)
+    E(i-offset+1,j-offset,k-offset,2) = E(i-offset+1,j-offset,k-offset,2) - (txx+txxsgs) + q
     E(i-offset+1,j-offset,k-offset,3) = E(i-offset+1,j-offset,k-offset,3) - (txy+txysgs)
     E(i-offset+1,j-offset,k-offset,4) = E(i-offset+1,j-offset,k-offset,4) - (txz+txzsgs)
     E(i-offset+1,j-offset,k-offset,5) = E(i-offset+1,j-offset,k-offset,5) &
     - (utxx + vtxy + wtxz + kTx + Hsgs)
   end subroutine calc_Ev
   
-  attributes(global) subroutine calc_Fv(nx, ny, nz, dy, dx, dz, rho, u, v, w, T, p, mut, qc2, F)
+  attributes(global) subroutine calc_Fv(nx, ny, nz, dy, dx, dz, rho, u, v, w, T, p, mut, qc2, sensor, F)
     use calc_sutherland, only : mu6, mu2, mu23, mu32
     integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
     real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
     real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p, mut, qc2
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p, mut, qc2, sensor
     real(8), intent(inout), device                    :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
-    real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy, muty, H(4), tyxsgs = 0.d0, tyysgs = 0.d0, tyzsgs = 0.d0, Hsgs = 0.d0
+    real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy, muty, H(4), tyxsgs = 0.d0, tyysgs = 0.d0, tyzsgs = 0.d0, Hsgs = 0.d0, q = 0.d0
     ! 4th-order accuracy
     real(8), dimension(5,6), device :: u561, v561
     real(8), dimension(6,5), device :: v165, w165
@@ -233,6 +258,9 @@ contains
     real(8), dimension(2,3), device   :: v123, w123, Tz
     real(8), dimension(2), device     :: Ty, u2, v2, w2, mz, mx
     real(8) my, muy, mvy, mwy, mvz, mwz, mux, mvx
+    ! artificial viscosity
+    real(8), dimension(2), device :: rho2, p2
+    real(8) sensory
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset - 1
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
@@ -317,25 +345,32 @@ contains
         Hsgs   = -my * (-H(2) + H(3)) * dy(j) / Prt
       endif
     endif
+    !if (id_av /= 0) then
+    !  rho2    = rho(i,j:j+1,k)
+    !  v2      =   v(i,j:j+1,k)
+    !  p2      =   p(i,j:j+1,k)
+    !  sensory = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
+    !  q       = av_vonNeumann(sensory, rho2, v2, p2)
+    !endif
 
     F(i-offset,j-offset+1,k-offset,2) = F(i-offset,j-offset+1,k-offset,2) - (tyx+tyxsgs)
-    F(i-offset,j-offset+1,k-offset,3) = F(i-offset,j-offset+1,k-offset,3) - (tyy+tyysgs)
+    F(i-offset,j-offset+1,k-offset,3) = F(i-offset,j-offset+1,k-offset,3) - (tyy+tyysgs) + q
     F(i-offset,j-offset+1,k-offset,4) = F(i-offset,j-offset+1,k-offset,4) - (tyz+tyzsgs)
     F(i-offset,j-offset+1,k-offset,5) = F(i-offset,j-offset+1,k-offset,5) &
     - (utyx + vtyy + wtyz + kTy + Hsgs)
   end subroutine calc_Fv
   
-  attributes(global) subroutine calc_Gv(nx, ny, nz, dx, dy, dz, rho, u, v, w, T, p, mut, qc2, G)
+  attributes(global) subroutine calc_Gv(nx, ny, nz, dx, dy, dz, rho, u, v, w, T, p, mut, qc2, sensor, G)
     use calc_sutherland, only : mu6, mu2, mu32
     integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
     real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p, mut, qc2
+    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p, mut, qc2, sensor
     real(8), intent(inout), device                    :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
-    real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz, mutz, H(4), tzxsgs = 0.d0, tzysgs = 0.d0, tzzsgs = 0.d0, Hsgs = 0.d0
+    real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz, mutz, H(4), tzxsgs = 0.d0, tzysgs = 0.d0, tzzsgs = 0.d0, Hsgs = 0.d0, q = 0.d0
     ! 4th-order accuracy
     real(8), dimension(5,6), device :: u516, w516, v156, w156
     real(8), dimension(6), device   :: T6, u6, v6, w6
@@ -345,6 +380,9 @@ contains
     real(8), dimension(3,2), device   :: u312, w312, v132, w132, Tx, Ty
     real(8), dimension(2), device     :: Tz, u2, v2, w2, mx, my
     real(8) mz, muz, mvz, mwz, mwx, mux, mvy, mwy
+    ! artificial viscosity
+    real(8), dimension(2), device :: rho2, p2
+    real(8) sensorz
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset - 1
@@ -429,10 +467,17 @@ contains
         Hsgs   = -mz * (-H(2) + H(3)) * dz(k) / Prt
       endif
     endif
+    !if (id_av /= 0) then
+    !  rho2    = rho(i,j,k:k+1)
+    !  w2      =   w(i,j,k:k+1)
+    !  p2      =   p(i,j,k:k+1)
+    !  sensorz = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
+    !  q       = av_vonNeumann(sensorz, rho2, w2, p2)
+    !endif
 
     G(i-offset,j-offset,k-offset+1,2) = G(i-offset,j-offset,k-offset+1,2) - (tzx+tzxsgs)
     G(i-offset,j-offset,k-offset+1,3) = G(i-offset,j-offset,k-offset+1,3) - (tzy+tzysgs)
-    G(i-offset,j-offset,k-offset+1,4) = G(i-offset,j-offset,k-offset+1,4) - (tzz+tzzsgs)
+    G(i-offset,j-offset,k-offset+1,4) = G(i-offset,j-offset,k-offset+1,4) - (tzz+tzzsgs) + q
     G(i-offset,j-offset,k-offset+1,5) = G(i-offset,j-offset,k-offset+1,5) &
     - (utzx + vtzy + wtzz + kTz + Hsgs)
   end subroutine calc_Gv

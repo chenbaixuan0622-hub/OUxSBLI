@@ -54,7 +54,10 @@ contains
 
     y(1) = 0.d0
     do j = 1, ny-1
-      dy(j) = min(1.d0, max(0.125d0, dble(j)/dble(128))) * dy1
+      ! LES
+      !dy(j) = min(1.d0, max(0.1d0, dble(j)/dble(128))) * dy1
+      ! DNS
+      dy(j) = min(1.d0, max(0.05d0, dble(j)/dble(128))) * dy1
       y(j+1) = y(j) + dy(j)
     enddo
 
@@ -164,7 +167,7 @@ contains
           do j = 1, ny
             ! inlet
             QJ(1,j,k,l) = Qre(1,j,k,l)
-            QJ(2,j,k,l) = Qre(2,j,k,l)
+            !QJ(2,j,k,l) = Qre(2,j,k,l)
             ! outlet
             QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
       enddo;enddo;enddo
@@ -198,17 +201,19 @@ contains
     enddo;enddo;enddo
   end subroutine set_bc
 
-  subroutine set_bc_mut(nx,ny,nz,mut)
+  subroutine set_bc_mut(nx,ny,nz,mut,qc2)
     integer, intent(in), value      :: nx, ny, nz
-    real(8), intent(inout), device  :: mut(nx,ny,nz)
+    real(8), intent(inout), device  :: mut(nx,ny,nz), qc2(nx,ny,nz)
     integer i, j, k
     !$cuf kernel do(2) <<<*,*>>>
     do k = 4, nz-3
       do j = 2, ny-1
         ! inlet
-        mut(1,j,k)  = mut(2,j,k)
+        mut(1,j,k)  = mut(nre,j,k)
+        qc2(1,j,k)  = qc2(nre,j,k)
         ! outlet
         mut(nx,j,k) = mut(nx-1,j,k)
+        qc2(nx,j,k) = qc2(nx-1,j,k)
     enddo;enddo
 
     !$cuf kernel do(2) <<<*,*>>>
@@ -216,8 +221,10 @@ contains
       do i = 1, nx
         ! wall
         mut(i,1,k) = 0.d0
+        qc2(i,1,k) = 0.d0
         ! top
         mut(i,ny,k) = mut(i,ny-1,k)
+        qc2(i,ny,k) = qc2(i,ny-1,k)
     enddo;enddo
 
     !$cuf kernel do(2) <<<*,*>>>
@@ -230,6 +237,12 @@ contains
         mut(i,j,nz-2) = mut(i,j,4)
         mut(i,j,nz-1) = mut(i,j,5)
         mut(i,j,nz)   = mut(i,j,6)
+        qc2(i,j,1)    = qc2(i,j,nz-5)
+        qc2(i,j,2)    = qc2(i,j,nz-4)
+        qc2(i,j,3)    = qc2(i,j,nz-3)
+        qc2(i,j,nz-2) = qc2(i,j,4)
+        qc2(i,j,nz-1) = qc2(i,j,5)
+        qc2(i,j,nz)   = qc2(i,j,6)
     enddo;enddo
   end subroutine set_bc_mut
 end module set
