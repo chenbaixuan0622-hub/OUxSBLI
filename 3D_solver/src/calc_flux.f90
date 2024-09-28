@@ -62,7 +62,7 @@ contains
     real(8) wiggle, rho2(2), p2(2), V2(2,3), p4(4), F(5)
     p4(:)  = p(2:5)
     wiggle = wiggle_detector(p4)
-    call calc_6points(rho,p,V,rho2,p2,V2)
+    call calc_6points(sensor,rho,p,V,rho2,p2,V2)
     F = SLAU(id_slau,id,rho2,p2,V2,Normal,wiggle,sensor)
   end function flux_SLAU6
 
@@ -76,7 +76,7 @@ contains
     real(8), intent(in), value                  :: sensor
     real(8) wiggle, rho2(2), p2(2), V2(2,3), F(5)
     wiggle = wiggle_detector(p)
-    call calc_4points(1.d0,1.d0,1.d0/3.d0,rho,p,V,rho2,p2,V2)
+    call calc_4points(1.d0,1.d0,1.d0/3.d0,sensor,rho,p,V,rho2,p2,V2)
     F = SLAU(id_slau,id,rho2,p2,V2,Normal,wiggle,sensor)
   end function flux_SLAU4
 
@@ -278,7 +278,7 @@ contains
       V4(:,1) = (/u(i,j,k),       u(i,j,k),   u(i,j+1,k),   u(i,j+2,k)/)
       V4(:,2) = (/v(i,j,k),       v(i,j,k),   v(i,j+1,k),   v(i,j+2,k)/)
       V4(:,3) = (/w(i,j,k),       w(i,j,k),   w(i,j+1,k),   w(i,j+2,k)/)
-      call calc_4points(0.d0,1.d0,1.d0/3.d0,rho4,p4,V4,rho2,p2,V2)
+      call calc_4points(0.d0,1.d0,1.d0/3.d0,fdy,rho4,p4,V4,rho2,p2,V2)
       F(i-offset,j,k-offset,:) = SLAU(id_slau_wall,2,rho2,p2,V2,Normal)
     else
       rho2(:) = rho(i,j:j+1,k)
