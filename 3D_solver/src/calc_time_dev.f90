@@ -2,7 +2,7 @@ module calc_time_dev
   use cudafor
   use mpi
   use nvtx
-  use mod_globals, only : accuracy, id_scheme, id_visc, id_turbulence, id_rescale, nt, np, nre, &
+  use mod_globals, only : accuracy, id_scheme, id_turbulence, id_rescale, nt, np, nre, &
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG
   use calc_physical_quantities
   use calc_steps
@@ -14,11 +14,40 @@ module calc_time_dev
   use set
   use print
   implicit none
+  interface calc_EFG
+    module procedure calc_EFG_Euler, calc_EFG_visc, calc_EFG_LES
+  end interface calc_EFG
+
   interface RungeKutta
     module procedure RungeKutta_3rd, RungeKutta_4th
   end interface
 contains
-  subroutine calc_EFG(nx,ny,nz,dx,dy,dz,Jacobian,QJ,mut,E,F,G,sensor)
+  subroutine calc_EFG_Euler(id_visc,nx,ny,nz,dx,dy,dz,Jacobian,QJ,mut,E,F,G,sensor)
+    integer(kind=2), intent(in), value                  :: id_visc
+    integer, intent(in), value                          :: nx, ny, nz
+    real(8), intent(in), dimension(nx-1), device        :: dx ! 1 / dx
+    real(8), intent(in), dimension(ny-1), device        :: dy ! 1 / dy
+    real(8), intent(in), dimension(nz-1), device        :: dz ! 1 / dz
+    real(8), intent(in), dimension(nx,ny,nz), device    :: Jacobian
+    real(8), intent(in), dimension(nx,ny,nz,5), device  :: QJ ! Q / Jacobian
+    real(8), intent(inout), dimension(nx,ny,nz), device :: mut
+    real(8), intent(out), device                        :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
+    real(8), intent(out), device                        :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
+    real(8), intent(out), device                        :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    real(8), intent(out), dimension(nx,ny,nz), device   :: sensor
+    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    integer stat
+    call calc_quantities(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p)
+    
+    call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,dz,u,v,w,rho,p,sensor)
+    call calc_E<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,sensor,E)
+    call calc_F<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,sensor,F)
+    call calc_G<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,sensor,G)
+    stat = cudaDeviceSynchronize()
+  end subroutine calc_EFG_Euler
+
+  subroutine calc_EFG_visc(id_visc,nx,ny,nz,dx,dy,dz,Jacobian,QJ,mut,E,F,G,sensor)
+    integer(kind=4), intent(in), value                  :: id_visc
     integer, intent(in), value                          :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device        :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device        :: dy ! 1 / dy
@@ -33,30 +62,54 @@ contains
     real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, T, qc2
     integer stat
     call calc_quantities(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p,T)
+    qc2 = 0.d0
     
-    if (id_scheme == 2 .or. 4 <= id_scheme .or. id_av /= 0) then
-      call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,dz,u,v,w,rho,p,sensor)
-    endif
+    call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,dz,u,v,w,rho,p,sensor)
     call calc_E<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,sensor,E)
     call calc_F<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,sensor,F)
     call calc_G<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,sensor,G)
-  
-    qc2 = 0.d0
-    if (id_turbulence /= 0) then
-      call calc_mut<<<blocks,threads>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,mut,qc2)
-      call set_bc_mut(nx,ny,nz,mut,qc2)
-    endif
 
     stat = cudaDeviceSynchronize()
-    if (1 <= id_visc .or. id_turbulence /= 0) then
-      call calc_Ev<<<blocksE,threadsE,1>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,T,p,mut,qc2,sensor,E)
-      call calc_Fv<<<blocksF,threadsF,2>>>(nx,ny,nz,dy,dx,dz,rho,u,v,w,T,p,mut,qc2,sensor,F)
-      call calc_Gv<<<blocksG,threadsG,3>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,T,p,mut,qc2,sensor,G)
-    endif
+    call calc_Ev<<<blocksE,threadsE,1>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,T,p,mut,qc2,sensor,E)
+    call calc_Fv<<<blocksF,threadsF,2>>>(nx,ny,nz,dy,dx,dz,rho,u,v,w,T,p,mut,qc2,sensor,F)
+    call calc_Gv<<<blocksG,threadsG,3>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,T,p,mut,qc2,sensor,G)
     stat = cudaDeviceSynchronize()
-  end subroutine calc_EFG
+  end subroutine calc_EFG_visc
+  
+  subroutine calc_EFG_LES(id_visc,nx,ny,nz,dx,dy,dz,Jacobian,QJ,mut,E,F,G,sensor)
+    integer(kind=8), intent(in), value                  :: id_visc
+    integer, intent(in), value                          :: nx, ny, nz
+    real(8), intent(in), dimension(nx-1), device        :: dx ! 1 / dx
+    real(8), intent(in), dimension(ny-1), device        :: dy ! 1 / dy
+    real(8), intent(in), dimension(nz-1), device        :: dz ! 1 / dz
+    real(8), intent(in), dimension(nx,ny,nz), device    :: Jacobian
+    real(8), intent(in), dimension(nx,ny,nz,5), device  :: QJ ! Q / Jacobian
+    real(8), intent(inout), dimension(nx,ny,nz), device :: mut
+    real(8), intent(out), device                        :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
+    real(8), intent(out), device                        :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
+    real(8), intent(out), device                        :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    real(8), intent(out), dimension(nx,ny,nz), device   :: sensor
+    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, T, qc2
+    integer stat
+    call calc_quantities(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p,T)
+    qc2 = 0.d0
+    
+    call calc_Ducros<<<blocks,threads>>>(nx,ny,nz,dx,dy,dz,u,v,w,rho,p,sensor)
+    call calc_E<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,sensor,E)
+    call calc_F<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,sensor,F)
+    call calc_G<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,sensor,G)
+    call calc_mut<<<blocks,threads,4>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,mut,qc2)
+    stat = cudaDeviceSynchronize()
+    call set_bc_mut(nx,ny,nz,mut,qc2)
+
+    call calc_Ev<<<blocksE,threadsE,1>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,T,p,mut,qc2,sensor,E)
+    call calc_Fv<<<blocksF,threadsF,2>>>(nx,ny,nz,dy,dx,dz,rho,u,v,w,T,p,mut,qc2,sensor,F)
+    call calc_Gv<<<blocksG,threadsG,3>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,T,p,mut,qc2,sensor,G)
+    stat = cudaDeviceSynchronize()
+  end subroutine calc_EFG_LES
 
   subroutine RungeKutta_3rd(id_RungeKutta,myrank,nx,ny,nz,x,dx_cpu,xix_cpu,y,dy_cpu,etay_cpu,z,dz_cpu,zetaz_cpu,Jacobian_cpu,Q)
+    use mod_globals, only : id_visc
     integer(kind=2), intent(in) :: id_RungeKutta
     integer, intent(in)         :: myrank, nx, ny, nz
     real(8), intent(in)         :: x(nx), dx_cpu(nx-1), xix_cpu(nx-1)
@@ -133,18 +186,18 @@ contains
         do t1 = 1, nt
           call nvtxStartRange("calc 1step",1)
           call nvtxStartRange("calc flux",2)
-          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJ,mut,E,F,G,sensor)
+          call calc_EFG(id_visc,nx,ny,nz,xix,etay,zetaz,Jacobian,QJ,mut,E,F,G,sensor)
           call nvtxEndRange
           call nvtxStartRange("calc time dev",3)
           call calc_step(nx,ny,nz,1.d0,0.d0,dx,dy,dz,E,F,G,QJ,QJ2)
           call nvtxEndRange
           call set_bc(nx,ny,nz,Jacobian,QJ2,Qre)
 
-          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJ2,mut,E,F,G,sensor)
+          call calc_EFG(id_visc,nx,ny,nz,xix,etay,zetaz,Jacobian,QJ2,mut,E,F,G,sensor)
           call calc_step2(nx,ny,nz,0.75d0,0.25d0,0.25d0,1.d0,dx,dy,dz,E,F,G,QJ,QJ2,QJ3)
           call set_bc(nx,ny,nz,Jacobian,QJ3,Qre)
 
-          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJ3,mut,E,F,G,sensor)
+          call calc_EFG(id_visc,nx,ny,nz,xix,etay,zetaz,Jacobian,QJ3,mut,E,F,G,sensor)
           call calc_step3(nx,ny,nz,dx,dy,dz,E,F,G,QJ3,QJ)
           call set_bc(nx,ny,nz,Jacobian,QJ,Qre)
           call nvtxEndRange
@@ -177,6 +230,7 @@ contains
   end subroutine RungeKutta_3rd
 
   subroutine RungeKutta_4th(id_RungeKutta,myrank,nx,ny,nz,x,dx_cpu,xix_cpu,y,dy_cpu,etay_cpu,z,dz_cpu,zetaz_cpu,Jacobian_cpu,Q)
+    use mod_globals, only : id_visc
     integer(kind=4), intent(in) :: id_RungeKutta
     integer, intent(in)         :: myrank, nx, ny, nz
     real(8), intent(in)         :: x(nx), dx_cpu(nx-1), xix_cpu(nx-1)
@@ -258,7 +312,7 @@ contains
           endif
           call nvtxEndRange
           call nvtxStartRange("calc flux", 2)
-          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJ,mut,E,F,G,sensor)
+          call calc_EFG(id_visc,nx,ny,nz,xix,etay,zetaz,Jacobian,QJ,mut,E,F,G,sensor)
           call calc_step(nx,ny,nz,0.5d0,1.d0,dx,dy,dz,E,F,G,QJ,QJs,Rs) ! QJs = Q2
           call nvtxEndRange
           call nvtxStartRange("Recv Qre", 3)
@@ -284,7 +338,7 @@ contains
             Qre_cpu(:,:,:,:) = QJs(nre+1:nre+2,:,:,:)
             call MPI_ISEND(Qre_cpu, 10*ny*nz, MPI_REAL8, 1, 2, MPI_COMM_WORLD, ireq, ierr)
           endif
-          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G,sensor)
+          call calc_EFG(id_visc,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G,sensor)
           call calc_step(nx,ny,nz,0.5d0,2.d0,dx,dy,dz,E,F,G,QJ,QJs,Rs) ! QJs = Q3
           if (kind(id_rescale) == 4) then
             call MPI_RECV(Qre_cpu, 10*ny*nz, MPI_REAL8, 1, 3, MPI_COMM_WORLD, istat, ierr)
@@ -303,7 +357,7 @@ contains
             Qre_cpu(:,:,:,:) = QJs(nre+1:nre+2,:,:,:)
             call MPI_ISEND(Qre_cpu, 10*ny*nz, MPI_REAL8, 1, 4, MPI_COMM_WORLD, ireq, ierr)
           endif
-          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G,sensor)
+          call calc_EFG(id_visc,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G,sensor)
           call calc_step(nx,ny,nz,1.0d0,2.d0,dx,dy,dz,E,F,G,QJ,QJs,Rs) ! QJs = Q4
           if (kind(id_rescale) == 4) then
             call MPI_RECV(Qre_cpu, 10*ny*nz, MPI_REAL8, 1, 5, MPI_COMM_WORLD, istat, ierr)
@@ -322,7 +376,7 @@ contains
             Qre_cpu(:,:,:,:) = QJs(nre+1:nre+2,:,:,:)
             call MPI_ISEND(Qre_cpu, 10*ny*nz, MPI_REAL8, 1, 0, MPI_COMM_WORLD, ireq, ierr)
           endif
-          call calc_EFG(nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G,sensor)
+          call calc_EFG(id_visc,nx,ny,nz,xix,etay,zetaz,Jacobian,QJs,mut,E,F,G,sensor)
           call calc_step4(nx,ny,nz,dx,dy,dz,E,F,G,Rs,QJ)
           if (kind(id_rescale) == 4) then
             call MPI_RECV(Qre_cpu, 10*ny*nz, MPI_REAL8, 1, 1, MPI_COMM_WORLD, istat, ierr)

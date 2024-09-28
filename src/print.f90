@@ -579,7 +579,7 @@ contains
       dy = 1.d0 / (-y(2) + y(3))
       Tw(:,:) = p(:,1,:) / (R * rho(:,1,:))
       call print_turbulent_boundary_layer(step,nx,ny,nz,dy,y,Tw,u,rho)
-      write(filename, "(a, i5.5, a)") "data/Q",int(step),".vtr"
+      write(filename, "(a, i5.5, a)") "data/Q",int(step+step_offset),".vtr"
     endif
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
     call print_xml(nx,ny,nz,3,real(x),real(y),real(z),real(rho1d),real(p1d),real(T1d),real(M1d),real(v1d),real(Qcriterion1d))

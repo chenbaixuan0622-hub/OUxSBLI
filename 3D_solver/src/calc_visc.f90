@@ -221,13 +221,13 @@ contains
         Hsgs   = -mx * (-H(2) + H(3)) * dx(i) / Prt
       endif
     endif
-    if (id_av /= 0) then
-      rho2    = rho(i:i+1,j,k)
-      u2      =   u(i:i+1,j,k)
-      p2      =   p(i:i+1,j,k)
-      sensorx = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
-      q       = av_vonNeumann(sensorx, rho2, u2, p2)
-    endif
+    !if (id_av /= 0) then
+    !  rho2    = rho(i:i+1,j,k)
+    !  u2      =   u(i:i+1,j,k)
+    !  p2      =   p(i:i+1,j,k)
+    !  sensorx = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
+    !  q       = av_vonNeumann(sensorx, rho2, u2, p2)
+    !endif
 
     E(i-offset+1,j-offset,k-offset,2) = E(i-offset+1,j-offset,k-offset,2) - (txx+txxsgs) + q
     E(i-offset+1,j-offset,k-offset,3) = E(i-offset+1,j-offset,k-offset,3) - (txy+txysgs)
@@ -345,13 +345,13 @@ contains
         Hsgs   = -my * (-H(2) + H(3)) * dy(j) / Prt
       endif
     endif
-    if (id_av /= 0) then
-      rho2    = rho(i,j:j+1,k)
-      v2      =   v(i,j:j+1,k)
-      p2      =   p(i,j:j+1,k)
-      sensory = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
-      q       = av_vonNeumann(sensory, rho2, v2, p2)
-    endif
+    !if (id_av /= 0) then
+    !  rho2    = rho(i,j:j+1,k)
+    !  v2      =   v(i,j:j+1,k)
+    !  p2      =   p(i,j:j+1,k)
+    !  sensory = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
+    !  q       = av_vonNeumann(sensory, rho2, v2, p2)
+    !endif
 
     F(i-offset,j-offset+1,k-offset,2) = F(i-offset,j-offset+1,k-offset,2) - (tyx+tyxsgs)
     F(i-offset,j-offset+1,k-offset,3) = F(i-offset,j-offset+1,k-offset,3) - (tyy+tyysgs) + q
@@ -467,13 +467,13 @@ contains
         Hsgs   = -mz * (-H(2) + H(3)) * dz(k) / Prt
       endif
     endif
-    if (id_av /= 0) then
-      rho2    = rho(i,j,k:k+1)
-      w2      =   w(i,j,k:k+1)
-      p2      =   p(i,j,k:k+1)
-      sensorz = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
-      q       = av_vonNeumann(sensorz, rho2, w2, p2)
-      endif
+    !if (id_av /= 0) then
+    !  rho2    = rho(i,j,k:k+1)
+    !  w2      =   w(i,j,k:k+1)
+    !  p2      =   p(i,j,k:k+1)
+    !  sensorz = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
+    !  q       = av_vonNeumann(sensorz, rho2, w2, p2)
+    !endif
 
     G(i-offset,j-offset,k-offset+1,2) = G(i-offset,j-offset,k-offset+1,2) - (tzx+tzxsgs)
     G(i-offset,j-offset,k-offset+1,3) = G(i-offset,j-offset,k-offset+1,3) - (tzy+tzysgs)
