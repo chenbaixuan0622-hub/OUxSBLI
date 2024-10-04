@@ -1,8 +1,7 @@
 program main2
   use, intrinsic :: iso_fortran_env
   use mpi
-  use nvtx
-  use mod_globals, only : id_recal, nx1, ny1, nz1, nx2, ny2, nz2
+  use mod_globals, only : id_recal, nxs, nys, nzs
   use set
   use set_coordinate
   use calc_time_dev2
@@ -11,6 +10,7 @@ program main2
   real(8) t_start, t_end
   real(8), allocatable :: x(:), xix(:), dx(:), y(:), etay(:), dy(:), z(:), zetaz(:), dz(:), Jacobian(:,:,:)
   real(8), allocatable, pinned :: Q(:,:,:,:)
+  character(len=40) filename
   ! MPI
   integer ierr, nranks, myrank, status(MPI_STATUS_SIZE)
 
@@ -32,17 +32,11 @@ program main2
 
   print *, "my rank is", myrank
 
-  if (myrank <= 1) then
-    nx = nx1
-    ny = ny1
-    nz = nz1
-    allocate(Q(nx,ny,nz,5),x(nx),xix(nx-1),dx(nx-1),y(ny),etay(ny-1),dy(ny-1),z(nz),zetaz(nz-1),dz(nz-1),Jacobian(nx,ny,nz))
-  elseif (myrank >= 2) then
-    nx = nx2
-    ny = ny2
-    nz = nz2
-    allocate(Q(nx,ny,nz,5),x(nx),xix(nx-1),dx(nx-1),y(ny),etay(ny-1),dy(ny-1),z(nz),zetaz(nz-1),dz(nz-1),Jacobian(nx,ny,nz))
-  endif
+  i = myrank / 2 + 1
+  nx = nxs(i)
+  ny = nys(i)
+  nz = nzs(i)
+  allocate(Q(nx,ny,nz,5),x(nx),xix(nx-1),dx(nx-1),y(ny),etay(ny-1),dy(ny-1),z(nz),zetaz(nz-1),dz(nz-1),Jacobian(nx,ny,nz))
 
   ! set grid information
   if (mod(myrank,2) == 0) then
@@ -76,12 +70,9 @@ program main2
 
   if (mod(myrank,2) == 0) then
     if (kind(id_recal) == 4) then
+      write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"
       write(*,*) "simulation restarted"
-      if (myrank == 0) then
-        open(10,file="recal/Q1.dat",action="read",form="unformatted",access="stream")
-      else
-        open(10,file="recal/Q2.dat",action="read",form="unformatted",access="stream")
-      endif
+      open(10,file=filename,action="read",form="unformatted",access="stream")
       read(10) Q
       close(10)
     elseif (kind(id_recal) == 2) then
@@ -110,11 +101,8 @@ program main2
         do i = 1, nx
           Q(i,j,l,:) = Jacobian(i,j,l) * Q(i,j,l,:)
     enddo;enddo;enddo
-    if (myrank == 0) then
-      open(10,file="recal/Q1.dat",status="replace",action="write",form="unformatted",access="stream")
-    else
-      open(10,file="recal/Q2.dat",status="replace",action="write",form="unformatted",access="stream")
-    endif
+    write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"
+    open(10,file=filename,status="replace",action="write",form="unformatted",access="stream")
     write(10) Q
     close(10)
     print *, "elapsed time:", t_end - t_start

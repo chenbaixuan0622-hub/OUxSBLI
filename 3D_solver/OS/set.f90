@@ -56,10 +56,11 @@ contains
     enddo;enddo
   end subroutine set_init
 
-  subroutine set_bc(nx,ny,nz,Jacobian,QJ)
+  subroutine set_bc(nx,ny,nz,Jacobian,QJ,Qre)
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: Jacobian(nx,ny,nz)
     real(8), intent(inout), device :: QJ(nx,ny,nz,5)
+    real(8), intent(in), device    :: Qre(2,ny,nz,5)
     ! Riemann boundary condition
     real(8) :: pin, cin, vin, Rp, Rm, vb, rhob, cb, pb, v0 = 0.d0, c0 = sqrt(gamma * p0 / rho0)
     integer i, j, k, l, No
@@ -130,24 +131,28 @@ contains
     do l = 1, 5
       do j = 1, ny
         do i = 1, nx
-          QJ(i,j,1,l)    = QJ(i,j,nz-3,l)
-          QJ(i,j,2,l)    = QJ(i,j,nz-2,l)
-          QJ(i,j,nz-1,l) = QJ(i,j,3,l)
-          QJ(i,j,nz,l)   = QJ(i,j,4,l)
+          QJ(i,j,1,l)    = QJ(i,j,nz-5,l)
+          QJ(i,j,2,l)    = QJ(i,j,nz-4,l)
+          QJ(i,j,3,l)    = QJ(i,j,nz-3,l)
+          QJ(i,j,nz-2,l) = QJ(i,j,4,l)
+          QJ(i,j,nz-1,l) = QJ(i,j,5,l)
+          QJ(i,j,nz,l)   = QJ(i,j,6,l)
     enddo;enddo;enddo
   end subroutine set_bc
 
-  subroutine set_bc_mut(nx,ny,nz,mut)
+  subroutine set_bc_mut(nx,ny,nz,mut,qc2)
     integer, intent(in), value      :: nx, ny, nz
-    real(8), intent(inout), device  :: mut(nx,ny,nz)
+    real(8), intent(inout), device  :: mut(nx,ny,nz), qc2(nx,ny,nz)
     integer i, j, k
     !$cuf kernel do(2) <<<*,*>>>
     do k = 1, nz
       do j = 1, ny
         ! inlet
         mut(1,j,k) = mut(2,j,k)
+        qc2(1,j,k) = qc2(2,j,k)
         ! outlet
         mut(nx,j,k) = mut(nx-1,j,k)
+        qc2(nx,j,k) = qc2(nx-1,j,k)
     enddo;enddo
 
     !$cuf kernel do(2) <<<*,*>>>
@@ -155,16 +160,28 @@ contains
       do i = 1, nx
         ! wall
         mut(i,1,k) = 0.d0
+        qc2(i,1,k) = 0.d0
         ! top
         mut(i,ny,k) = mut(i,ny-1,k)
+        qc2(i,ny,k) = qc2(i,ny-1,k)
     enddo;enddo
 
     !$cuf kernel do(2) <<<*,*>>>
     do j = 1, ny
       do i = 1, nx
         ! span
-        mut(i,j,1) = mut(i,j,2)
-        mut(i,j,nz) = mut(i,j,nz-1)
+        mut(i,j,1)    = mut(i,j,nz-5)
+        mut(i,j,2)    = mut(i,j,nz-4)
+        mut(i,j,3)    = mut(i,j,nz-3)
+        mut(i,j,nz-2) = mut(i,j,4)
+        mut(i,j,nz-1) = mut(i,j,5)
+        mut(i,j,nz)   = mut(i,j,6)
+        qc2(i,j,1)    = qc2(i,j,nz-5)
+        qc2(i,j,2)    = qc2(i,j,nz-4)
+        qc2(i,j,3)    = qc2(i,j,nz-3)
+        qc2(i,j,nz-2) = qc2(i,j,4)
+        qc2(i,j,nz-1) = qc2(i,j,5)
+        qc2(i,j,nz)   = qc2(i,j,6)
     enddo;enddo
   end subroutine set_bc_mut
 end module set
