@@ -1,4 +1,4 @@
-module calc_time_dev2
+module calc_time_dev8
   use cudafor
   use mpi
   use nvtx
@@ -119,7 +119,7 @@ contains
     ! rescale
     if (myrank == 0) then
       allocate(Qre(ny,nz,5))
-    elseif (myrank == 0 .or. myrank == 3) then
+    elseif (myrank == 0 .or. myrank == ) then
       allocate(Qre_cpu(10,ny,nz,5))
     endif
 
@@ -232,5 +232,5 @@ contains
     endif
     deallocate(rhomt,pmt,Tmt,Mmt,vmt)
   end subroutine RungeKutta
-end module calc_time_dev2
+end module calc_time_dev8
 
