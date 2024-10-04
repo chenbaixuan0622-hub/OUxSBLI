@@ -116,7 +116,7 @@ contains
     integer, intent(in), value      :: nx, ny, nz
     real(8), intent(in), device     :: Jacobian(nx,ny)
     real(8), intent(inout), device  :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(in), device     :: Qre(2,ny,nz,5)
+    real(8), intent(in), device     :: Qre(ny,nz,5)
     integer i, j, k, l
     real(8) :: p_wall
     ! Riemann invariants
@@ -166,8 +166,7 @@ contains
         do k = 3, nz-2
           do j = 1, ny
             ! inlet
-            QJ(1,j,k,l) = Qre(1,j,k,l)
-            !QJ(2,j,k,l) = Qre(2,j,k,l)
+            QJ(1,j,k,l) = Qre(j,k,l)
             ! outlet
             QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
       enddo;enddo;enddo
