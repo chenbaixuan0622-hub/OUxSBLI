@@ -495,10 +495,10 @@ contains
     call print_xml(nx,ny,1,2,real(x),real(y),real(z),real(rho1d),real(p1d),real(T1d),real(M1d),real(v1d))
   end subroutine print_vtk_2D
   
-  subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,sensor,rhom,pm,Tm,Mm,vm,mass0,ke0,entropy0,myrank)
+  subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,rhom,pm,Tm,Mm,vm,mass0,ke0,entropy0,myrank)
     integer, intent(in)           :: step, nx, ny, nz
     real(8), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(nx,ny,nz)
-    real(8), intent(in)           :: QJ(nx,ny,nz,5), sensor(nx,ny,nz) ! Q / Jacobian
+    real(8), intent(in)           :: QJ(nx,ny,nz,5) ! Q / Jacobian
     real(8), intent(inout)        :: rhom(nx*ny*nz), pm(nx*ny*nz), Tm(nx*ny*nz), Mm(nx*ny*nz), vm(3*nx*ny*nz)
     real(8), intent(inout)        :: mass0, ke0, entropy0
     integer, intent(in), optional :: myrank
@@ -557,25 +557,25 @@ contains
     enddo;enddo;enddo
     
     if (present(myrank)) then
-      call print_mass(step,nx,ny,nz,rho,u,v,w,mass0,myrank)
+      !call print_mass(step,nx,ny,nz,rho,u,v,w,mass0,myrank)
       call print_entropy(step,nx,ny,nz,rho,p,entropy0,myrank)
       call print_KE(step,nx,ny,nz,rho,u,v,w,ke0,myrank)
       call print_enstrophy(step,nx,ny,nz,x,y,z,rho,omega,myrank)
-      call print_1d(step,nx,ny,nz,x,y,z,rho,p,u,sensor)
+      !call print_1d(step,nx,ny,nz,x,y,z,rho,p,u,sensor)
       if (myrank == 3) then
-        call print_boundary_layer(nx,ny,nz,y,u)
+        !call print_boundary_layer(nx,ny,nz,y,u)
         dy = 1.d0 / (-y(1) + y(2))
         Tw(:,:) = p(:,1,:) / (R * rho(:,1,:))
         call print_turbulent_boundary_layer(step,nx,ny,nz,dy,y,Tw,u,rho)
       endif
       write(filename, "(a, i1.1, a, i5.5, a)") "data/",int(myrank),"/Q",int(step+step_offset),".vtr"
     else
-      call print_mass(step,nx,ny,nz,rho,u,v,w,mass0)
+      !call print_mass(step,nx,ny,nz,rho,u,v,w,mass0)
       call print_entropy(step,nx,ny,nz,rho,p,entropy0)
       call print_KE(step,nx,ny,nz,rho,u,v,w,ke0)
       call print_enstrophy(step,nx,ny,nz,x,y,z,rho,omega)
-      call print_1d(step,nx,ny,nz,x,y,z,rho,p,u,sensor)
-      call print_boundary_layer(nx,ny,nz,y,u)
+      !call print_1d(step,nx,ny,nz,x,y,z,rho,p,u,sensor)
+      !call print_boundary_layer(nx,ny,nz,y,u)
       dy = 1.d0 / (-y(2) + y(3))
       Tw(:,:) = p(:,1,:) / (R * rho(:,1,:))
       call print_turbulent_boundary_layer(step,nx,ny,nz,dy,y,Tw,u,rho)
