@@ -1,12 +1,12 @@
 program main2
   use, intrinsic :: iso_fortran_env
   use mpi
-  use mod_globals, only : id_recal, nxs, nys, nzs
+  use mod_globals, only : id_recal, nx, ny, nz, Lx, Ly, Lz
   use set
   use set_coordinate
   use calc_time_dev2
   implicit none
-  integer i, j, l, nx, ny, nz
+  integer i, j, l
   real(8) t_start, t_end
   real(8), allocatable :: x(:), xix(:), dx(:), y(:), etay(:), dy(:), z(:), zetaz(:), dz(:), Jacobian(:,:,:)
   real(8), allocatable, pinned :: Q(:,:,:,:)
@@ -32,15 +32,11 @@ program main2
 
   print *, "my rank is", myrank
 
-  i = myrank / 2 + 1
-  nx = nxs(i)
-  ny = nys(i)
-  nz = nzs(i)
   allocate(Q(nx,ny,nz,5),x(nx),xix(nx-1),dx(nx-1),y(ny),etay(ny-1),dy(ny-1),z(nz),zetaz(nz-1),dz(nz-1),Jacobian(nx,ny,nz))
 
   ! set grid information
   if (mod(myrank,2) == 0) then
-    call set_grid(myrank,nx,ny,nz,x,y,z,dx,dy,dz)
+    call set_grid(myrank,nx,ny,nz,Lx,Ly,Lz,x,y,z,dx,dy,dz)
     xix(:)   = 1.d0 / dx(:)
     etay(:)  = 1.d0 / dy(:)
     zetaz(:) = 1.d0 / dz(:)

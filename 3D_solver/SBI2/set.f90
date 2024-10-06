@@ -7,15 +7,15 @@ contains
   subroutine set_blocks_threads(myrank,nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads)
     integer, intent(in), value :: myrank, nx, ny, nz
     type(dim3), intent(out)    :: blocksE, blocksF, blocksG, blocks, threadsE, threadsF, threadsG, threads
-    ! 193, 257, 257
+    ! 769, 257, 257
     blocksE = dim3((nx-1)/32,(ny-2)/5,(nz-2)/1)
     blocksF = dim3((nx-2)/1,(ny-1)/128,(nz-2)/1)
     blocksG = dim3((nx-2)/1,(ny-2)/5,(nz-1)/32)
-    blocks  = dim3((nx-2)/191,(ny-2)/1,(nz-2)/1)
+    blocks  = dim3((nx-2)/13,(ny-2)/5,(nz-2)/1)
     threadsE = dim3(32,5,1)
     threadsF = dim3(1,128,1)
     threadsG = dim3(1,5,32)
-    threads  = dim3(191,1,1)
+    threads  = dim3(13,5,1)
   end subroutine set_blocks_threads
 
   subroutine calc_Blasius(eta,d,u,v)
@@ -60,7 +60,7 @@ contains
     real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     integer i, j, k
     real(8) dx1, dy1, dz1
-    dx1 = 0.125d0 * Lx / dble(nx-1)
+    dx1 = 0.5d0 * Lx / dble(nx-1)
     dy1 = 10.d-3 / dble(256)
     dz1 = Lz / dble(nz-1)
     x(1) = dble(myrank/2) * 0.125d0 * Lx
@@ -125,17 +125,18 @@ contains
     p_wall = (gamma - 1.d0) * (Q(2,2,2,5) - 0.5d0 * (Q(2,2,2,2)**2 + Q(2,2,2,3)**2 + Q(2,2,2,4)**2) / Q(2,2,2,1))
     Q(:,1,:,5) = p_wall / (gamma - 1.d0)
   end subroutine set_init
-
+ 
   subroutine set_bc(myrank,nx,ny,nz,Jacobian,QJ)
     integer, intent(in), value     :: myrank, nx, ny, nz
     real(8), intent(in), device    :: Jacobian(nx,ny)
     real(8), intent(inout), device :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    integer i, j, k, l, ierr, ireq1, ireq2, ireq3, ireq4, istat(MPI_STATUS_SIZE)
+    integer i, j, k, l, ierr, istat(MPI_STATUS_SIZE)
     real(8) :: p_wall
     ! Riemann invariants
     real(8) :: pin, cin, vin, Rp, Rm, rhob, vb, cb, pb
     real(8) :: v0 = 0.d0
     real(8) :: c0 = sqrt(gamma * p0 / rho0)
+    real(8) :: Qsend(3,ny,nz,5), Qrecv(3,ny,nz,5)
     !$cuf kernel do(2)<<<*,*>>>
     do k = 3, nz-2
       do i = 2, nx-1
@@ -167,21 +168,16 @@ contains
         QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
     enddo;enddo
 
-    if (2 <= myrank .and. myrank <= 12) then
-      call MPI_ISEND(QJ(4:6,:,4:nz-3,:),       15*ny*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, ireq1, ierr)
-      call MPI_ISEND(QJ(nx-5:nx-3,:,4:nz-3,:), 15*ny*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ireq2, ierr)
-      call MPI_IRECV(QJ(nx-2:nx,:,4:nz-3,:),   15*ny*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ireq3, ierr)
-      call MPI_IRECV(QJ(1:3,:,4:nz-3,:),       15*ny*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, ireq4, ierr)
-      call MPI_WAIT(ireq3, istat, ierr)
-      call MPI_WAIT(ireq4, istat, ierr)
-    elseif (myrank == 0) then
-      call MPI_ISEND(QJ(nx-5:nx-3,:,4:nz-3,:), 15*ny*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ireq1, ierr)
-      call MPI_IRECV(QJ(nx-2:nx,:,4:nz-3,:),   15*ny*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ireq2, ierr)
-      call MPI_WAIT(ireq2, istat, ierr)
-    elseif (myrank == 14) then
-      call MPI_ISEND(QJ(4:6,:,4:nz-3,:),       15*ny*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, ireq1, ierr)
-      call MPI_IRECV(QJ(1:3,:,4:nz-3,:),       15*ny*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, ireq2, ierr)
-      call MPI_WAIT(ireq2, istat, ierr)
+    if (myrank == 0) then
+      Qsend = QJ(nx-5:nx-3,:,4:nz-3,:)
+      call MPI_SENDRECV(Qsend, 15*ny*(nz-6), MPI_REAL8, 2, 0, &
+                        Qrecv, 15*ny*(nz-6), MPI_REAL8, 2, 1, MPI_COMM_WORLD, istat, ierr)
+      QJ(nx-2:nx,:,4:nz-3,:) = Qrecv
+    elseif (myrank == 2) then
+      Qsend = QJ(4:6,:,4:nz-3,:)
+      call MPI_SENDRECV(Qsend, 15*ny*(nz-6), MPI_REAL8, 0, 1,&
+                        Qrecv, 15*ny*(nz-6), MPI_REAL8, 0, 0, MPI_COMM_WORLD, istat, ierr)
+      QJ(1:3,:,4:nz-3,:) = Qrecv
       !$cuf kernel do(3)<<<*,*>>>
       do l = 1, 5
         do k = 4, nz-3

@@ -48,10 +48,9 @@ contains
     real(8), intent(in)    :: y(ny), dy_cpu(ny-1), etay_cpu(ny-1)
     real(8), intent(in)    :: z(nz), dz_cpu(nz-1), zetaz_cpu(nz-1), Jacobian_cpu(nx,ny,nz)
     real(8), intent(inout) :: Q(nx,ny,nz,5)
-    integer i, j, k, t1, t2, itr, ilen, ierr, stat, ireq, ireq2, istat(MPI_STATUS_SIZE)
+    integer i, j, k, t1, t2, itr, ilen, ierr, stat, ndevices, ireq, ireq2, istat(MPI_STATUS_SIZE)
     real(8), dimension(nx,ny,nz) :: sensor_cpu
     ! rescale
-    real(8), allocatable, device :: Qre(:,:,:)
     real(8), allocatable, pinned :: Qre_cpu(:,:,:,:)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type(cudaDeviceProp)         :: prop
@@ -64,10 +63,16 @@ contains
     real(8), allocatable :: rhomt(:), pmt(:), Tmt(:), Mmt(:), vmt(:)
 
     ! check GPU
-    stat = cudaSetDevice(0)
-    stat = cudaGetDeviceProperties(prop,0)
-    ilen = verify(prop%name, ' ', .true.)
-    print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", 0, ") is available"
+    if (mod(myrank,2) == 0) then
+      if (myrank == 0) then
+        stat = cudaGetDeviceCount(ndevices)
+        print '(2x, i2, a)', ndevices, " GPU devices are found"
+      endif
+      stat = cudaSetDevice(myrank/2)
+      stat = cudaGetDeviceProperties(prop,myrank/2)
+      ilen = verify(prop%name, ' ', .true.)
+      print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", myrank/2, ") is available"
+    endif
 
     allocate(rhomt(nx*ny*nz), pmt(nx*ny*nz), Tmt(nx*ny*nz), Mmt(nx*ny*nz), vmt(3*nx*ny*nz))
     rhomt(:) = 0.d0
@@ -117,93 +122,83 @@ contains
     endif
 
     ! rescale
-    if (myrank == 0) then
-      allocate(Qre(ny,nz,5))
-    elseif (myrank == 0 .or. myrank == 3) then
+    if (myrank == 0 .or. myrank == 1) then
       allocate(Qre_cpu(10,ny,nz,5))
     endif
 
     do t2 = 1, np
       do t1 = 1, nt
         if (mod(myrank,2) == 0) then
-          if (myrank == 2) then
+          if (myrank == 0) then
             Qre_cpu(:,:,:,:) = QJ(nre:nre+9,:,:,:)
-            call MPI_ISEND(Qre_cpu, 50*ny*nz, MPI_REAL8, 3, 0, MPI_COMM_WORLD, ireq, ierr)
+            call MPI_ISEND(Qre_cpu, 50*ny*nz, MPI_REAL8, 1, 0, MPI_COMM_WORLD, ireq, ierr)
           endif
           call calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,xix,etay,zetaz,Jacobian,QJ,E,F,G,sensor)
           call calc_step(nx,ny,nz,0.5d0,1.d0,dx,dy,dz,E,F,G,QJ,QJs,Rs) ! QJs = Q2
           if (myrank == 0) then
-            call MPI_RECV(Qre_cpu(1,:,:,:), 5*ny*nz, MPI_REAL8, 3, 1, MPI_COMM_WORLD, istat, ierr)
-            Qre(:,:,:) = Qre_cpu(1,:,:,:)
-            call set_bc1(nx,ny,nz,Jacobian,QJs,Qre)
-          elseif (myrank == 2) then
-            call set_bc2(nx,ny,nz,Jacobian,QJs)
+            call MPI_RECV(Qre_cpu(1,:,:,:), 5*ny*nz, MPI_REAL8, 1, 1, MPI_COMM_WORLD, istat, ierr)
+            QJs(1,:,:,:) = Qre_cpu(1,:,:,:)
           endif
-        elseif (myrank == 3) then
-          call MPI_IRECV(Qre_cpu, 50*ny*nz, MPI_REAL8, 2, 0, MPI_COMM_WORLD, ireq, ierr)
+          call set_bc(myrank,nx,ny,nz,Jacobian,QJs)
+        elseif (myrank == 1) then
+          call MPI_IRECV(Qre_cpu, 50*ny*nz, MPI_REAL8, 0, 0, MPI_COMM_WORLD, ireq, ierr)
           call MPI_WAIT(ireq, istat, ierr)
           call set_rescale(t1+(t2-1)*nt,nx,ny,nz,nre,2.d-3,y,Jacobian_cpu,Qre_cpu)
           call MPI_SEND(Qre_cpu(1,:,:,:), 5*ny*nz, MPI_REAL8, 0, 1, MPI_COMM_WORLD, ierr)
         endif
 
         if (mod(myrank,2) == 0) then
-          if (myrank == 2) then
+          if (myrank == 0) then
             Qre_cpu(:,:,:,:) = QJ(nre:nre+9,:,:,:)
-            call MPI_ISEND(Qre_cpu, 50*ny*nz, MPI_REAL8, 3, 2, MPI_COMM_WORLD, ireq, ierr)
+            call MPI_ISEND(Qre_cpu, 50*ny*nz, MPI_REAL8, 1, 2, MPI_COMM_WORLD, ireq, ierr)
           endif
           call calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,xix,etay,zetaz,Jacobian,QJs,E,F,G,sensor)
           call calc_step(nx,ny,nz,0.5d0,2.d0,dx,dy,dz,E,F,G,QJ,QJs,Rs) ! QJs = Q3
           if (myrank == 0) then
-            call MPI_RECV(Qre_cpu(1,:,:,:), 5*ny*nz, MPI_REAL8, 3, 3, MPI_COMM_WORLD, istat, ierr)
-            Qre(:,:,:) = Qre_cpu(1,:,:,:)
-            call set_bc1(nx,ny,nz,Jacobian,QJs,Qre)
-          elseif (myrank == 2) then
-            call set_bc2(nx,ny,nz,Jacobian,QJs)
+            call MPI_RECV(Qre_cpu(1,:,:,:), 5*ny*nz, MPI_REAL8, 1, 3, MPI_COMM_WORLD, istat, ierr)
+            QJs(1,:,:,:) = Qre_cpu(1,:,:,:)
           endif
-        elseif (myrank == 3) then
-          call MPI_IRECV(Qre_cpu, 50*ny*nz, MPI_REAL8, 2, 2, MPI_COMM_WORLD, ireq, ierr)
+          call set_bc(myrank,nx,ny,nz,Jacobian,QJs)
+        elseif (myrank == 1) then
+          call MPI_IRECV(Qre_cpu, 50*ny*nz, MPI_REAL8, 0, 2, MPI_COMM_WORLD, ireq, ierr)
           call MPI_WAIT(ireq, istat, ierr)
           call set_rescale(t1+(t2-1)*nt,nx,ny,nz,nre,2.d-3,y,Jacobian_cpu,Qre_cpu)
           call MPI_SEND(Qre_cpu(1,:,:,:), 5*ny*nz, MPI_REAL8, 0, 3, MPI_COMM_WORLD, ierr)
         endif
 
         if (mod(myrank,2) == 0) then
-          if (myrank == 2) then
+          if (myrank == 0) then
             Qre_cpu(:,:,:,:) = QJ(nre:nre+9,:,:,:)
-            call MPI_ISEND(Qre_cpu, 50*ny*nz, MPI_REAL8, 3, 4, MPI_COMM_WORLD, ireq, ierr)
+            call MPI_ISEND(Qre_cpu, 50*ny*nz, MPI_REAL8, 1, 4, MPI_COMM_WORLD, ireq, ierr)
           endif
           call calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,xix,etay,zetaz,Jacobian,QJs,E,F,G,sensor)
           call calc_step(nx,ny,nz,1.d0,2.d0,dx,dy,dz,E,F,G,QJ,QJs,Rs) ! QJs = Q4
           if (myrank == 0) then
-            call MPI_RECV(Qre_cpu(1,:,:,:), 5*ny*nz, MPI_REAL8, 3, 5, MPI_COMM_WORLD, istat, ierr)
-            Qre(:,:,:) = Qre_cpu(1,:,:,:)
-            call set_bc1(nx,ny,nz,Jacobian,QJs,Qre)
-          elseif (myrank == 2) then
-            call set_bc2(nx,ny,nz,Jacobian,QJs)
+            call MPI_RECV(Qre_cpu(1,:,:,:), 5*ny*nz, MPI_REAL8, 1, 5, MPI_COMM_WORLD, istat, ierr)
+            QJs(1,:,:,:) = Qre_cpu(1,:,:,:)
           endif
-        elseif (myrank == 3) then
-          call MPI_IRECV(Qre_cpu, 50*ny*nz, MPI_REAL8, 3, 4, MPI_COMM_WORLD, ireq, ierr)
+          call set_bc(myrank,nx,ny,nz,Jacobian,QJs)
+        elseif (myrank == 1) then
+          call MPI_IRECV(Qre_cpu, 50*ny*nz, MPI_REAL8, 0, 4, MPI_COMM_WORLD, ireq, ierr)
           call MPI_WAIT(ireq, istat, ierr)
           call set_rescale(t1+(t2-1)*nt,nx,ny,nz,nre,2.d-3,y,Jacobian_cpu,Qre_cpu)
           call MPI_SEND(Qre_cpu(1,:,:,:), 5*ny*nz, MPI_REAL8, 0, 5, MPI_COMM_WORLD, ierr)
         endif
 
         if (mod(myrank,2) == 0) then
-          if (myrank == 2) then
+          if (myrank == 0) then
             Qre_cpu(:,:,:,:) = QJ(nre:nre+9,:,:,:)
-            call MPI_ISEND(Qre_cpu, 50*ny*nz, MPI_REAL8, 3, 6, MPI_COMM_WORLD, ireq, ierr)
+            call MPI_ISEND(Qre_cpu, 50*ny*nz, MPI_REAL8, 1, 6, MPI_COMM_WORLD, ireq, ierr)
           endif
           call calc_EFG(nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads,xix,etay,zetaz,Jacobian,QJs,E,F,G,sensor)
           call calc_step4(nx,ny,nz,dx,dy,dz,E,F,G,Rs,QJ)
           if (myrank == 0) then
-            call MPI_RECV(Qre_cpu(1,:,:,:), 5*ny*nz, MPI_REAL8, 3, 7, MPI_COMM_WORLD, istat, ierr)
-            Qre(:,:,:) = Qre_cpu(1,:,:,:)
-            call set_bc1(nx,ny,nz,Jacobian,QJ,Qre)
-          elseif (myrank == 2) then
-            call set_bc2(nx,ny,nz,Jacobian,QJ)
+            call MPI_RECV(Qre_cpu(1,:,:,:), 5*ny*nz, MPI_REAL8, 1, 7, MPI_COMM_WORLD, istat, ierr)
+            QJ(1,:,:,:) = Qre_cpu(1,:,:,:)
           endif
-        elseif (myrank == 3) then
-          call MPI_IRECV(Qre_cpu, 50*ny*nz, MPI_REAL8, 3, 6, MPI_COMM_WORLD, ireq, ierr)
+          call set_bc(myrank,nx,ny,nz,Jacobian,QJ)
+        elseif (myrank == 1) then
+          call MPI_IRECV(Qre_cpu, 50*ny*nz, MPI_REAL8, 0, 6, MPI_COMM_WORLD, ireq, ierr)
           call MPI_WAIT(ireq, istat, ierr)
           call set_rescale(t1+(t2-1)*nt,nx,ny,nz,nre,2.d-3,y,Jacobian_cpu,Qre_cpu)
           call MPI_SEND(Qre_cpu(1,:,:,:), 5*ny*nz, MPI_REAL8, 0, 7, MPI_COMM_WORLD, ierr)
@@ -225,9 +220,7 @@ contains
     if (mod(myrank,2) == 0) then
       deallocate(QJ,QJs,Rs,E,F,G,dx,xix,dy,etay,dz,zetaz,Jacobian,sensor)
     endif
-    if (myrank == 0) then
-      deallocate(Qre)
-    elseif (myrank == 0 .or. myrank == 3) then
+    if (myrank == 0 .or. myrank == 1) then
       deallocate(Qre_cpu)
     endif
     deallocate(rhomt,pmt,Tmt,Mmt,vmt)
