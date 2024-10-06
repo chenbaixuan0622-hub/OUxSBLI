@@ -1,10 +1,10 @@
-program main2
+program main8
   use, intrinsic :: iso_fortran_env
   use mpi
   use mod_globals, only : id_recal, nx, ny, nz, Lx, Ly, Lz
   use set
   use set_coordinate
-  use calc_time_dev2
+  use calc_time_dev8
   implicit none
   integer i, j, l
   real(8) t_start, t_end
@@ -17,22 +17,33 @@ program main2
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! MPI rank  ! 0 ! Q1  ! calc  !
   !           ! 1 !     ! IO    !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !           ! 2 ! Q2  ! calc  !
   !           ! 3 !     ! IO    !
+  !           ! 4 ! Q3  ! calc  !
+  !           ! 5 !     ! IO    !
+  !           ! 6 ! Q4  ! calc  !
+  !           ! 7 !     ! IO    !
+  !           ! 8 ! Q5  ! calc  !
+  !           ! 9 !     ! IO    !
+  !           !10 ! Q6  ! calc  !
+  !           !11 !     ! IO    !
+  !           !12 ! Q7  ! calc  !
+  !           !13 !     ! IO    !
+  !           !14 ! Q8  ! calc  !
+  !           !15 !     ! IO    !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   call MPI_INIT(ierr)
   call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
   call MPI_COMM_RANK(MPI_COMM_WORLD, myrank, ierr)
-  if (nranks /= 4) then
-    print *, "num of rank must be 4"
+  if (nranks /= 16) then
+    print *, "num of rank must be 16"
     stop
   endif
 
   print *, "my rank is", myrank
 
-  allocate(Q(nx,ny,nz,5),x(nx),xix(nx-1),dx(nx-1),y(ny),etay(ny-1),dy(ny-1),z(nz),zetaz(nz-1),dz(nz-1),Jacobian(nx,ny,nz))
+  allocate(Q(nx,ny,nz,5),x(nx),xix(nx),dx(nx),y(ny),etay(ny),dy(ny),z(nz),zetaz(nz),dz(nz),Jacobian(nx,ny,nz))
 
   ! set grid information
   if (mod(myrank,2) == 0) then
@@ -107,5 +118,5 @@ program main2
   deallocate(Q,x,xix,dx,y,etay,dy,z,zetaz,dz,Jacobian)
   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   call MPI_FINALIZE(ierr)
-end program main2
+end program main8
 
