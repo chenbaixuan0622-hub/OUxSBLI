@@ -174,28 +174,6 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine print_mass(step,nx,ny,nz,rho,u,v,w,mass0,myrank)
-    integer, intent(in)                       :: step, nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz)  :: rho, u, v, w
-    real(8), intent(inout)                    :: mass0
-    integer, intent(in), optional             :: myrank
-    real(8) mass, t
-    character(len=40) filename
-    mass = sum(rho(3:nx-2,3:ny-2,3:nz-2))
-    if (step == 0) then
-      mass0 = mass
-    endif
-    t = nt * step * dt
-    if (present(myrank)) then
-      write(filename, "(a, i1.1, a)") "data/",int(myrank),"/mass.d"
-      open(10,file=filename, position="append")
-    else
-      open(10,file="data/mass.d", position="append")
-    endif
-    write(10,"(2e12.4)") t, (mass0 - mass) / mass0
-    close(10)
-  end subroutine print_mass
-
   subroutine print_entropy(step,nx,ny,nz,rho,p,entropy0,myrank)
     integer, intent(in)                       :: step, nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz)  :: rho, p
@@ -227,7 +205,7 @@ contains
     endif
     t = nt * step * dt
     if (present(myrank)) then
-      write(filename, "(a, i1.1, a)") "data/",int(myrank),"/entropy.d"
+      write(filename, "(a, i0, a)") "data/",int(myrank),"/entropy.d"
       open(10,file=filename, position="append")
     else
       open(10,file="data/entropy.d", position="append")
@@ -267,7 +245,7 @@ contains
     endif
     t = nt * step * dt
     if (present(myrank)) then
-      write(filename, "(a, i1.1, a)") "data/",int(myrank),"/kinetic_energy.d"
+      write(filename, "(a, i0, a)") "data/",int(myrank),"/kinetic_energy.d"
       open(10,file=filename, position="append")
     else
       open(10,file="data/kinetic_energy.d", position="append")
@@ -305,7 +283,7 @@ contains
     enstrophy = enstrophy / dble((nx-accuracy) * (ny-accuracy) * (nz-accuracy))
 
     if (present(myrank)) then
-      write(filename, "(a, i1.1, a)") "data/",int(myrank),"/enstrophy.d"
+      write(filename, "(a, i0, a)") "data/",int(myrank),"/enstrophy.d"
       open(10,file=filename, position="append")
     else
       open(10,file="data/enstrophy.d", position="append")
@@ -333,55 +311,6 @@ contains
     enddo
     close(10)
   end subroutine print_1d
-
-  function mu(T) result(ans)
-    real(8), intent(in), value :: T
-    real(8) :: ans, mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0
-    ans = mu0 * ((T0 + S) / (T + S)) * (T / T0)**1.5
-  end function mu
-  
-  subroutine print_turbulent_boundary_layer(step,nx,ny,nz,dy,y,T,u,rho)
-    integer, intent(in), value                :: step, nx, ny, nz
-    real(8), intent(in), value                :: dy
-    real(8), intent(in), dimension(ny)        :: y
-    real(8), intent(in), dimension(nx,nz)     :: T
-    real(8), intent(in), dimension(nx,ny,nz)  :: u, rho
-    integer j
-    real(8) rhow, nuw, dudy, tw, ut, uvd
-    real(8), dimension(ny) :: yplus, uplus
-    rhow = mean(rho(:,1,:))
-    nuw  = mu(mean(T(:,:))) / rhow
-    dudy = dy * mean(-u(:,2,:) + u(:,3,:))
-    tw   = rhow * nuw * dudy
-    ut   = sqrt(tw / rhow)
-    open(10,file="data/yplus.d",action="write")
-    yplus(1) = ut * y(1) / nuw
-    uplus(1) = mean(u(:,1,:)) / ut
-    do j = 2, ny
-      yplus(j) = ut * y(j) / nuw
-      ! van Driest transformation
-      uvd = mean(u(:,j-1,:)) + sqrt(mean(rho(:,j,:)) / rhow) * (-mean(u(:,j-1,:)) + mean(u(:,j,:)))
-      uplus(j) = uvd / ut
-      write(10,"(2e12.4)") yplus(j), uplus(j)
-    enddo
-    close(10)
-    ! tau
-    open(10,file="data/tau.d", position="append")
-    write(10,"(3(f9.4,1x))") nt * dt * step, tw, ut
-    close(10)
-  end subroutine print_turbulent_boundary_layer
-
-  subroutine print_boundary_layer(nx,ny,nz,y,u)
-    integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), dimension(ny)        :: y
-    real(8), intent(in), dimension(nx,ny,nz)  :: u
-    integer j
-    open(10,file="data/boundary_layer.d",action="write")
-    do j = 1, ny
-      write(10,"(2(f12.7,1x))") y(j), mean(u(:,j,:))/mean(u(:,ny,:))
-    enddo
-    close(10)
-  end subroutine print_boundary_layer
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -557,28 +486,16 @@ contains
     enddo;enddo;enddo
     
     if (present(myrank)) then
-      !call print_mass(step,nx,ny,nz,rho,u,v,w,mass0,myrank)
       call print_entropy(step,nx,ny,nz,rho,p,entropy0,myrank)
       call print_KE(step,nx,ny,nz,rho,u,v,w,ke0,myrank)
       call print_enstrophy(step,nx,ny,nz,x,y,z,rho,omega,myrank)
       !call print_1d(step,nx,ny,nz,x,y,z,rho,p,u,sensor)
-      if (myrank == 3) then
-        !call print_boundary_layer(nx,ny,nz,y,u)
-        dy = 1.d0 / (-y(1) + y(2))
-        Tw(:,:) = p(:,1,:) / (R * rho(:,1,:))
-        call print_turbulent_boundary_layer(step,nx,ny,nz,dy,y,Tw,u,rho)
-      endif
-      write(filename, "(a, i1.1, a, i5.5, a)") "data/",int(myrank),"/Q",int(step+step_offset),".vtr"
+      write(filename, "(a, i0, a, i5.5, a)") "data/",int(myrank),"/Q",int(step+step_offset),".vtr"
     else
-      !call print_mass(step,nx,ny,nz,rho,u,v,w,mass0)
       call print_entropy(step,nx,ny,nz,rho,p,entropy0)
       call print_KE(step,nx,ny,nz,rho,u,v,w,ke0)
       call print_enstrophy(step,nx,ny,nz,x,y,z,rho,omega)
       !call print_1d(step,nx,ny,nz,x,y,z,rho,p,u,sensor)
-      !call print_boundary_layer(nx,ny,nz,y,u)
-      dy = 1.d0 / (-y(2) + y(3))
-      Tw(:,:) = p(:,1,:) / (R * rho(:,1,:))
-      call print_turbulent_boundary_layer(step,nx,ny,nz,dy,y,Tw,u,rho)
       write(filename, "(a, i5.5, a)") "data/Q",int(step+step_offset),".vtr"
     endif
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")

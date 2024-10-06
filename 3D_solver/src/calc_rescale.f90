@@ -11,20 +11,20 @@ contains
     real(8) :: mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0
     real(8) t, bltre1, bltre2, bltre, taure, utre, utin, beta, mu, nu, ady, ade 
     ! mean properties at rescaling plane
-    real(8), dimension(ny)    :: Um, Vm, Wm, pm, Tm
+    real(8), dimension(ny)    :: Um, Vm, Wm, rhom, Tm, pm
     ! fluctuating properties at rescaling plane
-    real(8), dimension(ny,nz) :: ufre, vfre, wfre, pfre, Tfre
+    real(8), dimension(ny,nz) :: ufre, vfre, wfre, rhofre, Tfre
     real(8), dimension(ny)    :: ypre, ypin, etre, etin
     ! fluctuating properties at both inner and outer region
-    real(8), dimension(ny,nz) :: ufin, vfin, wfin, pfin, Tfin, ufout, vfout, wfout, pfout, Tfout
+    real(8), dimension(ny,nz) :: ufin, vfin, wfin, rhofin, Tfin, ufout, vfout, wfout, rhofout, Tfout
     ! mean properties at both inner and outer region
-    real(8), dimension(ny,nz) :: Umin, Vmin, Wmin, pmin, Tmin, Umout, Vmout, Wmout, pmout, Tmout
+    real(8), dimension(ny,nz) :: Umin, Vmin, Wmin, rhomin, Tmin, Umout, Vmout, Wmout, rhomout, Tmout
     ! weighting function
     real(8), dimension(ny)    :: weight
     ! properties at rescaling plane
-    real(8) ure, vre, wre, pre, Tre, rhore
+    real(8) ure, vre, wre, rhore, Tre, pre
     ! rescaled properties at inlet
-    real(8) uin, vin, win, pin, Tin, rhoin
+    real(8) uin, vin, win, rhoin, Tin, pin
     character(len=40) filename
     write(filename, "(a)") "data/rescaling.d"
 
@@ -38,13 +38,13 @@ contains
     enddo;enddo;enddo;enddo
 
     do j = 1, ny
-      rho   = sum(Qre(:,j,:,1)) / dble(size(Qre(:,j,:,1)))
-      Um(j) = sum(Qre(:,j,:,2) / Qre(:,j,:,1)) / dble(size(Qre(:,j,:,1)))
-      Vm(j) = sum(Qre(:,j,:,3) / Qre(:,j,:,1)) / dble(size(Qre(:,j,:,1)))
-      Wm(j) = sum(Qre(:,j,:,4) / Qre(:,j,:,1)) / dble(size(Qre(:,j,:,1)))
-      pm(j) = sum((gamma - 1.d0) * (Qre(:,j,:,5) &
+      rhom(j) = sum(Qre(:,j,:,1)) / dble(size(Qre(:,j,:,1)))
+        Um(j) = sum(Qre(:,j,:,2) / Qre(:,j,:,1)) / dble(size(Qre(:,j,:,1)))
+        Vm(j) = sum(Qre(:,j,:,3) / Qre(:,j,:,1)) / dble(size(Qre(:,j,:,1)))
+        Wm(j) = sum(Qre(:,j,:,4) / Qre(:,j,:,1)) / dble(size(Qre(:,j,:,1)))
+        pm(j) = sum((gamma - 1.d0) * (Qre(:,j,:,5) &
               - 0.5d0 * (Qre(:,j,:,2)**2 + Qre(:,j,:,3)**2 + Qre(:,j,:,4)**2) / Qre(:,j,:,1))) / dble(size(Qre(:,j,:,1)))
-      Tm(j) = pm(j) / (R * rho)
+        Tm(j) = pm(j) / (R * rhom(j))
     enddo
 
     ! check boundary layer thickness at rescaling plane
@@ -71,20 +71,19 @@ contains
           wre   = Qre(1,j,k,4) / rhore
           pre   = (gamma - 1.d0) * (Qre(1,j,k,5) - 0.5d0 * rhore * (ure**2 + vre**2 + wre**2)) 
           Tre   = pre / (rhore * R)
-          ufre(j,k) = ure - Um(j)
-          vfre(j,k) = vre - Vm(j)
-          wfre(j,k) = wre - Wm(j)
-          pfre(j,k) = pre - pm(j)
-          Tfre(j,k) = Tre - Tm(j)
+          ufre(j,k)   = ure   -   Um(j)
+          vfre(j,k)   = vre   -   Vm(j)
+          wfre(j,k)   = wre   -   Wm(j)
+          rhofre(j,k) = rhore - rhom(j)
+          Tfre(j,k)   = Tre   -   Tm(j)
       enddo;enddo
 
       ! friction velocity
-      rhore = pm(1) / (R * Tm(1))
       mu    = mu0 * ((T0 + S) / (Tm(1) + S)) * (Tm(1) / T0)**1.5
-      nu    = mu / rhore
+      nu    = mu / rhom(1)
       taure = mu * abs(-Um(1) + Um(2)) / (-y(1) + y(2))
-      utre  = sqrt(taure / rhore)
-      utin  = utre * (bltre / blt)**0.1
+      utre  = sqrt(taure / rhom(1))
+      utin  = utre * (bltre / blt)**0.125
       beta  = utin / utre
 
       do j = 1, ny
@@ -99,30 +98,30 @@ contains
         do j = 1, ny
           ! inner region
           ! mean
-          Umin(j,k) = Um(j)
-          Vmin(j,k) = Vm(j)
-          Wmin(j,k) = Wm(j)
-          pmin(j,k) = pm(j)
-          Tmin(j,k) = Tm(j)
+          Umin(j,k)   = Um(j)
+          Vmin(j,k)   = Vm(j)
+          Wmin(j,k)   = Wm(j)
+          rhomin(j,k) = rhom(j)
+          Tmin(j,k)   = Tm(j)
           ! fluctuating
-          ufin(j,k) = 0.d0
-          vfin(j,k) = 0.d0
-          wfin(j,k) = 0.d0
-          pfin(j,k) = 0.d0
-          Tfin(j,k) = 0.d0
+          ufin(j,k)   = 0.d0
+          vfin(j,k)   = 0.d0
+          wfin(j,k)   = 0.d0
+          rhofin(j,k) = 0.d0
+          Tfin(j,k)   = 0.d0
           ! outer region
           ! mean
-          Umout(j,k) = Um(j)
-          Vmout(j,k) = Vm(j)
-          Wmout(j,k) = Wm(j)
-          pmout(j,k) = pm(j)
-          Tmout(j,k) = Tm(j)
+          Umout(j,k)   = Um(j)
+          Vmout(j,k)   = Vm(j)
+          Wmout(j,k)   = Wm(j)
+          rhomout(j,k) = rhom(j)
+          Tmout(j,k)   = Tm(j)
           ! fluctuating
-          ufout(j,k) = 0.d0
-          vfout(j,k) = 0.d0
-          wfout(j,k) = 0.d0
-          pfout(j,k) = 0.d0
-          Tfout(j,k) = 0.d0
+          ufout(j,k)   = 0.d0
+          vfout(j,k)   = 0.d0
+          wfout(j,k)   = 0.d0
+          rhofout(j,k) = 0.d0
+          Tfout(j,k)   = 0.d0
       enddo;enddo
 
       do j = 1, ny
@@ -131,17 +130,17 @@ contains
             ady = (-ypre(jj-1) + ypin(j)) / (-ypre(jj-1) + ypre(jj))
             do k = 1, nz
               ! mean
-              Umin(j,k) = beta * (Um(jj-1) + ady * (-Um(jj-1) + Um(jj)))
-              Vmin(j,k) =         Vm(jj-1) + ady * (-Vm(jj-1) + Vm(jj))
-              Wmin(j,k) = 0.d0
-              pmin(j,k) =         pm(jj-1) + ady * (-pm(jj-1) + pm(jj)) 
-              Tmin(j,k) =         Tm(jj-1) + ady * (-Tm(jj-1) + Tm(jj))
+              Umin(j,k)   = beta * (Um(jj-1) + ady * (-  Um(jj-1) +   Um(jj)))
+              Vmin(j,k)   =         Vm(jj-1) + ady * (-  Vm(jj-1) +   Vm(jj))
+              Wmin(j,k)   = 0.d0
+              rhomin(j,k) =       rhom(jj-1) + ady * (-rhom(jj-1) + rhom(jj)) 
+              Tmin(j,k)   =         Tm(jj-1) + ady * (-  Tm(jj-1) +   Tm(jj))
               ! fluctuating
-              ufin(j,k) = beta * (ufre(jj-1,k) + ady * (-ufre(jj-1,k) + ufre(jj,k)))
-              vfin(j,k) = beta * (vfre(jj-1,k) + ady * (-vfre(jj-1,k) + vfre(jj,k)))
-              wfin(j,k) = beta * (wfre(jj-1,k) + ady * (-wfre(jj-1,k) + wfre(jj,k)))
-              pfin(j,k) =         pfre(jj-1,k) + ady * (-pfre(jj-1,k) + pfre(jj,k))
-              Tfin(j,k) =         Tfre(jj-1,k) + ady * (-Tfre(jj-1,k) + Tfre(jj,k))
+              ufin(j,k)   = beta * (ufre(jj-1,k) + ady * (-  ufre(jj-1,k) +   ufre(jj,k)))
+              vfin(j,k)   = beta * (vfre(jj-1,k) + ady * (-  vfre(jj-1,k) +   vfre(jj,k)))
+              wfin(j,k)   = beta * (wfre(jj-1,k) + ady * (-  wfre(jj-1,k) +   wfre(jj,k)))
+              rhofin(j,k) =       rhofre(jj-1,k) + ady * (-rhofre(jj-1,k) + rhofre(jj,k))
+              Tfin(j,k)   =         Tfre(jj-1,k) + ady * (-  Tfre(jj-1,k) +   Tfre(jj,k))
             enddo
             exit
           endif
@@ -153,17 +152,17 @@ contains
             ade = (-etre(jj-1) + etin(j)) / (-etre(jj-1) + etre(jj))
             do k = 1, nz
               ! mean
-              Umout(j,k) = beta * (Um(jj-1) + ade * (-Um(jj-1) + Um(jj))) + (1.d0 - beta) * u0
-              Vmout(j,k) =         Vm(jj-1) + ade
-              Wmout(j,k) = 0.d0
-              pmout(j,k) =         pm(jj-1) + ade * (-pm(jj-1) + pm(jj))
-              Tmout(j,k) =         Tm(jj-1) + ade * (-Tm(jj-1) + Tm(jj))
+              Umout(j,k)   = beta * (Um(jj-1) + ade * (-  Um(jj-1) + Um(jj))) + (1.d0 - beta) * u0
+              Vmout(j,k)   =         Vm(jj-1) + ade
+              Wmout(j,k)   = 0.d0
+              rhomout(j,k) =       rhom(jj-1) + ade * (-rhom(jj-1) + rhom(jj))
+              Tmout(j,k)   =         Tm(jj-1) + ade * (-  Tm(jj-1) +   Tm(jj))
               ! fluctuating
-              ufout(j,k) = beta * (ufre(jj-1,k) + ade * (-ufre(jj-1,k) + ufre(jj,k)))
-              vfout(j,k) = beta * (vfre(jj-1,k) + ade * (-vfre(jj-1,k) + vfre(jj,k)))
-              wfout(j,k) = beta * (wfre(jj-1,k) + ade * (-wfre(jj-1,k) + wfre(jj,k)))
-              pfout(j,k) =         pfre(jj-1,k) + ade * (-pfre(jj-1,k) + pfre(jj,k))
-              Tfout(j,k) =         Tfre(jj-1,k) + ade * (-Tfre(jj-1,k) + Tfre(jj,k))
+              ufout(j,k)   = beta * (ufre(jj-1,k) + ade * (-  ufre(jj-1,k) +   ufre(jj,k)))
+              vfout(j,k)   = beta * (vfre(jj-1,k) + ade * (-  vfre(jj-1,k) +   vfre(jj,k)))
+              wfout(j,k)   = beta * (wfre(jj-1,k) + ade * (-  wfre(jj-1,k) +   wfre(jj,k)))
+              rhofout(j,k) =       rhofre(jj-1,k) + ade * (-rhofre(jj-1,k) + rhofre(jj,k))
+              Tfout(j,k)   =         Tfre(jj-1,k) + ade * (-  Tfre(jj-1,k) +   Tfre(jj,k))
             enddo
             exit
           endif
@@ -177,12 +176,12 @@ contains
       ! re-introducing
       do k = 2, nz-1
         do j = 1, ny
-          uin   = (Umin(j,k) + ufin(j,k)) * (1.d0 - weight(j)) + (Umout(j,k) + ufout(j,k)) * weight(j)
-          vin   = (Vmin(j,k) + vfin(j,k)) * (1.d0 - weight(j)) + (Vmout(j,k) + vfout(j,k)) * weight(j)
-          win   = (Wmin(j,k) + wfin(j,k)) * (1.d0 - weight(j)) + (Wmout(j,k) + wfout(j,k)) * weight(j)
-          pin   = (pmin(j,k) + pfin(j,k)) * (1.d0 - weight(j)) + (pmout(j,k) + pfout(j,k)) * weight(j)
-          Tin   = (Tmin(j,k) + Tfin(j,k)) * (1.d0 - weight(j)) + (Tmout(j,k) + Tfout(j,k)) * weight(j)
-          rhoin = pin / (R * Tin)
+          uin   = (  Umin(j,k) +   ufin(j,k)) * (1.d0 - weight(j)) + (  Umout(j,k) +   ufout(j,k)) * weight(j)
+          vin   = (  Vmin(j,k) +   vfin(j,k)) * (1.d0 - weight(j)) + (  Vmout(j,k) +   vfout(j,k)) * weight(j)
+          win   = (  Wmin(j,k) +   wfin(j,k)) * (1.d0 - weight(j)) + (  Wmout(j,k) +   wfout(j,k)) * weight(j)
+          rhoin = (rhomin(j,k) + rhofin(j,k)) * (1.d0 - weight(j)) + (rhomout(j,k) + rhofout(j,k)) * weight(j)
+          Tin   = (  Tmin(j,k) +   Tfin(j,k)) * (1.d0 - weight(j)) + (  Tmout(j,k) +   Tfout(j,k)) * weight(j)
+          pin   = rhoin * R * Tin
           Qre(1,j,k,1) = rhoin / Jacobian(nre,j,k)
           Qre(1,j,k,2) = rhoin * uin / Jacobian(nre,j,k)
           Qre(1,j,k,3) = rhoin * vin / Jacobian(nre,j,k)

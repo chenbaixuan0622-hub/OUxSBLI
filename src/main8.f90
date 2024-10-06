@@ -6,7 +6,7 @@ program main8
   use set_coordinate
   use calc_time_dev8
   implicit none
-  integer i, j, l, nx, ny, nz
+  integer i, j, l
   real(8) t_start, t_end
   real(8), allocatable :: x(:), xix(:), dx(:), y(:), etay(:), dy(:), z(:), zetaz(:), dz(:), Jacobian(:,:,:)
   real(8), allocatable, pinned :: Q(:,:,:,:)
