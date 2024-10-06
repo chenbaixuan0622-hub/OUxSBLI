@@ -1,7 +1,23 @@
 module set
-  use mod_globals, only : id_rescale, nx, ny, nz, nre, Lx, Ly, Lz, gamma, R, rho0, u0, p0, T0, M0
+  use cudafor
+  use mpi
+  use mod_globals, only : gamma, R, rho0, u0, p0, T0, M0
   implicit none
 contains
+  subroutine set_blocks_threads(myrank,nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads)
+    integer, intent(in), value :: myrank, nx, ny, nz
+    type(dim3), intent(out)    :: blocksE, blocksF, blocksG, blocks, threadsE, threadsF, threadsG, threads
+    ! 193, 257, 257
+    blocksE = dim3((nx-1)/32,(ny-2)/5,(nz-2)/1)
+    blocksF = dim3((nx-2)/1,(ny-1)/128,(nz-2)/1)
+    blocksG = dim3((nx-2)/1,(ny-2)/5,(nz-1)/32)
+    blocks  = dim3((nx-2)/191,(ny-2)/1,(nz-2)/1)
+    threadsE = dim3(32,5,1)
+    threadsF = dim3(1,128,1)
+    threadsG = dim3(1,5,32)
+    threads  = dim3(191,1,1)
+  end subroutine set_blocks_threads
+
   subroutine calc_Blasius(eta,d,u,v)
     real(8), intent(in), value  :: eta, d
     real(8), intent(out)        :: u, v
@@ -35,18 +51,19 @@ contains
       endif
     enddo
     u = u0 * df
-    v = 0.d0!0.5d0 * (nu0 / d) * (min(eta,8.8d0) * df - f)
+    v = 0.d0
   end subroutine calc_Blasius
 
-  subroutine set_grid(nx,ny,nz,x,y,z,dx,dy,dz)
-    integer, intent(in)   :: nx, ny, nz
-    real(8), intent(out)  :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
+  subroutine set_grid(myrank,nx,ny,nz,Lx,Ly,Lz,x,y,z,dx,dy,dz)
+    integer, intent(in)  :: myrank, nx, ny, nz
+    real(8), intent(in)  :: Lx, Ly, Lz
+    real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     integer i, j, k
     real(8) dx1, dy1, dz1
-    dx1 = Lx / dble(nx-1)
+    dx1 = 0.125d0 * Lx / dble(nx-1)
     dy1 = 10.d-3 / dble(256)
     dz1 = Lz / dble(nz-1)
-    x(1) = 0.d0
+    x(1) = dble(myrank/2) * 0.125d0 * Lx
     do i = 1, nx-1
       dx(i) = dx1
       x(i+1) = x(i) + dx(i)
@@ -54,9 +71,6 @@ contains
 
     y(1) = 0.d0
     do j = 1, ny-1
-      ! LES
-      !dy(j) = min(1.d0, max(0.1d0, dble(j)/dble(128))) * dy1
-      ! DNS
       dy(j) = min(1.d0, max(0.05d0, dble(j)/dble(128))) * dy1
       y(j+1) = y(j) + dy(j)
     enddo
@@ -68,10 +82,10 @@ contains
     enddo
   end subroutine set_grid
 
-  subroutine set_init(nx,ny,nz,xs,ys,zs,Q)
-    integer, intent(in)                         :: nx, ny, nz
-    real(8), intent(in)                         :: xs(nx), ys(ny), zs(nz)
-    real(8), intent(out), dimension(nx,ny,nz,5) :: Q
+  subroutine set_init(myrank,nx,ny,nz,xs,ys,zs,Q)
+    integer, intent(in)  :: myrank, nx, ny, nz
+    real(8), intent(in)  :: xs(nx), ys(ny), zs(nz)
+    real(8), intent(out) :: Q(nx,ny,nz,5)
     integer i, j, k
     real(8) :: d = 0.2d0 * 1.d-3
     real(8) :: d1= 2.d-3
@@ -111,13 +125,12 @@ contains
     p_wall = (gamma - 1.d0) * (Q(2,2,2,5) - 0.5d0 * (Q(2,2,2,2)**2 + Q(2,2,2,3)**2 + Q(2,2,2,4)**2) / Q(2,2,2,1))
     Q(:,1,:,5) = p_wall / (gamma - 1.d0)
   end subroutine set_init
-  
-  subroutine set_bc(nx,ny,nz,Jacobian,QJ,Qre)
-    integer, intent(in), value      :: nx, ny, nz
-    real(8), intent(in), device     :: Jacobian(nx,ny)
-    real(8), intent(inout), device  :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(in), device     :: Qre(ny,nz,5)
-    integer i, j, k, l
+
+  subroutine set_bc(myrank,nx,ny,nz,Jacobian,QJ)
+    integer, intent(in), value     :: myrank, nx, ny, nz
+    real(8), intent(in), device    :: Jacobian(nx,ny)
+    real(8), intent(inout), device :: QJ(nx,ny,nz,5) ! Q / Jacobian
+    integer i, j, k, l, ierr, ireq1, ireq2, ireq3, ireq4, istat(MPI_STATUS_SIZE)
     real(8) :: p_wall
     ! Riemann invariants
     real(8) :: pin, cin, vin, Rp, Rm, rhob, vb, cb, pb
@@ -145,12 +158,6 @@ contains
         pb = (rhob * cb**2) / gamma
         QJ(i,ny,k,5) = (pb / (gamma - 1.d0)) / Jacobian(i,ny)  + 0.5d0 * (QJ(i,ny,k,2)**2 + QJ(i,ny,k,3)**2 + QJ(i,ny,k,4)**2) / QJ(i,ny,k,1)
 
-        ! Neumann boundary condition
-        !QJ(i,ny,k,1) = rhob
-        !QJ(i,ny,k,2) = QJ(i,ny-1,k,2)
-        !QJ(i,ny,k,3) = QJ(i,ny-1,k,3)
-        !QJ(i,ny,k,4) = QJ(i,ny-1,k,4)
-        !QJ(i,ny,k,5) = QJ(i,ny-1,k,5)
         ! NoSlip
         QJ(i,1,k,1) = QJ(i,2,k,1)
         QJ(i,1,k,2) = 0.d0
@@ -160,29 +167,26 @@ contains
         QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
     enddo;enddo
 
-    if (kind(id_rescale) == 4) then
+    if (2 <= myrank .and. myrank <= 12) then
+      call MPI_ISEND(QJ(4:6,:,4:nz-3,:),       15*ny*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, ireq1, ierr)
+      call MPI_ISEND(QJ(nx-5:nx-3,:,4:nz-3,:), 15*ny*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ireq2, ierr)
+      call MPI_IRECV(QJ(nx-2:nx,:,4:nz-3,:),   15*ny*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ireq3, ierr)
+      call MPI_IRECV(QJ(1:3,:,4:nz-3,:),       15*ny*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, ireq4, ierr)
+      call MPI_WAIT(ireq3, istat, ierr)
+      call MPI_WAIT(ireq4, istat, ierr)
+    elseif (myrank == 0) then
+      call MPI_ISEND(QJ(nx-5:nx-3,:,4:nz-3,:), 15*ny*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ireq1, ierr)
+      call MPI_IRECV(QJ(nx-2:nx,:,4:nz-3,:),   15*ny*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ireq2, ierr)
+      call MPI_WAIT(ireq2, istat, ierr)
+    elseif (myrank == 14) then
+      call MPI_ISEND(QJ(4:6,:,4:nz-3,:),       15*ny*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, ireq1, ierr)
+      call MPI_IRECV(QJ(1:3,:,4:nz-3,:),       15*ny*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, ireq2, ierr)
+      call MPI_WAIT(ireq2, istat, ierr)
       !$cuf kernel do(3)<<<*,*>>>
       do l = 1, 5
-        do k = 3, nz-2
+        do k = 4, nz-3
           do j = 1, ny
-            ! inlet
-            QJ(1,j,k,l) = Qre(j,k,l)
-            ! outlet
             QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
-      enddo;enddo;enddo
-    else
-      !$cuf kernel do(3)<<<*,*>>>
-      do l = 1, 5
-        do k = 3, nz-2
-          do j = 1, ny
-            ! inlet
-            QJ(1,j,k,l) = QJ(nx-5,j,k,l)
-            QJ(2,j,k,l) = QJ(nx-4,j,k,l)
-            QJ(3,j,k,l) = QJ(nx-3,j,k,l)
-            ! outlet
-            QJ(nx-2,j,k,l) = QJ(4,j,k,l)
-            QJ(nx-1,j,k,l) = QJ(5,j,k,l)
-            QJ(nx,j,k,l)   = QJ(6,j,k,l)
       enddo;enddo;enddo
     endif
 
@@ -199,50 +203,5 @@ contains
           QJ(i,j,nz,l)   = QJ(i,j,6,l)
     enddo;enddo;enddo
   end subroutine set_bc
-
-  subroutine set_bc_mut(nx,ny,nz,mut,qc2)
-    integer, intent(in), value      :: nx, ny, nz
-    real(8), intent(inout), device  :: mut(nx,ny,nz), qc2(nx,ny,nz)
-    integer i, j, k
-    !$cuf kernel do(2) <<<*,*>>>
-    do k = 4, nz-3
-      do j = 2, ny-1
-        ! inlet
-        mut(1,j,k)  = mut(nre,j,k)
-        qc2(1,j,k)  = qc2(nre,j,k)
-        ! outlet
-        mut(nx,j,k) = mut(nx-1,j,k)
-        qc2(nx,j,k) = qc2(nx-1,j,k)
-    enddo;enddo
-
-    !$cuf kernel do(2) <<<*,*>>>
-    do k = 4, nz-3
-      do i = 1, nx
-        ! wall
-        mut(i,1,k) = 0.d0
-        qc2(i,1,k) = 0.d0
-        ! top
-        mut(i,ny,k) = mut(i,ny-1,k)
-        qc2(i,ny,k) = qc2(i,ny-1,k)
-    enddo;enddo
-
-    !$cuf kernel do(2) <<<*,*>>>
-    do j = 1, ny
-      do i = 1, nx
-        ! span
-        mut(i,j,1)    = mut(i,j,nz-5)
-        mut(i,j,2)    = mut(i,j,nz-4)
-        mut(i,j,3)    = mut(i,j,nz-3)
-        mut(i,j,nz-2) = mut(i,j,4)
-        mut(i,j,nz-1) = mut(i,j,5)
-        mut(i,j,nz)   = mut(i,j,6)
-        qc2(i,j,1)    = qc2(i,j,nz-5)
-        qc2(i,j,2)    = qc2(i,j,nz-4)
-        qc2(i,j,3)    = qc2(i,j,nz-3)
-        qc2(i,j,nz-2) = qc2(i,j,4)
-        qc2(i,j,nz-1) = qc2(i,j,5)
-        qc2(i,j,nz)   = qc2(i,j,6)
-    enddo;enddo
-  end subroutine set_bc_mut
 end module set
 
