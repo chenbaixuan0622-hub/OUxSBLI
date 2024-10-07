@@ -1,9 +1,8 @@
 module calc_rescale
-  use mod_globals, only : nt, dt, gamma , R, u0, strat_rescale
+  use mod_globals, only : nt, dt, gamma , R, u0, blt, start_rescale
 contains
-  subroutine set_rescale(step,nx,ny,nz,nre,blt,y,Jacobian,Qre)
+  subroutine set_rescale(step,nx,ny,nz,nre,y,Jacobian,Qre)
     integer, intent(in)    :: step, nx, ny, nz, nre
-    real(8), intent(in)    :: blt
     real(8), intent(in)    :: y(ny)
     real(8), intent(in)    :: Jacobian(nx,ny,nz)
     real(8), intent(inout) :: Qre(10,ny,nz,5) ! Q / J
