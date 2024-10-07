@@ -313,7 +313,7 @@ contains
           call MPI_IRECV(Qre_cpu, 50*ny*nz, MPI_REAL8, 0, 0, MPI_COMM_WORLD, ireq, ierr)
           call MPI_WAIT(ireq, istat, ierr)
           call nvtxStartRange("rescale", 5)
-          call set_rescale(t1+(t2-1)*nt,nx,ny,nz,nre,2.d-3,y,Jacobian_cpu,Qre_cpu)
+          call set_rescale(t2,nx,ny,nz,nre,y,Jacobian_cpu,Qre_cpu)
           call nvtxEndRange
           call MPI_SEND(Qre_cpu(1,:,:,:), 5*ny*nz, MPI_REAL8, 0, 1, MPI_COMM_WORLD, ierr)
         endif
@@ -333,7 +333,7 @@ contains
         elseif (myrank == 1 .and. kind(id_rescale) == 4) then
           call MPI_IRECV(Qre_cpu, 50*ny*nz, MPI_REAL8, 0, 2, MPI_COMM_WORLD, ireq, ierr)
           call MPI_WAit(ireq, istat, ierr)
-          call set_rescale(t1+(t2-1)*nt,nx,ny,nz,nre,2.d-3,y,Jacobian_cpu,Qre_cpu)
+          call set_rescale(t2,nx,ny,nz,nre,y,Jacobian_cpu,Qre_cpu)
           call MPI_SEND(Qre_cpu(1,:,:,:), 5*ny*nz, MPI_REAL8, 0, 3, MPI_COMM_WORLD, ierr)
         endif
 
@@ -352,7 +352,7 @@ contains
         elseif (myrank == 1 .and. kind(id_rescale) == 4) then
           call MPI_IRECV(Qre_cpu, 50*ny*nz, MPI_REAL8, 0, 4, MPI_COMM_WORLD, ireq, ierr)
           call MPI_WAIT(ireq, istat, ierr)
-          call set_rescale(t1+(t2-1)*nt,nx,ny,nz,nre,2.d-3,y,Jacobian_cpu,Qre_cpu)
+          call set_rescale(t2,nx,ny,nz,nre,y,Jacobian_cpu,Qre_cpu)
           call MPI_SEND(Qre_cpu(1,:,:,:), 5*ny*nz, MPI_REAL8, 0, 5, MPI_COMM_WORLD, ierr)
         endif
 
@@ -371,7 +371,7 @@ contains
         elseif (myrank == 1 .and. kind(id_rescale) == 4) then
           call MPI_IRECV(Qre_cpu, 50*ny*nz, MPI_REAL8, 0, 0, MPI_COMM_WORLD, ireq, ierr)
           call MPI_WAIT(ireq, istat, ierr)
-          call set_rescale(t1+(t2-1)*nt,nx,ny,nz,nre,2.d-3,y,Jacobian_cpu,Qre_cpu)
+          call set_rescale(t2,nx,ny,nz,nre,y,Jacobian_cpu,Qre_cpu)
           call MPI_SEND(Qre_cpu(1,:,:,:), 5*ny*nz, MPI_REAL8, 0, 1, MPI_COMM_WORLD, ierr)
         endif
       enddo
