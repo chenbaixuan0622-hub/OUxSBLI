@@ -1,4 +1,4 @@
-rm *.mod *.o *.out
+rm *.mod *.o *.out *.err
 rm -rf data
 mkdir data
 

@@ -1,7 +1,7 @@
 module set
   use cudafor
   use mpi
-  use mod_globals, only : gamma, R, rho0, u0, p0, T0, M0
+  use mod_globals, only : gamma, R, rho0, rho2, u0, ux, uy, p0, p2, T0, M0
   implicit none
 contains
   subroutine set_blocks_threads(myrank,nx,ny,nz,blocksE,blocksF,blocksG,blocks,threadsE,threadsF,threadsG,threads)
@@ -60,10 +60,10 @@ contains
     real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     integer i, j, k
     real(8) dx1, dy1, dz1
-    dx1 = 0.125d0 * Lx / dble(nx-1)
+    dx1 = Lx / dble(nx-1)
     dy1 = 10.d-3 / dble(256)
     dz1 = Lz / dble(nz-1)
-    x(1) = dble(myrank/2) * 0.125d0 * Lx
+    x(1) = dble(myrank/2) * Lx
     do i = 1, nx-1
       dx(i) = dx1
       x(i+1) = x(i) + dx(i)
@@ -82,9 +82,9 @@ contains
     enddo
   end subroutine set_grid
 
-  subroutine set_init(myrank,nx,ny,nz,xs,ys,zs,Q)
+  subroutine set_init(myrank,nx,ny,nz,x,y,z,Q)
     integer, intent(in)  :: myrank, nx, ny, nz
-    real(8), intent(in)  :: xs(nx), ys(ny), zs(nz)
+    real(8), intent(in)  :: x(nx), y(ny), z(nz)
     real(8), intent(out) :: Q(nx,ny,nz,5)
     integer i, j, k
     real(8) :: d = 0.2d0 * 1.d-3
@@ -95,9 +95,9 @@ contains
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
-          eta = ys(j) / d
+          eta = y(j) / d
           call calc_Blasius(eta,d,u,v)
-          if (ys(j) <= d1) then
+          if (y(j) <= d1) then
             call random_number(std)   ! 0 <= std <= 1
             std = 2.d0 * std - 1.d0   !-1 <= std <= 1
           else
@@ -117,6 +117,18 @@ contains
           Q(i,j,k,5) = p0 / (gamma - 1.d0) + 0.5d0 * (Q(i,j,k,2)**2 + Q(i,j,k,3)**2 + Q(i,j,k,4)**2) / Q(i,j,k,1)
     enddo;enddo;enddo
 
+    ! oblique shock
+    if (10 <= myrank .or. (myrank == 8 .and. 10 <= i)) then
+      do k = 1, nz
+        do i = 1, nx
+          Q(i,ny,k,1) = rho2
+          Q(i,ny,k,2) = rho2 * ux
+          Q(i,ny,k,3) = rho2 * uy
+          Q(i,ny,k,4) = 0.d0
+          Q(i,ny,k,5) = p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)
+      enddo;enddo
+    endif
+
     ! bottom
     Q(:,1,:,1) = Q(:,2,:,1)
     Q(:,1,:,2) = 0.d0
@@ -128,60 +140,89 @@ contains
 
   subroutine set_bc(myrank,nx,ny,nz,Jacobian,QJ)
     integer, intent(in), value     :: myrank, nx, ny, nz
-    real(8), intent(in), device    :: Jacobian(nx,ny)
+    real(8), intent(in), device    :: Jacobian(ny)
     real(8), intent(inout), device :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    integer i, j, k, l, ierr, ireq1, ireq2, ireq3, ireq4, istat(MPI_STATUS_SIZE)
+    integer i, j, k, l, ierr, ireq2(2), ireq4(4), istat2(MPI_STATUS_SIZE,2), istat4(MPI_STATUS_SIZE,4)
     real(8) :: p_wall
+    real(8), dimension(3,ny,nz-6,5) :: Qsend1, Qsend2, Qrecv1, Qrecv2
     ! Riemann invariants
     real(8) :: pin, cin, vin, Rp, Rm, rhob, vb, cb, pb
     real(8) :: v0 = 0.d0
     real(8) :: c0 = sqrt(gamma * p0 / rho0)
-    !$cuf kernel do(2)<<<*,*>>>
-    do k = 3, nz-2
-      do i = 2, nx-1
-        ! top
-        ! Riemann invariants
-        pin = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) / QJ(i,ny-1,k,1)) &
-        & * Jacobian(i,ny-1)
-        cin = sqrt(gamma * pin / (QJ(i,ny-1,k,1) * Jacobian(i,ny-1)))
-        vin = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
-        Rp = vin + 2.d0 * cin / (gamma - 1.d0)
-        Rm = v0  - 2.d0 * c0  / (gamma - 1.d0)
-        vb = v0 + (0.5d0 * (Rp + Rm) - v0)
+    if (10 <= myrank .or. (myrank == 8 .and. 10 <= i)) then
+      !$cuf kernel do(2)<<<*,*>>>
+      do k = 3, nz-2
+        do i = 1, nx
+          ! oblique shock
+          QJ(i,ny,k,1) = rho2 / Jacobian(ny)
+          QJ(i,ny,k,2) = QJ(i,ny,k,1) * ux
+          QJ(i,ny,k,3) = QJ(i,ny,k,1) * uy
+          QJ(i,ny,k,4) = 0.d0
+          QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(ny)
 
-        rhob = QJ(i,ny-1,k,1) * Jacobian(i,ny-1)
-        QJ(i,ny,k,1) = rhob / Jacobian(i,ny)
-        QJ(i,ny,k,2) = QJ(i,ny-1,k,1) * u0 
-        QJ(i,ny,k,3) = QJ(i,ny-1,k,1) * vb
-        QJ(i,ny,k,4) = 0.d0
-        cb = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
-        pb = (rhob * cb**2) / gamma
-        QJ(i,ny,k,5) = (pb / (gamma - 1.d0)) / Jacobian(i,ny)  + 0.5d0 * (QJ(i,ny,k,2)**2 + QJ(i,ny,k,3)**2 + QJ(i,ny,k,4)**2) / QJ(i,ny,k,1)
+          ! NoSlip
+          QJ(i,1,k,1) = QJ(i,2,k,1)
+          QJ(i,1,k,2) = 0.d0
+          QJ(i,1,k,3) = 0.d0
+          QJ(i,1,k,4) = 0.d0
+          p_wall = (gamma - 1.d0) * (QJ(i,2,k,5) - 0.5d0 * (QJ(i,2,k,2)**2 + QJ(i,2,k,3)**2 + QJ(i,2,k,4)**2) / QJ(i,2,k,1))
+          QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
+      enddo;enddo
+    else
+      !$cuf kernel do(2)<<<*,*>>>
+      do k = 3, nz-2
+        do i = 1, nx
+          ! top
+          ! Riemann invariants
+          pin = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) / QJ(i,ny-1,k,1)) &
+          & * Jacobian(ny-1)
+          cin = sqrt(gamma * pin / (QJ(i,ny-1,k,1) * Jacobian(ny-1)))
+          vin = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
+          Rp = vin + 2.d0 * cin / (gamma - 1.d0)
+          Rm = v0  - 2.d0 * c0  / (gamma - 1.d0)
+          vb = v0 + (0.5d0 * (Rp + Rm) - v0)
 
-        ! NoSlip
-        QJ(i,1,k,1) = QJ(i,2,k,1)
-        QJ(i,1,k,2) = 0.d0
-        QJ(i,1,k,3) = 0.d0
-        QJ(i,1,k,4) = 0.d0
-        p_wall = (gamma - 1.d0) * (QJ(i,2,k,5) - 0.5d0 * (QJ(i,2,k,2)**2 + QJ(i,2,k,3)**2 + QJ(i,2,k,4)**2) / QJ(i,2,k,1))
-        QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
-    enddo;enddo
+          rhob = QJ(i,ny-1,k,1) * Jacobian(ny-1)
+          QJ(i,ny,k,1) = rhob / Jacobian(ny)
+          QJ(i,ny,k,2) = QJ(i,ny-1,k,1) * u0 
+          QJ(i,ny,k,3) = QJ(i,ny-1,k,1) * vb
+          QJ(i,ny,k,4) = 0.d0
+          cb = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
+          pb = (rhob * cb**2) / gamma
+          QJ(i,ny,k,5) = (pb / (gamma - 1.d0)) / Jacobian(ny)  + 0.5d0 * (QJ(i,ny,k,2)**2 + QJ(i,ny,k,3)**2 + QJ(i,ny,k,4)**2) / QJ(i,ny,k,1)
+
+          ! NoSlip
+          QJ(i,1,k,1) = QJ(i,2,k,1)
+          QJ(i,1,k,2) = 0.d0
+          QJ(i,1,k,3) = 0.d0
+          QJ(i,1,k,4) = 0.d0
+          p_wall = (gamma - 1.d0) * (QJ(i,2,k,5) - 0.5d0 * (QJ(i,2,k,2)**2 + QJ(i,2,k,3)**2 + QJ(i,2,k,4)**2) / QJ(i,2,k,1))
+          QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
+      enddo;enddo
+    endif
 
     if (2 <= myrank .and. myrank <= 12) then
-      call MPI_ISEND(QJ(4:6,:,4:nz-3,:),       15*ny*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, ireq1, ierr)
-      call MPI_ISEND(QJ(nx-5:nx-3,:,4:nz-3,:), 15*ny*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ireq2, ierr)
-      call MPI_IRECV(QJ(nx-2:nx,:,4:nz-3,:),   15*ny*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ireq3, ierr)
-      call MPI_IRECV(QJ(1:3,:,4:nz-3,:),       15*ny*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, ireq4, ierr)
-      call MPI_WAIT(ireq3, istat, ierr)
-      call MPI_WAIT(ireq4, istat, ierr)
+      Qsend1 = QJ(4:6,:,4:nz-3,:)
+      call MPI_ISEND(Qsend1, 15*ny*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, ireq4(1), ierr)
+      Qsend2 = QJ(nx-5:nx-3,:,4:nz-3,:)
+      call MPI_ISEND(Qsend2, 15*ny*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ireq4(2), ierr)
+      call MPI_IRECV(Qrecv1, 15*ny*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, ireq4(3), ierr)
+      call MPI_IRECV(Qrecv2, 15*ny*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ireq4(4), ierr)
+      call MPI_WAITALL(4, ireq4, istat4, ierr)
+      QJ(1:3,:,4:nz-3,:)     = Qrecv1
+      QJ(nx-2:nx,:,4:nz-3,:) = Qrecv2
     elseif (myrank == 0) then
-      call MPI_ISEND(QJ(nx-5:nx-3,:,4:nz-3,:), 15*ny*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ireq1, ierr)
-      call MPI_IRECV(QJ(nx-2:nx,:,4:nz-3,:),   15*ny*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ireq2, ierr)
-      call MPI_WAIT(ireq2, istat, ierr)
-    elseif (myrank == 14) then
-      call MPI_ISEND(QJ(4:6,:,4:nz-3,:),       15*ny*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, ireq1, ierr)
-      call MPI_IRECV(QJ(1:3,:,4:nz-3,:),       15*ny*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, ireq2, ierr)
-      call MPI_WAIT(ireq2, istat, ierr)
+      Qsend2 = QJ(nx-5:nx-3,:,4:nz-3,:)
+      call MPI_ISEND(Qsend2, 15*ny*(nz-6), MPI_REAL8, 2, 0, MPI_COMM_WORLD, ireq2(1), ierr)
+      call MPI_IRECV(Qrecv2, 15*ny*(nz-6), MPI_REAL8, 2, 0, MPI_COMM_WORLD, ireq2(2), ierr)
+      call MPI_WAITALL(2, ireq2, istat2, ierr)
+      QJ(nx-2:nx,:,4:nz-3,:) = Qrecv2
+    else
+      Qsend1 = QJ(4:6,:,4:nz-3,:)
+      call MPI_ISEND(Qsend1, 15*ny*(nz-6), MPI_REAL8, 12, 0, MPI_COMM_WORLD, ireq2(1), ierr)
+      call MPI_IRECV(Qrecv1, 15*ny*(nz-6), MPI_REAL8, 12, 0, MPI_COMM_WORLD, ireq2(2), ierr)
+      call MPI_WAITALL(2, ireq2, istat2, ierr)
+      QJ(1:3,:,4:nz-3,:)     = Qrecv1
       !$cuf kernel do(3)<<<*,*>>>
       do l = 1, 5
         do k = 4, nz-3

@@ -1,4 +1,4 @@
-rm *.mod *.o *.out
+rm *.mod *.o *.out *.err
 rm -rf data
-mkdir data
+mkdir data;mkdir ./data/1;mkdir ./data/3;mkdir ./data/5;mkdir ./data/7;mkdir ./data/9;mkdir ./data/11;mkdir ./data/13;mkdir ./data/15
 
