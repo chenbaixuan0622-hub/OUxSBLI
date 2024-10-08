@@ -31,7 +31,7 @@ OBJ =	mod_globals.o \
       calc_steps.o \
       calc_rescale.o \
       print.o \
-      calc_time_dev8.o \
+      calc_time_dev2.o \
       main8.o
 
 a.out: $(OBJ)
@@ -54,7 +54,7 @@ calc_flux.o: mod_globals.mod calc_keep.mod calc_slau.mod calc_roe.mod calc_muscl
 calc_hybrid.o: mod_globals.mod
 calc_steps.o: mod_globals.mod
 calc_rescale.o: mod_globals.mod
-calc_time_dev8.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_flux.mod calc_hybrid.mod calc_visc.mod calc_steps.mod calc_rescale.mod print.mod
+calc_time_dev2.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_flux.mod calc_hybrid.mod calc_visc.mod calc_steps.mod calc_rescale.mod print.mod
 print.o: mod_globals.mod
-main8.o: main8.f90 mod_globals.mod set_coordinate.mod set.mod calc_time_dev8.mod
+main8.o: main8.f90 mod_globals.mod set_coordinate.mod set.mod calc_time_dev2.mod
 

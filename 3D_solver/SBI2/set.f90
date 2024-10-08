@@ -60,10 +60,10 @@ contains
     real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     integer i, j, k
     real(8) dx1, dy1, dz1
-    dx1 = 0.5d0 * Lx / dble(nx-1)
+    dx1 = Lx / dble(nx-1)
     dy1 = 10.d-3 / dble(256)
     dz1 = Lz / dble(nz-1)
-    x(1) = dble(myrank/2) * 0.125d0 * Lx
+    x(1) = dble(myrank/2) * Lx
     do i = 1, nx-1
       dx(i) = dx1
       x(i+1) = x(i) + dx(i)
@@ -169,15 +169,19 @@ contains
     enddo;enddo
 
     if (myrank == 0) then
-      Qsend = QJ(nx-5:nx-3,:,4:nz-3,:)
-      call MPI_SENDRECV(Qsend, 15*ny*(nz-6), MPI_REAL8, 2, 0, &
-                        Qrecv, 15*ny*(nz-6), MPI_REAL8, 2, 1, MPI_COMM_WORLD, istat, ierr)
-      QJ(nx-2:nx,:,4:nz-3,:) = Qrecv
+      Qsend(:,:,4:nz-3,:) = QJ(nx-5:nx-3,:,4:nz-3,:)
+      call MPI_SENDRECV(Qsend(:,:,4:nz-3,:), 15*ny*(nz-6), MPI_REAL8, 2, 0, &
+                        Qrecv(:,:,4:nz-3,:), 15*ny*(nz-6), MPI_REAL8, 2, 1, MPI_COMM_WORLD, istat, ierr)
+      QJ(nx-2:nx,:,4:nz-3,:) = Qrecv(:,:,4:nz-3,:)
+      !call MPI_SENDRECV(QJ(nx-5:nx-3,:,4:nz-3,:), 15*ny*(nz-6), MPI_REAL8, 2, 0, &
+      !                  QJ(nx-2:nx,:,4:nz-3,:), 15*ny*(nz-6), MPI_REAL8, 2, 1, MPI_COMM_WORLD, istat, ierr)
     elseif (myrank == 2) then
-      Qsend = QJ(4:6,:,4:nz-3,:)
-      call MPI_SENDRECV(Qsend, 15*ny*(nz-6), MPI_REAL8, 0, 1,&
-                        Qrecv, 15*ny*(nz-6), MPI_REAL8, 0, 0, MPI_COMM_WORLD, istat, ierr)
-      QJ(1:3,:,4:nz-3,:) = Qrecv
+      Qsend(:,:,4:nz-3,:) = QJ(4:6,:,4:nz-3,:)
+      call MPI_SENDRECV(Qsend(:,:,4:nz-3,:), 15*ny*(nz-6), MPI_REAL8, 0, 1,&
+                        Qrecv(:,:,4:nz-3,:), 15*ny*(nz-6), MPI_REAL8, 0, 0, MPI_COMM_WORLD, istat, ierr)
+      QJ(1:3,:,4:nz-3,:) = Qrecv(:,:,4:nz-3,:)
+      !call MPI_SENDRECV(QJ(4:6,:,4:nz-3,:), 15*ny*(nz-6), MPI_REAL8, 0, 1,&
+      !                  QJ(1:3,:,4:nz-3,:), 15*ny*(nz-6), MPI_REAL8, 0, 0, MPI_COMM_WORLD, istat, ierr)
       !$cuf kernel do(3)<<<*,*>>>
       do l = 1, 5
         do k = 4, nz-3

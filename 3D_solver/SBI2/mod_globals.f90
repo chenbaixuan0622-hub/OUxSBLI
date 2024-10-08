@@ -45,12 +45,13 @@ module mod_globals
   integer, parameter         :: start_rescale = 1000
 
   ! mesh
-  real(8), parameter :: Lx = 60d-3 ! 30 delta
+  real(8), parameter :: Lx = 20d-3 ! * 2 20 delta
   real(8), parameter :: Ly = 8d-3  !  4 delta
   real(8), parameter :: Lz = 4d-3  !  2 delta
-  integer, parameter :: nx = 769   ! * 8
+  integer, parameter :: nx = 769   ! * 2
   integer, parameter :: ny = 257
   integer, parameter :: nz = 257
+  integer, parameter :: rerank = 0
   integer, parameter :: nre = int(nx * 8 / 15)
 
   ! time
@@ -65,7 +66,7 @@ module mod_globals
   integer(kind=2), parameter :: id_recal      = 0
   integer, parameter         :: step_offset   = 0
   real(8), parameter :: endT = 0.5d-3
-  integer, parameter :: np   = 1!100
+  integer, parameter :: np   = 20!100
   real(8), parameter :: u0   = 506.8d0
   real(8), parameter :: CFL  = 0.1d0
   real(8), parameter :: dt   = CFL * Lx / (dble(nx-1) * u0) ! 7.7e-9
