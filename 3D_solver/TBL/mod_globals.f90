@@ -5,7 +5,6 @@ module mod_globals
   integer, parameter    :: accuracy  = 2
   integer, parameter    :: offset    = accuracy / 2
   integer(4), parameter :: id_visc   = 2
-  integer, parameter    :: id_av     = 0
   integer, parameter    :: id_turbulence = 0
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! kind2 Euler       !
@@ -99,8 +98,8 @@ module mod_globals
   integer(kind=2), parameter :: id_recal      = 0
   integer, parameter         :: step_offset   = 0
   integer, parameter         :: start_rescale = 80
-  real(8), parameter :: endT  = 0.5d-3
-  integer, parameter :: np    = 100
+  real(8), parameter :: endT  = 0.4d-3
+  integer, parameter :: np    = 80
   real(8), parameter :: R     = 287.03d0
   real(8), parameter :: gamma = 1.4d0
   real(8), parameter :: T0    = 171.31d0
