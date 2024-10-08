@@ -5,7 +5,6 @@ module mod_globals
   integer, parameter    :: accuracy  = 2
   integer, parameter    :: offset    = accuracy / 2
   integer(4), parameter :: id_visc   = 2
-  integer, parameter    :: id_av     = 0
   integer, parameter    :: id_turbulence = 0
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! kind2 Euler       !
@@ -60,6 +59,7 @@ module mod_globals
   integer(kind=4), parameter :: id_slau     = 0
   integer(kind=4), parameter :: slau_wall   = 0
   integer(kind=4), parameter :: id_rescale  = 0
+  real(8), parameter         :: blt         = 2.d-3
 
   ! mesh
   real(8), parameter :: Lx = 20d-3 ! 10 delta
@@ -97,16 +97,16 @@ module mod_globals
   integer(kind=4), parameter :: id_RungeKutta = 0
   integer(kind=2), parameter :: id_recal      = 0
   integer, parameter         :: step_offset   = 0
-  integer, parameter         :: start_rescale = 100
-  real(8), parameter :: endT  = 0.5d-3
-  integer, parameter :: np    = 5!100
+  integer, parameter         :: start_rescale = 80
+  real(8), parameter :: endT  = 0.4d-3
+  integer, parameter :: np    = 80
   real(8), parameter :: R     = 287.03d0
   real(8), parameter :: gamma = 1.4d0
   real(8), parameter :: T0    = 171.31d0
   real(8), parameter :: u0    = 506.8d0! + sqrt(gamma * R * T0)
   real(8), parameter :: CFL   = 0.1d0
   real(8), parameter :: dt    = CFL * Lx / (dble(nx-1) * u0)
-  integer, parameter :: nt    = 1!int(endT / (dble(np) * dt))
+  integer, parameter :: nt    = int(endT / (dble(np) * dt))
 
   ! physical properties
   real(8), parameter :: Pr    = 0.71d0

@@ -10,8 +10,6 @@ module mod_globals
   !             ! real(4)   Weighted  !
   !             ! real(8)   Threshold !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_sensor   ! 1 Ducros            !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_accuracy ! kind2 2nd           !
   !             ! kind4 4th           !
   !             ! kind8 6th           !
@@ -34,7 +32,6 @@ module mod_globals
   !             ! kind4 on            !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   real(2), parameter         :: id_scheme   = 0
-  integer, parameter         :: id_sensor   = 1
   real(8), parameter         :: threshold   = 0.6d0
   integer(kind=8), parameter :: id_accuracy = 0
   integer(kind=8), parameter :: id_tvd      = 0
@@ -42,15 +39,17 @@ module mod_globals
   integer(kind=4), parameter :: id_slau     = 0
   integer(kind=4), parameter :: slau_wall   = 0
   integer(kind=4), parameter :: id_rescale  = 0
-  integer, parameter         :: start_rescale = 1000
+  real(8), parameter         :: blt         = 2.d-3
 
   ! mesh
-  real(8), parameter :: Lx = 60d-3 ! 30 delta
+  real(8), parameter :: Lx = 5d-3  ! * 8 20 delta
   real(8), parameter :: Ly = 8d-3  !  4 delta
-  real(8), parameter :: Lz = 4d-3  !  2 delta
-  integer, parameter :: nx = 193   ! * 8
+  real(8), parameter :: Lz = 16d-3 !  8 delta
+  integer, parameter :: nx = 129   ! * 8
   integer, parameter :: ny = 257
-  integer, parameter :: nz = 257
+  integer, parameter :: nz = 1025
+  integer, parameter :: rerank = 6
+  integer, parameter :: nre = nx-30
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -63,12 +62,13 @@ module mod_globals
   integer(kind=4), parameter :: id_RungeKutta = 0
   integer(kind=2), parameter :: id_recal      = 0
   integer, parameter         :: step_offset   = 0
+  integer, parameter         :: start_rescale = 80
   real(8), parameter :: endT = 0.5d-3
-  integer, parameter :: np   = 100!1000
+  integer, parameter :: np   = 20!1000
   real(8), parameter :: u0   = 506.8d0
   real(8), parameter :: CFL  = 0.1d0
   real(8), parameter :: dt   = CFL * Lx / (dble(nx-1) * u0) ! 7.7e-9
-  integer, parameter :: nt   = int(endT / (dble(np) * dt))
+  integer, parameter :: nt   = 100!int(endT / (dble(np) * dt))
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
