@@ -4,7 +4,7 @@ contains
   subroutine set_rescale(step,nx,ny,nz,nre,y,Jacobian,Qre)
     integer, intent(in)    :: step, nx, ny, nz, nre
     real(8), intent(in)    :: y(ny)
-    real(8), intent(in)    :: Jacobian(nx,ny,nz)
+    real(8), intent(in)    :: Jacobian(ny)
     real(8), intent(inout) :: Qre(10,ny,nz,5) ! Q / J
     integer i, j, jj, k, l
     real(8) :: mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0
@@ -33,7 +33,7 @@ contains
       do k = 1, nz
         do j = 1, ny
           do i = 1, 10
-            Qre(i,j,k,l) = Qre(i,j,k,l) * Jacobian(nre+i,j,k)
+            Qre(i,j,k,l) = Qre(i,j,k,l) * Jacobian(j)
     enddo;enddo;enddo;enddo
 
     do j = 1, ny
@@ -181,11 +181,11 @@ contains
           rhoin = (rhomin(j,k) + rhofin(j,k)) * (1.d0 - weight(j)) + (rhomout(j,k) + rhofout(j,k)) * weight(j)
           Tin   = (  Tmin(j,k) +   Tfin(j,k)) * (1.d0 - weight(j)) + (  Tmout(j,k) +   Tfout(j,k)) * weight(j)
           pin   = rhoin * R * Tin
-          Qre(1,j,k,1) = rhoin / Jacobian(nre,j,k)
-          Qre(1,j,k,2) = rhoin * uin / Jacobian(nre,j,k)
-          Qre(1,j,k,3) = rhoin * vin / Jacobian(nre,j,k)
-          Qre(1,j,k,4) = rhoin * win / Jacobian(nre,j,k)
-          Qre(1,j,k,5) = (pin / (gamma - 1.d0) + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) / Jacobian(nre,j,k)
+          Qre(1,j,k,1) = rhoin / Jacobian(j)
+          Qre(1,j,k,2) = rhoin * uin / Jacobian(j)
+          Qre(1,j,k,3) = rhoin * vin / Jacobian(j)
+          Qre(1,j,k,4) = rhoin * win / Jacobian(j)
+          Qre(1,j,k,5) = (pin / (gamma - 1.d0) + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) / Jacobian(j)
       enddo;enddo
     else
       open(10, file=filename, position="append")
@@ -196,7 +196,7 @@ contains
         do k = 1, nz
           do j = 1, ny
             ! inlet
-            Qre(1,j,k,l) = Qre(1,j,k,l) / Jacobian(nre,j,k)
+            Qre(1,j,k,l) = Qre(1,j,k,l) / Jacobian(j)
       enddo;enddo;enddo
     endif
   end subroutine set_rescale
