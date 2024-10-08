@@ -114,7 +114,7 @@ contains
   
   subroutine set_bc(nx,ny,nz,Jacobian,QJ)
     integer, intent(in), value     :: nx, ny, nz
-    real(8), intent(in), device    :: Jacobian(nx,ny)
+    real(8), intent(in), device    :: Jacobian(ny)
     real(8), intent(inout), device :: QJ(nx,ny,nz,5) ! Q / Jacobian
     integer i, j, k, l
     real(8) :: p_wall
@@ -128,21 +128,21 @@ contains
         ! top
         ! Riemann invariants
         pin = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) / QJ(i,ny-1,k,1)) &
-        & * Jacobian(i,ny-1)
-        cin = sqrt(gamma * pin / (QJ(i,ny-1,k,1) * Jacobian(i,ny-1)))
+        & * Jacobian(ny-1)
+        cin = sqrt(gamma * pin / (QJ(i,ny-1,k,1) * Jacobian(ny-1)))
         vin = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
         Rp = vin + 2.d0 * cin / (gamma - 1.d0)
         Rm = v0  - 2.d0 * c0  / (gamma - 1.d0)
         vb = v0 + (0.5d0 * (Rp + Rm) - v0)
 
-        rhob = QJ(i,ny-1,k,1) * Jacobian(i,ny-1)
-        QJ(i,ny,k,1) = rhob / Jacobian(i,ny)
+        rhob = QJ(i,ny-1,k,1) * Jacobian(ny-1)
+        QJ(i,ny,k,1) = rhob / Jacobian(ny)
         QJ(i,ny,k,2) = QJ(i,ny-1,k,1) * u0 
         QJ(i,ny,k,3) = QJ(i,ny-1,k,1) * vb
         QJ(i,ny,k,4) = 0.d0
         cb = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
         pb = (rhob * cb**2) / gamma
-        QJ(i,ny,k,5) = (pb / (gamma - 1.d0)) / Jacobian(i,ny)  + 0.5d0 * (QJ(i,ny,k,2)**2 + QJ(i,ny,k,3)**2 + QJ(i,ny,k,4)**2) / QJ(i,ny,k,1)
+        QJ(i,ny,k,5) = (pb / (gamma - 1.d0)) / Jacobian(ny)  + 0.5d0 * (QJ(i,ny,k,2)**2 + QJ(i,ny,k,3)**2 + QJ(i,ny,k,4)**2) / QJ(i,ny,k,1)
 
         ! Neumann boundary condition
         !QJ(i,ny,k,1) = rhob
