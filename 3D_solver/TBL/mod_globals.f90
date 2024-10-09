@@ -74,17 +74,24 @@ module mod_globals
   integer, parameter :: ny = 257 ! yp = 0.5, 0.002  mm
   integer, parameter :: nz = 257 ! zp = 5    0.0156 mm
 
-  integer, parameter :: nre = int(0.8 * nx)
+  integer, parameter :: nre1 = int(0.8 * nx)
+  integer, parameter :: nre2 = int(0.9 * nx)
 
- ! GPU
-  type(dim3) :: blocksE = dim3((nx-accuracy+1)/32,(ny-accuracy)/5,(nz-accuracy)/1)
-  type(dim3) :: blocksF = dim3((nx-accuracy)/1,(ny-accuracy+1)/128,(nz-accuracy)/1)
-  type(dim3) :: blocksG = dim3((nx-accuracy)/1,(ny-accuracy)/5,(nz-accuracy+1)/32)
-  type(dim3) :: blocks  = dim3((nx-accuracy)/1,(ny-accuracy)/51,(nz-accuracy)/1)
-  type(dim3) :: threadsE = dim3(32,5,1)
-  type(dim3) :: threadsF = dim3(1,128,1)
-  type(dim3) :: threadsG = dim3(1,5,32)
-  type(dim3) :: threads  = dim3(1,51,1)
+  ! RTX 4090
+  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/64,(ny-accuracy)/5,(nz-accuracy)/1)
+  type(dim3) :: blocksF   = dim3((nx-accuracy)/7,(ny-accuracy+1)/64,(nz-accuracy)/1)
+  type(dim3) :: blocksG   = dim3((nx-accuracy)/7,(ny-accuracy)/1,(nz-accuracy+1)/64)
+  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/32,(ny-accuracy)/5,(nz-accuracy)/1)
+  type(dim3) :: blocksFv  = dim3((nx-accuracy)/7,(ny-accuracy+1)/32,(nz-accuracy)/1)
+  type(dim3) :: blocksGv  = dim3((nx-accuracy)/7,(ny-accuracy)/1,(nz-accuracy+1)/32)
+  type(dim3) :: blocks    = dim3((nx-accuracy)/73,(ny-accuracy)/5,(nz-accuracy)/1)
+  type(dim3) :: threadsE  = dim3(64,5,1)
+  type(dim3) :: threadsF  = dim3(7,64,1)
+  type(dim3) :: threadsG  = dim3(7,1,64)
+  type(dim3) :: threadsEv = dim3(32,5,1)
+  type(dim3) :: threadsFv = dim3(7,32,1)
+  type(dim3) :: threadsGv = dim3(7,1,32)
+  type(dim3) :: threads   = dim3(73,5,1)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -99,14 +106,14 @@ module mod_globals
   integer, parameter         :: step_offset   = 0
   integer, parameter         :: start_rescale = 80
   real(8), parameter :: endT  = 0.4d-3
-  integer, parameter :: np    = 80
+  integer, parameter :: np    = 1!80
   real(8), parameter :: R     = 287.03d0
   real(8), parameter :: gamma = 1.4d0
   real(8), parameter :: T0    = 171.31d0
-  real(8), parameter :: u0    = 506.8d0! + sqrt(gamma * R * T0)
+  real(8), parameter :: u0    = 506.8d0
   real(8), parameter :: CFL   = 0.1d0
-  real(8), parameter :: dt    = CFL * Lx / (dble(nx-1) * u0)
-  integer, parameter :: nt    = int(endT / (dble(np) * dt))
+  real(8), parameter :: dt    = 1d-8!CFL * Lx / (dble(nx-1) * u0)
+  integer, parameter :: nt    = 1!int(endT / (dble(np) * dt))
 
   ! physical properties
   real(8), parameter :: Pr    = 0.71d0
