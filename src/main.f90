@@ -9,7 +9,8 @@ program main
   implicit none
   integer i, j, l
   real(8) t_start, t_end
-  real(8), allocatable :: x(:), dx(:), y(:), dy(:), z(:), dz(:), Jacobian(:), Q(:,:,:,:)
+  real(8), allocatable :: x(:), dx(:), y(:), dy(:), z(:), dz(:), Jacobian(:)
+  real(8), allocatable, pinned :: Q(:,:,:,:)
   ! MPI
   integer ierr, nranks, myrank
 
