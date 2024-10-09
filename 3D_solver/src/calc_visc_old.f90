@@ -114,14 +114,14 @@ contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  attributes(global) subroutine calc_Ev(nx, ny, nz, dx, dy, dz, rho, u, v, w, T, p, E)
+  attributes(global) subroutine calc_Ev(nx, ny, nz, dx, dy, dz, Jacobian, QJ, E)
     use calc_sutherland, only : mu6, mu2, mu23
-    integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
-    real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
-    real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p
-    real(8), intent(inout), device                    :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
+    integer, intent(in), value     :: nx, ny, nz
+    real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
+    real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
+    real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
+    real(8), intent(in), device    :: Jacobian(ny), QJ(nx,ny,nz,5)
+    real(8), intent(inout), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx
@@ -139,14 +139,15 @@ contains
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
 
     if (id_visc ==2 .and. 3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
-      u651(:,:) = u(i-2:i+3,j-2:j+2,k)
-      v651(:,:) = v(i-2:i+3,j-2:j+2,k)
-      u615(:,:) = u(i-2:i+3,j,k-2:k+2)
-      w615(:,:) = w(i-2:i+3,j,k-2:k+2)
-      T6(:)     = T(i-2:i+3,j,k)
-      u6(:)     = u651(:,3) 
-      v6(:)     = v651(:,3) 
-      w6(:)     = w615(:,3) 
+      u651(:,:) = QJ(i-2:i+3,j-2:j+2,k,2) / QJ(i-2:i+3,j-2:j+2,k,1)
+      v651(:,:) = QJ(i-2:i+3,j-2:j+2,k,3) / QJ(i-2:i+3,j-2:j+2,k,1)
+      u615(:,:) = QJ(i-2:i+3,j,k-2:k+2,2) / QJ(i-2:i+3,j,k-2:k+2,1)
+      w615(:,:) = QJ(i-2:i+3,j,k-2:k+2,4) / QJ(i-2:i+3,j,k-2:k+2,1)
+      T6(:)     = (gamma - 1.d0) * (QJ(i-2:i+3,j,k,5) - 0.5d0 * &
+                  (QJ(i-2:i+3,j,k,2)**2 + QJ(i-2:i+3,j,k,3)**2 + QJ(i-2:i+3,j,k,4)**2) / QJ(i-2:i+3,j,k,1)) / (R * QJ(i-2:i+3,j,k,1))
+      u6(:)     = u651(:,3)
+      v6(:)     = v651(:,3)
+      w6(:)     = w615(:,3)
       mu(:)     = mu6(T6(:))
       ux3(:)    = dx6(u6(:), dx(i))
       vx3(:)    = dx6(v6(:), dx(i))
@@ -160,11 +161,13 @@ contains
       call tauxy4(mu(:), wx3(:), uz3(:), w6(:), txz, wtxz)
       kTx = heat_conduction6(mu(:), T6(:), dx(i))
     else
-      T233(:,:,:) = T(i:i+1,j-1:j+1,k-1:k+1)
-      u231(:,:)   = u(i:i+1,j-1:j+1,k)
-      v231(:,:)   = v(i:i+1,j-1:j+1,k)
-      u213(:,:)   = u(i:i+1,j,k-1:k+1)
-      w213(:,:)   = w(i:i+1,j,k-1:k+1)
+      T233(:,:,:) = (gamma - 1.d0) * (QJ(i:i+1,j-1:j+1,k-1:k+1,5) - 0.5d0 * &
+                    (QJ(i:i+1,j-1:j+1,k-1:k+1,2)**2 + QJ(i:i+1,j-1:j+1,k-1:k+1,3)**2 + QJ(i:i+1,j-1:j+1,k-1:k+1,4)**2) &
+                    / QJ(i:i+1,j-1:j+1,k-1:k+1,1)) / (R * QJ(i:i+1,j-1:j+1,k-1:k+1,1))
+      u231(:,:)   = QJ(i:i+1,j-1:j+1,k,2) / QJ(i:i+1,j-1:j+1,k,1)
+      v231(:,:)   = QJ(i:i+1,j-1:j+1,k,3) / QJ(i:i+1,j-1:j+1,k,1)
+      u213(:,:)   = QJ(i:i+1,j,k-1:k+1,2) / QJ(i:i+1,j,k-1:k+1,1)
+      w213(:,:)   = QJ(i:i+1,j,k-1:k+1,4) / QJ(i:i+1,j,k-1:k+1,1)
       Tx(:)       = T233(:,2,2)
       Ty(:,:)     = T233(:,:,2)
       Tz(:,:)     = T233(:,2,:)
@@ -196,14 +199,14 @@ contains
     E(i-offset+1,j-offset,k-offset,5) = E(i-offset+1,j-offset,k-offset,5) - (utxx + vtxy + wtxz + kTx)
   end subroutine calc_Ev
   
-  attributes(global) subroutine calc_Ev_LES(nx, ny, nz, dx, dy, dz, rho, u, v, w, T, p, mut, qc2, E)
+  attributes(global) subroutine calc_Ev_LES(nx, ny, nz, dx, dy, dz, Jacobian, QJ, mut, qc2, E)
     use calc_sutherland, only : mu6, mu2, mu23
-    integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
-    real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
-    real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p, mut, qc2
-    real(8), intent(inout), device                    :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
+    integer, intent(in), value     :: nx, ny, nz
+    real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
+    real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
+    real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
+    real(8), intent(in), device    :: Jacobian(ny), QJ(nx,ny,nz,5), mut(nx,ny,nz), qc2(nx,ny,nz)
+    real(8), intent(inout), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx, mutx, H(4), txxsgs = 0.d0, txysgs = 0.d0, txzsgs = 0.d0, Hsgs = 0.d0
@@ -221,11 +224,12 @@ contains
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
 
     if (id_visc ==2 .and. 3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
-      u651(:,:) = u(i-2:i+3,j-2:j+2,k)
-      v651(:,:) = v(i-2:i+3,j-2:j+2,k)
-      u615(:,:) = u(i-2:i+3,j,k-2:k+2)
-      w615(:,:) = w(i-2:i+3,j,k-2:k+2)
-      T6(:)     = T(i-2:i+3,j,k)
+      u651(:,:) = QJ(i-2:i+3,j-2:j+2,k,2) / QJ(i-2:i+3,j-2:j+2,k,1)
+      v651(:,:) = QJ(i-2:i+3,j-2:j+2,k,3) / QJ(i-2:i+3,j-2:j+2,k,1)
+      u615(:,:) = QJ(i-2:i+3,j,k-2:k+2,2) / QJ(i-2:i+3,j,k-2:k+2,1)
+      w615(:,:) = QJ(i-2:i+3,j,k-2:k+2,4) / QJ(i-2:i+3,j,k-2:k+2,1)
+      T6(:)     = (gamma - 1.d0) * (QJ(i-2:i+3,j,k,5) - 0.5d0 * &
+                  (QJ(i-2:i+3,j,k,2)**2 + QJ(i-2:i+3,j,k,3)**2 + QJ(i-2:i+3,j,k,4)**2) / QJ(i-2:i+3,j,k,1)) / (R * QJ(i-2:i+3,j,k,1))
       u6(:)     = u651(:,3) 
       v6(:)     = v651(:,3) 
       w6(:)     = w615(:,3) 
@@ -245,15 +249,16 @@ contains
       txxsgs = 2.d0 * mutx * (2.d0 * ux3(2) - vy3(2) - wz3(2)) / 3.d0
       txysgs = mutx * (uy3(2) + vx3(2))
       txzsgs = mutx * (wx3(2) + uz3(2))
-      H(:)   = (gamma * p(i-1:i+2,j,k) / (rho(i-1:i+2,j,k) * (gamma - 1.d0))) &
-               + 0.5d0 * (u(i-1:i+2,j,k)**2 + v(i-1:i+2,j,k)**2 + w(i-1:i+2,j,k)**2) + qc2(i-1:i+2,j,k)
+      H(:)   = QJ(i-1:i+2,j,k,5) / QJ(i-1:i+2,j,k,1) + R * T6(2:5) + qc2(i-1:i+2,j,k)
       Hsgs   = -mutx * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) / 3.d0) * dx(i) / Prt
     else
-      T233(:,:,:) = T(i:i+1,j-1:j+1,k-1:k+1)
-      u231(:,:)   = u(i:i+1,j-1:j+1,k)
-      v231(:,:)   = v(i:i+1,j-1:j+1,k)
-      u213(:,:)   = u(i:i+1,j,k-1:k+1)
-      w213(:,:)   = w(i:i+1,j,k-1:k+1)
+      T233(:,:,:) = (gamma - 1.d0) * (QJ(i:i+1,j-1:j+1,k-1:k+1,5) - 0.5d0 * &
+                    (QJ(i:i+1,j-1:j+1,k-1:k+1,2)**2 + QJ(i:i+1,j-1:j+1,k-1:k+1,3)**2 + QJ(i:i+1,j-1:j+1,k-1:k+1,4)**2) &
+                    / QJ(i:i+1,j-1:j+1,k-1:k+1,1)) / (R * QJ(i:i+1,j-1:j+1,k-1:k+1,1))
+      u231(:,:)   = QJ(i:i+1,j-1:j+1,k,2) / QJ(i:i+1,j-1:j+1,k,1)
+      v231(:,:)   = QJ(i:i+1,j-1:j+1,k,3) / QJ(i:i+1,j-1:j+1,k,1)
+      u213(:,:)   = QJ(i:i+1,j,k-1:k+1,2) / QJ(i:i+1,j,k-1:k+1,1)
+      w213(:,:)   = QJ(i:i+1,j,k-1:k+1,4) / QJ(i:i+1,j,k-1:k+1,1)
       Tx(:)       = T233(:,2,2)
       Ty(:,:)     = T233(:,:,2)
       Tz(:,:)     = T233(:,2,:)
@@ -292,8 +297,7 @@ contains
       txxsgs = 2.d0 * (2.d0 * mux - mvy - mwz) / 3.d0
       txysgs = muy + mvx
       txzsgs = mwx + muz
-      H(2:3) = (gamma * p(i:i+1,j,k) / (rho(i:i+1,j,k) * (gamma - 1.d0))) &
-               + 0.5d0 * (u2(:)**2 + v2(:)**2 + w2(:)**2) + qc2(i:i+1,j,k)
+      H(2:3) = QJ(i:i+1,j,k,5) / QJ(i:i+1,j,k,1) + R * T233(:,2,2) + qc2(i:i+1,j,k)
       Hsgs   = -mx * (-H(2) + H(3)) * dx(i) / Prt
     endif
 
@@ -303,14 +307,14 @@ contains
     E(i-offset+1,j-offset,k-offset,5) = E(i-offset+1,j-offset,k-offset,5) - (utxx + vtxy + wtxz + kTx + Hsgs)
   end subroutine calc_Ev_LES
   
-  attributes(global) subroutine calc_Fv(nx, ny, nz, dy, dx, dz, rho, u, v, w, T, p, F)
+  attributes(global) subroutine calc_Fv(nx, ny, nz, dy, dx, dz, Jacobian, QJ, F)
     use calc_sutherland, only : mu6, mu2, mu23, mu32
-    integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
-    real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
-    real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p
-    real(8), intent(inout), device                    :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
+    integer, intent(in), value     :: nx, ny, nz
+    real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
+    real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
+    real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
+    real(8), intent(in), device    :: Jacobian(ny), QJ(nx,ny,nz,5)
+    real(8), intent(inout), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy, muty
@@ -330,11 +334,12 @@ contains
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
 
     if (id_visc == 2 .and. 3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-2) then
-      u561(:,:) = u(i-2:i+2,j-2:j+3,k)
-      v561(:,:) = v(i-2:i+2,j-2:j+3,k)
-      v165(:,:) = v(i,j-2:j+3,k-2:k+2)
-      w165(:,:) = w(i,j-2:j+3,k-2:k+2)
-      T6(:)     = T(i,j-2:j+3,k)
+      u561(:,:) = QJ(i-2:i+2,j-2:j+3,k,2) / QJ(i-2:i+2,j-2:j+3,k,1)
+      v561(:,:) = QJ(i-2:i+2,j-2:j+3,k,3) / QJ(i-2:i+2,j-2:j+3,k,1)
+      v165(:,:) = QJ(i,j-2:j+3,k-2:k+2,3) / QJ(i,j-2:j+3,k-2:k+2,1)
+      w165(:,:) = QJ(i,j-2:j+3,k-2:k+2,4) / QJ(i,j-2:j+3,k-2:k+2,1)
+      T6(:)     = (gamma - 1.d0) * (QJ(i,j-2:j+3,k,5) - 0.5d0 * &
+                  (QJ(i,j-2:j+3,k,2)**2 + QJ(i,j-2:j+3,k,3)**2 + QJ(i,j-2:j+3,k,4)**2) / QJ(i,j-2:j+3,k,1)) / (R * QJ(i,j-2:j+3,k,1))
       u6(:)     = u561(3,:)
       v6(:)     = v561(3,:)
       w6(:)     = w165(:,3)
@@ -351,11 +356,13 @@ contains
       call tauxy4(mu(:), vz3(:), wy3(:), w6(:), tyz, wtyz)
       kTy = heat_conduction6(mu(:), T6(:), dy(j))
     else
-      T323(:,:,:) = T(i-1:i+1,j:j+1,k-1:k+1)
-      u321(:,:)   = u(i-1:i+1,j:j+1,k)
-      v321(:,:)   = v(i-1:i+1,j:j+1,k)
-      v123(:,:)   = v(i,j:j+1,k-1:k+1)
-      w123(:,:)   = w(i,j:j+1,k-1:k+1)
+      T323(:,:,:) = (gamma - 1.d0) * (QJ(i-1:i+1,j:j+1,k-1:k+1,5) - 0.5d0 * &
+                    (QJ(i-1:i+1,j:j+1,k-1:k+1,2)**2 + QJ(i-1:i+1,j:j+1,k-1:k+1,3)**2 + QJ(i-1:i+1,j:j+1,k-1:k+1,4)**2) &
+                    / QJ(i-1:i+1,j:j+1,k-1:k+1,1)) / (R * QJ(i-1:i+1,j:j+1,k-1:k+1,1))
+      u321(:,:)   = QJ(i-1:i+1,j:j+1,k,2) / QJ(i-1:i+1,j:j+1,k,1)
+      v321(:,:)   = QJ(i-1:i+1,j:j+1,k,3) / QJ(i-1:i+1,j:j+1,k,1)
+      v123(:,:)   = QJ(i,j:j+1,k-1:k+1,3) / QJ(i,j:j+1,k-1:k+1,1)
+      w123(:,:)   = QJ(i,j:j+1,k-1:k+1,4) / QJ(i,j:j+1,k-1:k+1,1)
       Tx(:,:)     = T323(:,:,2)
       Ty(:)       = T323(2,:,2)
       Tz(:,:)     = T323(2,:,:)
@@ -387,14 +394,14 @@ contains
     F(i-offset,j-offset+1,k-offset,5) = F(i-offset,j-offset+1,k-offset,5) - (utyx + vtyy + wtyz + kTy)
   end subroutine calc_Fv
   
-  attributes(global) subroutine calc_Fv_LES(nx, ny, nz, dy, dx, dz, rho, u, v, w, T, p, mut, qc2, F)
+  attributes(global) subroutine calc_Fv_LES(nx, ny, nz, dy, dx, dz, Jacobian, QJ, mut, qc2, F)
     use calc_sutherland, only : mu6, mu2, mu23, mu32
-    integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
-    real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
-    real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p, mut, qc2
-    real(8), intent(inout), device                    :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
+    integer, intent(in), value     :: nx, ny, nz
+    real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
+    real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
+    real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
+    real(8), intent(in), device    :: Jacobian(ny), QJ(nx,ny,nz,5), mut(nx,ny,nz), qc2(nx,ny,nz)
+    real(8), intent(inout), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy, muty, H(4), tyxsgs = 0.d0, tyysgs = 0.d0, tyzsgs = 0.d0, Hsgs = 0.d0
@@ -414,11 +421,12 @@ contains
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
 
     if (id_visc == 2 .and. 3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-2) then
-      u561(:,:) = u(i-2:i+2,j-2:j+3,k)
-      v561(:,:) = v(i-2:i+2,j-2:j+3,k)
-      v165(:,:) = v(i,j-2:j+3,k-2:k+2)
-      w165(:,:) = w(i,j-2:j+3,k-2:k+2)
-      T6(:)     = T(i,j-2:j+3,k)
+      u561(:,:) = QJ(i-2:i+2,j-2:j+3,k,2) / QJ(i-2:i+2,j-2:j+3,k,1)
+      v561(:,:) = QJ(i-2:i+2,j-2:j+3,k,3) / QJ(i-2:i+2,j-2:j+3,k,1)
+      v165(:,:) = QJ(i,j-2:j+3,k-2:k+2,3) / QJ(i,j-2:j+3,k-2:k+2,1)
+      w165(:,:) = QJ(i,j-2:j+3,k-2:k+2,4) / QJ(i,j-2:j+3,k-2:k+2,1)
+      T6(:)     = (gamma - 1.d0) * (QJ(i,j-2:j+3,k,5) - 0.5d0 * &
+                  (QJ(i,j-2:j+3,k,2)**2 + QJ(i,j-2:j+3,k,3)**2 + QJ(i,j-2:j+3,k,4)**2) / QJ(i,j-2:j+3,k,1)) / (R * QJ(i,j-2:j+3,k,1))
       u6(:)     = u561(3,:)
       v6(:)     = v561(3,:)
       w6(:)     = w165(:,3)
@@ -438,15 +446,16 @@ contains
       tyxsgs = muty * (uy3(2) + vx3(2))
       tyysgs = 2.d0 * muty * (2.d0 * vy3(2) - ux3(2) - wz3(2)) / 3.d0
       tyzsgs = muty * (vz3(2) + wy3(2))
-      H(:)   = (gamma * p(i,j-1:j+2,k) / (rho(i,j-1:j+2,k) * (gamma - 1.d0))) &
-               + 0.5d0 * (u(i,j-1:j+2,k)**2 + v(i,j-1:j+2,k)**2 + w(i,j-1:j+2,k)**2) + qc2(i,j-1:j+2,k)
+      H(:)   = QJ(i,j-1:j+2,k,5) / QJ(i,j-1:j+2,k,1) + R * T6(2:5) + qc2(i,j-1:j+2,k)
       Hsgs   = -muty * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) / 3.d0) * dy(j) / Prt
     else
-      T323(:,:,:) = T(i-1:i+1,j:j+1,k-1:k+1)
-      u321(:,:)   = u(i-1:i+1,j:j+1,k)
-      v321(:,:)   = v(i-1:i+1,j:j+1,k)
-      v123(:,:)   = v(i,j:j+1,k-1:k+1)
-      w123(:,:)   = w(i,j:j+1,k-1:k+1)
+      T323(:,:,:) = (gamma - 1.d0) * (QJ(i-1:i+1,j:j+1,k-1:k+1,5) - 0.5d0 * &
+                    (QJ(i-1:i+1,j:j+1,k-1:k+1,2)**2 + QJ(i-1:i+1,j:j+1,k-1:k+1,3)**2 + QJ(i-1:i+1,j:j+1,k-1:k+1,4)**2) &
+                    / QJ(i-1:i+1,j:j+1,k-1:k+1,1)) / (R * QJ(i-1:i+1,j:j+1,k-1:k+1,1))
+      u321(:,:)   = QJ(i-1:i+1,j:j+1,k,2) / QJ(i-1:i+1,j:j+1,k,1)
+      v321(:,:)   = QJ(i-1:i+1,j:j+1,k,3) / QJ(i-1:i+1,j:j+1,k,1)
+      v123(:,:)   = QJ(i,j:j+1,k-1:k+1,3) / QJ(i,j:j+1,k-1:k+1,1)
+      w123(:,:)   = QJ(i,j:j+1,k-1:k+1,4) / QJ(i,j:j+1,k-1:k+1,1)
       Tx(:,:)     = T323(:,:,2)
       Ty(:)       = T323(2,:,2)
       Tz(:,:)     = T323(2,:,:)
@@ -485,8 +494,7 @@ contains
       tyxsgs = muy + mvx
       tyysgs = 2.d0 * (2.d0 * mvy - mwz - mux) / 3.d0
       tyzsgs = mvz + mwy
-      H(2:3) = (gamma * p(i,j:j+1,k) / (rho(i,j:j+1,k) * (gamma - 1.d0))) &
-               + 0.5d0 * (u2(:)**2 + v2(:)**2 + w2(:)**2) + qc2(i,j:j+1,k)
+      H(2:3) = QJ(i,j:j+1,k,5) / QJ(i,j:j+1,k,1) + R * T323(2,:,2) + qc2(i,j:j+1,k)
       Hsgs   = -my * (-H(2) + H(3)) * dy(j) / Prt
     endif
 
@@ -496,14 +504,14 @@ contains
     F(i-offset,j-offset+1,k-offset,5) = F(i-offset,j-offset+1,k-offset,5) - (utyx + vtyy + wtyz + kTy + Hsgs)
   end subroutine calc_Fv_LES
   
-  attributes(global) subroutine calc_Gv(nx, ny, nz, dx, dy, dz, rho, u, v, w, T, p, G)
+  attributes(global) subroutine calc_Gv(nx, ny, nz, dx, dy, dz, Jacobian, QJ, G)
     use calc_sutherland, only : mu6, mu2, mu32
-    integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
-    real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
-    real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p
-    real(8), intent(inout), device                    :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    integer, intent(in), value     :: nx, ny, nz
+    real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
+    real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
+    real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
+    real(8), intent(in), device    :: Jacobian(ny), QJ(nx,ny,nz,5)
+    real(8), intent(inout), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz
@@ -521,11 +529,12 @@ contains
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset - 1
     
     if (id_visc == 2 .and. 3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-3) then
-      u516(:,:) = u(i-2:i+2,j,k-2:k+3)
-      w516(:,:) = w(i-2:i+2,j,k-2:k+3)
-      v156(:,:) = v(i,j-2:j+2,k-2:k+3)
-      w156(:,:) = w(i,j-2:j+2,k-2:k+3)
-      T6(:)     = T(i,j,k-2:k+3)
+      u516(:,:) = QJ(i-2:i+2,j,k-2:k+3,2) / QJ(i-2:i+2,j,k-2:k+3,1)
+      w516(:,:) = QJ(i-2:i+2,j,k-2:k+3,4) / QJ(i-2:i+2,j,k-2:k+3,1)
+      v156(:,:) = QJ(i,j-2:j+2,k-2:k+3,3) / QJ(i,j-2:j+2,k-2:k+3,1)
+      w156(:,:) = QJ(i,j-2:j+2,k-2:k+3,4) / QJ(i,j-2:j+2,k-2:k+3,1)
+      T6(:)     = (gamma - 1.d0) * (QJ(i,j,k-2:k+3,5) - 0.5d0 * &
+                  (QJ(i,j,k-2:k+3,2)**2 + QJ(i,j,k-2:k+3,3)**2 + QJ(i,j,k-2:k+3,4)**2) / QJ(i,j,k-2:k+3,1)) / (R * QJ(i,j,k-2:k+3,1))
       u6(:)     = u516(3,:)
       v6(:)     = v156(3,:)
       w6(:)     = w156(3,:)
@@ -542,11 +551,13 @@ contains
       call tauxx4(mu(:), wz3(:), ux3(:), vy3(:), w6(:), tzz, wtzz)
       kTz = heat_conduction6(mu(:), T6(:), dz(k))
     else
-      T332(:,:,:) = T(i-1:i+1,j-1:j+1,k:k+1)
-      u312(:,:)   = u(i-1:i+1,j,k:k+1)
-      w312(:,:)   = w(i-1:i+1,j,k:k+1)
-      v132(:,:)   = v(i,j-1:j+1,k:k+1)
-      w132(:,:)   = w(i,j-1:j+1,k:k+1)
+      T332(:,:,:) = (gamma - 1.d0) * (QJ(i-1:i+1,j-1:j+1,k:k+1,5) - 0.5d0 * &
+                    (QJ(i-1:i+1,j-1:j+1,k:k+1,2)**2 + QJ(i-1:i+1,j-1:j+1,k:k+1,3)**2 + QJ(i-1:i+1,j-1:j+1,k:k+1,4)**2) &
+                    / QJ(i-1:i+1,j-1:j+1,k:k+1,1)) / (R * QJ(i-1:i+1,j-1:j+1,k:k+1,1))
+      u312(:,:)   = QJ(i-1:i+1,j,k:k+1,2) / QJ(i-1:i+1,j,k:k+1,1)
+      w312(:,:)   = QJ(i-1:i+1,j,k:k+1,4) / QJ(i-1:i+1,j,k:k+1,1)
+      v132(:,:)   = QJ(i,j-1:j+1,k:k+1,3) / QJ(i,j-1:j+1,k:k+1,1)
+      w132(:,:)   = QJ(i,j-1:j+1,k:k+1,4) / QJ(i,j-1:j+1,k:k+1,1)
       Tx(:,:)     = T332(:,2,:)
       Ty(:,:)     = T332(2,:,:)
       Tz(:)       = T332(2,2,:)
@@ -578,14 +589,14 @@ contains
     G(i-offset,j-offset,k-offset+1,5) = G(i-offset,j-offset,k-offset+1,5) - (utzx + vtzy + wtzz + kTz)
   end subroutine calc_Gv
 
-  attributes(global) subroutine calc_Gv_LES(nx, ny, nz, dx, dy, dz, rho, u, v, w, T, p, mut, qc2, G)
+  attributes(global) subroutine calc_Gv_LES(nx, ny, nz, dx, dy, dz, Jacobian, QJ, mut, qc2, G)
     use calc_sutherland, only : mu6, mu2, mu32
-    integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
-    real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
-    real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, T, p, mut, qc2
-    real(8), intent(inout), device                    :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    integer, intent(in), value     :: nx, ny, nz
+    real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
+    real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
+    real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
+    real(8), intent(in), device    :: Jacobian(ny), QJ(nx,ny,nz,5), mut(nx,ny,nz), qc2(nx,ny,nz)
+    real(8), intent(inout), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz, mutz, H(4), tzxsgs = 0.d0, tzysgs = 0.d0, tzzsgs = 0.d0, Hsgs = 0.d0
@@ -603,11 +614,12 @@ contains
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset - 1
     
     if (id_visc == 2 .and. 3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-3) then
-      u516(:,:) = u(i-2:i+2,j,k-2:k+3)
-      w516(:,:) = w(i-2:i+2,j,k-2:k+3)
-      v156(:,:) = v(i,j-2:j+2,k-2:k+3)
-      w156(:,:) = w(i,j-2:j+2,k-2:k+3)
-      T6(:)     = T(i,j,k-2:k+3)
+      u516(:,:) = QJ(i-2:i+2,j,k-2:k+3,2) / QJ(i-2:i+2,j,k-2:k+3,1)
+      w516(:,:) = QJ(i-2:i+2,j,k-2:k+3,4) / QJ(i-2:i+2,j,k-2:k+3,1)
+      v156(:,:) = QJ(i,j-2:j+2,k-2:k+3,3) / QJ(i,j-2:j+2,k-2:k+3,1)
+      w156(:,:) = QJ(i,j-2:j+2,k-2:k+3,4) / QJ(i,j-2:j+2,k-2:k+3,1)
+      T6(:)     = (gamma - 1.d0) * (QJ(i,j,k-2:k+3,5) - 0.5d0 * &
+                  (QJ(i,j,k-2:k+3,2)**2 + QJ(i,j,k-2:k+3,3)**2 + QJ(i,j,k-2:k+3,4)**2) / QJ(i,j,k-2:k+3,1)) / (R * QJ(i,j,k-2:k+3,1))
       u6(:)     = u516(3,:)
       v6(:)     = v156(3,:)
       w6(:)     = w156(3,:)
@@ -627,15 +639,16 @@ contains
       tzxsgs = mutz * (wx3(2) + uz3(2))
       tzysgs = mutz * (vz3(2) + wy3(2))
       tzzsgs = 2.d0 * mutz * (2.d0 * wz3(2) - ux3(2) - vy3(2)) / 3.d0
-      H(:)   = (gamma * p(i,j,k-1:k+2) / (rho(i,j,k-1:k+2) * (gamma - 1.d0))) &
-               + 0.5d0 * (u(i,j,k-1:k+2)**2 + v(i,j,k-1:k+2)**2 + w(i,j,k-1:k+2)**2) + qc2(i,j,k-1:k+2)
+      H(:)   = QJ(i,j,k-1:k+2,5) / QJ(i,j,k-1:k+2,1) + R * T6(2:5) + qc2(i,j,k-1:k+2)
       Hsgs   = -mutz * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) / 3.d0) * dz(k) / Prt
     else
-      T332(:,:,:) = T(i-1:i+1,j-1:j+1,k:k+1)
-      u312(:,:)   = u(i-1:i+1,j,k:k+1)
-      w312(:,:)   = w(i-1:i+1,j,k:k+1)
-      v132(:,:)   = v(i,j-1:j+1,k:k+1)
-      w132(:,:)   = w(i,j-1:j+1,k:k+1)
+      T332(:,:,:) = (gamma - 1.d0) * (QJ(i-1:i+1,j-1:j+1,k:k+1,5) - 0.5d0 * &
+                    (QJ(i-1:i+1,j-1:j+1,k:k+1,2)**2 + QJ(i-1:i+1,j-1:j+1,k:k+1,3)**2 + QJ(i-1:i+1,j-1:j+1,k:k+1,4)**2) &
+                    / QJ(i-1:i+1,j-1:j+1,k:k+1,1)) / (R * QJ(i-1:i+1,j-1:j+1,k:k+1,1))
+      u312(:,:)   = QJ(i-1:i+1,j,k:k+1,2) / QJ(i-1:i+1,j,k:k+1,1)
+      w312(:,:)   = QJ(i-1:i+1,j,k:k+1,4) / QJ(i-1:i+1,j,k:k+1,1)
+      v132(:,:)   = QJ(i,j-1:j+1,k:k+1,3) / QJ(i,j-1:j+1,k:k+1,1)
+      w132(:,:)   = QJ(i,j-1:j+1,k:k+1,4) / QJ(i,j-1:j+1,k:k+1,1)
       Tx(:,:)     = T332(:,2,:)
       Ty(:,:)     = T332(2,:,:)
       Tz(:)       = T332(2,2,:)
@@ -674,8 +687,7 @@ contains
       tzxsgs = mwx + muz
       tzysgs = mvz + mwy
       tzzsgs = 2.d0 * (2.d0 * mwz - mux - mvy) / 3.d0
-      H(2:3) = (gamma * p(i,j,k:k+1) / (rho(i,j,k:k+1) * (gamma - 1.d0))) &
-               + 0.5d0 * (u2(:)**2 + v2(:)**2 + w2(:)**2) + qc2(i,j,k:k+1)
+      H(2:3) = QJ(i,j,k:k+1,5) / QJ(i,j,k:k+1,1) + R * T332(2,2,:) + qc2(i,j,k:k+1)
       Hsgs   = -mz * (-H(2) + H(3)) * dz(k) / Prt
     endif
 
