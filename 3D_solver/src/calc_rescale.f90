@@ -188,7 +188,7 @@ contains
           vin   = (  Vmin(j,k) +   vfin(j,k)) * (1.d0 - weight(j)) + (  Vmout(j,k) +   vfout(j,k)) * weight(j)
           win   = (  Wmin(j,k) +   wfin(j,k)) * (1.d0 - weight(j)) + (  Wmout(j,k) +   wfout(j,k)) * weight(j)
           rhoin = (rhomin(j,k) + rhofin(j,k)) * (1.d0 - weight(j)) + (rhomout(j,k) + rhofout(j,k)) * weight(j)
-          Tin   = (  Tmin(j,k) +   Tfin(j,k)) * (1.d0 - weight(j)) + (  Tmout(j,k) +   Tfout(j,k)) * weight(j)
+          !Tin   = (  Tmin(j,k) +   Tfin(j,k)) * (1.d0 - weight(j)) + (  Tmout(j,k) +   Tfout(j,k)) * weight(j)
           !pin   = (  pmin(j,k) +   pfin(j,k)) * (1.d0 - weight(j)) + (  pmout(j,k) +   pfout(j,k)) * weight(j)
           pin   = p0!rhoin * R * Tin
           Qre(1,j,k,1) = rhoin / Jacobian(j)

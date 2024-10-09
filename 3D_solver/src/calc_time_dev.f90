@@ -3,7 +3,8 @@ module calc_time_dev
   use mpi
   use nvtx
   use mod_globals, only : accuracy, id_scheme, id_turbulence, id_rescale, nt, np, nre, &
-  & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG
+  & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
+  & blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv
   use calc_physical_quantities
   use calc_steps
   use calc_hybrid
@@ -33,10 +34,12 @@ contains
     real(8), intent(out), device       :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     real(8), intent(out), device       :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device       :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p
     integer stat
-    call calc_E<<<blocksE,threadsE,1>>>(nx,ny,nz,Jacobian,QJ,E)
-    call calc_F<<<blocksF,threadsF,2>>>(nx,ny,nz,Jacobian,QJ,F)
-    call calc_G<<<blocksG,threadsG,3>>>(nx,ny,nz,Jacobian,QJ,G)
+    call calc_quantities_3D(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p)
+    call calc_E<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,E)
+    call calc_F<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,F)
+    call calc_G<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,G)
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_Euler
 
@@ -51,15 +54,41 @@ contains
     real(8), intent(out), device       :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     real(8), intent(out), device       :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device       :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p
     integer stat
-    call calc_E<<<blocksE,threadsE,1>>>(nx,ny,nz,Jacobian,QJ,E)
-    call calc_F<<<blocksF,threadsF,2>>>(nx,ny,nz,Jacobian,QJ,F)
-    call calc_G<<<blocksG,threadsG,3>>>(nx,ny,nz,Jacobian,QJ,G)
+    call calc_quantities_3D(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p)
+    call calc_E<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,E)
+    stat = cudaGetLastError
+    if (stat /= cudaSuccess) then
+      print *, "calc E ", trim(cudaGetErrorString(stat))
+    endif
+    call calc_F<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,F)
+    stat = cudaGetLastError
+    if (stat /= cudaSuccess) then
+      print *, "calc F ", trim(cudaGetErrorString(stat))
+    endif
+    call calc_G<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,G)
+    stat = cudaGetLastError
+    if (stat /= cudaSuccess) then
+      print *, "calc G ", trim(cudaGetErrorString(stat))
+    endif
 
     stat = cudaDeviceSynchronize()
-    call calc_Ev<<<blocksE,threadsE,1>>>(nx,ny,nz,dx,dy,dz,Jacobian,QJ,E)
-    call calc_Fv<<<blocksF,threadsF,2>>>(nx,ny,nz,dy,dx,dz,Jacobian,QJ,F)
-    call calc_Gv<<<blocksG,threadsG,3>>>(nx,ny,nz,dx,dy,dz,Jacobian,QJ,G)
+    call calc_Ev<<<blocksEv,threadsEv,1>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,p,E)
+    stat = cudaGetLastError
+    if (stat /= cudaSuccess) then
+      print *, "calc Ev ", trim(cudaGetErrorString(stat))
+    endif
+    call calc_Fv<<<blocksFv,threadsFv,2>>>(nx,ny,nz,dy,dx,dz,rho,u,v,w,p,F)
+    stat = cudaGetLastError
+    if (stat /= cudaSuccess) then
+      print *, "calc Fv ", trim(cudaGetErrorString(stat))
+    endif
+    call calc_Gv<<<blocksGv,threadsGv,3>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,p,G)
+    stat = cudaGetLastError
+    if (stat /= cudaSuccess) then
+      print *, "calc Gv ", trim(cudaGetErrorString(stat))
+    endif
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_visc
   
@@ -75,21 +104,23 @@ contains
     real(8), intent(out), device       :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device       :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     real(8), allocatable, device       :: mut(:,:,:), qc2(:,:,:)
+    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p
     integer stat
     allocate(mut(nx,ny,nz), qc2(nx,ny,nz))
     mut = 0.d0
     qc2 = 0.d0
     
-    call calc_E<<<blocksE,threadsE,1>>>(nx,ny,nz,Jacobian,QJ,E)
-    call calc_F<<<blocksF,threadsF,2>>>(nx,ny,nz,Jacobian,QJ,F)
-    call calc_G<<<blocksG,threadsG,3>>>(nx,ny,nz,Jacobian,QJ,G)
-    call calc_mut<<<blocks,threads,4>>>(nx,ny,nz,dx,dy,dz,Jacobian,QJ,mut,qc2)
+    call calc_quantities_3D(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p)
+    call calc_E<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,E)
+    call calc_F<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,F)
+    call calc_G<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,G)
+    !call calc_mut<<<blocks,threads,4>>>(nx,ny,nz,dx,dy,dz,Jacobian,QJ,mut,qc2)
     stat = cudaDeviceSynchronize()
     call set_bc_mut(nx,ny,nz,mut,qc2)
 
-    call calc_Ev_LES<<<blocksE,threadsE,1>>>(nx,ny,nz,dx,dy,dz,Jacobian,QJ,mut,qc2,E)
-    call calc_Fv_LES<<<blocksF,threadsF,2>>>(nx,ny,nz,dy,dx,dz,Jacobian,QJ,mut,qc2,F)
-    call calc_Gv_LES<<<blocksG,threadsG,3>>>(nx,ny,nz,dx,dy,dz,Jacobian,QJ,mut,qc2,G)
+    call calc_Ev_LES<<<blocksEv,threadsEv,1>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,p,mut,qc2,E)
+    call calc_Fv_LES<<<blocksFv,threadsFv,2>>>(nx,ny,nz,dy,dx,dz,rho,u,v,w,p,mut,qc2,F)
+    call calc_Gv_LES<<<blocksGv,threadsGv,3>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,p,mut,qc2,G)
     stat = cudaDeviceSynchronize()
     deallocate(mut, qc2)
   end subroutine calc_EFG_LES
@@ -195,9 +226,9 @@ contains
     real(8), intent(in)         :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)         :: z(nz), dz_cpu(nz-1), Jacobian_cpu(ny)
     real(8), intent(inout)      :: Q(nx,ny,nz,5)
-    integer i, j, k, t1, t2, itr, ierr, ilen, stat, ireq, ireq2, istat(MPI_STATUS_SIZE), status(MPI_STATUS_SIZE)
+    integer i, j, k, t1, t2, itr, ierr, ilen, ndevices, stat, ireq, ireq2, istat(MPI_STATUS_SIZE), status(MPI_STATUS_SIZE)
     ! rescale !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable         :: Qre_cpu(:,:,:,:)
+    real(8), allocatable, pinned :: Qre_cpu(:,:,:,:)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type(cudaDeviceProp)         :: prop
     real(8), allocatable, device :: QJ(:,:,:,:), QJs(:,:,:,:), Rs(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
@@ -206,9 +237,16 @@ contains
     real(8) :: mass0 = 1.d0, ke0 = 1.d0, entropy0 = 1.d0
 
     ! check GPU
-    stat = cudaSetDevice(0)
-    stat = cudaGetDeviceProperties(prop,0)
-    ilen = verify(prop%name, ' ', .true.)
+    if (mod(myrank,2) == 0) then
+      if (myrank == 0) then
+        stat = cudaGetDeviceCount(ndevices)
+        print '(2x, i2, a)', ndevices, " GPU devices are found"
+      endif
+      stat = cudaSetDevice(myrank/2)
+      stat = cudaGetDeviceProperties(prop,myrank/2)
+      ilen = verify(prop%name, ' ', .true.)
+      print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", myrank/2, ") is available"
+    endif
 
     if (myrank == 0) then
       allocate(QJ(nx,ny,nz,5),QJs(nx,ny,nz,5),Rs(nx-2,ny-2,nz-2,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
@@ -264,9 +302,11 @@ contains
           call set_bc(nx,ny,nz,Jacobian,QJs)
           call nvtxEndRange
         elseif (myrank == 1 .and. kind(id_rescale) == 4) then
+          call nvtxStartRange("recv", 5)
           call MPI_IRECV(Qre_cpu, 50*ny*nz, MPI_REAL8, 0, 0, MPI_COMM_WORLD, ireq, ierr)
           call MPI_WAIT(ireq, istat, ierr)
-          call nvtxStartRange("rescale", 5)
+          call nvtxEndRange
+          call nvtxStartRange("rescale", 6)
           call set_rescale(t2,nx,ny,nz,nre,y,Jacobian_cpu,Qre_cpu)
           call nvtxEndRange
           call MPI_SEND(Qre_cpu(1,:,:,:), 5*ny*nz, MPI_REAL8, 0, 1, MPI_COMM_WORLD, ierr)
