@@ -1,11 +1,40 @@
 module calc_rescale
-  use mod_globals, only : nt, dt, gamma , R, u0, p0, blt, start_rescale
+  use mod_globals, only : nre1, nre2, nt, dt, gamma , R, u0, p0, blt, start_rescale
 contains
-  subroutine set_rescale(step,nx,ny,nz,nre,y,Jacobian,Qre)
-    integer, intent(in)    :: step, nx, ny, nz, nre
+  subroutine calc_mean(nx,ny,nz,QJ,Qm)
+    integer, intent(in)          :: nx, ny, nz
+    real(8), intent(in), device  :: QJ(nx,ny,nz,5)
+    real(8), intent(out), device :: Qm(ny,5)
+    real(8) Q1, Q2, Q3, Q4, Q5
+    integer i, k
+    !$cuf kernel do <<<*,*>>>
+    do j = 1, ny
+      Q1 = 0.d0
+      Q2 = 0.d0
+      Q3 = 0.d0
+      Q4 = 0.d0
+      Q5 = 0.d0
+      do k = 1, nz
+        do i = nre1, nre2
+          Q1 = Q1 + QJ(i,j,k,1)
+          Q2 = Q2 + QJ(i,j,k,2)
+          Q3 = Q3 + QJ(i,j,k,3)
+          Q4 = Q4 + QJ(i,j,k,4)
+          Q5 = Q5 + QJ(i,j,k,5)
+      enddo;enddo
+      Qm(j,1) = Q1 / dble((nre2-nre1+1)*nz)
+      Qm(j,2) = Q2 / dble((nre2-nre1+1)*nz)
+      Qm(j,3) = Q3 / dble((nre2-nre1+1)*nz)
+      Qm(j,4) = Q4 / dble((nre2-nre1+1)*nz)
+      Qm(j,5) = Q5 / dble((nre2-nre1+1)*nz)
+    enddo
+  end subroutine calc_mean
+
+  subroutine set_rescale(step,nx,ny,nz,y,Jacobian,Qm,Qre)
+    integer, intent(in)    :: step, nx, ny, nz
     real(8), intent(in)    :: y(ny)
-    real(8), intent(in)    :: Jacobian(ny)
-    real(8), intent(inout) :: Qre(10,ny,nz,5) ! Q / J
+    real(8), intent(in)    :: Jacobian(ny), Qm(ny,5)
+    real(8), intent(inout) :: Qre(ny,nz,5) ! Q / J
     integer i, j, jj, k, l
     real(8) :: mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0
     real(8) t, bltre, taure, utre, utin, beta, mu, nu, ady, ade 
@@ -32,17 +61,15 @@ contains
     do l = 1, 5
       do k = 1, nz
         do j = 1, ny
-          do i = 1, 10
-            Qre(i,j,k,l) = Qre(i,j,k,l) * Jacobian(j)
-    enddo;enddo;enddo;enddo
+          Qre(j,k,l) = Qre(j,k,l) * Jacobian(j)
+    enddo;enddo;enddo
 
     do j = 1, ny
-      rhom(j) = sum(Qre(:,j,:,1)) / dble(size(Qre(:,j,:,1)))
-        Um(j) = sum(Qre(:,j,:,2) / Qre(:,j,:,1)) / dble(size(Qre(:,j,:,1)))
-        Vm(j) = sum(Qre(:,j,:,3) / Qre(:,j,:,1)) / dble(size(Qre(:,j,:,1)))
-        Wm(j) = sum(Qre(:,j,:,4) / Qre(:,j,:,1)) / dble(size(Qre(:,j,:,1)))
-        pm(j) = sum((gamma - 1.d0) * (Qre(:,j,:,5) &
-              - 0.5d0 * (Qre(:,j,:,2)**2 + Qre(:,j,:,3)**2 + Qre(:,j,:,4)**2) / Qre(:,j,:,1))) / dble(size(Qre(:,j,:,1)))
+      rhom(j) = Qm(j,1) * Jacobian(j)
+        Um(j) = Qm(j,2) / Qm(j,1)
+        Vm(j) = Qm(j,3) / Qm(j,1)
+        Wm(j) = Qm(j,4) / Qm(j,1)
+        pm(j) = (gamma - 1.d0) * (Qm(j,5) * Jacobian(j) - 0.5d0 * (Um(j)**2 + Vm(j)**2 + Wm(j)**2) / rhom(j))
         Tm(j) = pm(j) / (R * rhom(j))
     enddo
 
@@ -64,11 +91,11 @@ contains
       close(10)
       do k = 1, nz
         do j = 1, ny
-          rhore = Qre(1,j,k,1)
-          ure   = Qre(1,j,k,2) / rhore
-          vre   = Qre(1,j,k,3) / rhore
-          wre   = Qre(1,j,k,4) / rhore
-          pre   = (gamma - 1.d0) * (Qre(1,j,k,5) - 0.5d0 * rhore * (ure**2 + vre**2 + wre**2)) 
+          rhore = Qre(j,k,1)
+          ure   = Qre(j,k,2) / rhore
+          vre   = Qre(j,k,3) / rhore
+          wre   = Qre(j,k,4) / rhore
+          pre   = (gamma - 1.d0) * (Qre(j,k,5) - 0.5d0 * rhore * (ure**2 + vre**2 + wre**2)) 
           Tre   = pre / (rhore * R)
           ufre(j,k)   = ure   -   Um(j)
           vfre(j,k)   = vre   -   Vm(j)
@@ -191,11 +218,11 @@ contains
           !Tin   = (  Tmin(j,k) +   Tfin(j,k)) * (1.d0 - weight(j)) + (  Tmout(j,k) +   Tfout(j,k)) * weight(j)
           !pin   = (  pmin(j,k) +   pfin(j,k)) * (1.d0 - weight(j)) + (  pmout(j,k) +   pfout(j,k)) * weight(j)
           pin   = p0!rhoin * R * Tin
-          Qre(1,j,k,1) = rhoin / Jacobian(j)
-          Qre(1,j,k,2) = rhoin * uin / Jacobian(j)
-          Qre(1,j,k,3) = rhoin * vin / Jacobian(j)
-          Qre(1,j,k,4) = rhoin * win / Jacobian(j)
-          Qre(1,j,k,5) = (pin / (gamma - 1.d0) + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) / Jacobian(j)
+          Qre(j,k,1) = rhoin / Jacobian(j)
+          Qre(j,k,2) = rhoin * uin / Jacobian(j)
+          Qre(j,k,3) = rhoin * vin / Jacobian(j)
+          Qre(j,k,4) = rhoin * win / Jacobian(j)
+          Qre(j,k,5) = (pin / (gamma - 1.d0) + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) / Jacobian(j)
       enddo;enddo
     else
       open(10, file=filename, position="append")
@@ -206,7 +233,7 @@ contains
         do k = 1, nz
           do j = 1, ny
             ! inlet
-            Qre(1,j,k,l) = Qre(1,j,k,l) / Jacobian(j)
+            Qre(j,k,l) = Qre(j,k,l) / Jacobian(j)
       enddo;enddo;enddo
     endif
   end subroutine set_rescale
