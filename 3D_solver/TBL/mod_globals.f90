@@ -74,7 +74,8 @@ module mod_globals
   integer, parameter :: ny = 257 ! yp = 0.5, 0.002  mm
   integer, parameter :: nz = 257 ! zp = 5    0.0156 mm
 
-  integer, parameter :: nre = int(0.8 * nx)
+  integer, parameter :: nre1 = int(0.8 * nx)
+  integer, parameter :: nre2 = int(0.9 * nx)
 
   ! RTX 4090
   type(dim3) :: blocksE   = dim3((nx-accuracy+1)/64,(ny-accuracy)/5,(nz-accuracy)/1)
