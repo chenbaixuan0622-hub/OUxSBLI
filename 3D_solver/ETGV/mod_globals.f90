@@ -1,12 +1,11 @@
 module mod_globals
   use cudafor
   implicit none
-  integer, parameter :: dimension = 3
-  integer, parameter :: accuracy  = 2 
-  integer, parameter :: offset    = accuracy / 2
-  integer, parameter :: id_visc   = 0
-  integer, parameter :: id_av     = 0
-  integer, parameter :: id_turbulence = 0
+  integer, parameter         :: dimension = 3
+  integer, parameter         :: accuracy  = 2 
+  integer, parameter         :: offset    = accuracy / 2
+  integer(kind=2), parameter :: id_visc   = 0
+  integer, parameter         :: id_turbulence = 0
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! 0 no-visc         !
   !               ! 1 2nd visc        !
@@ -15,15 +14,10 @@ module mod_globals
   ! id_turbulence ! 0 laminar         !
   !               ! 1 SMS             !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_scheme   ! 1  KEEP4th          !
-  !             ! 2  KEEP MUSCL       !
-  !             ! 3  SLAU             !
-  !             ! 4  KEEPUP           !
-  !             ! 5  Hybrid Weighted  !
-  !             ! 6  Hybrid threshold !
-  !             ! 7  Hybrid Sigmoid   !
-  !             ! 8  KEEP + Rho       !
-  !             ! 9  KEEP2nd          !
+  ! id_scheme   ! integer(2)  KEEP    !
+  !             ! real(2) SLAU        !
+  !             ! real(4) Weighted    !
+  !             ! real(8) threshold   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_sensor   ! 1 Ducros            !
   !             ! 2 Albada            !
@@ -48,13 +42,14 @@ module mod_globals
   ! id_rescale  ! kind2 off           !
   !             ! kind4 on            !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer, parameter         :: id_scheme   = 6
+  integer(2), parameter      :: id_scheme   = 0
   integer, parameter         :: id_sensor   = 1
-  real(8), parameter         :: threshold   = 0.4d0
+  real(8), parameter         :: threshold   = 0.9d0
   integer(kind=8), parameter :: id_accuracy = 0
   integer(kind=2), parameter :: id_tvd      = 0
   integer(kind=2), parameter :: id_keep     = 0
-  integer(kind=2), parameter :: id_slau     = 0
+  integer(kind=4), parameter :: id_slau     = 0
+  integer(kind=2), parameter :: slau_wall   = 0
   integer(kind=2), parameter :: id_rescale  = 0
 
   ! mesh
@@ -63,9 +58,9 @@ module mod_globals
   real(8), parameter :: Ly = 2.d0 * pi
   real(8), parameter :: Lz = 2.d0 * pi
   ! 4th-order accuracy
-  integer, parameter :: nx = 66
-  integer, parameter :: ny = 66
-  integer, parameter :: nz = 66
+  integer, parameter :: nx = 66!258!130!66
+  integer, parameter :: ny = 66!258!130!66
+  integer, parameter :: nz = 66!258!130!66
   ! 6th-order accuracy
   !integer, parameter :: nx = 70
   !integer, parameter :: ny = 70
@@ -104,8 +99,10 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter  :: id_recal = 0
   integer(kind=4), parameter  :: id_RungeKutta = 0
-  integer, parameter          :: nt = 200!1
-  integer, parameter          :: np = 10!200
+  integer, parameter          :: step_offset = 0
+  integer, parameter          :: start_rescale = 0
+  integer, parameter          :: nt = 1!200
+  integer, parameter          :: np = 200!200
   real(8), parameter          :: dt = 0.01d0!0.02d0
 
   ! physical properties
