@@ -233,7 +233,7 @@ contains
           vin      = (Vmin(j) + vfins) * (1.d0 - weight(j)) + (Vmout(j) + vfouts) * weight(j)
           win      =            wfins  * (1.d0 - weight(j)) +             wfouts  * weight(j)
           ! Crocco-Busemann integral, White Viscous fluid flow
-          Taw      = p0    / (R * rho0) + 0.5d0 * u0**2 / Cp
+          Taw      = T0 + 0.5d0 * u0**2 / Cp
           Tw       = pm(1) / (R * rhom(1))
           Tin      = Tw + (Taw - Tw) * Umin(j)  / u0 - 0.5d0 * (Pr**(1.d0/3.d0)) * Umin(j)**2  / Cp
           Tout     = Tw + (Taw - Tw) * Umout(j) / u0 - 0.5d0 * (Pr**(1.d0/3.d0)) * Umout(j)**2 / Cp

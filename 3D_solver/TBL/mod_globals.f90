@@ -106,14 +106,14 @@ module mod_globals
   integer, parameter         :: step_offset   = 0
   integer, parameter         :: start_rescale = 80
   real(8), parameter :: endT  = 0.4d-3
-  integer, parameter :: np    = 1!80
+  integer, parameter :: np    = 80
   real(8), parameter :: R     = 287.03d0
   real(8), parameter :: gamma = 1.4d0
   real(8), parameter :: T0    = 171.31d0
   real(8), parameter :: u0    = 506.8d0
   real(8), parameter :: CFL   = 0.1d0
-  real(8), parameter :: dt    = 1d-8!CFL * Lx / (dble(nx-1) * u0)
-  integer, parameter :: nt    = 1!int(endT / (dble(np) * dt))
+  real(8), parameter :: dt    = 5d-9!CFL * Lx / (dble(nx-1) * u0)
+  integer, parameter :: nt    = int(endT / (dble(np) * dt))
 
   ! physical properties
   real(8), parameter :: Pr    = 0.71d0
@@ -122,6 +122,5 @@ module mod_globals
   ! initial condition
   real(8), parameter :: M0   = 1.9d0
   real(8), parameter :: p0   = 14924.d0
-  real(8), parameter :: rho0 = p0 / (R * T0)
 end module mod_globals
 
