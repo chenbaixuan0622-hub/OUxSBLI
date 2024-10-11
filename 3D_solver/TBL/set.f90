@@ -75,7 +75,7 @@ contains
     integer i, j, k
     real(8) :: d = 0.2d0 * 1.d-3
     real(8) :: d1= 2.d-3
-    real(8) :: eta, rho, u, v, w, T, p_wall
+    real(8) :: eta, rho, u, v, w, T, Tw, Taw, p_wall
     ! random
     real(8) :: std, ustd, Tstd
     do k = 1, nz
@@ -90,11 +90,13 @@ contains
             std = 0.d0
           endif
           ustd = 0.2d0 * u * std
-          u = u + ustd
-          v = v + 0.5d0 * ustd
-          w = 0.5d0 * ustd
           Tstd = T0 * (gamma - 1.d0) * M0**2 / u0
-          T = T0 + Tstd * std
+          Taw  = T0 + 0.5d0 * u0**2 / Cp
+          Tw   = Taw
+          T    = Tw + (Taw - Tw) * u / u0 - 0.5d0 * Pr**(1.d0/3.d0) * u**2 / Cp + Tstd * std
+          u    = u + ustd
+          v    = v + 0.5d0 * ustd
+          w    = 0.5d0 * ustd
           rho = p0 / (R * T)
           Q(i,j,k,1) = rho
           Q(i,j,k,2) = Q(i,j,k,1) * u
