@@ -1,5 +1,5 @@
 module set
-  use mod_globals, only : id_rescale, nx, ny, nz, nre, Lx, Ly, Lz, gamma, R, rho0, u0, p0, T0, M0
+  use mod_globals, only : id_rescale, nx, ny, nz, nre, Lx, Ly, Lz, gamma, R, Cp, Pr, u0, p0, T0, M0
   implicit none
 contains
   subroutine calc_Blasius(eta,d,u,v)
@@ -7,9 +7,7 @@ contains
     real(8), intent(out)        :: u, v
     real(8) f, df, x
     real(8) fs(45), dfs(45)
-    real(8) :: nu0
     integer i
-    nu0 = (1.716d-5 * ((273.2d0 + 111.d0) / (T0 + 111.d0)) * (T0 / 273.2d0)**1.5d0) / rho0 
     fs(:) = (/0.d0, 0.00664d0, 0.02656d0, 0.05974d0, 0.10611d0, 0.16557d0, 0.23795d0, &
     & 0.32298d0, 0.42032d0, 0.52952d0, 0.65003d0, 0.78120d0, 0.92230d0, 1.07252d0, &
     & 1.23099d0, 1.39682d0, 1.56911d0, 1.74696d0, 1.92954d0, 2.11605d0, 2.30576d0, &
@@ -75,6 +73,7 @@ contains
     integer i, j, k
     real(8) :: d = 0.2d0 * 1.d-3
     real(8) :: d1= 2.d-3
+    real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: eta, rho, u, v, w, T, Tw, Taw, p_wall
     ! random
     real(8) :: std, ustd, Tstd
@@ -97,7 +96,7 @@ contains
           u    = u + ustd
           v    = v + 0.5d0 * ustd
           w    = 0.5d0 * ustd
-          rho = p0 / (R * T)
+          rho  = p0 / (R * T)
           Q(i,j,k,1) = rho
           Q(i,j,k,2) = Q(i,j,k,1) * u
           Q(i,j,k,3) = Q(i,j,k,1) * v
@@ -120,39 +119,44 @@ contains
     real(8), intent(inout), device :: QJ(nx,ny,nz,5) ! Q / Jacobian
     real(8), intent(in), device    :: Qre(ny,nz,5)
     integer i, j, k, l
+    real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: p_wall
     ! Riemann invariants
     real(8) :: pin, cin, vin, Rp, Rm, rhob, vb, cb, pb
-    real(8) :: v0 = 0.d0
-    real(8) :: c0 = sqrt(gamma * p0 / rho0)
+    real(8) :: Taw, Tw, T, v0 = 0.d0
     !$cuf kernel do(2)<<<*,*>>>
     do k = 3, nz-2
       do i = 2, nx-1
         ! top
         ! Riemann invariants
-        pin = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) / QJ(i,ny-1,k,1)) &
-        & * Jacobian(ny-1)
-        cin = sqrt(gamma * pin / (QJ(i,ny-1,k,1) * Jacobian(ny-1)))
-        vin = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
-        Rp = vin + 2.d0 * cin / (gamma - 1.d0)
-        Rm = v0  - 2.d0 * c0  / (gamma - 1.d0)
-        vb = v0 + (0.5d0 * (Rp + Rm) - v0)
+        !pin  = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) / QJ(i,ny-1,k,1)) &
+        !      & * Jacobian(ny-1)
+        !cin  = sqrt(gamma * pin / (QJ(i,ny-1,k,1) * Jacobian(ny-1)))
+        !Taw  = T0 + 0.5d0 * u0**2 / Cp
+        !Tw   = p0 / (R * rho0)
+        !Tin  = Tw + (Taw - Tw) * Umin(j)  / u0 - 0.5d0 * (Pr**(1.d0/3.d0)) * Umin(j)**2  / Cp
+        !rho0 =
+        !c0   = sqrt(gamma * p0  / rho0)
+        !vin  = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
+        !Rp   = vin + 2.d0 * cin / (gamma - 1.d0)
+        !Rm   = v0  - 2.d0 * c0  / (gamma - 1.d0)
+        !vb   = v0 + (0.5d0 * (Rp + Rm) - v0)
 
-        rhob = QJ(i,ny-1,k,1) * Jacobian(ny-1)
-        QJ(i,ny,k,1) = rhob / Jacobian(ny)
-        QJ(i,ny,k,2) = QJ(i,ny-1,k,1) * u0 
-        QJ(i,ny,k,3) = QJ(i,ny-1,k,1) * vb
-        QJ(i,ny,k,4) = 0.d0
-        cb = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
-        pb = (rhob * cb**2) / gamma
-        QJ(i,ny,k,5) = (pb / (gamma - 1.d0)) / Jacobian(ny)  + 0.5d0 * (QJ(i,ny,k,2)**2 + QJ(i,ny,k,3)**2 + QJ(i,ny,k,4)**2) / QJ(i,ny,k,1)
+        !rhob         = QJ(i,ny-1,k,1) * Jacobian(ny-1)
+        !QJ(i,ny,k,1) = rhob / Jacobian(ny)
+        !QJ(i,ny,k,2) = QJ(i,ny-1,k,1) * u0 
+        !QJ(i,ny,k,3) = QJ(i,ny-1,k,1) * vb
+        !QJ(i,ny,k,4) = 0.d0
+        !cb           = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
+        !pb           = (rhob * cb**2) / gamma
+        !QJ(i,ny,k,5) = (pb / (gamma - 1.d0)) / Jacobian(ny)  + 0.5d0 * (QJ(i,ny,k,2)**2 + QJ(i,ny,k,3)**2 + QJ(i,ny,k,4)**2) / QJ(i,ny,k,1)
 
         ! Neumann boundary condition
-        !QJ(i,ny,k,1) = rhob
-        !QJ(i,ny,k,2) = QJ(i,ny-1,k,2)
-        !QJ(i,ny,k,3) = QJ(i,ny-1,k,3)
-        !QJ(i,ny,k,4) = QJ(i,ny-1,k,4)
-        !QJ(i,ny,k,5) = QJ(i,ny-1,k,5)
+        QJ(i,ny,k,1) = QJ(i,ny-1,k,1)
+        QJ(i,ny,k,2) = QJ(i,ny-1,k,2)
+        QJ(i,ny,k,3) = QJ(i,ny-1,k,3)
+        QJ(i,ny,k,4) = QJ(i,ny-1,k,4)
+        QJ(i,ny,k,5) = QJ(i,ny-1,k,5)
         ! NoSlip
         QJ(i,1,k,1) = QJ(i,2,k,1)
         QJ(i,1,k,2) = 0.d0
