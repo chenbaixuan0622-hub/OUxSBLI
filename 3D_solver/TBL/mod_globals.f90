@@ -112,7 +112,7 @@ module mod_globals
   real(8), parameter :: T0    = 171.31d0
   real(8), parameter :: u0    = 506.8d0
   real(8), parameter :: CFL   = 0.1d0
-  real(8), parameter :: dt    = 5d-9!CFL * Lx / (dble(nx-1) * u0)
+  real(8), parameter :: dt    = 2d-9!CFL * Lx / (dble(nx-1) * u0)
   integer, parameter :: nt    = int(endT / (dble(np) * dt))
 
   ! physical properties
