@@ -1,5 +1,5 @@
 module set
-  use mod_globals, only : id_rescale, nx, ny, nz, nre, Lx, Ly, Lz, gamma, R, Cp, Pr, u0, p0, T0, M0
+  use mod_globals, only : id_rescale, nx, ny, nz, nre, Lx, Ly, Lz, gamma, R, Cp, Pr, u0, p0, T0, M0, blt
   implicit none
 contains
   subroutine calc_Blasius(eta,d,u,v)
@@ -71,31 +71,33 @@ contains
     real(8), intent(in)                         :: xs(nx), ys(ny), zs(nz)
     real(8), intent(out), dimension(nx,ny,nz,5) :: Q
     integer i, j, k
-    real(8) :: d = 0.2d0 * 1.d-3
-    real(8) :: d1= 2.d-3
-    real(8) :: Cp = gamma * R / (gamma - 1.d0)
+    real(8) :: blt0 = 0.5d0 * blt
+    real(8) :: Cp   = gamma * R / (gamma - 1.d0)
     real(8) :: eta, rho, u, v, w, T, Tw, Taw, p_wall
     ! random
     real(8) :: std, ustd, Tstd
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
-          eta = ys(j) / d
-          call calc_Blasius(eta,d,u,v)
-          if (ys(j) <= d1) then
+          eta = 5.d0 * ys(j) / blt0
+          u   = min(u0, u0 * (0.0015d0 * eta**4 - 0.0181d0 * eta**3 + 0.029d0 * eta**2 + 0.3192 * eta + 0.0003d0))
+          v   = 0.d0
+          Taw  = T0 + 0.5d0 * u0**2 / Cp
+          Tw   = Taw
+          T    = Tw + (Taw - Tw) * u / u0 - 0.5d0 * Pr**(1.d0/3.d0) * u**2 / Cp
+          !call calc_Blasius(eta,d,u,v)
+          if (ys(j) <= blt) then
             call random_number(std)   ! 0 <= std <= 1
             std = 2.d0 * std - 1.d0   !-1 <= std <= 1
           else
             std = 0.d0
           endif
-          ustd = 0.2d0 * u * std
-          Tstd = T0 * (gamma - 1.d0) * M0**2 / u0
-          Taw  = T0 + 0.5d0 * u0**2 / Cp
-          Tw   = Taw
-          T    = Tw + (Taw - Tw) * u / u0 - 0.5d0 * Pr**(1.d0/3.d0) * u**2 / Cp + Tstd * std
+          ustd = 0.2d0 * u0 * std
+          Tstd = T0 * (gamma - 1.d0) * M0**2 / u0 * std
           u    = u + ustd
           v    = v + 0.5d0 * ustd
           w    = 0.5d0 * ustd
+          T    = T + Tstd
           rho  = p0 / (R * T)
           Q(i,j,k,1) = rho
           Q(i,j,k,2) = Q(i,j,k,1) * u
