@@ -1,4 +1,5 @@
 module calc_flux
+  !$use omp_lib
   use mod_globals, only : gamma, id_accuracy
   use calc_keep
   implicit none
@@ -15,6 +16,7 @@ contains
     real(8), dimension(6)   :: rho6, p6
     real(8), dimension(6,3) :: V6
     real(8)                 :: Normal(5) = (/0.d0, 1.d0, 0.d0, 0.d0, 0.d0/)
+    !$omp parallel do private(rho2,p2,V2,rho4,p4,V4,rho6,p6,V6)
     do k = 2, nz-1
       do j = 2, ny-1
         do i = 1, nx-1
@@ -55,6 +57,7 @@ contains
     real(8), dimension(6)   :: rho6, p6
     real(8), dimension(6,3) :: V6
     real(8)                 :: Normal(5) = (/0.d0, 0.d0, 1.d0, 0.d0, 0.d0/)
+    !$omp parallel do private(rho2,p2,V2,rho4,p4,V4,rho6,p6,V6)
     do k = 2, nz-1
       do j = 1, ny-1
         do i = 2, nx-1
@@ -95,6 +98,7 @@ contains
     real(8), dimension(6)   :: rho6, p6
     real(8), dimension(6,3) :: V6
     real(8)                 :: Normal(5) = (/0.d0, 0.d0, 0.d0, 1.d0, 0.d0/)
+    !$omp parallel do private(rho2,p2,V2,rho4,p4,V4,rho6,p6,V6)
     do k = 1, nz-1
       do j = 2, ny-1
         do i = 2, nx-1

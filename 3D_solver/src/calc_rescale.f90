@@ -214,19 +214,18 @@ contains
       ! re-introducing
       do k = 2, nz-1
         do j = 1, ny
-          !kc = mod(k + int(nz/2), nz) + 2
-          !call random_number(std)   ! 0 <= std <= 1
-          !ustd     = 0.04d0 * Um * (2.d0 * std - 1.d0)
-          !call random_number(std)   ! 0 <= std <= 1
-          !vstd     = 0.04d0 * Um * (2.d0 * std - 1.d0)
-          !call random_number(std)   ! 0 <= std <= 1
-          !wstd     = 0.04d0 * Um * (2.d0 * std - 1.d0)
-          ufins    = 0.5d0 * (ufin(j,k-1)    + ufin(j,k))! + ustd
-          vfins    = 0.5d0 * (vfin(j,k-1)    + vfin(j,k))! + vstd
-          wfins    = 0.5d0 * (wfin(j,k-1)    + wfin(j,k))! + wstd
-          ufouts   = 0.5d0 * (ufout(j,k-1)   + ufout(j,k))! + ustd
-          vfouts   = 0.5d0 * (vfout(j,k-1)   + vfout(j,k))! + vstd
-          wfouts   = 0.5d0 * (wfout(j,k-1)   + wfout(j,k))! + wstd
+          call random_number(std)   ! 0 <= std <= 1
+          ustd     = 0.04d0 * u0 * (2.d0 * std - 1.d0)
+          call random_number(std)   ! 0 <= std <= 1
+          vstd     = 0.04d0 * u0 * (2.d0 * std - 1.d0)
+          call random_number(std)   ! 0 <= std <= 1
+          wstd     = 0.04d0 * u0 * (2.d0 * std - 1.d0)
+          ufins    = 0.5d0 * (ufin(j,k-1)    + ufin(j,k)) + ustd
+          vfins    = 0.5d0 * (vfin(j,k-1)    + vfin(j,k)) + vstd
+          wfins    = 0.5d0 * (wfin(j,k-1)    + wfin(j,k)) + wstd
+          ufouts   = 0.5d0 * (ufout(j,k-1)   + ufout(j,k)) + ustd
+          vfouts   = 0.5d0 * (vfout(j,k-1)   + vfout(j,k)) + vstd
+          wfouts   = 0.5d0 * (wfout(j,k-1)   + wfout(j,k)) + wstd
           rhofins  = 0.5d0 * (rhofin(j,k-1)  + rhofin(j,k))
           rhofouts = 0.5d0 * (rhofout(j,k-1) + rhofout(j,k))
           uin      = (Umin(j) + ufins) * (1.d0 - weight(j)) + (Umout(j) + ufouts) * weight(j)
@@ -254,12 +253,14 @@ contains
       write(10, "(4e12.4, a)") t*1d3, blt1, bltre, blt2, "cyclic"
       close(10)
       ! cyclic boundary condition !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      do l = 1, 5
-        do k = 1, nz
-          do j = 1, ny
-            ! inlet
-            Qre(j,k,l) = Qre(j,k,l) / Jacobian(j)
-      enddo;enddo;enddo
+      do k = 1, nz
+        do j = 1, ny
+          Qre(j,k,1) = Qre(j,k,1) / Jacobian(j)
+          Qre(j,k,2) = Qre(j,k,2) / Jacobian(j)
+          Qre(j,k,3) = Qre(j,k,3) / Jacobian(j)
+          Qre(j,k,4) = Qre(j,k,4) / Jacobian(j)
+          Qre(j,k,5) = Qre(j,k,5) / Jacobian(j)
+      enddo;enddo
     endif
   end subroutine set_rescale
 end module calc_rescale
