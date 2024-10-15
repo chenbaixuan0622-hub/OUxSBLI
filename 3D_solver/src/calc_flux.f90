@@ -179,16 +179,16 @@ contains
     endif
   end function flux_Threshold2
 
-  attributes(global) subroutine calc_E(nx, ny, nz, rho, u, v, w, p, fd, E)
+  attributes(global) subroutine calc_E(nx, ny, nz, rho, u, v, w, p, E)
     use mod_globals, only : id_accuracy, id_scheme
-    integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, fd
-    real(8), intent(out), device                      :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
+    integer, intent(in), value                       :: nx, ny, nz
+    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
     integer(kind=2) id_slau_wall
     real(8), dimension(2)   :: rho2, p2
     real(8), dimension(2,3) :: V2
-    real(8), dimension(4)   :: rho4, p4
+    real(8), dimension(4)   :: rho4, p4, e4
     real(8), dimension(4,3) :: V4
     real(8), dimension(6)   :: rho6, p6
     real(8), dimension(6,3) :: V6
@@ -197,58 +197,46 @@ contains
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
-    fdx = max(fd(i,j,k), fd(i+1,j,k))
     if (3 <= i .and. i <= nx-3 .and. 8 <= kind(id_accuracy)) then
+      !e4(:)   = QJ(i-1:i+2,j,k,5) !   e / Jacobian
+      !rho4(:) = QJ(i-1:i+2,j,k,1) ! rho / Jacobian
       rho6(:) = rho(i-2:i+3,j,k)
-      p6(:)   =   p(i-2:i+3,j,k)
       V6(:,1) =   u(i-2:i+3,j,k)
       V6(:,2) =   v(i-2:i+3,j,k)
       V6(:,3) =   w(i-2:i+3,j,k)
+      p6(:)   =   p(i-2:i+3,j,k)
+      !fdx     = Albada(e4, rho4)
       E(i,j-offset,k-offset,:) = flux6(id_scheme,1,rho6,p6,V6,Normal,fdx)
     elseif (2 <= i .and. i <= nx-2 .and. 4 <= kind(id_accuracy)) then
+      !e4(:)   = QJ(i-1:i+2,j,k,5) * Jacobian(j)
       rho4(:) = rho(i-1:i+2,j,k)
-      p4(:)   =   p(i-1:i+2,j,k)
       V4(:,1) =   u(i-1:i+2,j,k)
       V4(:,2) =   v(i-1:i+2,j,k)
       V4(:,3) =   w(i-1:i+2,j,k)
+      p4(:)   =   p(i-1:i+2,j,k)
+      !fdx     = Albada(e4, rho4)
       E(i,j-offset,k-offset,:) = flux4(id_scheme,1,rho4,p4,V4,Normal,fdx)
     else
       rho2(:) = rho(i:i+1,j,k)
-      p2(:)   =   p(i:i+1,j,k)
       V2(:,1) =   u(i:i+1,j,k)
       V2(:,2) =   v(i:i+1,j,k)
       V2(:,3) =   w(i:i+1,j,k)
+      p2(:)   =   p(i:i+1,j,k)
+      !fdx     = 0.d0
       E(i,j-offset,k-offset,:) = flux2(id_scheme,1,rho2,p2,V2,Normal,fdx)
-    ! use 3rd-order SLAU at wall
-    !elseif (i == 1) then
-    !  rho4(:) = (/rho(i,j,k),   rho(i,j,k), rho(i+1,j,k), rho(i+2,j,k)/)
-    !  p4(:)   = (/p(i,j,k),       p(i,j,k),   p(i+1,j,k),   p(i+2,j,k)/)
-    !  V4(:,1) = (/u(i,j,k),       u(i,j,k),   u(i+1,j,k),   u(i+2,j,k)/)
-    !  V4(:,2) = (/v(i,j,k),       v(i,j,k),   v(i+1,j,k),   v(i+2,j,k)/)
-    !  V4(:,3) = (/w(i,j,k),       w(i,j,k),   w(i+1,j,k),   w(i+2,j,k)/)
-    !  call calc_4points(0.d0,1.d0,1.d0/3.d0,rho4,p4,V4,rho2,p2,V2)
-    !  E(i,j-offset,k-offset,:) = SLAU(id_slau_wall,1,rho2,p2,V2,Normal)
-    !else
-    !  rho4(:) = (/rho(i-1,j,k), rho(i,j,k), rho(i+1,j,k), rho(i+1,j,k)/)
-    !  p4(:)   = (/p(i-1,j,k),     p(i,j,k),   p(i+1,j,k),   p(i+1,j,k)/)
-    !  V4(:,1) = (/u(i-1,j,k),     u(i,j,k),   u(i+1,j,k),   u(i+1,j,k)/)
-    !  V4(:,2) = (/v(i-1,j,k),     v(i,j,k),   v(i+1,j,k),   v(i+1,j,k)/)
-    !  V4(:,3) = (/w(i-1,j,k),     w(i,j,k),   w(i+1,j,k),   w(i+1,j,k)/)
-    !  call calc_4points(1.d0,0.d0,1.d0/3.d0,rho4,p4,V4,rho2,p2,V2)
-    !  E(i,j-offset,k-offset,:) = SLAU(id_slau_wall,1,rho2,p2,V2,Normal)
     endif
   end subroutine calc_E
 
-  attributes(global) subroutine calc_F(nx, ny, nz, rho, u, v, w, p, fd, F)
+  attributes(global) subroutine calc_F(nx, ny, nz, rho, u, v, w, p, F)
     use mod_globals, only : id_accuracy, id_scheme, slau_wall
-    integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, fd
-    real(8), intent(out), device                      :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
+    integer, intent(in), value                       :: nx, ny, nz
+    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), intent(out), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
     integer(kind=2) id_slau_wall
     real(8), dimension(2)   :: rho2, p2
     real(8), dimension(2,3) :: V2
-    real(8), dimension(4)   :: rho4, p4
+    real(8), dimension(4)   :: rho4, p4, e4
     real(8), dimension(4,3) :: V4
     real(8), dimension(6)   :: rho6, p6
     real(8), dimension(6,3) :: V6
@@ -257,66 +245,50 @@ contains
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
-    fdy = max(fd(i,j,k), fd(i,j+1,k))
     if (3 <= j .and. j <= ny-3 .and. 8 <= kind(id_accuracy)) then
+      !e4(:)   = QJ(i,j-1:j+2,k,5) !   e / Jacobian
+      !rho4(:) = QJ(i,j-1:j+2,k,1) ! rho / Jacobian
       rho6(:) = rho(i,j-2:j+3,k)
-      p6(:)   =   p(i,j-2:j+3,k)
       V6(:,1) =   u(i,j-2:j+3,k)
       V6(:,2) =   v(i,j-2:j+3,k)
       V6(:,3) =   w(i,j-2:j+3,k)
+      p6(:)   =   p(i,j-2:j+3,k)
+      !fdy     = Albada(e4, rho4)
       F(i-offset,j,k-offset,:) = flux6(id_scheme,2,rho6,p6,V6,Normal,fdy)
     elseif (2 <= j .and. j <= ny-2 .and. 4 <= kind(id_accuracy)) then
+      !e4(:)   = QJ(i,j-1:j+2,k,5) * Jacobian(j-1:j+2)
       rho4(:) = rho(i,j-1:j+2,k)
-      p4(:)   =   p(i,j-1:j+2,k)
       V4(:,1) =   u(i,j-1:j+2,k)
       V4(:,2) =   v(i,j-1:j+2,k)
       V4(:,3) =   w(i,j-1:j+2,k)
+      p4(:)   =   p(i,j-1:j+2,k)
+      !fdy     = Albada(e4, rho4)
       F(i-offset,j,k-offset,:) = flux4(id_scheme,2,rho4,p4,V4,Normal,fdy)
-    elseif (j == 1 .and. kind(slau_wall) == 4) then
-      rho4(:) = (/rho(i,j,k),   rho(i,j,k), rho(i,j+1,k), rho(i,j+2,k)/)
-      p4(:)   = (/p(i,j,k),       p(i,j,k),   p(i,j+1,k),   p(i,j+2,k)/)
-      V4(:,1) = (/u(i,j,k),       u(i,j,k),   u(i,j+1,k),   u(i,j+2,k)/)
-      V4(:,2) = (/v(i,j,k),       v(i,j,k),   v(i,j+1,k),   v(i,j+2,k)/)
-      V4(:,3) = (/w(i,j,k),       w(i,j,k),   w(i,j+1,k),   w(i,j+2,k)/)
-      call calc_4points(0.d0,1.d0,1.d0/3.d0,fdy,rho4,p4,V4,rho2,p2,V2)
-      F(i-offset,j,k-offset,:) = SLAU(id_slau_wall,2,rho2,p2,V2,Normal)
     else
       rho2(:) = rho(i,j:j+1,k)
-      p2(:)   =   p(i,j:j+1,k)
       V2(:,1) =   u(i,j:j+1,k)
       V2(:,2) =   v(i,j:j+1,k)
       V2(:,3) =   w(i,j:j+1,k)
-      F(i-offset,j,k-offset,:) = flux2(id_scheme,2,rho2,p2,V2,Normal,fdy)
-    ! use 3rd-order SLAU at wall
-    !elseif (j == 1) then
-    !  rho4(:) = (/rho(i,j,k),   rho(i,j,k), rho(i,j+1,k), rho(i,j+2,k)/)
-    !  p4(:)   = (/p(i,j,k),       p(i,j,k),   p(i,j+1,k),   p(i,j+2,k)/)
-    !  V4(:,1) = (/u(i,j,k),       u(i,j,k),   u(i,j+1,k),   u(i,j+2,k)/)
-    !  V4(:,2) = (/v(i,j,k),       v(i,j,k),   v(i,j+1,k),   v(i,j+2,k)/)
-    !  V4(:,3) = (/w(i,j,k),       w(i,j,k),   w(i,j+1,k),   w(i,j+2,k)/)
-    !  call calc_4points(0.d0,1.d0,1.d0/3.d0,rho4,p4,V4,rho2,p2,V2)
-    !  F(i-offset,j,k-offset,:) = SLAU(id_slau_wall,2,rho2,p2,V2,Normal)
-    !else
-    !  rho4(:) = (/rho(i,j-1,k), rho(i,j,k), rho(i,j+1,k), rho(i,j+1,k)/)
-    !  p4(:)   = (/p(i,j-1,k),     p(i,j,k),   p(i,j+1,k),   p(i,j+1,k)/)
-    !  V4(:,1) = (/u(i,j-1,k),     u(i,j,k),   u(i,j+1,k),   u(i,j+1,k)/)
-    !  V4(:,2) = (/v(i,j-1,k),     v(i,j,k),   v(i,j+1,k),   v(i,j+1,k)/)
-    !  V4(:,3) = (/w(i,j-1,k),     w(i,j,k),   w(i,j+1,k),   w(i,j+1,k)/)
-    !  call calc_4points(1.d0,0.d0,1.d0/3.d0,rho4,p4,V4,rho2,p2,V2)
-    !  F(i-offset,j,k-offset,:) = SLAU(id_slau_wall,2,rho2,p2,V2,Normal)
+      p2(:)   =   p(i,j:j+1,k)
+      !fdy     = 0.d0
+      if (kind(slau_wall) /= 4) then
+        F(i-offset,j,k-offset,:) = flux2(id_scheme,2,rho2,p2,V2,Normal,fdy)
+      else
+        F(i-offset,j,k-offset,:) = SLAU(id_slau_wall,2,rho2,p2,V2,Normal)
+      endif
     endif
   end subroutine calc_F
 
-  attributes(global) subroutine calc_G(nx, ny, nz, rho, u, v, w, p, fd, G)
+  attributes(global) subroutine calc_G(nx, ny, nz, rho, u, v, w, p, G)
     use mod_globals, only : id_accuracy, id_scheme
-    integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, fd
-    real(8), intent(out), device                      :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    integer, intent(in), value                       :: nx, ny, nz
+    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), intent(out), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
     integer(kind=2) id_slau_wall
     real(8), dimension(2)   :: rho2, p2
     real(8), dimension(2,3) :: V2
-    real(8), dimension(4)   :: rho4, p4
+    real(8), dimension(4)   :: rho4, p4, e4
     real(8), dimension(4,3) :: V4
     real(8), dimension(6)   :: rho6, p6
     real(8), dimension(6,3) :: V6
@@ -325,45 +297,33 @@ contains
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
-    fdz = max(fd(i,j,k), fd(i,j,k+1))
     if (3 <= k .and. k <= nz-3 .and. 8 <= kind(id_accuracy)) then
+      !e4(:)   = QJ(i,j,k-1:k+2,5) !   e / Jacobian
+      !rho4(:) = QJ(i,j,k-1:k+2,1) ! rho / Jacobian
       rho6(:) = rho(i,j,k-2:k+3)
-      p6(:)   =   p(i,j,k-2:k+3)
       V6(:,1) =   u(i,j,k-2:k+3)
       V6(:,2) =   v(i,j,k-2:k+3)
       V6(:,3) =   w(i,j,k-2:k+3)
+      p6(:)   =   p(i,j,k-2:k+3)
+      !fdz     = Albada(e4, rho4)
       G(i-offset,j-offset,k,:) = flux6(id_scheme,3,rho6,p6,V6,Normal,fdz)
     elseif (2 <= k .and. k <= nz-2 .and. 4 <= kind(id_accuracy)) then
+      !e4(:)   = QJ(i,j,k-1:k+2,5) * Jacobian(j)
       rho4(:) = rho(i,j,k-1:k+2)
-      p4(:)   =   p(i,j,k-1:k+2)
       V4(:,1) =   u(i,j,k-1:k+2)
       V4(:,2) =   v(i,j,k-1:k+2)
       V4(:,3) =   w(i,j,k-1:k+2)
+      p4(:)   =   p(i,j,k-1:k+2)
+      !fdz     = Albada(e4, rho4)
       G(i-offset,j-offset,k,:) = flux4(id_scheme,3,rho4,p4,V4,Normal,fdz)
     else
       rho2(:) = rho(i,j,k:k+1)
-      p2(:)   =   p(i,j,k:k+1)
       V2(:,1) =   u(i,j,k:k+1)
       V2(:,2) =   v(i,j,k:k+1)
       V2(:,3) =   w(i,j,k:k+1)
+      p2(:)   =   p(i,j,k:k+1)
+      !fdz     = 0.d0
       G(i-offset,j-offset,k,:) = flux2(id_scheme,3,rho2,p2,V2,Normal,fdz)
-    ! use 3rd-order SLAU at wall
-    !elseif (k == 1) then
-    !  rho4(:) = (/rho(i,j,k),   rho(i,j,k), rho(i,j,k+1), rho(i,j,k+2)/)
-    !  p4(:)   = (/p(i,j,k),       p(i,j,k),   p(i,j,k+1),   p(i,j,k+2)/)
-    !  V4(:,1) = (/u(i,j,k),       u(i,j,k),   u(i,j,k+1),   u(i,j,k+2)/)
-    !  V4(:,2) = (/v(i,j,k),       v(i,j,k),   v(i,j,k+1),   v(i,j,k+2)/)
-    !  V4(:,3) = (/w(i,j,k),       w(i,j,k),   w(i,j,k+1),   w(i,j,k+2)/)
-    !  call calc_4points(0.d0,1.d0,1.d0/3.d0,rho4,p4,V4,rho2,p2,V2)
-    !  G(i-offset,j-offset,k,:) = SLAU(id_slau_wall,3,rho2,p2,V2,Normal)
-    !else
-    !  rho4(:) = (/rho(i,j,k-1), rho(i,j,k), rho(i,j,k+1), rho(i,j,k+1)/)
-    !  p4(:)   = (/p(i,j,k-1),     p(i,j,k),   p(i,j,k+1),   p(i,j,k+1)/)
-    !  V4(:,1) = (/u(i,j,k-1),     u(i,j,k),   u(i,j,k+1),   u(i,j,k+1)/)
-    !  V4(:,2) = (/v(i,j,k-1),     v(i,j,k),   v(i,j,k+1),   v(i,j,k+1)/)
-    !  V4(:,3) = (/w(i,j,k-1),     w(i,j,k),   w(i,j,k+1),   w(i,j,k+1)/)
-    !  call calc_4points(1.d0,0.d0,1.d0/3.d0,rho4,p4,V4,rho2,p2,V2)
-    !  G(i-offset,j-offset,k,:) = SLAU(id_slau_wall,3,rho2,p2,V2,Normal)
     endif
   end subroutine calc_G
 end module calc_flux

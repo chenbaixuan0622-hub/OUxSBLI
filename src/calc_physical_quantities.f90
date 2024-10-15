@@ -35,38 +35,38 @@ contains
   end subroutine calc_quantities_2D
 
   subroutine calc_quantities_3D(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p)
-    integer, intent(in), value                          :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device    :: Jacobian
-    real(8), intent(in), dimension(nx,ny,nz,5), device  :: QJ ! Q / Jacobian
-    real(8), intent(out), dimension(nx,ny,nz), device   :: rho, u, v, w, p
+    integer, intent(in), value                         :: nx, ny, nz
+    real(8), intent(in), dimension(ny), device         :: Jacobian
+    real(8), intent(in), dimension(nx,ny,nz,5), device :: QJ ! Q / Jacobian
+    real(8), intent(out), dimension(nx,ny,nz), device  :: rho, u, v, w, p
     integer i, j, k
     !$cuf kernel do(3) <<<*,*>>>
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
-          rho(i,j,k) = Jacobian(i,j,k) * QJ(i,j,k,1)
+          rho(i,j,k) = Jacobian(j) * QJ(i,j,k,1)
           u(i,j,k) = QJ(i,j,k,2) / QJ(i,j,k,1)
           v(i,j,k) = QJ(i,j,k,3) / QJ(i,j,k,1)
           w(i,j,k) = QJ(i,j,k,4) / QJ(i,j,k,1)
-          p(i,j,k) = (gamma - 1.d0) * (Jacobian(i,j,k) * QJ(i,j,k,5) - 0.5d0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
+          p(i,j,k) = (gamma - 1.d0) * (Jacobian(j) * QJ(i,j,k,5) - 0.5d0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
     enddo;enddo;enddo
   end subroutine calc_quantities_3D
 
   subroutine calc_quantities_3D_T(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p,T)
-    integer, intent(in), value                          :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device    :: Jacobian
-    real(8), intent(in), dimension(nx,ny,nz,5), device  :: QJ ! Q / Jacobian
-    real(8), intent(out), dimension(nx,ny,nz), device   :: rho, u, v, w, p, T
+    integer, intent(in), value                         :: nx, ny, nz
+    real(8), intent(in), dimension(ny), device         :: Jacobian
+    real(8), intent(in), dimension(nx,ny,nz,5), device :: QJ ! Q / Jacobian
+    real(8), intent(out), dimension(nx,ny,nz), device  :: rho, u, v, w, p, T
     integer i, j, k
     !$cuf kernel do(3) <<<*,*>>>
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
-          rho(i,j,k) = Jacobian(i,j,k) * QJ(i,j,k,1)
+          rho(i,j,k) = Jacobian(j) * QJ(i,j,k,1)
           u(i,j,k) = QJ(i,j,k,2) / QJ(i,j,k,1)
           v(i,j,k) = QJ(i,j,k,3) / QJ(i,j,k,1)
           w(i,j,k) = QJ(i,j,k,4) / QJ(i,j,k,1)
-          p(i,j,k) = (gamma - 1.d0) * (Jacobian(i,j,k) * QJ(i,j,k,5) - 0.5d0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
+          p(i,j,k) = (gamma - 1.d0) * (Jacobian(j) * QJ(i,j,k,5) - 0.5d0 * rho(i,j,k) * (u(i,j,k)**2 + v(i,j,k)**2 + w(i,j,k)**2))
           T(i,j,k) = p(i,j,k) / (R * rho(i,j,k))
     enddo;enddo;enddo
   end subroutine calc_quantities_3D_T

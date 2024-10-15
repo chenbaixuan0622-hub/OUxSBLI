@@ -1,15 +1,14 @@
 program main8
   use, intrinsic :: iso_fortran_env
   use mpi
-  use mod_globals, only : id_recal, nxs, nys, nzs
+  use mod_globals, only : id_recal, nx, ny, nz, Lx, Ly, Lz
   use set
   use set_coordinate
-  use calc_time_dev8
+  use calc_time_dev2
   implicit none
-  integer i, j, l, nx, ny, nz
+  integer i, j, l
   real(8) t_start, t_end
-  real(8), allocatable :: x(:), xix(:), dx(:), y(:), etay(:), dy(:), z(:), zetaz(:), dz(:), Jacobian(:,:,:)
-  real(8), allocatable, pinned :: Q(:,:,:,:)
+  real(8), allocatable :: x(:), dx(:), y(:), dy(:), z(:), dz(:), Jacobian(:), Q(:,:,:,:)
   character(len=40) filename
   ! MPI
   integer ierr, nranks, myrank, status(MPI_STATUS_SIZE)
@@ -43,40 +42,27 @@ program main8
 
   print *, "my rank is", myrank
 
-  i = myrank / 2 + 1
-  nx = nxs(i)
-  ny = nys(i)
-  nz = nzs(i)
-  allocate(Q(nx,ny,nz,5),x(nx),xix(nx),dx(nx),y(ny),etay(ny),dy(ny),z(nz),zetaz(nz),dz(nz),Jacobian(nx,ny,nz))
+  allocate(Q(nx,ny,nz,5),x(nx),dx(nx),y(ny),dy(ny),z(nz),dz(nz),Jacobian(ny))
 
   ! set grid information
   if (mod(myrank,2) == 0) then
-    call set_grid(myrank,nxs,ny,nz,x,y,z,dx,dy,dz)
-    xix(:)   = 1.d0 / dx(:)
-    etay(:)  = 1.d0 / dy(:)
-    zetaz(:) = 1.d0 / dz(:)
-    call set_Jacobian(nx,ny,nz,dx,dy,dz,Jacobian)
-    call MPI_SEND(x,        nx,       MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(dx,       nx-1,     MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(xix,      nx-1,     MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(y,        ny,       MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(dy,       ny-1,     MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(etay,     ny-1,     MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(z,        nz,       MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(dz,       nz-1,     MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(zetaz,    nz-1,     MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(Jacobian, nx*ny*nz, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
+    call set_grid(myrank,nx,ny,nz,Lx,Ly,Lz,x,y,z,dx,dy,dz)
+    call set_Jacobian_y(nx,ny,nz,dx,dy,dz,Jacobian)
+    call MPI_SEND(x,        nx,   MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
+    call MPI_SEND(dx,       nx-1, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
+    call MPI_SEND(y,        ny,   MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
+    call MPI_SEND(dy,       ny-1, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
+    call MPI_SEND(z,        nz,   MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
+    call MPI_SEND(dz,       nz-1, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
+    call MPI_SEND(Jacobian, ny,   MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
   else
-    call MPI_RECV(x,        nx,       MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
-    call MPI_RECV(dx,       nx-1,     MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
-    call MPI_RECV(xix,      nx-1,     MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
-    call MPI_RECV(y,        ny,       MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
-    call MPI_RECV(dy,       ny-1,     MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
-    call MPI_RECV(etay,     ny-1,     MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
-    call MPI_RECV(z,        nz,       MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
-    call MPI_RECV(dz,       nz-1,     MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
-    call MPI_RECV(zetaz,    nz-1,     MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
-    call MPI_RECV(Jacobian, nx*ny*nz, MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
+    call MPI_RECV(x,        nx,   MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
+    call MPI_RECV(dx,       nx-1, MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
+    call MPI_RECV(y,        ny,   MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
+    call MPI_RECV(dy,       ny-1, MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
+    call MPI_RECV(z,        nz,   MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
+    call MPI_RECV(dz,       nz-1, MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
+    call MPI_RECV(Jacobian, ny,   MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
   endif
 
   if (mod(myrank,2) == 0) then
@@ -102,7 +88,7 @@ program main8
   endif
 
   call cpu_time(t_start)
-  call RungeKutta(myrank,nx,ny,nz,x,dx,xix,y,dy,etay,z,dz,zetaz,Jacobian,Q)
+  call RungeKutta(myrank,nx,ny,nz,x,dx,y,dy,z,dz,Jacobian,Q)
   call cpu_time(t_end)
 
   if (mod(myrank,2) == 0) then
@@ -110,7 +96,7 @@ program main8
     do l = 1, nz
       do j = 1, ny
         do i = 1, nx
-          Q(i,j,l,:) = Jacobian(i,j,l) * Q(i,j,l,:)
+          Q(i,j,l,:) = Jacobian(j) * Q(i,j,l,:)
     enddo;enddo;enddo
     write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream")
@@ -119,7 +105,7 @@ program main8
     print *, "elapsed time:", t_end - t_start
   endif
 
-  deallocate(Q,x,xix,dx,y,etay,dy,z,zetaz,dz,Jacobian)
+  deallocate(Q,x,dx,y,dy,z,dz,Jacobian)
   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   call MPI_FINALIZE(ierr)
 end program main8

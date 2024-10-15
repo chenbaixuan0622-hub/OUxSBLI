@@ -54,7 +54,10 @@ contains
 
     y(1) = 0.d0
     do j = 1, ny-1
-      dy(j) = min(1.2d0, max(0.05d0, dble(j)/dble(128))) * dy1
+      ! LES
+      !dy(j) = min(1.d0, max(0.1d0, dble(j)/dble(128))) * dy1
+      ! DNS
+      dy(j) = min(1.d0, max(0.05d0, dble(j)/dble(128))) * dy1
       y(j+1) = y(j) + dy(j)
     enddo
 
@@ -75,7 +78,7 @@ contains
     real(8) :: eta, rho, u, v, w, T, p_wall
     ! random
     real(8) :: std, ustd, Tstd
-    No = int(0.35d0 * nx)
+    No = int(0.5d0 * nx)
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
@@ -119,39 +122,38 @@ contains
     Q(:,1,:,5) = p_wall / (gamma - 1.d0)
   end subroutine set_init
   
-  subroutine set_bc(nx,ny,nz,Jacobian,QJ,Qre)
-    integer, intent(in), value      :: nx, ny, nz
-    real(8), intent(in), device     :: Jacobian(nx,ny,nz)
-    real(8), intent(inout), device  :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(in), device     :: Qre(2,ny,nz,5)
+  subroutine set_bc(nx,ny,nz,Jacobian,QJ)
+    integer, intent(in), value     :: nx, ny, nz
+    real(8), intent(in), device    :: Jacobian(ny)
+    real(8), intent(inout), device :: QJ(nx,ny,nz,5) ! Q / Jacobian
     integer i, j, k, l, No
     real(8) :: p_wall
     ! Riemann invariants
     real(8) :: pin, cin, vin, Rp, Rm, rhob, vb, cb, pb
     real(8) :: v0 = 0.d0
     real(8) :: c0 = sqrt(gamma * p0 / rho0)
-    No = int(0.35d0 * nx)
+    No = int(0.5d0 * nx)
     !$cuf kernel do(2)<<<*,*>>>
     do k = 3, nz-2
       do i = 2, nx-1
         ! top
         ! Riemann invariants
         pin = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) / QJ(i,ny-1,k,1)) &
-        & * Jacobian(i,ny-1,k)
-        cin = sqrt(gamma * pin / (QJ(i,ny-1,k,1) * Jacobian(i,ny-1,k)))
+        & * Jacobian(ny-1)
+        cin = sqrt(gamma * pin / (QJ(i,ny-1,k,1) * Jacobian(ny-1)))
         vin = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
         Rp = vin + 2.d0 * cin / (gamma - 1.d0)
         Rm = v0  - 2.d0 * c0  / (gamma - 1.d0)
         vb = v0 + (0.5d0 * (Rp + Rm) - v0)
 
-        rhob = QJ(i,ny-1,k,1) * Jacobian(i,ny-1,k)
-        QJ(i,ny,k,1) = rhob / Jacobian(i,ny,k)
+        rhob = QJ(i,ny-1,k,1) * Jacobian(ny-1)
+        QJ(i,ny,k,1) = rhob / Jacobian(ny)
         QJ(i,ny,k,2) = QJ(i,ny-1,k,1) * u0 
         QJ(i,ny,k,3) = QJ(i,ny-1,k,1) * vb
         QJ(i,ny,k,4) = 0.d0
         cb = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
         pb = (rhob * cb**2) / gamma
-        QJ(i,ny,k,5) = (pb / (gamma - 1.d0)) / Jacobian(i,ny,k)  + 0.5d0 * (QJ(i,ny,k,2)**2 + QJ(i,ny,k,3)**2 + QJ(i,ny,k,4)**2) / QJ(i,ny,k,1)
+        QJ(i,ny,k,5) = (pb / (gamma - 1.d0)) / Jacobian(ny)  + 0.5d0 * (QJ(i,ny,k,2)**2 + QJ(i,ny,k,3)**2 + QJ(i,ny,k,4)**2) / QJ(i,ny,k,1)
 
         ! Neumann boundary condition
         !QJ(i,ny,k,1) = rhob
@@ -168,23 +170,20 @@ contains
         QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
     enddo;enddo
 
-    !!$cuf kernel do(2)<<<*,*>>>
-    !do k = 1, nz
-    !  do i = No, nx
-    !    QJ(i,ny,k,1) = rho2 / Jacobian(i,ny,k)
-    !    QJ(i,ny,k,2) = rho2 * ux / Jacobian(i,ny,k)
-    !    QJ(i,ny,k,3) = rho2 * uy / Jacobian(i,ny,k)
-    !    QJ(i,ny,k,4) = 0.d0
-    !    QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(i,ny,k)
-    !enddo;enddo
+    !$cuf kernel do(2)<<<*,*>>>
+    do k = 1, nz
+      do i = No, nx
+        QJ(i,ny,k,1) = rho2 / Jacobian(ny)
+        QJ(i,ny,k,2) = rho2 * ux / Jacobian(ny)
+        QJ(i,ny,k,3) = rho2 * uy / Jacobian(ny)
+        QJ(i,ny,k,4) = 0.d0
+        QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(ny)
+    enddo;enddo
 
     !$cuf kernel do(3)<<<*,*>>>
     do l = 1, 5
       do k = 3, nz-2
         do j = 1, ny
-          ! inlet
-          QJ(1,j,k,l) = Qre(1,j,k,l)
-          QJ(2,j,k,l) = Qre(2,j,k,l)
           ! outlet
           QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
     enddo;enddo;enddo

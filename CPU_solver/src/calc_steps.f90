@@ -1,4 +1,5 @@
 module calc_steps
+  !$use omp_lib
   use mod_globals, only : accuracy, offset, dt
   implicit none
 contains
@@ -16,6 +17,7 @@ contains
     real(8), intent(inout), dimension(nx-accuracy,ny-accuracy,nz-accuracy,5) :: Rs
     integer i, j, k, l
     real(8) R
+    !$omp parallel do private(k, R)
     do l = 1, 5
       do k = 1+offset, nz-offset
         do j = 1+offset, ny-offset
@@ -40,6 +42,7 @@ contains
     real(8), intent(inout), dimension(nx,ny,nz,5)                            :: Q
     integer i, j, k, l
     real(8) R
+    !$omp parallel do private(k, R)
     do l = 1, 5
       do k = 1+offset, nz-offset
         do j = 1+offset, ny-offset
