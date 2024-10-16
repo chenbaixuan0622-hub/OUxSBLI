@@ -4,7 +4,7 @@ module mod_globals
   integer, parameter    :: dimension = 3
   integer, parameter    :: accuracy  = 2
   integer, parameter    :: offset    = accuracy / 2
-  integer(4), parameter :: id_visc   = 2
+  integer(4), parameter :: id_visc   = 1
   integer, parameter    :: id_turbulence = 0
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! kind2 Euler       !
@@ -50,14 +50,14 @@ module mod_globals
   ! id_rescale  ! kind2 off           !
   !             ! kind4 on            !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  real(2), parameter         :: id_scheme   = 0
+  integer(2), parameter      :: id_scheme   = 0
   integer, parameter         :: id_sensor   = 1
   real(8), parameter         :: threshold   = 0.4d0
-  integer(kind=8), parameter :: id_accuracy = 0
+  integer(kind=2), parameter :: id_accuracy = 0
   integer(kind=2), parameter :: id_tvd      = 0
   integer(kind=2), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
-  integer(kind=4), parameter :: slau_wall   = 0
+  integer(kind=2), parameter :: slau_wall   = 0
   integer(kind=4), parameter :: id_rescale  = 0
   real(8), parameter         :: blt         = 2.d-3
 
@@ -74,8 +74,8 @@ module mod_globals
   integer, parameter :: ny = 257 ! yp = 0.5, 0.002  mm
   integer, parameter :: nz = 257 ! zp = 5    0.0156 mm
 
-  integer, parameter :: nre1 = int(0.8 * nx)
-  integer, parameter :: nre2 = int(0.9 * nx)
+  integer, parameter :: nre1 = int(0.7 * nx)
+  integer, parameter :: nre2 = int(0.8 * nx)
 
   ! RTX 4090
   type(dim3) :: blocksE   = dim3((nx-accuracy+1)/64,(ny-accuracy)/5,(nz-accuracy)/1)
@@ -104,16 +104,16 @@ module mod_globals
   integer(kind=4), parameter :: id_RungeKutta = 0
   integer(kind=2), parameter :: id_recal      = 0
   integer, parameter         :: step_offset   = 0
-  integer, parameter         :: start_rescale = 80
+  integer, parameter         :: start_rescale = 40
   real(8), parameter :: endT  = 0.4d-3
-  integer, parameter :: np    = 1!80
+  integer, parameter :: np    = 40
   real(8), parameter :: R     = 287.03d0
   real(8), parameter :: gamma = 1.4d0
   real(8), parameter :: T0    = 171.31d0
   real(8), parameter :: u0    = 506.8d0
   real(8), parameter :: CFL   = 0.1d0
-  real(8), parameter :: dt    = 1d-8!CFL * Lx / (dble(nx-1) * u0)
-  integer, parameter :: nt    = 1!int(endT / (dble(np) * dt))
+  real(8), parameter :: dt    = 5d-9!CFL * Lx / (dble(nx-1) * u0)
+  integer, parameter :: nt    = int(endT / (dble(np) * dt))
 
   ! physical properties
   real(8), parameter :: Pr    = 0.71d0
@@ -122,6 +122,5 @@ module mod_globals
   ! initial condition
   real(8), parameter :: M0   = 1.9d0
   real(8), parameter :: p0   = 14924.d0
-  real(8), parameter :: rho0 = p0 / (R * T0)
 end module mod_globals
 

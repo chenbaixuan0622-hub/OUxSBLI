@@ -285,9 +285,9 @@ contains
         if (myrank == 0) then
           call nvtxStartRange("Send Qre", 1)
           if (kind(id_rescale) == 4) then
-            Qre_cpu = QJ(nre1,:,:,:)
+            Qre_cpu = QJ(nre2,:,:,:)
             call MPI_ISEND(Qre_cpu, 5*ny*nz, MPI_REAL8, 1, 0, MPI_COMM_WORLD, ireq, ierr)
-            call calc_mean(nx,ny,nz,QJ,Qm)
+            call calc_mean(nx,ny,nz,Jacobian,QJ,Qm)
             Qm_cpu  = Qm
             call MPI_ISEND(Qm_cpu,  5*ny,    MPI_REAL8, 1, 1, MPI_COMM_WORLD, ireq, ierr)
           endif
@@ -319,9 +319,9 @@ contains
 
         if (myrank == 0) then
           if (kind(id_rescale) == 4) then
-            Qre_cpu = QJs(nre1,:,:,:)
+            Qre_cpu = QJs(nre2,:,:,:)
             call MPI_ISEND(Qre_cpu, 5*ny*nz, MPI_REAL8, 1, 3, MPI_COMM_WORLD, ireq, ierr)
-            call calc_mean(nx,ny,nz,QJs,Qm)
+            call calc_mean(nx,ny,nz,Jacobian,QJs,Qm)
             Qm_cpu  = Qm
             call MPI_ISEND(Qm_cpu,  5*ny,    MPI_REAL8, 1, 4, MPI_COMM_WORLD, ireq, ierr)
           endif
@@ -342,9 +342,9 @@ contains
 
         if (myrank == 0) then
           if (kind(id_rescale) == 4) then
-            Qre_cpu = QJs(nre1,:,:,:)
+            Qre_cpu = QJs(nre2,:,:,:)
             call MPI_ISEND(Qre_cpu, 5*ny*nz, MPI_REAL8, 1, 6, MPI_COMM_WORLD, ireq, ierr)
-            call calc_mean(nx,ny,nz,QJs,Qm)
+            call calc_mean(nx,ny,nz,Jacobian,QJs,Qm)
             Qm_cpu  = Qm
             call MPI_ISEND(Qm_cpu,  5*ny,    MPI_REAL8, 1, 7, MPI_COMM_WORLD, ireq, ierr)
           endif
@@ -365,9 +365,9 @@ contains
 
         if (myrank == 0) then
           if (kind(id_rescale) == 4) then
-            Qre_cpu = QJs(nre1,:,:,:)
+            Qre_cpu = QJs(nre2,:,:,:)
             call MPI_ISEND(Qre_cpu, 5*ny*nz, MPI_REAL8, 1, 9, MPI_COMM_WORLD, ireq, ierr)
-            call calc_mean(nx,ny,nz,QJs,Qm)
+            call calc_mean(nx,ny,nz,Jacobian,QJs,Qm)
             Qm_cpu  = Qm
             call MPI_ISEND(Qm_cpu,  5*ny,    MPI_REAL8, 1,10, MPI_COMM_WORLD, ireq, ierr)
           endif

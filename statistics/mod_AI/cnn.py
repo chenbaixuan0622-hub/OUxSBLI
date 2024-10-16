@@ -104,7 +104,7 @@ class UNet(nn.Module):
     self.relu4 = nn.PReLU()
 
     # Block
-    self.layer = self._make_layer(block, channels2)
+    self.layer = self._make_layer(block, channels4)
     
     # decoder
     # layer5
@@ -121,7 +121,7 @@ class UNet(nn.Module):
     self.relu8    = nn.PReLU()
 
     self.connect  = nn.Sequential()
-    self.dropout  = nn.Dropout(0.05)
+    self.dropout  = nn.Dropout(0.1)
 
   def _make_layer(self, block, in_channels):
     layers = []
@@ -131,39 +131,35 @@ class UNet(nn.Module):
   def forward(self, x):
     # encoder
     # layer1
-    x = self.conv1(x)
-    x = self.relu1(x)
+    x1 = self.conv1(x)
+    x1 = self.relu1(x1)
     # layer2
-    x = self.conv2(x)
-    x = self.relu2(x)
+    x2 = self.conv2(x1)
+    x2 = self.relu2(x2)
     # layer3
-    #x = self.conv3(x)
-    #x = self.relu3(x)
+    x3 = self.conv3(x2)
+    x3 = self.relu3(x3)
     # layer4
-    #x = self.conv4(x)
-    #x = self.relu4(x)
+    x4 = self.conv4(x3)
+    x4 = self.relu4(x4)
 
     # block
-    #x = self.layer(x)
-
-    x1 = self.layer(x) + x
-    x  = self.layer(x1) + x
-    #x2 = self.layer(x) + x
-    #x  = self.layer(x2) + x
+    x4f = self.layer(x4)
+    x4  = self.layer(x4f) + x4f
 
     # decoder
     # layer5
-    #x = self.tconv1(x)
-    #x = self.relu5(x)
+    x5 = self.tconv1(x4)
+    x5 = self.relu5(x5) + x3
     # layer6
-    #x = self.tconv2(x)
-    #x = self.relu6(x)
+    x6 = self.tconv2(x5)
+    x6 = self.relu6(x6) + x2
     # layer7
-    x = self.tconv3(x)
-    x = self.relu7(x)
+    x7 = self.tconv3(x6)
+    x7 = self.relu7(x7) + x1
     # layer8
-    x = self.tconv4(x)
-    x = self.relu8(x)
+    x8 = self.tconv4(x7)
+    x  = self.relu8(x8)
 
     # dropout
     x = self.dropout(x)

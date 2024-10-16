@@ -23,8 +23,8 @@ module mod_globals
 
   integer(kind=2), parameter  :: id_recal = 0
   integer, parameter          :: step_offset = 0
-  integer, parameter          :: nt = 200!1
-  integer, parameter          :: np = 200
+  integer, parameter          :: nt = 100!1
+  integer, parameter          :: np = 10!200
   real(8), parameter          :: dt = 0.01d0!0.02d0
 
   ! physical properties
