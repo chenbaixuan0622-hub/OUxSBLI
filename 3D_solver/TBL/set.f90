@@ -156,9 +156,36 @@ contains
     ! Riemann invariants
     real(8) :: pin, cin, vin, Rp, Rm, rhob, vb, cb, pb
     real(8) :: Taw, Tw, T, v0 = 0.d0
+
+    if (kind(id_rescale) == 4) then
+      !$cuf kernel do(3)<<<*,*>>>
+      do l = 1, 5
+        do k = 3, nz-2
+          do j = 2, ny-1
+            ! inlet
+            QJ(1,j,k,l)  = Qre(j,k,l)
+            ! outlet
+            QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
+      enddo;enddo;enddo
+    else
+      !$cuf kernel do(3)<<<*,*>>>
+      do l = 1, 5
+        do k = 3, nz-2
+          do j = 2, ny-1
+            ! inlet
+            QJ(1,j,k,l) = QJ(nx-5,j,k,l)
+            QJ(2,j,k,l) = QJ(nx-4,j,k,l)
+            QJ(3,j,k,l) = QJ(nx-3,j,k,l)
+            ! outlet
+            QJ(nx-2,j,k,l) = QJ(4,j,k,l)
+            QJ(nx-1,j,k,l) = QJ(5,j,k,l)
+            QJ(nx,j,k,l)   = QJ(6,j,k,l)
+      enddo;enddo;enddo
+    endif
+
     !$cuf kernel do(2)<<<*,*>>>
     do k = 3, nz-2
-      do i = 2, nx-1
+      do i = 1, nx
         ! top
         ! Riemann invariants
         !pin  = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) / QJ(i,ny-1,k,1)) &
@@ -197,32 +224,6 @@ contains
         p_wall = (gamma - 1.d0) * (QJ(i,2,k,5) - 0.5d0 * (QJ(i,2,k,2)**2 + QJ(i,2,k,3)**2 + QJ(i,2,k,4)**2) / QJ(i,2,k,1))
         QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
     enddo;enddo
-
-    if (kind(id_rescale) == 4) then
-      !$cuf kernel do(3)<<<*,*>>>
-      do l = 1, 5
-        do k = 3, nz-2
-          do j = 1, ny
-            ! inlet
-            QJ(1,j,k,l)  = Qre(j,k,l)
-            ! outlet
-            QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
-      enddo;enddo;enddo
-    else
-      !$cuf kernel do(3)<<<*,*>>>
-      do l = 1, 5
-        do k = 3, nz-2
-          do j = 1, ny
-            ! inlet
-            QJ(1,j,k,l) = QJ(nx-5,j,k,l)
-            QJ(2,j,k,l) = QJ(nx-4,j,k,l)
-            QJ(3,j,k,l) = QJ(nx-3,j,k,l)
-            ! outlet
-            QJ(nx-2,j,k,l) = QJ(4,j,k,l)
-            QJ(nx-1,j,k,l) = QJ(5,j,k,l)
-            QJ(nx,j,k,l)   = QJ(6,j,k,l)
-      enddo;enddo;enddo
-    endif
 
     ! cyclic
     !$cuf kernel do(3)<<<*,*>>>
