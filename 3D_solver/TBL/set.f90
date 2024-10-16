@@ -67,15 +67,37 @@ contains
   end subroutine set_grid
 
   subroutine set_init(nx,ny,nz,xs,ys,zs,Q)
-    integer, intent(in)                         :: nx, ny, nz
-    real(8), intent(in)                         :: xs(nx), ys(ny), zs(nz)
-    real(8), intent(out), dimension(nx,ny,nz,5) :: Q
+    integer, intent(in)  :: nx, ny, nz
+    real(8), intent(in)  :: xs(nx), ys(ny), zs(nz)
+    real(8), intent(out) :: Q(nx,ny,nz,5)
     integer i, j, k
     real(8) :: blt0 = 0.5d0 * blt
     real(8) :: Cp   = gamma * R / (gamma - 1.d0)
     real(8) :: eta, rho, u, v, w, T, Tw, Taw, p_wall
     ! random
-    real(8) :: std, ustd, Tstd
+    real(8) :: std, ustd, vstd, wstd, Tstd
+    real(8), allocatable :: randum(:,:,:,:)
+    integer ir, jr, kr, nxr, nyr, nzr
+
+    ! generate randum
+    nxr = (nx+9) / 10
+    nyr = (ny+1) / 2
+    nzr = (nz+1) / 2
+    allocate(randum(nxr,nyr,nzr,4))
+
+    do k = 1, nzr
+      do j = 1, nyr
+        do i = 1, nxr
+          call random_number(randum(i,j,k,1))
+          call random_number(randum(i,j,k,2))
+          call random_number(randum(i,j,k,3))
+          call random_number(randum(i,j,k,4))
+          randum(i,j,k,1) = 2.d0 * randum(i,j,k,1) - 1.d0
+          randum(i,j,k,2) = 2.d0 * randum(i,j,k,2) - 1.d0
+          randum(i,j,k,3) = 2.d0 * randum(i,j,k,3) - 1.d0
+          randum(i,j,k,4) = 2.d0 * randum(i,j,k,4) - 1.d0
+    enddo;enddo;enddo
+
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
@@ -86,25 +108,33 @@ contains
           Tw   = Taw
           T    = Tw + (Taw - Tw) * u / u0 - 0.5d0 * Pr**(1.d0/3.d0) * u**2 / Cp
           !call calc_Blasius(eta,d,u,v)
-          if (ys(j) <= blt) then
-            call random_number(std)   ! 0 <= std <= 1
-            std = 2.d0 * std - 1.d0   !-1 <= std <= 1
+          if (10 < j .and. ys(j) <= blt) then
+            ir = i / 10 + 1
+            jr = j / 2  + 1
+            kr = k / 2  + 1
+            ustd = 0.2d0 * u0 * randum(ir,jr,kr,1)
+            vstd = 0.1d0 * u0 * randum(ir,jr,kr,2)
+            wstd = 0.1d0 * u0 * randum(ir,jr,kr,3)
+            Tstd = T0 * (gamma - 1.d0) * M0**2 * 0.2d0 * randum(ir,jr,kr,4)
           else
-            std = 0.d0
+            ustd = 0.d0
+            vstd = 0.d0
+            wstd = 0.d0
+            Tstd = 0.d0
           endif
-          ustd = 0.2d0 * u0 * std
-          Tstd = T0 * (gamma - 1.d0) * M0**2 / u0 * std
-          u    = u + ustd
-          v    = v + 0.5d0 * ustd
-          w    = 0.5d0 * ustd
-          T    = T + Tstd
-          rho  = p0 / (R * T)
+          u   = u + ustd
+          v   = v + vstd
+          w   = wstd
+          T   = T + Tstd
+          rho = p0 / (R * T)
           Q(i,j,k,1) = rho
           Q(i,j,k,2) = Q(i,j,k,1) * u
           Q(i,j,k,3) = Q(i,j,k,1) * v
           Q(i,j,k,4) = Q(i,j,k,1) * w
           Q(i,j,k,5) = p0 / (gamma - 1.d0) + 0.5d0 * (Q(i,j,k,2)**2 + Q(i,j,k,3)**2 + Q(i,j,k,4)**2) / Q(i,j,k,1)
     enddo;enddo;enddo
+
+    deallocate(randum)
 
     ! bottom
     Q(:,1,:,1) = Q(:,2,:,1)
@@ -126,9 +156,36 @@ contains
     ! Riemann invariants
     real(8) :: pin, cin, vin, Rp, Rm, rhob, vb, cb, pb
     real(8) :: Taw, Tw, T, v0 = 0.d0
+
+    if (kind(id_rescale) == 4) then
+      !$cuf kernel do(3)<<<*,*>>>
+      do l = 1, 5
+        do k = 3, nz-2
+          do j = 2, ny-1
+            ! inlet
+            QJ(1,j,k,l)  = Qre(j,k,l)
+            ! outlet
+            QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
+      enddo;enddo;enddo
+    else
+      !$cuf kernel do(3)<<<*,*>>>
+      do l = 1, 5
+        do k = 3, nz-2
+          do j = 2, ny-1
+            ! inlet
+            QJ(1,j,k,l) = QJ(nx-5,j,k,l)
+            QJ(2,j,k,l) = QJ(nx-4,j,k,l)
+            QJ(3,j,k,l) = QJ(nx-3,j,k,l)
+            ! outlet
+            QJ(nx-2,j,k,l) = QJ(4,j,k,l)
+            QJ(nx-1,j,k,l) = QJ(5,j,k,l)
+            QJ(nx,j,k,l)   = QJ(6,j,k,l)
+      enddo;enddo;enddo
+    endif
+
     !$cuf kernel do(2)<<<*,*>>>
     do k = 3, nz-2
-      do i = 2, nx-1
+      do i = 1, nx
         ! top
         ! Riemann invariants
         !pin  = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) / QJ(i,ny-1,k,1)) &
@@ -167,32 +224,6 @@ contains
         p_wall = (gamma - 1.d0) * (QJ(i,2,k,5) - 0.5d0 * (QJ(i,2,k,2)**2 + QJ(i,2,k,3)**2 + QJ(i,2,k,4)**2) / QJ(i,2,k,1))
         QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
     enddo;enddo
-
-    if (kind(id_rescale) == 4) then
-      !$cuf kernel do(3)<<<*,*>>>
-      do l = 1, 5
-        do k = 3, nz-2
-          do j = 1, ny
-            ! inlet
-            QJ(1,j,k,l)  = Qre(j,k,l)
-            ! outlet
-            QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
-      enddo;enddo;enddo
-    else
-      !$cuf kernel do(3)<<<*,*>>>
-      do l = 1, 5
-        do k = 3, nz-2
-          do j = 1, ny
-            ! inlet
-            QJ(1,j,k,l) = QJ(nx-5,j,k,l)
-            QJ(2,j,k,l) = QJ(nx-4,j,k,l)
-            QJ(3,j,k,l) = QJ(nx-3,j,k,l)
-            ! outlet
-            QJ(nx-2,j,k,l) = QJ(4,j,k,l)
-            QJ(nx-1,j,k,l) = QJ(5,j,k,l)
-            QJ(nx,j,k,l)   = QJ(6,j,k,l)
-      enddo;enddo;enddo
-    endif
 
     ! cyclic
     !$cuf kernel do(3)<<<*,*>>>
