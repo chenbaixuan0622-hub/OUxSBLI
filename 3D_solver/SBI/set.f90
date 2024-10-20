@@ -1,5 +1,5 @@
 module set
-  use mod_globals, only : id_rescale, nx, ny, nz, nre, Lx, Ly, Lz, gamma, R, rho0, rho2, u0, ux, uy, p0, p2, T0, M0
+  use mod_globals, only : id_rescale, nx, ny, nz, nre, Lx, Ly, Lz, gamma, R, Pr, blt, rho0, rho2, u0, ux, uy, p0, p2, T0, M0
   implicit none
 contains
   subroutine set_grid(nx,ny,nz,x,y,z,dx,dy,dz)
@@ -121,10 +121,11 @@ contains
     Q(:,1,:,5) = p_wall / (gamma - 1.d0)
   end subroutine set_init
   
-  subroutine set_bc(nx,ny,nz,Jacobian,QJ)
+  subroutine set_bc(nx,ny,nz,Jacobian,QJ,Qre)
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: Jacobian(ny)
     real(8), intent(inout), device :: QJ(nx,ny,nz,5) ! Q / Jacobian
+    real(8), intent(in), device    :: Qre(ny,nz,5)
     integer i, j, k, l, No
     real(8) :: p_wall
     ! Riemann invariants
@@ -132,34 +133,61 @@ contains
     real(8) :: v0 = 0.d0
     real(8) :: c0 = sqrt(gamma * p0 / rho0)
     No = int(0.5d0 * nx)
+
+    if (kind(id_rescale) == 4) then
+      !$cuf kernel do(3)<<<*,*>>>
+      do l = 1, 5
+        do k = 3, nz-2
+          do j = 2, ny-1
+            ! inlet
+            QJ(1,j,k,l)  = Qre(j,k,l)
+            ! outlet
+            QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
+      enddo;enddo;enddo
+    else
+      !$cuf kernel do(3)<<<*,*>>>
+      do l = 1, 5
+        do k = 3, nz-2
+          do j = 2, ny-1
+            ! inlet
+            QJ(1,j,k,l) = QJ(nx-5,j,k,l)
+            QJ(2,j,k,l) = QJ(nx-4,j,k,l)
+            QJ(3,j,k,l) = QJ(nx-3,j,k,l)
+            ! outlet
+            QJ(nx-2,j,k,l) = QJ(4,j,k,l)
+            QJ(nx-1,j,k,l) = QJ(5,j,k,l)
+            QJ(nx,j,k,l)   = QJ(6,j,k,l)
+      enddo;enddo;enddo
+    endif
+    
     !$cuf kernel do(2)<<<*,*>>>
     do k = 3, nz-2
-      do i = 2, nx-1
+      do i = 1, nx
         ! top
         ! Riemann invariants
-        pin = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) / QJ(i,ny-1,k,1)) &
-        & * Jacobian(ny-1)
-        cin = sqrt(gamma * pin / (QJ(i,ny-1,k,1) * Jacobian(ny-1)))
-        vin = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
-        Rp = vin + 2.d0 * cin / (gamma - 1.d0)
-        Rm = v0  - 2.d0 * c0  / (gamma - 1.d0)
-        vb = v0 + (0.5d0 * (Rp + Rm) - v0)
+        !pin = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) / QJ(i,ny-1,k,1)) &
+        !& * Jacobian(ny-1)
+        !cin = sqrt(gamma * pin / (QJ(i,ny-1,k,1) * Jacobian(ny-1)))
+        !vin = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
+        !Rp = vin + 2.d0 * cin / (gamma - 1.d0)
+        !Rm = v0  - 2.d0 * c0  / (gamma - 1.d0)
+        !vb = v0 + (0.5d0 * (Rp + Rm) - v0)
 
-        rhob = QJ(i,ny-1,k,1) * Jacobian(ny-1)
-        QJ(i,ny,k,1) = rhob / Jacobian(ny)
-        QJ(i,ny,k,2) = QJ(i,ny-1,k,1) * u0 
-        QJ(i,ny,k,3) = QJ(i,ny-1,k,1) * vb
-        QJ(i,ny,k,4) = 0.d0
-        cb = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
-        pb = (rhob * cb**2) / gamma
-        QJ(i,ny,k,5) = (pb / (gamma - 1.d0)) / Jacobian(ny)  + 0.5d0 * (QJ(i,ny,k,2)**2 + QJ(i,ny,k,3)**2 + QJ(i,ny,k,4)**2) / QJ(i,ny,k,1)
+        !rhob = QJ(i,ny-1,k,1) * Jacobian(ny-1)
+        !QJ(i,ny,k,1) = rhob / Jacobian(ny)
+        !QJ(i,ny,k,2) = QJ(i,ny-1,k,1) * u0 
+        !QJ(i,ny,k,3) = QJ(i,ny-1,k,1) * vb
+        !QJ(i,ny,k,4) = 0.d0
+        !cb = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
+        !pb = (rhob * cb**2) / gamma
+        !QJ(i,ny,k,5) = (pb / (gamma - 1.d0)) / Jacobian(ny)  + 0.5d0 * (QJ(i,ny,k,2)**2 + QJ(i,ny,k,3)**2 + QJ(i,ny,k,4)**2) / QJ(i,ny,k,1)
 
         ! Neumann boundary condition
-        !QJ(i,ny,k,1) = rhob
-        !QJ(i,ny,k,2) = QJ(i,ny-1,k,2)
-        !QJ(i,ny,k,3) = QJ(i,ny-1,k,3)
-        !QJ(i,ny,k,4) = QJ(i,ny-1,k,4)
-        !QJ(i,ny,k,5) = QJ(i,ny-1,k,5)
+        QJ(i,ny,k,1) = QJ(i,ny-1,k,1)
+        QJ(i,ny,k,2) = QJ(i,ny-1,k,2)
+        QJ(i,ny,k,3) = QJ(i,ny-1,k,3)
+        QJ(i,ny,k,4) = QJ(i,ny-1,k,4)
+        QJ(i,ny,k,5) = QJ(i,ny-1,k,5)
         ! NoSlip
         QJ(i,1,k,1) = QJ(i,2,k,1)
         QJ(i,1,k,2) = 0.d0
@@ -169,23 +197,15 @@ contains
         QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
     enddo;enddo
 
-    !$cuf kernel do(2)<<<*,*>>>
-    do k = 1, nz
-      do i = No, nx
-        QJ(i,ny,k,1) = rho2 / Jacobian(ny)
-        QJ(i,ny,k,2) = rho2 * ux / Jacobian(ny)
-        QJ(i,ny,k,3) = rho2 * uy / Jacobian(ny)
-        QJ(i,ny,k,4) = 0.d0
-        QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(ny)
-    enddo;enddo
-
-    !$cuf kernel do(3)<<<*,*>>>
-    do l = 1, 5
-      do k = 3, nz-2
-        do j = 1, ny
-          ! outlet
-          QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
-    enddo;enddo;enddo
+    !!$cuf kernel do(2)<<<*,*>>>
+    !do k = 1, nz
+    !  do i = No, nx
+    !    QJ(i,ny,k,1) = rho2 / Jacobian(ny)
+    !    QJ(i,ny,k,2) = rho2 * ux / Jacobian(ny)
+    !    QJ(i,ny,k,3) = rho2 * uy / Jacobian(ny)
+    !    QJ(i,ny,k,4) = 0.d0
+    !    QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(ny)
+    !enddo;enddo
 
     ! cyclic
     !$cuf kernel do(3)<<<*,*>>>
