@@ -1,5 +1,5 @@
 module set
-  use mod_globals, only : id_rescale, nx, ny, nz, nre, Lx, Ly, Lz, gamma, R, Cp, Pr, u0, p0, T0, M0, blt
+  use mod_globals, only : id_rescale, nx, ny, nz, nre, Lx, Ly, Lz, gamma, R, Cp, Pr, u0, p0, T0, M0, blt, rho2, p2, ux, uy
   implicit none
 contains
   subroutine calc_Blasius(eta,d,u,v)
@@ -51,11 +51,14 @@ contains
     enddo
 
     y(1) = 0.d0
-    do j = 1, ny-1
-      ! LES
-      !dy(j) = min(1.d0, max(0.1d0, dble(j)/dble(128))) * dy1
+    do j = 1, 256
       ! DNS
-      dy(j) = min(1.d0, max(0.05d0, dble(j)/dble(128))) * dy1
+      dy(j)  = min(1.d0, max(0.05d0, dble(j)/dble(128))) * dy1
+      y(j+1) = y(j) + dy(j)
+    enddo
+    ! buffer
+    do j = 257, ny-1
+      dy(j)  = 2.d0 * dy1
       y(j+1) = y(j) + dy(j)
     enddo
 
@@ -150,12 +153,13 @@ contains
     real(8), intent(in), device    :: Jacobian(ny)
     real(8), intent(inout), device :: QJ(nx,ny,nz,5) ! Q / Jacobian
     real(8), intent(in), device    :: Qre(ny,nz,5)
-    integer i, j, k, l
+    integer i, j, k, l, No
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: p_wall
     ! Riemann invariants
     real(8) :: pin, cin, vin, Rp, Rm, rhob, vb, cb, pb
     real(8) :: Taw, Tw, T, v0 = 0.d0
+    No = int(0.4 * nx)
 
     if (kind(id_rescale) == 4) then
       !$cuf kernel do(3)<<<*,*>>>
@@ -223,6 +227,16 @@ contains
         QJ(i,1,k,4) = 0.d0
         p_wall = (gamma - 1.d0) * (QJ(i,2,k,5) - 0.5d0 * (QJ(i,2,k,2)**2 + QJ(i,2,k,3)**2 + QJ(i,2,k,4)**2) / QJ(i,2,k,1))
         QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
+    enddo;enddo
+
+    !$cuf kernel do(2)<<<*,*>>>
+    do k = 1, nz
+      do i = No, nx
+        QJ(i,ny,k,1) = rho2 / Jacobian(ny)
+        QJ(i,ny,k,2) = rho2 * ux / Jacobian(ny)
+        QJ(i,ny,k,3) = rho2 * uy / Jacobian(ny)
+        QJ(i,ny,k,4) = 0.d0
+        QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(ny)
     enddo;enddo
 
     ! cyclic
