@@ -6,11 +6,18 @@
 
 <body>
 <h1>
-Compressible solver
+GPU Based Explicit solver
 </h1>
-<p>
-2D and 3D solvers are accelerated by GPU
-</p>
+
+<h2>
+Available schemes
+<h2>
+<ul>
+<li>SLAU</li>
+<li>HR-SLAU2</li>
+<li>KEEP</li>
+<li>KEP</li>
+</ul>
 
 <h2>
 KEEP scheme
