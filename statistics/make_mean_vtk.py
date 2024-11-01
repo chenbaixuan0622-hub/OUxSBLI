@@ -3,13 +3,12 @@ import os
 import vtk
 from mod.mod_read import getGrid
 
-def print_vtk(x, y, z, rho, u, v, w, p, prms, directory, name):
+def print_vtk(x, y, z, rho, u, v, w, p, directory, name):
   rho1d  = np.float32(rho.flatten())
   u1d    = np.float32(u.flatten())
   v1d    = np.float32(v.flatten())
   w1d    = np.float32(w.flatten())
   p1d    = np.float32(p.flatten())
-  prms1d = np.float32(prms.flatten())
 
   os.makedirs(directory, exist_ok=True)
   filename  = name + ".vtr" 
@@ -58,38 +57,30 @@ def print_vtk(x, y, z, rho, u, v, w, p, prms, directory, name):
     p.InsertNextValue(p1d[i])
   grid.GetPointData().AddArray(p)
 
-  prms = vtk.vtkFloatArray()
-  prms.SetName("prms")
-  for i in range(nx * ny * nz):
-    prms.InsertNextValue(prms1d[i])
-  grid.GetPointData().AddArray(prms)
-
   writer = vtk.vtkXMLRectilinearGridWriter()
   writer.SetFileName(filepath)
   writer.SetInputData(grid)
   writer.Write()
 
 
-Q_directory = "../../../../../media/user/HD-EDS-E/hatayama/TOS/TOS20240830"
+Q_directory = "../3D_solver/TBL/data"
 
 Q_files = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
 
 first_path       = os.path.join(Q_directory, Q_files[0])
 _, _, _, x, y, z = getGrid(os.path.join(first_path))
 
-rho_path  = os.path.join(Q_directory, "rhom.npy")
-u_path    = os.path.join(Q_directory, "um.npy"  )
-v_path    = os.path.join(Q_directory, "vm.npy"  )
-w_path    = os.path.join(Q_directory, "wm.npy"  )
-p_path    = os.path.join(Q_directory, "pm.npy"  )
-prms_path = os.path.join(Q_directory, "prms.npy")
+rho_path  = os.path.join(Q_directory, "rho.npy")
+u_path    = os.path.join(Q_directory, "u.npy"  )
+v_path    = os.path.join(Q_directory, "v.npy"  )
+w_path    = os.path.join(Q_directory, "w.npy"  )
+p_path    = os.path.join(Q_directory, "p.npy"  )
 
-rho  = np.load(rho_path )
-u    = np.load(u_path   )
-v    = np.load(v_path   )
-w    = np.load(w_path   )
-p    = np.load(p_path   )
-prms = np.load(prms_path)
+rho  = np.load(rho_path)
+u    = np.load(u_path  )
+v    = np.load(v_path  )
+w    = np.load(w_path  )
+p    = np.load(p_path  )
 
-print_vtk(np.float32(x), np.float32(y), np.float32(z), rho, u, v, w, p, prms, Q_directory, "Qm")
+print_vtk(np.float32(x), np.float32(y), np.float32(z), rho, u, v, w, p, Q_directory, "Qmean")
 
