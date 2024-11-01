@@ -219,20 +219,25 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine print_1d(step,nx,ny,nz,x,y,z,rho,p,u,sensor)
-    integer, intent(in), value               :: step, nx, ny, nz
-    real(8), intent(in)                      :: x(nx), y(ny), z(nz)
-    real(8), intent(in), dimension(nx,ny,nz) :: rho, p, u, sensor
-    real(8) T
+  subroutine print_1d(step,nx,ny,nz,x,y,z,Jacobian,QJ)
+    integer, intent(in) :: step, nx, ny, nz
+    real(4), intent(in) :: x(nx), y(ny), z(nz)
+    real(8), intent(in) :: Jacobian(ny), QJ(nx,ny,nz,5)
+    real(8) rho, u, v, w, p, Lx
     integer i, nyh, nzh
     character(len=40) filename
     nyh = int(0.5 * ny)
     nzh = int(0.5 * nz)
+    Lx  = x(nx)
     write(filename, "(a, i5.5, a)") "data/1d/Q", int(step), ".d"
     open(10,file=filename)
     do i = 1, nx
-      T = p(i,nyh,nzh) / (rho(i,nyh,nzh) * R)
-      write(10,"(7e12.4)") x(i) / Lx, rho(i,nyh,nzh), u(i,nyh,nzh), p(i,nyh,nzh), T, sensor(i,nyh,nzh)
+      rho = Jacobian(nyh) * QJ(i,nyh,nzh,1)
+      u   = QJ(i,nyh,nzh,2) / QJ(i,nyh,nzh,1)
+      v   = QJ(i,nyh,nzh,3) / QJ(i,nyh,nzh,1)
+      w   = QJ(i,nyh,nzh,4) / QJ(i,nyh,nzh,1)
+      p   = (gamma - 1.d0) * (Jacobian(nyh) * QJ(i,nyh,nzh,5) - 0.5d0 * rho * (u**2 + v**2 + w**2))
+      write(10,"(7e12.4)") x(i) / Lx, rho, u, p
     enddo
     close(10)
   end subroutine print_1d
@@ -397,6 +402,7 @@ contains
     endif
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
     call print_xml(nx,ny,nz,3,real(x),real(y),real(z),rho1d,p1d,T1d,M1d,v1d)
+    !call print_1d(step+step_offset,nx,ny,nz,real(x),real(y),real(z),Jacobian,QJ)
 
     deallocate(rho1d,p1d,T1d,M1d,v1d)
   end subroutine print_vtk_3D
