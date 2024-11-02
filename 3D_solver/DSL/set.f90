@@ -83,7 +83,7 @@ contains
   
   subroutine set_bc(nx,ny,nz,Jacobian,Q,Qre)
     integer, intent(in), value      :: nx, ny, nz
-    real(8), intent(in), device     :: Jacobian(nx,ny,nz)
+    real(8), intent(in), device     :: Jacobian(ny)
     real(8), intent(inout), device  :: Q(nx,ny,nz,5)
     real(8), intent(in), device     :: Qre(2,ny,nz,5)
     integer i, j, k, l

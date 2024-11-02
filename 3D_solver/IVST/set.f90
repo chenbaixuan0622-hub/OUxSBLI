@@ -50,10 +50,10 @@ contains
   end subroutine set_init
   
   subroutine set_bc(nx,ny,nz,Jacobian,Q,Qre)
-    integer, intent(in), value      :: nx, ny, nz
-    real(8), intent(in), device     :: Jacobian(nx,ny,nz)
-    real(8), intent(inout), device  :: Q(nx,ny,nz,5) ! Q / J
-    real(8), intent(in), device     :: Qre(2,ny,nz,5)
+    integer, intent(in), value     :: nx, ny, nz
+    real(8), intent(in), device    :: Jacobian(ny)
+    real(8), intent(inout), device :: Q(nx,ny,nz,5) ! Q / J
+    real(8), intent(in), device    :: Qre(2,ny,nz,5)
     integer :: i, j, k, l, jc = 4, kc = 4
     real(8), device :: Qc(nx,5)
   
@@ -61,36 +61,36 @@ contains
     !$cuf kernel do(2) <<<*,*>>>
     do k = 4, 4
       do j = 4, 4
-        Q(1,j,k,1)    = rhol / Jacobian(1,j,k)
+        Q(1,j,k,1)    = rhol / Jacobian(j)
         Q(1,j,k,2)    = 0.d0
         Q(1,j,k,3)    = 0.d0
         Q(1,j,k,4)    = 0.d0
-        Q(1,j,k,5)    = pl / (gamma - 1.d0) / Jacobian(1,j,k)
-        Q(2,j,k,1)    = rhol / Jacobian(2,j,k)
+        Q(1,j,k,5)    = pl / (gamma - 1.d0) / Jacobian(j)
+        Q(2,j,k,1)    = rhol / Jacobian(j)
         Q(2,j,k,2)    = 0.d0
         Q(2,j,k,3)    = 0.d0
         Q(2,j,k,4)    = 0.d0
-        Q(2,j,k,5)    = pl / (gamma - 1.d0) / Jacobian(2,j,k)
-        Q(3,j,k,1)    = rhol / Jacobian(3,j,k)
+        Q(2,j,k,5)    = pl / (gamma - 1.d0) / Jacobian(j)
+        Q(3,j,k,1)    = rhol / Jacobian(j)
         Q(3,j,k,2)    = 0.d0
         Q(3,j,k,3)    = 0.d0
         Q(3,j,k,4)    = 0.d0
-        Q(3,j,k,5)    = pl / (gamma - 1.d0) / Jacobian(3,j,k)
-        Q(nx-2,j,k,1) = rhor / Jacobian(nx-2,j,k)
+        Q(3,j,k,5)    = pl / (gamma - 1.d0) / Jacobian(j)
+        Q(nx-2,j,k,1) = rhor / Jacobian(j)
         Q(nx-2,j,k,2) = 0.d0
         Q(nx-2,j,k,3) = 0.d0
         Q(nx-2,j,k,4) = 0.d0
-        Q(nx-2,j,k,5) = pr / (gamma - 1.d0) / Jacobian(nx-2,j,k)
-        Q(nx-1,j,k,1) = rhor / Jacobian(nx-1,j,k)
+        Q(nx-2,j,k,5) = pr / (gamma - 1.d0) / Jacobian(j)
+        Q(nx-1,j,k,1) = rhor / Jacobian(j)
         Q(nx-1,j,k,2) = 0.d0
         Q(nx-1,j,k,3) = 0.d0
         Q(nx-1,j,k,4) = 0.d0
-        Q(nx-1,j,k,5) = pr / (gamma - 1.d0) / Jacobian(nx-1,j,k)
-        Q(nx,j,k,1)   = rhor / Jacobian(nx,j,k)
+        Q(nx-1,j,k,5) = pr / (gamma - 1.d0) / Jacobian(j)
+        Q(nx,j,k,1)   = rhor / Jacobian(j)
         Q(nx,j,k,2)   = 0.d0
         Q(nx,j,k,3)   = 0.d0
         Q(nx,j,k,4)   = 0.d0
-        Q(nx,j,k,5)   = pr / (gamma - 1.d0) / Jacobian(nx,j,k)
+        Q(nx,j,k,5)   = pr / (gamma - 1.d0) / Jacobian(j)
     enddo;enddo
 
     !$cuf kernel do(2)<<<*,*>>>
