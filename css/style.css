@@ -1,0 +1,58 @@
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: white;
+}
+
+h2 {
+  color: black;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 24;
+}
+
+img {
+  width: 60%;
+  height: auto;
+}
+
+#title {
+  width: 100%;
+  height: auto;
+  color: white;
+  background-color: blue;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 32px;
+}
+
+.main_section {
+  color: white;
+  background-color: blue;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 28;
+}
+
+#nav_section {
+  color:black;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 20px;
+}
+
+#nav_problem {
+  color:black;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 20px;
+  border-style: solid;
+  border-width: 1px;
+  border-color: black;
+}
+
+#problems {
+  color: black;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 20px;
+}
+
+.Fig_title {
+  color: black;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 20px;
+}
