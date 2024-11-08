@@ -39,11 +39,10 @@ module print
   end interface
 
   interface print_vtk
-    subroutine print_vtk_2D(step,nx,ny,x,y,Q,T)
-      integer, intent(in)           :: step, nx, ny
-      real(8), intent(in)           :: x(nx), y(ny)
-      real(8), intent(in)           :: Q(nx,ny,4)
-      real(8), intent(in), optional :: T(nx,ny)
+    subroutine print_vtk_2D(step,nx,ny,x,y,Jacobian,QJ)
+      integer, intent(in) :: step, nx, ny
+      real(8), intent(in) :: x(nx), y(ny)
+      real(8), intent(in) :: QJ(nx,ny,4)
     end subroutine print_vtk_2D
 
     subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,ke0,entropy0,myrank)
@@ -219,20 +218,25 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine print_1d(step,nx,ny,nz,x,y,z,rho,p,u,sensor)
-    integer, intent(in), value               :: step, nx, ny, nz
-    real(8), intent(in)                      :: x(nx), y(ny), z(nz)
-    real(8), intent(in), dimension(nx,ny,nz) :: rho, p, u, sensor
-    real(8) T
+  subroutine print_1d(step,nx,ny,nz,x,y,z,Jacobian,QJ)
+    integer, intent(in) :: step, nx, ny, nz
+    real(4), intent(in) :: x(nx), y(ny), z(nz)
+    real(8), intent(in) :: Jacobian(ny), QJ(nx,ny,nz,5)
+    real(8) rho, u, v, w, p, Lx
     integer i, nyh, nzh
     character(len=40) filename
     nyh = int(0.5 * ny)
     nzh = int(0.5 * nz)
+    Lx  = x(nx)
     write(filename, "(a, i5.5, a)") "data/1d/Q", int(step), ".d"
     open(10,file=filename)
     do i = 1, nx
-      T = p(i,nyh,nzh) / (rho(i,nyh,nzh) * R)
-      write(10,"(7e12.4)") x(i) / Lx, rho(i,nyh,nzh), u(i,nyh,nzh), p(i,nyh,nzh), T, sensor(i,nyh,nzh)
+      rho = Jacobian(nyh) * QJ(i,nyh,nzh,1)
+      u   = QJ(i,nyh,nzh,2) / QJ(i,nyh,nzh,1)
+      v   = QJ(i,nyh,nzh,3) / QJ(i,nyh,nzh,1)
+      w   = QJ(i,nyh,nzh,4) / QJ(i,nyh,nzh,1)
+      p   = (gamma - 1.d0) * (Jacobian(nyh) * QJ(i,nyh,nzh,5) - 0.5d0 * rho * (u**2 + v**2 + w**2))
+      write(10,"(7e12.4)") x(i) / Lx, rho, u, p
     enddo
     close(10)
   end subroutine print_1d
@@ -313,16 +317,14 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine print_vtk_2D(step,nx,ny,x,y,Q,T)
-    integer, intent(in)                   :: step, nx, ny
-    real(8), intent(in)                   :: x(nx), y(ny)
-    real(8), intent(in)                   :: Q(nx,ny,4)
-    real(8), intent(in), optional         :: T(nx,ny)
+  subroutine print_vtk_2D(step,nx,ny,x,y,Jacobian,QJ)
+    integer, intent(in) :: step, nx, ny
+    real(8), intent(in) :: x(nx), y(ny), Jacobian(ny)
+    real(8), intent(in) :: QJ(nx,ny,4)
     integer i, j, l, m
-    real(8), dimension(nx,ny) :: rho, u, v, p
-    real(8) :: z(1) = 0.d0
-    real(8), dimension(nx*ny)   :: rho1d, p1d, T1d, M1d
-    real(8), dimension(2*nx*ny) :: v1d
+    real(8) :: rho, u, v, p, z(1) = 0.d0
+    real(4), dimension(nx*ny)   :: rho1d, p1d, T1d, M1d
+    real(4), dimension(2*nx*ny) :: v1d
     character(len=40) filename
     character :: lf*1
     lf = char(10)
@@ -330,23 +332,23 @@ contains
     m = 1
     do j = 1, ny
       do i = 1, nx
-        rho(i,j) = Q(i,j,1)
-        u(i,j) = Q(i,j,2) / rho(i,j)
-        v(i,j) = Q(i,j,3) / rho(i,j)
-        p(i,j) = (gamma - 1.d0) * (Q(i,j,4) - 0.5d0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
-        rho1d(l) = rho(i,j)
-        p1d(l)   = p(i,j)
-        T1d(l)   = p1d(l) / (R * rho1d(l))
-        v1d(m)   = u(i,j)
-        v1d(m+1) = v(i,j)
-        M1d(l)   = sqrt(v1d(m)**2 + v1d(m+1)**2) / sqrt(gamma * p1d(l) / rho1d(l))
+        rho = Jacobian(j) * QJ(i,j,1)
+        u   = QJ(i,j,2) / QJ(i,j,1)
+        v   = QJ(i,j,3) / QJ(i,j,1)
+        p   = (gamma - 1.d0) * (Jacobian(j) * QJ(i,j,4) - 0.5d0 * rho * (u**2 + v**2))
+        rho1d(l) = real(rho)
+        p1d(l)   = real(p)
+        T1d(l)   = real(p / (R * rho))
+        v1d(m)   = real(u)
+        v1d(m+1) = real(v)
+        M1d(l)   = real(sqrt(u**2 + v**2) / sqrt(gamma * p / rho))
         l = l + 1
         m = m + 2
     enddo;enddo
 
     write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtr"
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
-    call print_xml(nx,ny,1,2,real(x),real(y),real(z),real(rho1d),real(p1d),real(T1d),real(M1d),real(v1d))
+    call print_xml(nx,ny,1,2,real(x),real(y),real(z),rho1d,p1d,T1d,M1d,v1d)
   end subroutine print_vtk_2D
   
   subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,mass0,ke0,entropy0,myrank)
@@ -397,6 +399,7 @@ contains
     endif
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
     call print_xml(nx,ny,nz,3,real(x),real(y),real(z),rho1d,p1d,T1d,M1d,v1d)
+    !call print_1d(step+step_offset,nx,ny,nz,real(x),real(y),real(z),Jacobian,QJ)
 
     deallocate(rho1d,p1d,T1d,M1d,v1d)
   end subroutine print_vtk_3D

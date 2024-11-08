@@ -278,7 +278,9 @@ contains
     call MPI_BCAST(entropy0, 1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
 
     ! rescale
-    allocate(Qre_cpu(ny,nz,5),Qm_cpu(ny,5))
+    if (kind(id_rescale) == 4) then
+      allocate(Qre_cpu(ny,nz,5),Qm_cpu(ny,5))
+    endif
 
     do t2 = 1, np
       do t1 = 1, nt
@@ -402,7 +404,9 @@ contains
     if (myrank == 0) then
       deallocate(QJ,QJs,Rs,E,F,G,xix,etay,zetaz,Jacobian,Qm,Qre)
     endif
-    deallocate(Qre_cpu,Qm_cpu)
+    if (kind(id_rescale) == 4) then
+      deallocate(Qre_cpu,Qm_cpu)
+    endif
   end subroutine RungeKutta_4th
 end module calc_time_dev
 
