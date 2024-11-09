@@ -43,31 +43,32 @@ module mod_globals
   real(8), parameter         :: blt         = 2.d-3
 
   ! mesh
-  real(8), parameter :: Lx = 5d-3  ! * 8 20 delta
-  real(8), parameter :: Ly = 8d-3  !   4 delta
-  real(8), parameter :: Lz = 32d-3 !  16 delta
-  integer, parameter :: nx = 129   ! * 8
-  integer, parameter :: ny = 257
+  real(8), parameter :: Lx = 6.25d-3  ! * 8 25 delta
+  real(8), parameter :: Ly = 8d-3     !   4 delta
+  real(8), parameter :: Lz = 32d-3    !  16 delta
+  integer, parameter :: nx = 161      ! * 8
+  integer, parameter :: ny = 321
   integer, parameter :: nz = 2049
   integer, parameter :: rerank = 6
   integer, parameter :: nre1 = int(0.2d0 * nx)
   integer, parameter :: nre2 = int(0.8d0 * nx)
+  integer, parameter :: overlap = 1
 
   ! RTX 4090
-  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/64,(ny-accuracy)/5,(nz-accuracy)/1)
-  type(dim3) :: blocksF   = dim3((nx-accuracy)/1,(ny-accuracy+1)/128,(nz-accuracy)/1)
-  type(dim3) :: blocksG   = dim3((nx-accuracy)/1,(ny-accuracy)/1,(nz-accuracy+1)/128)
-  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/32,(ny-accuracy)/5,(nz-accuracy)/1)
-  type(dim3) :: blocksFv  = dim3((nx-accuracy)/1,(ny-accuracy+1)/128,(nz-accuracy)/1)
-  type(dim3) :: blocksGv  = dim3((nx-accuracy)/1,(ny-accuracy)/1,(nz-accuracy+1)/128)
-  type(dim3) :: blocks    = dim3((nx-accuracy)/127,(ny-accuracy)/1,(nz-accuracy)/1)
-  type(dim3) :: threadsE  = dim3(64,5,1)
-  type(dim3) :: threadsF  = dim3(1,128,1)
-  type(dim3) :: threadsG  = dim3(1,1,128)
-  type(dim3) :: threadsEv = dim3(32,5,1)
-  type(dim3) :: threadsFv = dim3(1,128,1)
-  type(dim3) :: threadsGv = dim3(1,1,128)
-  type(dim3) :: threads   = dim3(127,1,1)
+  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
+  type(dim3) :: blocksF   = dim3((nx-accuracy)/1,(ny-accuracy+1)/64,(nz-accuracy)/1)
+  type(dim3) :: blocksG   = dim3((nx-accuracy)/1,(ny-accuracy)/1,(nz-accuracy+1)/64)
+  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
+  type(dim3) :: blocksFv  = dim3((nx-accuracy)/1,(ny-accuracy+1)/64,(nz-accuracy)/1)
+  type(dim3) :: blocksGv  = dim3((nx-accuracy)/1,(ny-accuracy)/1,(nz-accuracy+1)/64)
+  type(dim3) :: blocks    = dim3((nx-accuracy)/159,(ny-accuracy)/1,(nz-accuracy)/1)
+  type(dim3) :: threadsE  = dim3(32,1,1)
+  type(dim3) :: threadsF  = dim3(1,64,1)
+  type(dim3) :: threadsG  = dim3(1,1,64)
+  type(dim3) :: threadsEv = dim3(32,1,1)
+  type(dim3) :: threadsFv = dim3(1,64,1)
+  type(dim3) :: threadsGv = dim3(1,1,64)
+  type(dim3) :: threads   = dim3(159,1,1)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -86,7 +87,7 @@ module mod_globals
   real(8), parameter :: u0   = 506.8d0
   real(8), parameter :: CFL  = 0.1d0
   real(8), parameter :: dt   = 5d-9!CFL * Lx / (dble(nx-1) * u0) ! 7.7e-9
-  integer, parameter :: nt   = 10!int(endT / (dble(np) * dt))
+  integer, parameter :: nt   = 1!int(endT / (dble(np) * dt))
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
