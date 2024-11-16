@@ -3,12 +3,12 @@ module calc_hybrid
   use mod_globals, only : accuracy, offset, gamma
   implicit none
 contains
-  attributes(global) subroutine calc_Ducros(nx,ny,nz,dx,dy,dz,u,v,w,rho,p,fd)
+  attributes(global) subroutine calc_Ducros(nx,ny,nz,dx,dy,dz,u,v,w,fd)
     integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
     real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: u, v, w, rho, p
+    real(8), intent(in), dimension(nx,ny,nz), device  :: u, v, w
     real(8), intent(out), dimension(nx,ny,nz), device :: fd
     integer i, j, k
     real(8) dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz

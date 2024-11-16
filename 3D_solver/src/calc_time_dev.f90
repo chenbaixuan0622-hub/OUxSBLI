@@ -34,12 +34,13 @@ contains
     real(8), intent(out), device       :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     real(8), intent(out), device       :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device       :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
-    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, sensor
     integer stat
-    call calc_quantities_3D(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p)
-    call calc_E<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,E)
-    call calc_F<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,F)
-    call calc_G<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,G)
+    call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, rho, u, v, w, p)
+    call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, dx, dy, dz, u, v, w, sensor)
+    call calc_E<<<blocksE,threadsE,1>>>(nx, ny, nz, rho, u, v, w, p, sensor, E)
+    call calc_F<<<blocksF,threadsF,2>>>(nx, ny, nz, rho, u, v, w, p, sensor, F)
+    call calc_G<<<blocksG,threadsG,3>>>(nx, ny, nz, rho, u, v, w, p, sensor, G)
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_Euler
 
@@ -54,37 +55,38 @@ contains
     real(8), intent(out), device       :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     real(8), intent(out), device       :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device       :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
-    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, sensor
     integer stat
-    call calc_quantities_3D(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p)
-    call calc_E<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,E)
+    call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, rho, u, v, w, p)
+    call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, dx, dy, dz, u, v, w, sensor)
+    call calc_E<<<blocksE,threadsE,1>>>(nx, ny, nz, rho, u, v, w, p, sensor, E)
     !stat = cudaGetLastError
     !if (stat /= cudaSuccess) then
     !  print *, "calc E ", trim(cudaGetErrorString(stat))
     !endif
-    call calc_F<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,F)
+    call calc_F<<<blocksF,threadsF,2>>>(nx, ny, nz, rho, u, v, w, p, sensor, F)
     !stat = cudaGetLastError
     !if (stat /= cudaSuccess) then
     !  print *, "calc F ", trim(cudaGetErrorString(stat))
     !endif
-    call calc_G<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,G)
+    call calc_G<<<blocksG,threadsG,3>>>(nx, ny, nz, rho, u, v, w, p, sensor, G)
     !stat = cudaGetLastError
     !if (stat /= cudaSuccess) then
     !  print *, "calc G ", trim(cudaGetErrorString(stat))
     !endif
 
     stat = cudaDeviceSynchronize()
-    call calc_Ev<<<blocksEv,threadsEv,1>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,p,E)
+    call calc_Ev<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, rho, u, v, w, p, E)
     !stat = cudaGetLastError
     !if (stat /= cudaSuccess) then
     !  print *, "calc Ev ", trim(cudaGetErrorString(stat))
     !endif
-    call calc_Fv<<<blocksFv,threadsFv,2>>>(nx,ny,nz,dy,dx,dz,rho,u,v,w,p,F)
+    call calc_Fv<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, rho, u, v, w, p, F)
     !stat = cudaGetLastError
     !if (stat /= cudaSuccess) then
     !  print *, "calc Fv ", trim(cudaGetErrorString(stat))
     !endif
-    call calc_Gv<<<blocksGv,threadsGv,3>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,p,G)
+    call calc_Gv<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, rho, u, v, w, p, G)
     !stat = cudaGetLastError
     !if (stat /= cudaSuccess) then
     !  print *, "calc Gv ", trim(cudaGetErrorString(stat))
@@ -104,23 +106,24 @@ contains
     real(8), intent(out), device       :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device       :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     real(8), allocatable, device       :: mut(:,:,:), qc2(:,:,:)
-    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, sensor
     integer stat
     allocate(mut(nx,ny,nz), qc2(nx,ny,nz))
     mut = 0.d0
     qc2 = 0.d0
     
-    call calc_quantities_3D(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p)
-    call calc_E<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,E)
-    call calc_F<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,F)
-    call calc_G<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,G)
+    call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, rho, u, v, w, p)
+    call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, dx, dy, dz, u, v, w, sensor)
+    call calc_E<<<blocksE,threadsE,1>>>(nx, ny, nz, rho, u, v, w, p, sensor, E)
+    call calc_F<<<blocksF,threadsF,2>>>(nx, ny, nz, rho, u, v, w, p, sensor, F)
+    call calc_G<<<blocksG,threadsG,3>>>(nx, ny, nz, rho, u, v, w, p, sensor, G)
     !call calc_mut<<<blocks,threads,4>>>(nx,ny,nz,dx,dy,dz,Jacobian,QJ,mut,qc2)
     stat = cudaDeviceSynchronize()
     call set_bc_mut(nx,ny,nz,mut,qc2)
 
-    call calc_Ev_LES<<<blocksEv,threadsEv,1>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,p,mut,qc2,E)
-    call calc_Fv_LES<<<blocksFv,threadsFv,2>>>(nx,ny,nz,dy,dx,dz,rho,u,v,w,p,mut,qc2,F)
-    call calc_Gv_LES<<<blocksGv,threadsGv,3>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,p,mut,qc2,G)
+    call calc_Ev_LES<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, rho, u, v, w, p, mut, qc2, E)
+    call calc_Fv_LES<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, rho, u, v, w, p, mut, qc2, F)
+    call calc_Gv_LES<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, rho, u, v, w, p, mut, qc2, G)
     stat = cudaDeviceSynchronize()
     deallocate(mut, qc2)
   end subroutine calc_EFG_LES
@@ -133,7 +136,7 @@ contains
     real(8), intent(in)         :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)         :: z(nz), dz_cpu(nz-1), Jacobian_cpu(ny)
     real(8), intent(inout)      :: Q(nx,ny,nz,5)
-    integer i, j, k, t1, t2, itr, ilen, ierr, stat, istat(MPI_STATUS_SIZE)
+    integer i, j, k, t1, t2, itr, ndevices, nranks, canaccess, canaccess1, canaccess2, ilen, ierr, stat, istat(MPI_STATUS_SIZE)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type(cudaDeviceProp)         :: prop
     real(8), allocatable, device :: QJ(:,:,:,:), QJ2(:,:,:,:), QJ3(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
@@ -142,10 +145,64 @@ contains
     real(8) :: mass0 = 1.d0, ke0 = 1.d0, entropy0 = 1.d0
 
     ! check GPU
-    stat = cudaSetDevice(0)
-    stat = cudaGetDeviceProperties(prop,0)
-    ilen = verify(prop%name, ' ', .true.)
-    print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", 0, ") is available"
+    if (mod(myrank,2) == 0) then
+      if (myrank == 0) then
+        call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
+        stat = cudaGetDeviceCount(ndevices)
+        print '(2x, i2, a)', ndevices, " GPU devices are found"
+      endif
+
+      call MPI_BCAST(ndevices, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+      call MPI_BCAST(nranks,   1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+      stat = cudaSetDevice(myrank/2)
+      stat = cudaGetDeviceProperties(prop,myrank/2)
+      ilen = verify(prop%name, ' ', .true.)
+      print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", myrank/2, ") is available"
+      
+      if (ndevices >= 2) then
+        ! check Peer to Peer Access
+        if (2 <= myrank .and. myrank <= nranks-2) then
+          istat = cudaDeviceCanAccessPeer(canaccess1, myrank/2, myrank/2-1)
+          istat = cudaDeviceCanAccessPeer(canaccess2, myrank/2, myrank/2+1)
+          canaccess = canaccess1 * canaccess2
+        elseif (myrank == 0) then
+          istat = cudaDeviceCanAccessPeer(canaccess1, myrank/2, nranks/2)
+          istat = cudaDeviceCanAccessPeer(canaccess2, myrank/2, myrank/2+1)
+          canaccess = canaccess1 * canaccess2
+        else
+          istat = cudaDeviceCanAccessPeer(canaccess1, myrank/2, myrank/2-1)
+          istat = cudaDeviceCanAccessPeer(canaccess2, myrank/2, 0)
+          canaccess = canaccess1 * canaccess2
+        endif
+        ! rescale
+        if (kind(id_rescale) == 4) then
+        endif
+
+        ! enable Peer to Peer Access
+        if (canaccess == 1) then
+          if (2 <= myrank .and. myrank <= nranks-2) then
+            istat = cudaDeviceEnablePeerAccess(myrank/2-1,0)
+            istat = cudaDeviceEnablePeerAccess(myrank/2+1,0)
+          elseif (myrank == 0) then
+            istat = cudaDeviceEnablePeerAccess(nranks/2,0)
+            istat = cudaDeviceEnablePeerAccess(myrank/2+1,0)
+          else
+            istat = cudaDeviceEnablePeerAccess(myrank/2-1,0)
+            istat = cudaDeviceEnablePeerAccess(0,0)
+          endif
+          print *, "GPU:", myrank/2, " Device Peer to Peer Access is available"
+        else
+          print *, "GPU:", myrank/2, " Device Peer to Peer Access is unavailable"
+        endif
+
+        ! rescale
+        if (kind(id_rescale) == 4) then
+        endif
+      endif
+    endif
+
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 
     if (myrank == 0) then
       allocate(QJ(nx,ny,nz,5),QJ2(nx,ny,nz,5),QJ3(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
