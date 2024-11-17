@@ -52,10 +52,10 @@ contains
   
   subroutine set_bc(nx,ny,nz,Jacobian,QJ,Qre)
     use mod_globals, only : id_accuracy
-    integer, intent(in), value      :: nx, ny, nz
-    real(8), intent(in), device     :: Jacobian(nx,ny,nz)
-    real(8), intent(inout), device  :: QJ(nx,ny,nz,5) ! Q / J
-    real(8), intent(in), device     :: Qre(2,ny,nz,5)
+    integer, intent(in), value     :: nx, ny, nz
+    real(8), intent(in), device    :: Jacobian(ny)
+    real(8), intent(inout), device :: QJ(nx,ny,nz,5) ! Q / J
+    real(8), intent(in), device    :: Qre(2,ny,nz,5)
     integer i, j, k, l, jc, kc, offset
     real(8), device :: Qc(nx,5)
     real(8) pw
@@ -67,21 +67,11 @@ contains
     !$cuf kernel do(2) <<<*,*>>>
     do k = 1+offset, nz-offset
       do j = 1+offset, ny-offset
-        QJ(1,j,k,1)    = rhol / Jacobian(1,j,k)
+        QJ(1,j,k,1)    = rhol / Jacobian(j)
         QJ(1,j,k,2)    = QJ(1,j,k,1) * ul
         QJ(1,j,k,3)    = 0.d0
         QJ(1,j,k,4)    = 0.d0
-        QJ(1,j,k,5)    = (pl / (gamma - 1.d0) + 0.5d0 * rhol * ul**2)  / Jacobian(1,j,k)
-        !QJ(2,j,k,1)    = rhol / Jacobian(2,j,k)
-        !QJ(2,j,k,2)    = QJ(2,j,k,1) * ul
-        !QJ(2,j,k,3)    = 0.d0
-        !QJ(2,j,k,4)    = 0.d0
-        !QJ(2,j,k,5)    = (pl / (gamma - 1.d0) + 0.5d0 * rhol * ul**2)  / Jacobian(2,j,k)
-        !QJ(3,j,k,1)    = rhol / Jacobian(3,j,k)
-        !QJ(3,j,k,2)    = QJ(3,j,k,1) * ul
-        !QJ(3,j,k,3)    = 0.d0
-        !QJ(3,j,k,4)    = 0.d0
-        !QJ(3,j,k,5)    = (pl / (gamma - 1.d0) + 0.5d0 * rhol * ul**2)  / Jacobian(3,j,k)
+        QJ(1,j,k,5)    = (pl / (gamma - 1.d0) + 0.5d0 * rhol * ul**2) / Jacobian(j)
 
         QJ(nx,j,k,1)   = QJ(nx-1,j,k,1)
         QJ(nx,j,k,2)   = 0.d0

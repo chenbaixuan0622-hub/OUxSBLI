@@ -1,5 +1,7 @@
 import numpy as np
 import torch
+from torch import nn
+import cv2
 import matplotlib.pyplot as plt
 
 class Dataset(torch.utils.data.Dataset):
@@ -28,7 +30,42 @@ def divide_into_batch(train_dataset,test_dataset,batchsize):
   return train_batch, test_batch
 
 
+class EarlyStopping:
+  def __init__(self, patience=5, verbose=False):
+    self.patience     = patience
+    self.verbose      = verbose
+    self.counter      = 0
+    self.best_score   = None
+    self.early_stop   = False
+    self.val_loss_min = np.Inf
+
+  def __call__(self, val_loss, model):
+    score = -val_loss
+
+    if self.best_score is None:
+      self.best_score = score
+      self.checkpoint(val_loss, model)
+    elif score < self.best_score:
+      self.counter += 1
+      if self.verbose:
+        print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
+      if self.counter >= self.patience:
+        self.erarly_stop = True
+    else:
+      self.best_score = score
+      self.checkpoint(val_loss, model)
+      self.counter = 0
+
+  def checkpoint(self, val_loss, model):
+    if self.verbose:
+      print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}). Saving model ...')
+    self.val_loss_min = val_loss
+
+
 def trainNN(net,device,optimizer,criterion,train_batch,test_batch,epoch):
+  earlystopping = EarlyStopping(patience=5, verbose=False)
+
+
   # make lists to store MSE
   train_loss_list = []
   test_loss_list  = []
@@ -66,6 +103,11 @@ def trainNN(net,device,optimizer,criterion,train_batch,test_batch,epoch):
     # calc mean loss
     batch_train_loss = train_loss / len(train_batch)
 
+    earlystopping(train_loss / len(train_batch), net)
+    if earlystopping.early_stop:
+      print("Early Stopping")
+      break
+
     # evaluate NN
     net.eval()
     with torch.no_grad():
@@ -74,9 +116,9 @@ def trainNN(net,device,optimizer,criterion,train_batch,test_batch,epoch):
         teaching_data = teaching_data.to(device)
         test_data     = test_data.to(device)
         # calc pred
-        y_pred = net(test_data)
+        y_pred  = net(test_data)
         # calc loss
-        loss   = criterion(y_pred, teaching_data)
+        loss = criterion(y_pred, teaching_data)
         # stock test loss
         test_loss += loss.item()
 

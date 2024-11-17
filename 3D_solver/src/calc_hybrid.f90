@@ -3,12 +3,12 @@ module calc_hybrid
   use mod_globals, only : accuracy, offset, gamma
   implicit none
 contains
-  attributes(global) subroutine calc_Ducros(nx,ny,nz,dx,dy,dz,u,v,w,rho,p,fd)
+  attributes(global) subroutine calc_Ducros(nx,ny,nz,dx,dy,dz,u,v,w,fd)
     integer, intent(in), value                        :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
     real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: u, v, w, rho, p
+    real(8), intent(in), dimension(nx,ny,nz), device  :: u, v, w
     real(8), intent(out), dimension(nx,ny,nz), device :: fd
     integer i, j, k
     real(8) dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz
@@ -55,20 +55,15 @@ contains
     endif
   end subroutine calc_Ducros
 
-  attributes(device) function Albada(rho,p,V) result(phi)
-    real(8), intent(in), dimension(4), device   :: rho, p
-    real(8), intent(in), dimension(4,3), device :: V
-    integer i
-    real(8) :: e(4), d1, d2, d3, phim, phip, phi, eps = 1.d-16
-    do i = 1, 4
-      e(i)  = p(i) / (gamma - 1.d0) + 0.5d0 * rho(i) * (V(i,1)**2 + V(i,2)**2 + V(i,3)**2)
-    enddo
+  attributes(device) function Albada(e, rho) result(phi)
+    real(8), intent(in), dimension(4), device :: e, rho
+    real(8) :: d1, d2, d3, phim, phip, phi, eps = 1.d-16
     d1   = -e(1) / rho(1) + e(2) / rho(2)
     d2   = -e(2) / rho(2) + e(3) / rho(3)
     d3   = -e(3) / rho(3) + e(4) / rho(4)
     phip = (d2 * d1 + d1**2) / (d2**2 + d1**2 + eps)
     phim = (d2 * d3 + d3**2) / (d2**2 + d3**2 + eps)
-    phi  = min(phim, phip)
+    phi  = max(min(1.d0 - min(phim, phip), 1.d0), 0.d0)
   end function Albada
 
   attributes(device) function sigmoid(x) result(ans)

@@ -3,7 +3,7 @@ import torch
 import matplotlib.pyplot as plt
 import os
 
-def plot_loss(epoch,train_loss_list,test_loss_list,dir_path):
+def plot_loss(epoch,train_loss_list,test_loss_list,dir_path,itr):
   # save fig
   plt.figure()
   plt.title('Train and Test Loss')
@@ -16,14 +16,20 @@ def plot_loss(epoch,train_loss_list,test_loss_list,dir_path):
   plt.legend()
   plt.xscale('log')
   plt.yscale('log')
-  plt.savefig(os.path.join(dir_path, 'loss.png'))
+  filename1 = 'loss' + str(itr) + '.png'
+  plt.savefig(os.path.join(dir_path, filename1))
   # save text
-  f = open(os.path.join(dir_path, 'train_loss.txt'), 'w')
-  f.write(train_loss_list)
-  f.close()
-  f = open(os.path.join(dir_path, 'test_loss.txt'), 'w')
-  f.write(test_loss_list)
-  f.close()
+  filename2 = 'train_loss' + str(itr) + '.txt'
+  file_path = os.path.join(dir_path, filename2)
+  with open(file_path, "w", encoding="UTF-8") as fo:
+    for i in range(len(train_loss_list)):
+      print(f'{train_loss_list[i]}:.3e', file=fo)
+
+  filename3 = 'test_loss' + str(itr) + '.txt'
+  file_path = os.path.join(dir_path, filename3)
+  with open(file_path, "w", encoding="UTF-8") as fo:
+    for i in range(len(train_loss_list)):
+      print(f'{test_loss_list[i]}:.3e', file=fo)
 
 
 def plot_Dataset(x,y,dataset,dir_path):
@@ -37,11 +43,13 @@ def plot_Dataset(x,y,dataset,dir_path):
     ax.set_xlabel('x')
     ax.set_ylabel('y')
     ax.set_title(titles[i])
+    cbar = plt.colorbar(CS, ax=ax)
+    cbar.set_label('K')
   plt.tight_layout()
   plt.savefig(os.path.join(dir_path, 'dataset.png'))
 
 
-def plot_result(x,y,net,device,test_batch,dir_path,input,output):
+def plot_result(x,y,net,device,test_batch,dir_path,input,output,itr,teaching_mean,test_mean,teaching_std,test_std):
   net.eval()
   with torch.no_grad():
     for teaching_data, test_data in test_batch:
@@ -53,7 +61,11 @@ def plot_result(x,y,net,device,test_batch,dir_path,input,output):
       test      = np.array(test_data.to('cpu'))
       teaching  = np.array(teaching_data.to('cpu'))
       pred      = np.array(y_pred.to('cpu'))
-      fig, axes = plt.subplots(3, 1, figsize=(16,8))
+      # unnormalize data
+      test      = test * test_std         + test_mean
+      teaching  = teaching * teaching_std + teaching_mean
+      pred      = pred * teaching_std     + teaching_mean
+      fig, axes = plt.subplots(1, 3, figsize=(24,8))
       contours  = [test[-1,0,:,:], teaching[-1,0,:,:], pred[-1,0,:,:]]
       minval    = np.min(np.minimum(teaching[-1,0,:,:], pred[-1,0,:,:]))
       maxval    = np.max(np.maximum(teaching[-1,0,:,:], pred[-1,0,:,:]))
@@ -61,11 +73,16 @@ def plot_result(x,y,net,device,test_batch,dir_path,input,output):
       maxs      = [np.max(test[-1,0,:,:]), maxval, maxval]
       titles    = [input, output, 'predicted']
       for i, ax in enumerate(axes.flat):
-        CS = ax.contourf(x, y, contours[i], levels=100, cmap='turbo', vmin=mins[i], vmax=maxs[i])
+        CS = ax.contourf(x, y, contours[i], levels=10, cmap='turbo', vmin=mins[i], vmax=maxs[i])
         ax.set_xlabel('x')
-        ax.set_ylabel('y')
+        ax.set_ylabel('z')
         ax.set_title(titles[i])
+
+        cbar = plt.colorbar(CS, ax=ax)
+        cbar.set_label('K')
+
         plt.tight_layout()
-        plt.savefig(os.path.join(dir_path, 'trainedNN.png'))
+        filename = 'trainedNN' + str(itr) + '.png'
+        plt.savefig(os.path.join(dir_path, filename))
       break
 
