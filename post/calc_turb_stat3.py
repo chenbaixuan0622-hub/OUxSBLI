@@ -28,7 +28,7 @@ Rgas  = 287.03
 yp1 = 5.e0
 yp2 = 30.e0
 
-endT = 0.2e-3
+endT = 0.6e-3
 
 first_path          = os.path.join(Q_directory, Q_files[0])
 Nx, Ny, Nz, X, y, z = getGrid(first_path)

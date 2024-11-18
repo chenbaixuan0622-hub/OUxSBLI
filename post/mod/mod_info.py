@@ -4,6 +4,14 @@ from pyinform.utils import bin_series
 from pyinform import transfer_entropy, conditional_entropy
 
 
+def cross_corr(x, y):
+  X = np.mean(x)
+  Y = np.mean(y)
+  corr = np.mean((x - X) * (y - Y)) \
+         / (np.sqrt(np.mean((x - X)**2)) * np.sqrt(np.mean((y - Y)**2)))
+  return corr
+
+
 def KMeans(x, bin):
   est = KBinsDiscretizer(n_bins=bin, encode='onehot', strategy='kmeans')
   x = x.reshape(-1, 1)
@@ -49,4 +57,18 @@ def NTE(x, y, history_len, bin):
   NTEx_y = (TEx_y - np.mean(Ex_y)) / Hy
   NTEy_x = (TEy_x - np.mean(Ey_x)) / Hx
   return NTEx_y, NTEy_x
+
+
+def causal_map(V, history_len, bin):
+  # V[kind, time_series]
+  N = len(V[:,0])
+  map = np.zeros((N,N), dtype=np.float32)
+  for j in range(N):
+    for i in range(N):
+      if i != j:
+        # N[j,i]: causality from j to i
+        map[j,i], map[i,j] = TE(V[j,:], V[i,:], history_len, bin)
+      else:
+        map[j,i] = np.nan
+  return map
 
