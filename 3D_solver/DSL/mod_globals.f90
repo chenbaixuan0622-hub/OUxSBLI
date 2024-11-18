@@ -56,7 +56,7 @@ module mod_globals
   integer(kind=8), parameter :: id_accuracy = 0
   integer(kind=2), parameter :: id_tvd      = 0
   integer(kind=2), parameter :: id_keep     = 0
-  integer(kind=4), parameter :: id_slau     = 0
+  integer(kind=2), parameter :: id_slau     = 0
   integer(kind=2), parameter :: slau_wall   = 0
   integer(kind=2), parameter :: id_rescale  = 0
   real(8), parameter         :: blt         = 2.d-3

@@ -179,10 +179,10 @@ contains
     endif
   end function flux_Threshold2
 
-  attributes(global) subroutine calc_E(nx, ny, nz, rho, u, v, w, p, E)
+  attributes(global) subroutine calc_E(nx, ny, nz, rho, u, v, w, p, sensor, E)
     use mod_globals, only : id_accuracy, id_scheme
     integer, intent(in), value                       :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p, sensor
     real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     integer i, j, k
     integer(kind=2) id_slau_wall
@@ -197,24 +197,20 @@ contains
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
+    fdx = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
     if (3 <= i .and. i <= nx-3 .and. 8 <= kind(id_accuracy)) then
-      !e4(:)   = QJ(i-1:i+2,j,k,5) !   e / Jacobian
-      !rho4(:) = QJ(i-1:i+2,j,k,1) ! rho / Jacobian
       rho6(:) = rho(i-2:i+3,j,k)
       V6(:,1) =   u(i-2:i+3,j,k)
       V6(:,2) =   v(i-2:i+3,j,k)
       V6(:,3) =   w(i-2:i+3,j,k)
       p6(:)   =   p(i-2:i+3,j,k)
-      !fdx     = Albada(e4, rho4)
       E(i,j-offset,k-offset,:) = flux6(id_scheme,1,rho6,p6,V6,Normal,fdx)
     elseif (2 <= i .and. i <= nx-2 .and. 4 <= kind(id_accuracy)) then
-      !e4(:)   = QJ(i-1:i+2,j,k,5) * Jacobian(j)
       rho4(:) = rho(i-1:i+2,j,k)
       V4(:,1) =   u(i-1:i+2,j,k)
       V4(:,2) =   v(i-1:i+2,j,k)
       V4(:,3) =   w(i-1:i+2,j,k)
       p4(:)   =   p(i-1:i+2,j,k)
-      !fdx     = Albada(e4, rho4)
       E(i,j-offset,k-offset,:) = flux4(id_scheme,1,rho4,p4,V4,Normal,fdx)
     else
       rho2(:) = rho(i:i+1,j,k)
@@ -222,15 +218,14 @@ contains
       V2(:,2) =   v(i:i+1,j,k)
       V2(:,3) =   w(i:i+1,j,k)
       p2(:)   =   p(i:i+1,j,k)
-      !fdx     = 0.d0
       E(i,j-offset,k-offset,:) = flux2(id_scheme,1,rho2,p2,V2,Normal,fdx)
     endif
   end subroutine calc_E
 
-  attributes(global) subroutine calc_F(nx, ny, nz, rho, u, v, w, p, F)
+  attributes(global) subroutine calc_F(nx, ny, nz, rho, u, v, w, p, sensor, F)
     use mod_globals, only : id_accuracy, id_scheme, slau_wall
     integer, intent(in), value                       :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p, sensor
     real(8), intent(out), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     integer i, j, k
     integer(kind=2) id_slau_wall
@@ -245,24 +240,20 @@ contains
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
+    fdy = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
     if (3 <= j .and. j <= ny-3 .and. 8 <= kind(id_accuracy)) then
-      !e4(:)   = QJ(i,j-1:j+2,k,5) !   e / Jacobian
-      !rho4(:) = QJ(i,j-1:j+2,k,1) ! rho / Jacobian
       rho6(:) = rho(i,j-2:j+3,k)
       V6(:,1) =   u(i,j-2:j+3,k)
       V6(:,2) =   v(i,j-2:j+3,k)
       V6(:,3) =   w(i,j-2:j+3,k)
       p6(:)   =   p(i,j-2:j+3,k)
-      !fdy     = Albada(e4, rho4)
       F(i-offset,j,k-offset,:) = flux6(id_scheme,2,rho6,p6,V6,Normal,fdy)
     elseif (2 <= j .and. j <= ny-2 .and. 4 <= kind(id_accuracy)) then
-      !e4(:)   = QJ(i,j-1:j+2,k,5) * Jacobian(j-1:j+2)
       rho4(:) = rho(i,j-1:j+2,k)
       V4(:,1) =   u(i,j-1:j+2,k)
       V4(:,2) =   v(i,j-1:j+2,k)
       V4(:,3) =   w(i,j-1:j+2,k)
       p4(:)   =   p(i,j-1:j+2,k)
-      !fdy     = Albada(e4, rho4)
       F(i-offset,j,k-offset,:) = flux4(id_scheme,2,rho4,p4,V4,Normal,fdy)
     else
       rho2(:) = rho(i,j:j+1,k)
@@ -270,7 +261,6 @@ contains
       V2(:,2) =   v(i,j:j+1,k)
       V2(:,3) =   w(i,j:j+1,k)
       p2(:)   =   p(i,j:j+1,k)
-      !fdy     = 0.d0
       if (kind(slau_wall) /= 4) then
         F(i-offset,j,k-offset,:) = flux2(id_scheme,2,rho2,p2,V2,Normal,fdy)
       else
@@ -279,10 +269,10 @@ contains
     endif
   end subroutine calc_F
 
-  attributes(global) subroutine calc_G(nx, ny, nz, rho, u, v, w, p, G)
+  attributes(global) subroutine calc_G(nx, ny, nz, rho, u, v, w, p, sensor, G)
     use mod_globals, only : id_accuracy, id_scheme
     integer, intent(in), value                       :: nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p, sensor
     real(8), intent(out), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
     integer i, j, k
     integer(kind=2) id_slau_wall
@@ -297,24 +287,20 @@ contains
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
+    fdz = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
     if (3 <= k .and. k <= nz-3 .and. 8 <= kind(id_accuracy)) then
-      !e4(:)   = QJ(i,j,k-1:k+2,5) !   e / Jacobian
-      !rho4(:) = QJ(i,j,k-1:k+2,1) ! rho / Jacobian
       rho6(:) = rho(i,j,k-2:k+3)
       V6(:,1) =   u(i,j,k-2:k+3)
       V6(:,2) =   v(i,j,k-2:k+3)
       V6(:,3) =   w(i,j,k-2:k+3)
       p6(:)   =   p(i,j,k-2:k+3)
-      !fdz     = Albada(e4, rho4)
       G(i-offset,j-offset,k,:) = flux6(id_scheme,3,rho6,p6,V6,Normal,fdz)
     elseif (2 <= k .and. k <= nz-2 .and. 4 <= kind(id_accuracy)) then
-      !e4(:)   = QJ(i,j,k-1:k+2,5) * Jacobian(j)
       rho4(:) = rho(i,j,k-1:k+2)
       V4(:,1) =   u(i,j,k-1:k+2)
       V4(:,2) =   v(i,j,k-1:k+2)
       V4(:,3) =   w(i,j,k-1:k+2)
       p4(:)   =   p(i,j,k-1:k+2)
-      !fdz     = Albada(e4, rho4)
       G(i-offset,j-offset,k,:) = flux4(id_scheme,3,rho4,p4,V4,Normal,fdz)
     else
       rho2(:) = rho(i,j,k:k+1)
@@ -322,7 +308,6 @@ contains
       V2(:,2) =   v(i,j,k:k+1)
       V2(:,3) =   w(i,j,k:k+1)
       p2(:)   =   p(i,j,k:k+1)
-      !fdz     = 0.d0
       G(i-offset,j-offset,k,:) = flux2(id_scheme,3,rho2,p2,V2,Normal,fdz)
     endif
   end subroutine calc_G
