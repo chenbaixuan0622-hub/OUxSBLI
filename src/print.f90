@@ -39,11 +39,10 @@ module print
   end interface
 
   interface print_vtk
-    subroutine print_vtk_2D(step,nx,ny,x,y,Q,T)
-      integer, intent(in)           :: step, nx, ny
-      real(8), intent(in)           :: x(nx), y(ny)
-      real(8), intent(in)           :: Q(nx,ny,4)
-      real(8), intent(in), optional :: T(nx,ny)
+    subroutine print_vtk_2D(step,nx,ny,x,y,Jacobian,QJ)
+      integer, intent(in) :: step, nx, ny
+      real(8), intent(in) :: x(nx), y(ny)
+      real(8), intent(in) :: QJ(nx,ny,4)
     end subroutine print_vtk_2D
 
     subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,ke0,entropy0,myrank)
@@ -252,7 +251,7 @@ contains
     real(4), intent(in), dimension(ni*nj*nk), optional  :: Q1d
     integer(4) byte_x, byte_y, byte_z, byte_rho, byte_p, byte_T, byte_M, byte_v, byte_Q
     character :: lf*1, str1*4, str2*4, str3*4, str4*1
-    character :: offset1*10, offset2*10, offset3*10, offset4*10, offset5*10, offset6*10, offset7*10, offset8*10
+    character :: offset1*12, offset2*12, offset3*12, offset4*12, offset5*12, offset6*12, offset7*12, offset8*12
     lf = char(10)
     write(str1(1:4),'(i4)') ni-1
     write(str2(1:4),'(i4)') nj-1
@@ -267,14 +266,19 @@ contains
     byte_M   = byte_rho
     byte_v   = 4 + 4 * (dimension * ni * nj * nk)
     byte_Q   = byte_rho
-    write(offset1(1:10),'(i10)') byte_x
-    write(offset2(1:10),'(i10)') byte_x + byte_y
-    write(offset3(1:10),'(i10)') byte_x + byte_y + byte_z
-    write(offset4(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho
-    write(offset5(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho + byte_p
-    write(offset6(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho + byte_p + byte_T
-    write(offset7(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho + byte_P + byte_T + byte_M
-    write(offset8(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho + byte_P + byte_T + byte_M + byte_v
+    write(offset1(1:12),'(i12)') int(byte_x, kind=8)
+    write(offset2(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8)
+    write(offset3(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8)
+    write(offset4(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8) + &
+                                 int(byte_rho, kind=8)
+    write(offset5(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8) + &
+                                 int(byte_rho, kind=8) + int(byte_p, kind=8)
+    write(offset6(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8) + &
+                                 int(byte_rho, kind=8) + int(byte_p, kind=8) + int(byte_T, kind=8)
+    write(offset7(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8) + &
+                                 int(byte_rho, kind=8) + int(byte_P, kind=8) + int(byte_T, kind=8) + int(byte_M, kind=8)
+    write(offset8(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8) + int(byte_rho, kind=8) + &
+                                 int(byte_P, kind=8) + int(byte_T, kind=8) + int(byte_M, kind=8) + int(byte_v, kind=8)
 
     write(10) '<?xml version="1.0"?>'//lf
     write(10) '<VTKFile type="RectilinearGrid" version="1.0" byte_order="LittleEndian">'//lf
@@ -318,16 +322,14 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine print_vtk_2D(step,nx,ny,x,y,Q,T)
-    integer, intent(in)                   :: step, nx, ny
-    real(8), intent(in)                   :: x(nx), y(ny)
-    real(8), intent(in)                   :: Q(nx,ny,4)
-    real(8), intent(in), optional         :: T(nx,ny)
+  subroutine print_vtk_2D(step,nx,ny,x,y,Jacobian,QJ)
+    integer, intent(in) :: step, nx, ny
+    real(8), intent(in) :: x(nx), y(ny), Jacobian(ny)
+    real(8), intent(in) :: QJ(nx,ny,4)
     integer i, j, l, m
-    real(8), dimension(nx,ny) :: rho, u, v, p
-    real(8) :: z(1) = 0.d0
-    real(8), dimension(nx*ny)   :: rho1d, p1d, T1d, M1d
-    real(8), dimension(2*nx*ny) :: v1d
+    real(8) :: rho, u, v, p, z(1) = 0.d0
+    real(4), dimension(nx*ny)   :: rho1d, p1d, T1d, M1d
+    real(4), dimension(2*nx*ny) :: v1d
     character(len=40) filename
     character :: lf*1
     lf = char(10)
@@ -335,23 +337,23 @@ contains
     m = 1
     do j = 1, ny
       do i = 1, nx
-        rho(i,j) = Q(i,j,1)
-        u(i,j) = Q(i,j,2) / rho(i,j)
-        v(i,j) = Q(i,j,3) / rho(i,j)
-        p(i,j) = (gamma - 1.d0) * (Q(i,j,4) - 0.5d0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
-        rho1d(l) = rho(i,j)
-        p1d(l)   = p(i,j)
-        T1d(l)   = p1d(l) / (R * rho1d(l))
-        v1d(m)   = u(i,j)
-        v1d(m+1) = v(i,j)
-        M1d(l)   = sqrt(v1d(m)**2 + v1d(m+1)**2) / sqrt(gamma * p1d(l) / rho1d(l))
+        rho = Jacobian(j) * QJ(i,j,1)
+        u   = QJ(i,j,2) / QJ(i,j,1)
+        v   = QJ(i,j,3) / QJ(i,j,1)
+        p   = (gamma - 1.d0) * (Jacobian(j) * QJ(i,j,4) - 0.5d0 * rho * (u**2 + v**2))
+        rho1d(l) = real(rho)
+        p1d(l)   = real(p)
+        T1d(l)   = real(p / (R * rho))
+        v1d(m)   = real(u)
+        v1d(m+1) = real(v)
+        M1d(l)   = real(sqrt(u**2 + v**2) / sqrt(gamma * p / rho))
         l = l + 1
         m = m + 2
     enddo;enddo
 
     write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtr"
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
-    call print_xml(nx,ny,1,2,real(x),real(y),real(z),real(rho1d),real(p1d),real(T1d),real(M1d),real(v1d))
+    call print_xml(nx,ny,1,2,real(x),real(y),real(z),rho1d,p1d,T1d,M1d,v1d)
   end subroutine print_vtk_2D
   
   subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,mass0,ke0,entropy0,myrank)
