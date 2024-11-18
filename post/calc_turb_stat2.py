@@ -5,8 +5,7 @@ from mod.mod_read import getGrid, getVector, getScalar
 from mod.mod_turb_stat import non_dim_tbl, Sutherland, tau
 from mod.mod_TKE import BudgetTerms, print_TKE
 
-#Q_directory = "../3D_solver/TBL/data"
-Q_directory = "../../a100/"
+Q_directory = "../../../../../../media/user/HD-EDS-E/hatayama/TBL/SBLI_05delta/stat03ms_09ms_SLAU"
 Q_files   = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
 
 Rgas  = 287.03
@@ -21,7 +20,8 @@ def TKE(Nx, Ny, Nz, nx0, nx, ny, nz, x, y, z, Rho, U, V, W, P, UF, VF, WF, yp, u
   itr = 0.e0
   for Q_file in tqdm(Q_files):
     file_path = os.path.join(Q_directory, Q_file)
-    if file_path == os.path.join(Q_directory, "TKE.vtr"):
+    if file_path == os.path.join(Q_directory, "TKE.vtr") \
+    or file_path == os.path.join(Q_directory, "Qmean.vtr"):
       continue
     rhos       = getScalar(file_path, Nx, Ny, Nz, 'rho')
     us, vs, ws = getVector(file_path, Nx, Ny, Nz, 'velocity')
@@ -99,6 +99,7 @@ def main():
   z = Z
   del rho, u, v, w, p, uF, vF, wF, X, Y, Z
 
+  print(Norm)
   TKE(Nx, Ny, Nz, nx0, nx, ny, nz, x, y, z, Rho, U, V, W, P, UF, VF, WF, yp, ut, Norm)
 
 

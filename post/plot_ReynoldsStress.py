@@ -16,10 +16,10 @@ ruv = getScalar(file_path, Nx, Ny, Nz, 'ruv')
 
 delta = 25.e0
 
-nx1 = int(14.e0 / delta * Nx)
-nx2 = int(16.e0 / delta * Nx)
+nx1 = int(21.e0 / delta * Nx)
+nx2 = int(23.e0 / delta * Nx)
 
-save_path = os.path.join(Q_directory, "ReynoldsStress_downstream.d")
+save_path = os.path.join(Q_directory, "ReynoldsStress_relaxation_region.d")
 with open(save_path, "w", encoding="UTF-8") as f:
   print("# yp      ruu        rvv       rww        ruv", file=f)
   for j in range(Ny):

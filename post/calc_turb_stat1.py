@@ -8,7 +8,6 @@ from mod.mod_read import getGrid, getVector, getScalar
 from mod.mod_turb_stat import non_dim_tbl, Sutherland
 
 Q_directory = "../3D_solver/TBL/data"
-#Q_directory = "../../../../../mnt/data1/TBL_5thHRSLAU2_20240922"
 
 Q_files   = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
 num_files = len(Q_files)
@@ -20,7 +19,6 @@ Nx, Ny, Nz, x, y, z = getGrid(first_path)
 Rgas  = 287.03e0
 gamma = 1.4e0
 endT  = 2.087e-3
-nyp   = 48
 
 def extract_number(filename):
   match = re.search(r'Q(\d+)\.vtr$', filename)
@@ -38,10 +36,17 @@ def PSD(uf, t):
   psd  = ps / float(len(t))
   return freq, psd
 
-mean_path  = os.path.join(Q_directory, "Qmean.vtr")
-rhom       = getScalar(mean_path, Nx, Ny, Nz, 'rho')
-um, vm, wm = getVector(mean_path, Nx, Ny, Nz, 'velocity')
-pm         = getScalar(mean_path, Nx, Ny, Nz, 'p')
+rho_path = os.path.join(Q_directory, "rho.npy")
+u_path   = os.path.join(Q_directory, "u.npy")
+v_path   = os.path.join(Q_directory, "v.npy")
+w_path   = os.path.join(Q_directory, "w.npy")
+p_path   = os.path.join(Q_directory, "p.npy")
+
+rhom = np.load(rho_path)
+um   = np.load(u_path)
+vm   = np.load(v_path)
+wm   = np.load(w_path)
+pm   = np.load(p_path)
 
 Q = np.zeros((5,Nz,Ny,Nx), dtype=np.float32)
 
@@ -53,14 +58,6 @@ p   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
 uf  = np.zeros((Nz,Ny,Nx), dtype=np.float32)
 vf  = np.zeros((Nz,Ny,Nx), dtype=np.float32)
 wf  = np.zeros((Nz,Ny,Nx), dtype=np.float32)
-# Farvre average
-rhoF = np.zeros((Nz,Ny,Nx), dtype=np.float32)
-uF   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
-vF   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
-wF   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
-pF   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
-TF   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
-TtF  = np.zeros((Nz,Ny,Nx), dtype=np.float32)
 
 uf_PSD = np.zeros((100, num_files), dtype=np.float32)
 pf_PSD = np.zeros((100, num_files), dtype=np.float32)
@@ -78,21 +75,36 @@ rww    = np.zeros(Ny, dtype=np.float32)
 ruv    = np.zeros(Ny, dtype=np.float32)
 mdudy  = np.zeros(Ny, dtype=np.float32)
 
+# spanwise correlaion
+Rrr = np.zeros(Nz, dtype=np.float32)
+Ruu = np.zeros(Nz, dtype=np.float32)
+Rvv = np.zeros(Nz, dtype=np.float32)
+Rww = np.zeros(Nz, dtype=np.float32)
+Rpp = np.zeros(Nz, dtype=np.float32)
+
 dx = -x[:-2] + x[2:]
 dy = -y[:-2] + y[2:]
 dz = -z[:-2] + z[2:]
 
+nx1 = int(0.5*Nx)
+nx2 = int(0.9*Nx)
+
 # non dim
-rhow = rhom[:,0,:]
+rhow = rhom[:,0,nx1:nx2]
 Q[0,:,:,:], Q[1,:,:,:], Q[2,:,:,:], Q[3,:,:,:], Q[4,:,:,:] = rhom, um, vm, wm, pm
 yp, _, _, tw, ut, up = non_dim_tbl(Q, x, y, z)
-Mt = ut / np.sqrt(1.4e0 * np.mean(pm[:,0,:] / rhow))
+Mt = ut / np.sqrt(1.4e0 * np.mean(pm[:,0,nx1:nx2] / rhow))
 print("ut, tw ",ut, tw)
 # shear stress balance
-mu = Sutherland(np.mean(np.mean(pm / (Rgas * rhom), axis=0), axis=-1))
-du = np.mean(np.mean(-um[:,:-1,:] + um[:,1:,:], axis=0), axis=-1)
+mu = Sutherland(np.mean(pm[:,:,nx1:nx2] / (Rgas * rhom[:,:,nx1:nx2]), axis=(0,2)))
+du = np.mean(np.mean(-um[:,:-1,nx1:nx2] + um[:,1:,nx1:nx2], axis=0), axis=-1)
 mdudy[0] = 1.e0
 mdudy[1:] = 0.5e0 * (mu[:-1] + mu[1:]) * du / (-y[:-1] + y[1:]) / tw
+
+for j in range(Ny):
+  if yp[j] > 10.e0:
+    nyp = j
+    break
 
 itr = 0
 for Q_file in tqdm(Q_files):
@@ -102,33 +114,35 @@ for Q_file in tqdm(Q_files):
   rho     = getScalar(file_path, Nx, Ny, Nz, 'rho')
   u, v, w = getVector(file_path, Nx, Ny, Nz, 'velocity')
   p       = getScalar(file_path, Nx, Ny, Nz, 'p')
-  uf = u - um
-  vf = v - vm
-  wf = w - wm
+  # fluctuation
+  rhof = rho - rhom
+  uf   = u - um
+  vf   = v - vm
+  wf   = w - wm
+  pf   = p - pm
+  # spanwise correlation
+  for k in range(Nz):
+    Rrr[k] += np.mean(rhof[0,nyp,nx1:nx2] * rhof[k,nyp,nx1:nx2])
+    Ruu[k] += np.mean(  uf[0,nyp,nx1:nx2] *   uf[k,nyp,nx1:nx2])
+    Rvv[k] += np.mean(  vf[0,nyp,nx1:nx2] *   vf[k,nyp,nx1:nx2])
+    Rww[k] += np.mean(  wf[0,nyp,nx1:nx2] *   wf[k,nyp,nx1:nx2])
+    Rpp[k] += np.mean(  pf[0,nyp,nx1:nx2] *   pf[k,nyp,nx1:nx2])
   # calc RMS
-  rhorms += np.mean(np.mean(np.sqrt((rho - rhom)**2) / (gamma * np.mean(rhow) * Mt**2), axis=0), axis=-1)
-  urms   += np.mean(np.mean(np.sqrt(uf**2) / ut, axis=0), axis=-1)
-  vrms   += np.mean(np.mean(np.sqrt(vf**2) / ut, axis=0), axis=-1)
-  uvrms  += np.mean(np.mean(uf * vf / ut**2, axis=0), axis=-1)
-  prms   += np.mean(np.mean(np.sqrt((p - pm)**2) / tw, axis=0), axis=-1)
+  rhorms += np.mean(np.sqrt(rhof[:,:,nx1:nx2]**2) / (gamma * np.mean(rhow) * Mt**2), axis=(0,2))
+  urms   += np.mean(np.sqrt(uf[:,:,nx1:nx2]**2) / ut, axis=(0,2))
+  vrms   += np.mean(np.sqrt(vf[:,:,nx1:nx2]**2) / ut, axis=(0,2))
+  uvrms  += np.mean(uf[:,:,nx1:nx2] * vf[:,:,nx1:nx2] / ut**2, axis=(0,2))
+  prms   += np.mean(np.sqrt(pf[:,:,nx1:nx2]**2) / tw, axis=(0,2))
   # calc TKE
-  tke += np.mean(np.mean(0.5e0 * (uf**2 + vf**2 + wf**2) / (ut**2), axis=0), axis=-1)
+  tke += np.mean(0.5e0 * (uf[:,:,nx1:nx2]**2 + vf[:,:,nx1:nx2]**2 + wf[:,:,nx1:nx2]**2) / (ut**2), axis=(0,2))
   # calc Reynolds Stress
-  ruu += np.mean(np.mean(rhom * uf**2 / (rhow * ut**2), axis=0), axis=-1)
-  rvv += np.mean(np.mean(rhom * vf**2 / (rhow * ut**2), axis=0), axis=-1)
-  rww += np.mean(np.mean(rhom * wf**2 / (rhow * ut**2), axis=0), axis=-1)
-  ruv += np.mean(np.mean(rhom * uf * vf / tw, axis=0), axis=-1)
-  # Favre average
-  rhoF += rho
-  uF   += u
-  vF   += v
-  wF   += w
-  pF   += p
-  TF   += (p / (Rgas * rho))
-  TtF  += (p / (Rgas * rho)) + 0.5e0 * (gamma - 1.e0) * (u**2 + v**2 + w**2) / gamma
+  ruu += np.mean(rhom[:,:,nx1:nx2] * uf[:,:,nx1:nx2]**2 / (rhow * ut**2), axis=(0,2))
+  rvv += np.mean(rhom[:,:,nx1:nx2] * vf[:,:,nx1:nx2]**2 / (rhow * ut**2), axis=(0,2))
+  rww += np.mean(rhom[:,:,nx1:nx2] * wf[:,:,nx1:nx2]**2 / (rhow * ut**2), axis=(0,2))
+  ruv += np.mean(rhom[:,:,nx1:nx2] * uf[:,:,nx1:nx2] * vf[:,:,nx1:nx2] / tw, axis=(0,2))
   # PSD
-  uf_PSD[:,itr] = (u[0:20:2,nyp,0:100:10] - um[0:20:2,nyp,0:100:10]).flatten()
-  pf_PSD[:,itr] = (p[0:20:2,nyp,0:100:10] - pm[0:20:2,nyp,0:100:10]).flatten()
+  #uf_PSD[:,itr] = (u[0:20:2,nyp,0:100:10] - um[0:20:2,nyp,0:100:10]).flatten()
+  #pf_PSD[:,itr] = (p[0:20:2,nyp,0:100:10] - pm[0:20:2,nyp,0:100:10]).flatten()
   itr += 1
 
 rhorms /= np.float32(itr)
@@ -141,35 +155,17 @@ ruu    /= np.float32(itr)
 rvv    /= np.float32(itr)
 rww    /= np.float32(itr)
 ruv    /= np.float32(itr)
-rhoF   /= np.float32(itr)
-uF     /= np.float32(itr)
-vF     /= np.float32(itr)
-wF     /= np.float32(itr)
-pF     /= np.float32(itr)
-TF     /= np.float32(itr)
-TtF    /= np.float32(itr)
-
-# save Favre average
-rhoF_path = os.path.join(Q_directory, "rhoF")
-uF_path   = os.path.join(Q_directory, "uF")
-vF_path   = os.path.join(Q_directory, "vF")
-wF_path   = os.path.join(Q_directory, "wF")
-pF_path   = os.path.join(Q_directory, "pF")
-TF_path   = os.path.join(Q_directory, "TF")
-TtF_path  = os.path.join(Q_directory, "TtF")
-np.save(rhoF_path, rhoF)
-np.save(uF_path,   uF)
-np.save(vF_path,   vF)
-np.save(wF_path,   wF)
-np.save(pF_path,   pF)
-np.save(TF_path,   TF)
-np.save(TtF_path,  TtF)
+Rrr    /= np.float32(itr)
+Ruu    /= np.float32(itr)
+Rvv    /= np.float32(itr)
+Rww    /= np.float32(itr)
+Rpp    /= np.float32(itr)
 
 save_path = os.path.join(Q_directory, "turb_stat.d")
 
 delta = 2.e-3
 for j in range(Ny):
-  if np.mean(um[:,j,:]) >= 0.99e0 * np.mean(um[:,-1,:]):
+  if np.mean(um[:,j,nx1:nx2]) >= 0.99e0 * np.mean(um[:,-1,nx1:nx2]):
     delta = y[j]
     break
 
@@ -183,6 +179,13 @@ with open(save_path, "w", encoding="UTF-8") as f:
 
 del Q, rhom, um, vm, wm, pm, uf, vf
 
+save_path = os.path.join(Q_directory, "span_corr.d")
+with open(save_path, "w", encoding="UTF-8") as f:
+  print("# z       Rrr       Ruu       Rvv       Rww       Rpp", file=f)
+  for k in range(Nz):
+    print(f'{z[k]/delta:.3e}', f'{Rrr[k]/Rrr[0]:.3e}', f'{Ruu[k]/Ruu[0]:.3e}', f'{Rvv[k]/Rvv[0]:.3e}', f'{Rww[k]/Rww[0]:.3e}', f'{Rpp[k]/Rpp[0]:.3e}', file=f)
+
+'''
 t = np.linspace(0.e0, endT, num_files)
 
 freq   = np.zeros((100,num_files), dtype=np.float32)
@@ -202,4 +205,5 @@ with open(save_path, "w", encoding="UTF-8") as f:
   print("# k       u_PSD       p_psd", file=f)
   for i in range(1,int(0.5*num_files)):
     print(f'{freq[i]:.3e}', f'{u_psd[i]:.3e}', f'{p_psd[i]:.3e}', file=f)
+'''
 
