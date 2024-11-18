@@ -4,8 +4,9 @@ module mod_globals
   integer, parameter :: dimension = 3
   integer, parameter :: accuracy  = 2 
   integer, parameter :: offset    = accuracy / 2
-  integer, parameter :: id_visc   = 2
+  integer, parameter :: id_visc   = 1
   integer, parameter :: id_turbulence = 0
+  integer, parameter :: id_av = 1
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! 0 no-visc         !
   !               ! 1 2nd visc        !
@@ -13,6 +14,9 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_turbulence ! 0 laminar         !
   !               ! 1 SMS             !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_av         ! 0 non av          !
+  !               ! 1 vonNeumann      !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_scheme   ! 1  KEEP4th          !
   !             ! 2  KEEP MUSCL       !
@@ -44,13 +48,13 @@ module mod_globals
   !             ! kind4 HR-SLAU2      !
   !             ! kind8 VHR-SLAU2     !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer, parameter         :: id_scheme   = 3
+  integer, parameter         :: id_scheme   = 1
   integer, parameter         :: id_sensor   = 1
-  integer(kind=8), parameter :: id_accuracy = 0
+  integer(kind=4), parameter :: id_accuracy = 0
   integer(kind=4), parameter :: id_tvd      = 0
-  integer(kind=4), parameter :: id_keep     = 0
+  integer(kind=2), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
-  real(8), parameter         :: threshold   = 0.4d0
+  real(8), parameter         :: threshold   = 0.9d0
 
   ! mesh
   real(8), parameter :: Lx = 36d-3
