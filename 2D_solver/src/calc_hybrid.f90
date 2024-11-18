@@ -34,68 +34,18 @@ contains
     endif
   end subroutine calc_Ducros
 
-  attributes(global) subroutine calc_E_hybrid(rho,e,fd,E_keep,E_upwind,E_hybrid)
-    real(8), intent(in), dimension(nx,ny) :: rho, e, fd
-    real(8), intent(in), dimension(nx-accuracy+1,ny-accuracy,4), device :: E_keep, E_upwind
-    real(8), intent(out), dimension(nx-accuracy+1,ny-accuracy,4), device :: E_hybrid
-    real(8) d1, d2, d3, phi_p, phi_m, phi, E_tvd(4), fdc
-    real(8) :: eps = 1.d-16
-    integer i, j
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset - 1
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
-    if (2 <= i) then
-      d1 = -e(i-1,j) / rho(i-1,j) + e(i,j) / rho(i,j)
-    else
-      d1  = 0.d0
-    endif
-    d2 = -e(i,j) / rho(i,j) + e(i+1,j) / rho(i+1,j)
-    if (i <= nx-2) then
-      d3 = -e(i+1,j) / rho(i+1,j) + e(i+2,j) / rho(i+2,j)
-    else
-      d3 = 0.d0
-    endif
-    phi_p = (d2 * d1 + d1**2) / (d2**2 + d1**2 + eps)
-    phi_m = (d2 * d3 + d3**2) / (d2**2 + d3**2 + eps)
-    !phi = min(phi_p, phi_m)
-    phi = 0.d0
-    E_tvd(:) = phi * E_keep(i-offset+1,j-offset,:) + (1.d0 - phi) * E_upwind(i-offset+1,j-offset,:)
-    
-    fdc = 0.5d0 * (fd(i,j) + fd(i+1,j))
-    fdc = dble(int(fdc > 0.4d0))
-    !fdc = 1.d0
-    E_hybrid(i-offset+1,j-offset,:) = (1.d0 - fdc) * E_keep(i-offset+1,j-offset,:) + fdc * E_tvd(:)
-  end subroutine calc_E_hybrid
-  
-  attributes(global) subroutine calc_F_hybrid(rho,e,fd,F_keep,F_upwind,F_hybrid)
-    real(8), intent(in), dimension(nx,ny) :: rho, e, fd
-    real(8), intent(in), dimension(nx-accuracy,ny-accuracy+1,4), device :: F_keep, F_upwind
-    real(8), intent(out), dimension(nx-accuracy,ny-accuracy+1,4), device :: F_hybrid
-    real(8) d1, d2, d3, phi_p, phi_m, phi, F_tvd(4), fdc
-    real(8) :: eps = 1.d-16
-    integer i, j
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset - 1
-    if (2 <= j) then
-      d1 = -e(i,j-1) / rho(i,j-1) + e(i,j) / rho(i,j)
-    else
-      d1  = 0.d0
-    endif
-    d2 = -e(i,j) / rho(i,j) + e(i,j+1) / rho(i,j+1)
-    if (j <= ny-2) then
-      d3 = -e(i,j+1) / rho(i,j+1) + e(i,j+2) / rho(i,j+2)
-    else
-      d3 = 0.d0
-    endif
-    phi_p = (d2 * d1 + d1**2) / (d2**2 + d1**2 + eps)
-    phi_m = (d2 * d3 + d3**2) / (d2**2 + d3**2 + eps)
-    !phi = min(phi_p, phi_m)
-    phi = 0.d0 
-    F_tvd(:) = phi * F_keep(i-offset,j-offset+1,:) + (1.d0 - phi) * F_upwind(i-offset,j-offset+1,:)
-    
-    fdc = 0.5d0 * (fd(i,j) + fd(i,j+1))
-    fdc = dble(int(fdc > 0.4d0))
-    !fdc = 1.d0
-    F_hybrid(i-offset,j-offset+1,:) = (1.d0 - fdc) * F_keep(i-offset,j-offset+1,:) + fdc * F_tvd(:)
-  end subroutine calc_F_hybrid
+  attributes(device) function sigmoid(x) result(ans)
+    real(8), intent(in), value :: x
+    real(8) :: ans
+    ans = 0.5d0 * (tanh(10.d0 * (x - 0.5d0)) + 1.d0)
+  end function sigmoid
+
+  attributes(device) function wiggle_detector(phi) result(ans)
+    real(8), intent(in), device :: phi(4)
+    real(8) ans, phi1, phi2
+    phi1 = (-phi(1) + phi(2)) * (-phi(2) + phi(3))
+    phi2 = (-phi(3) + phi(4)) * (-phi(2) + phi(3))
+    ans  = 0.5d0 * (1.d0 - sign(1.d0, min(phi1, phi2)))
+  end function wiggle_detector
 end module calc_hybrid
 
