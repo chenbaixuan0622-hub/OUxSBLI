@@ -79,15 +79,15 @@ module mod_globals
   !               ! kind4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=4), parameter :: id_RungeKutta = 0
-  integer(kind=2), parameter :: id_recal      = 0
-  integer, parameter         :: step_offset   = 0
+  integer(kind=4), parameter :: id_recal      = 0
+  integer, parameter         :: step_offset   = 9
   integer, parameter         :: start_rescale = 0
   real(8), parameter :: endT = 0.05d-3! nt * np = 10000
   integer, parameter :: np   = 1
   real(8), parameter :: u0   = 506.8d0
   real(8), parameter :: CFL  = 0.1d0
   real(8), parameter :: dt   = 5d-9!CFL * Lx / (dble(nx-1) * u0) ! 7.7e-9
-  integer, parameter :: nt   = 1!int(endT / (dble(np) * dt))
+  integer, parameter :: nt   = 1000!int(endT / (dble(np) * dt))
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0

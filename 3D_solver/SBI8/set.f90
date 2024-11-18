@@ -12,11 +12,14 @@ contains
     dx1 = Lx / dble(nx-1)
     dy1 = 10.d-3 / dble(256)
     dz1 = Lz / dble(nz-1)
-    x(1) = Lx * dble(myrank-1)
+
+    x(1) = Lx * 0.5d0 * dble(myrank)
     do i = 1, nx-1
       dx(i) = dx1
       x(i+1) = x(i) + dx(i)
     enddo
+
+    print *, "myrank is ", myrank, " x(1) = ", x(1)
 
     y(1) = 0.d0
     do j = 1, 256

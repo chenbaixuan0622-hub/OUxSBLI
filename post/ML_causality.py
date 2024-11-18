@@ -20,7 +20,7 @@ from mod.mod_read import getGrid, getVector, getScalar
 from mod.mod_turb_stat import tau_2d
 
 
-Q_directory = "../../../../../mnt/data1/TBL20240819_KEEP6thVisc4th"
+Q_directory = "../../../../../media/user/HD-EDS-E/hatayama/TBL/TBL20240819_KEEP6thVisc4th"
 Q_files     = [f for f in os.listdir(Q_directory) if f.endswith("vtr")]
 num_files   = len(Q_files)
 
@@ -57,7 +57,8 @@ nz = 32
 
 # set GPU and NN property
 device       = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-net_instance = UNet(FourierBlock, [64,32,16,8]).to(device)
+#net_instance = UNet(FourierBlock, [64,32,16,8]).to(device)
+net_instance = ResNet(BasicBlock, [64,32,16,8]).to(device)
 net          = torch.jit.script(net_instance).to(device)
 criterion    = nn.L1Loss()#nn.MSELoss()
 optimizer    = optim.Adam(net.parameters())

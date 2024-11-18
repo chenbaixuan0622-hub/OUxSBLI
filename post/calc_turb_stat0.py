@@ -3,7 +3,7 @@ import os
 from tqdm import tqdm
 from mod.mod_read import getGrid, getVector, getScalar
 
-Q_directory = "../3D_solver/TBL/data"
+Q_directory = "../../../../../../media/user/HD-EDS-E/hatayama/TBL/SBLI_025delta/stat04ms_1_2ms_SLAU"
 
 Q_files   = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
 num_files = len(Q_files)
@@ -29,6 +29,9 @@ TtF  = np.zeros((Nz,Ny,Nx), dtype=np.float32)
 
 for Q_file in tqdm(Q_files):
   file_path = os.path.join(Q_directory, Q_file)
+  if file_path == os.path.join(Q_directory, "TKE.vtr") \
+  or file_path == os.path.join(Q_directory, "Qmean.vtr"):
+    continue
   rho     = getScalar(file_path, Nx, Ny, Nz, 'rho')
   u, v, w = getVector(file_path, Nx, Ny, Nz, 'velocity')
   p       = getScalar(file_path, Nx, Ny, Nz, 'p')
@@ -44,7 +47,7 @@ for Q_file in tqdm(Q_files):
   wF   += rho * w
   pF   += rho * p
   TF   += rho * (p / (Rgas * rho))
-  TtF  += rho * (p / (Rgas * rho)) + 0.5e0 * (gamma - 1.e0) * (u**2 + v**2 + w**2) / gamma
+  TtF  += rho * ((p / (Rgas * rho)) + 0.5e0 * (gamma - 1.e0) * (u**2 + v**2 + w**2) / gamma)
 
 rhom /= np.float32(num_files)
 um   /= np.float32(num_files)

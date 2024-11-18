@@ -6,4 +6,5 @@
 *.out
 *.png
 *.err
-
+post/__pycache__/
+post/mod/__pycache__/

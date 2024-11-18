@@ -6,8 +6,9 @@ from numba import jit
 from mod.mod_read import getGrid, getVector, getScalar
 from mod.mod_turb_stat import non_dim_tbl
 
-Q_directory = "../3D_solver/TBL/data"#"../../../../../media/user/HD-EDS-E/hatayama/TBL/yp1/coarse/HRSLAU2MUSCL4th"
-target_path = os.path.join(Q_directory, "Q00271.vtr")
+Q_directory = "../3D_solver/TBL/data"
+#Q_directory = "../../../../../media/user/HD-EDS-E/hatayama/TBL/TBL20240826_KEEP4thVisc2nd"
+target_path = os.path.join(Q_directory, "Q00100.vtr")
 save_path   = os.path.join(Q_directory, "yplus.d")
 hist_path   = os.path.join(Q_directory, "hist.png")
 
@@ -34,8 +35,8 @@ for Q_file in Q_files:
     Q[1,:,:,:], Q[2,:,:,:], Q[3,:,:,:]  = getVector(file_path, Nx, Ny, Nz, 'velocity')
     Q[4,:,:,:]                          = getScalar(file_path, Nx, Ny, Nz, 'p')
     yp, tw, ut, twm, utm, up = non_dim_tbl(Q, x, y, z)
-    print("tw is", twm)
-    print("ut is", utm)
+    print("tw is ", twm)
+    print("ut is ", utm)
     with open(save_path, "w", encoding="UTF-8") as f:
       print("# yplus  uplus", file=f)
       for j in range(Ny):
@@ -56,4 +57,19 @@ for Q_file in Q_files:
 
     plt.tight_layout()
     plt.savefig(hist_path)
+    u0 = 506.8e0
+    for j in range(Ny):
+      if np.mean(Q[1,:,j,0]) >= 0.99e0 * u0:
+        tblin = y[j] - (-y[j-1] + y[j]) * \
+        (np.mean(Q[1,:,j,0]) - 0.99e0 * u0) \
+        / (-np.mean(Q[1,:,j-1,0]) + np.mean(Q[1,:,j,0]) + 1.e-20)
+        break
+    for j in range(Ny):
+      if np.mean(Q[1,:,j,int(0.8*Nx)]) >= 0.99e0 * u0:
+        tblre = y[j] - (-y[j-1] + y[j]) * \
+        (np.mean(Q[1,:,j,int(0.8*Nx)]) - 0.99e0 * u0) \
+        / (-np.mean(Q[1,:,j-1,int(0.8*Nx)]) + np.mean(Q[1,:,j,int(0.8*Nx)]) + 1.e-20)
+        break
+    print("tblin is ", tblin*1e3, "[mm]")
+    print("tblre is ", tblre*1e3, "[mm]")
 

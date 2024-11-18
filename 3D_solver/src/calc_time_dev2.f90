@@ -29,13 +29,14 @@ contains
     real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
     real(8), intent(out), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
     real(8), intent(out), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
-    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p
+    real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, sensor
     integer stat
     call calc_quantities_3D(nx,ny,nz,Jacobian,QJ,rho,u,v,w,p)
     
-    call calc_E<<<blocksE,threadsE,1>>>(nx,ny,nz,rho,u,v,w,p,E)
-    call calc_F<<<blocksF,threadsF,2>>>(nx,ny,nz,rho,u,v,w,p,F)
-    call calc_G<<<blocksG,threadsG,3>>>(nx,ny,nz,rho,u,v,w,p,G)
+    call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, dx, dy, dz, u, v, w, sensor)
+    call calc_E<<<blocksE,threadsE,1>>>(nx, ny, nz, rho, u, v, w, p, sensor, E)
+    call calc_F<<<blocksF,threadsF,2>>>(nx, ny, nz, rho, u, v, w, p, sensor, F)
+    call calc_G<<<blocksG,threadsG,3>>>(nx, ny, nz, rho, u, v, w, p, sensor, G)
   
     stat = cudaDeviceSynchronize()
     call calc_Ev<<<blocksE,threadsE,1>>>(nx,ny,nz,dx,dy,dz,rho,u,v,w,p,E)
