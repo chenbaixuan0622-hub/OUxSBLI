@@ -404,7 +404,6 @@ contains
     endif
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
     call print_xml(nx,ny,nz,3,real(x),real(y),real(z),rho1d,p1d,T1d,M1d,v1d)
-    !call print_1d(step+step_offset,nx,ny,nz,real(x),real(y),real(z),Jacobian,QJ)
 
     deallocate(rho1d,p1d,T1d,M1d,v1d)
   end subroutine print_vtk_3D
