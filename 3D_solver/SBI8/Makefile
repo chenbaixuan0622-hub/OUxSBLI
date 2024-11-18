@@ -1,6 +1,6 @@
 FC = mpif90
 
-OUTPUT_OPTIN = -cuda -acc -fast -Minfo=accel -lnvhpcwrapnvtx
+OUTPUT_OPTIN = -cuda -Xptxas -warn-spills -acc -fast -Minfo=accel -lnvhpcwrapnvtx
 
 .SUFFIXES : .f90
 
@@ -10,7 +10,7 @@ OUTPUT_OPTIN = -cuda -acc -fast -Minfo=accel -lnvhpcwrapnvtx
 %.mod: %.f90 %.o
 		@:
 
-TARGET = TBL8
+TARGET = SBI8
 vpath %f90 ../src:../../src
 
 OBJ =	mod_globals.o \
@@ -30,12 +30,13 @@ OBJ =	mod_globals.o \
       calc_flux.o \
       calc_steps.o \
       calc_rescale.o \
+			calc_para.o \
       print.o \
       calc_time_dev2.o \
       main8.o
 
 a.out: $(OBJ)
-		$(FC) -cuda -acc -fast -Minfo -lnvhpcwrapnvtx -I./ $^
+		$(FC) -cuda -Xptxas -warn-spills -acc -fast -Minfo -lnvhpcwrapnvtx -I./ $^
 
 $(TARGET): $(OBJ)
 		$(LINK.f) $^ $(LOADLIBES) $(LDLIBS) -o $@
@@ -54,7 +55,7 @@ calc_flux.o: mod_globals.mod calc_keep.mod calc_slau.mod calc_roe.mod calc_muscl
 calc_hybrid.o: mod_globals.mod
 calc_steps.o: mod_globals.mod
 calc_rescale.o: mod_globals.mod
-calc_time_dev2.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_flux.mod calc_hybrid.mod calc_visc.mod calc_steps.mod calc_rescale.mod print.mod
+calc_time_dev2.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_flux.mod calc_hybrid.mod calc_visc.mod calc_steps.mod calc_rescale.mod calc_para.mod print.mod
 print.o: mod_globals.mod
 main8.o: main8.f90 mod_globals.mod set_coordinate.mod set.mod calc_time_dev2.mod
 
