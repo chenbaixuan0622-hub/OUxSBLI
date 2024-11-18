@@ -1,10 +1,15 @@
 module mod_globals
   use cudafor
   implicit none
-  integer, parameter :: dimension = 3
-  integer, parameter :: accuracy  = 2
-  integer, parameter :: offset    = accuracy / 2
-  integer, parameter :: id_visc   = 1
+  integer, parameter    :: dimension = 2
+  integer, parameter    :: accuracy  = 2
+  integer, parameter    :: offset    = accuracy / 2
+  integer(2), parameter :: id_visc   = 2
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_visc       ! kind2 Euler       !
+  !               ! kind4 NS          !
+  !               ! 1 2nd             !
+  !               ! 2 4th             !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_scheme   ! integer(2)  KEEP    !
   !             ! real(2)     SLAU    !
@@ -17,7 +22,7 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_tvd      ! kind2 non TVD       !
   !             ! kind4 minmod        !
-  !             ! kind8 switch        !
+  !             ! kind8 MUSCL4th      !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_keep     ! kind2 KEEP          !
   !             ! kind4 KEEPPE        !
@@ -29,46 +34,35 @@ module mod_globals
   ! slau_wall   ! kind2 off           !
   !             ! kind4 on            !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_rescale  ! kind2 off           !
-  !             ! kind4 on            !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(2), parameter      :: id_scheme   = 0
-  real(8), parameter         :: threshold   = 0.6d0
-  integer(kind=2), parameter :: id_accuracy = 0
-  integer(kind=2), parameter :: id_tvd      = 0
+  real(2), parameter         :: id_scheme   = 0
+  real(8), parameter         :: threshold   = 0.4d0
+  integer(kind=8), parameter :: id_accuracy = 0
+  integer(kind=8), parameter :: id_tvd      = 0
   integer(kind=2), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
   integer(kind=2), parameter :: slau_wall   = 0
-  integer(kind=2), parameter :: id_rescale  = 0
   real(8), parameter         :: blt         = 2.d-3
 
   ! mesh
-  real(8), parameter :: Lx = 6.25d-3  ! * 8 25 delta
-  real(8), parameter :: Ly = 8d-3     !   4 delta
-  real(8), parameter :: Lz = 32d-3    !  16 delta
-  integer, parameter :: nx = 161      ! * 8
-  integer, parameter :: ny = 321
-  integer, parameter :: nz = 2049
-  integer, parameter :: rerank = 6
-  integer, parameter :: nre1 = int(0.2d0 * nx)
-  integer, parameter :: nre2 = int(0.8d0 * nx)
-  integer, parameter :: overlap = 1
+  real(8), parameter :: Lx = 50d-3  ! 20  delta
+  real(8), parameter :: Ly = 10d-3  !  5  delta
+  real(8), parameter :: Lz = 0.1d-3 ! 1/4 delta
+  ! DNS
+  integer, parameter :: nx = 1281 ! xp = 10   0.04   mm
+  integer, parameter :: ny = 321  ! yp = 0.5, 0.002  mm
+  integer, parameter :: nz = 2    ! zp = 5    0.0156 mm
 
   ! RTX 4090
-  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
-  type(dim3) :: blocksF   = dim3((nx-accuracy)/1,(ny-accuracy+1)/64,(nz-accuracy)/1)
-  type(dim3) :: blocksG   = dim3((nx-accuracy)/1,(ny-accuracy)/1,(nz-accuracy+1)/64)
-  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
-  type(dim3) :: blocksFv  = dim3((nx-accuracy)/1,(ny-accuracy+1)/64,(nz-accuracy)/1)
-  type(dim3) :: blocksGv  = dim3((nx-accuracy)/1,(ny-accuracy)/1,(nz-accuracy+1)/64)
-  type(dim3) :: blocks    = dim3((nx-accuracy)/159,(ny-accuracy)/1,(nz-accuracy)/1)
+  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,1)
+  type(dim3) :: blocksF   = dim3((nx-accuracy)/1,(ny-accuracy+1)/64,1)
+  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,1)
+  type(dim3) :: blocksFv  = dim3((nx-accuracy)/1,(ny-accuracy+1)/32,1)
+  type(dim3) :: blocks    = dim3((nx-accuracy)/1,(ny-accuracy)/29,1)
   type(dim3) :: threadsE  = dim3(32,1,1)
   type(dim3) :: threadsF  = dim3(1,64,1)
-  type(dim3) :: threadsG  = dim3(1,1,64)
   type(dim3) :: threadsEv = dim3(32,1,1)
-  type(dim3) :: threadsFv = dim3(1,64,1)
-  type(dim3) :: threadsGv = dim3(1,1,64)
-  type(dim3) :: threads   = dim3(159,1,1)
+  type(dim3) :: threadsFv = dim3(1,32,1)
+  type(dim3) :: threads   = dim3(1,29,1)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -79,26 +73,26 @@ module mod_globals
   !               ! kind4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=4), parameter :: id_RungeKutta = 0
-  integer(kind=4), parameter :: id_recal      = 0
-  integer, parameter         :: step_offset   = 9
-  integer, parameter         :: start_rescale = 0
-  real(8), parameter :: endT = 0.05d-3! nt * np = 10000
-  integer, parameter :: np   = 1
-  real(8), parameter :: u0   = 506.8d0
-  real(8), parameter :: CFL  = 0.1d0
-  real(8), parameter :: dt   = 5d-9!CFL * Lx / (dble(nx-1) * u0) ! 7.7e-9
-  integer, parameter :: nt   = 1000!int(endT / (dble(np) * dt))
+  integer(kind=2), parameter :: id_recal      = 0
+  integer, parameter         :: step_offset   = 0
+  real(8), parameter :: endT  = 0.1d-3
+  integer, parameter :: np    = 10
+  real(8), parameter :: R     = 287.03d0
+  real(8), parameter :: gamma = 1.4d0
+  real(8), parameter :: T0    = 171.31d0
+  real(8), parameter :: u0    = 506.8d0
+  real(8), parameter :: CFL   = 0.1d0
+  real(8), parameter :: dt    = 5d-9!CFL * Lx / (dble(nx-1) * u0)
+  integer, parameter :: nt    = 1!int(endT / (dble(np) * dt))
 
   ! physical properties
-  real(8), parameter :: gamma = 1.4d0
   real(8), parameter :: Pr    = 0.71d0
   real(8), parameter :: Prt   = 0.9d0
-  real(8), parameter :: R     = 287.03d0
 
   ! initial condition
-  real(8), parameter :: M0    = 1.9d0
-  real(8), parameter :: p0    = 14924.d0
-  real(8), parameter :: T0    = 171.31d0
+  real(8), parameter :: M0   = 1.9d0
+  real(8), parameter :: p0   = 14924.d0
+  ! oblique shock
   real(8), parameter :: rho0  = p0 / (R * T0)
   real(8), parameter :: beta  = dacos(-1.d0) * 37.2d0 / 180.d0
   real(8), parameter :: Ms    = M0 * dsin(beta)
