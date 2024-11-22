@@ -8,7 +8,7 @@ from mod.mod_read import getGrid, getVector
 from mod.mod_info import KMeans, causal_map
 
 
-Q_dir = "../../a100"
+Q_dir = "../../SBLI/SBLI_4delta/stat03ms_04ms_SLAU"
 Q_files    = [f for f in os.listdir(Q_dir) if f.endswith(".vtr")]
 first_path = os.path.join(Q_dir, Q_files[0])
 Nx, Ny, Nz, X, Y, Z = getGrid(first_path)
