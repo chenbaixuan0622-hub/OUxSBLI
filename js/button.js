@@ -1,3 +1,15 @@
+let button0 = document.getElementById('btn0');
+
+button0.addEventListener("click",function() {
+
+  let text = document.getElementById('toggleBlock0');
+  if(text.style.display === 'block'){
+    text.style.display = 'none';
+  } else {
+    text.style.display = 'block';
+  }
+});
+
 let button1 = document.getElementById('btn1');
 
 button1.addEventListener("click",function() {

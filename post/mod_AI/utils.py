@@ -4,6 +4,7 @@ from torch import nn
 import cv2
 import matplotlib.pyplot as plt
 
+
 class Dataset(torch.utils.data.Dataset):
   def __init__(self, teaching_data, test_data):
     self.data    = torch.tensor(teaching_data, dtype=torch.float32, requires_grad=False)
@@ -18,55 +19,32 @@ class Dataset(torch.utils.data.Dataset):
     return x, y
 
 
+class Dataset_classify(torch.utils.data.Dataset):
+  def __init__(self, image, label):
+    self.image = torch.tensor(image, dtype=torch.float32, requires_grad=False)
+    self.label = torch.tensor(label, dtype=torch.long, requires_grad=False)
+  
+  def __len__(self):
+    return len(self.image)
+
+  def __getitem__(self, index):
+    x = self.image[index]
+    y = self.label[index]
+    return x, y
+
+
 def divide_into_batch(train_dataset,test_dataset,batchsize):
   train_batch = torch.utils.data.DataLoader(dataset=train_dataset,
                                           batch_size=batchsize,
-                                          shuffle=True,
-                                          num_workers=2)
+                                          shuffle=True)
   test_batch  = torch.utils.data.DataLoader(dataset=test_dataset,
                                           batch_size=batchsize,
-                                          shuffle=True,
-                                          num_workers=2)
+                                          shuffle=True)
   return train_batch, test_batch
 
 
-class EarlyStopping:
-  def __init__(self, patience=5, verbose=False):
-    self.patience     = patience
-    self.verbose      = verbose
-    self.counter      = 0
-    self.best_score   = None
-    self.early_stop   = False
-    self.val_loss_min = np.Inf
-
-  def __call__(self, val_loss, model):
-    score = -val_loss
-
-    if self.best_score is None:
-      self.best_score = score
-      self.checkpoint(val_loss, model)
-    elif score < self.best_score:
-      self.counter += 1
-      if self.verbose:
-        print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
-      if self.counter >= self.patience:
-        self.erarly_stop = True
-    else:
-      self.best_score = score
-      self.checkpoint(val_loss, model)
-      self.counter = 0
-
-  def checkpoint(self, val_loss, model):
-    if self.verbose:
-      print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}). Saving model ...')
-    self.val_loss_min = val_loss
-
-
 def trainNN(net,device,optimizer,criterion,train_batch,test_batch,epoch):
-  earlystopping = EarlyStopping(patience=5, verbose=False)
-
-
-  # make lists to store MSE
+  # make lists to store loss
   train_loss_list = []
   test_loss_list  = []
 
@@ -84,42 +62,26 @@ def trainNN(net,device,optimizer,criterion,train_batch,test_batch,epoch):
     net.train()
     # load mini batch
     for teaching_data, test_data in train_batch:
-      # transfer Tensor to GPU
       teaching_data = teaching_data.to(device)
       test_data     = test_data.to(device)
-      # initialize grad
       optimizer.zero_grad()
-      # calc pred
       y_pred = net(test_data)
-      # calc loss
       loss   = criterion(y_pred, teaching_data)
-      # calc grad
       loss.backward()
-      # update parameters
       optimizer.step()
-      # stock train loss
       train_loss += loss.item()
 
     # calc mean loss
     batch_train_loss = train_loss / len(train_batch)
 
-    earlystopping(train_loss / len(train_batch), net)
-    if earlystopping.early_stop:
-      print("Early Stopping")
-      break
-
     # evaluate NN
     net.eval()
     with torch.no_grad():
       for teaching_data, test_data in test_batch:
-        # transfer Tensor to GPU
         teaching_data = teaching_data.to(device)
         test_data     = test_data.to(device)
-        # calc pred
         y_pred  = net(test_data)
-        # calc loss
         loss = criterion(y_pred, teaching_data)
-        # stock test loss
         test_loss += loss.item()
 
     # calc mean loss
@@ -130,5 +92,71 @@ def trainNN(net,device,optimizer,criterion,train_batch,test_batch,epoch):
 
     train_loss_list.append(batch_train_loss)
     test_loss_list.append(batch_test_loss)
-  return net, train_loss_list, test_loss_list
+  return train_loss_list, test_loss_list
+
+
+def trainNN_classify(net,device,optimizer,criterion,train_batch,test_batch,epoch):
+  # make lists to store loss
+  train_loss_list = []
+  test_loss_list  = []
+  train_acc_list  = []
+  test_acc_list   = []
+
+  # do machine learning
+  for i in torch.arange(epoch):
+    # progress var
+    print('---------------------------------------------')
+    print("Epoch: {}/{}".format(i+1, epoch))
+
+    # initialize loss
+    train_loss    = 0.e0
+    test_loss     = 0.e0
+    correct_train = 0
+    correct_test  = 0
+
+    # train NN
+    net.train()
+    # load mini batch
+    for images, labels in train_batch:
+      images = images.to(device)
+      labels = labels.to(device)
+      optimizer.zero_grad()
+      y_pred = net(images)
+      loss   = criterion(y_pred, labels)
+      loss.backward()
+      optimizer.step()
+      train_loss += loss.item()
+
+      _, predicted = torch.max(y_pred, 1)
+      correct_train += (predicted == labels).sum().item()
+
+    # calc mean loss
+    batch_train_loss = train_loss    / len(train_batch)
+    batch_train_acc  = correct_train / len(train_batch.dataset)
+
+    # evaluate NN
+    net.eval()
+    with torch.no_grad():
+      for images, labels in test_batch:
+        images = images.to(device)
+        labels = labels.to(device)
+        y_pred = net(images)
+        loss = criterion(y_pred, labels)
+        test_loss += loss.item()
+
+        _, predicted = torch.max(y_pred, 1)
+        correct_test += (predicted == labels).sum().item()
+
+    # calc mean loss
+    batch_test_loss = test_loss    / len(test_batch)
+    batch_test_acc  = correct_test / len(test_batch.dataset)
+
+    print("Train_Loss: {:E} | Train_Acc: {:.2%}".format(batch_train_loss, batch_train_acc))
+    print("Test_Loss : {:E} | Test_Acc : {:.2%}".format(batch_test_loss,  batch_test_acc))
+
+    train_loss_list.append(batch_train_loss)
+    test_loss_list.append(batch_test_loss)
+    train_acc_list.append(batch_train_acc)
+    test_acc_list.append(batch_test_acc)
+  return train_loss_list, test_loss_list
 
