@@ -63,7 +63,8 @@ def print_vtk(x, y, z, rho, u, v, w, p, directory, name):
   writer.Write()
 
 
-Q_directory = "../3D_solver/TBL/data"
+#Q_directory = "../3D_solver/TBL/data"
+Q_directory = "../../SBLI/SBLI_4delta/stat03ms_04ms_SLAU"
 
 Q_files = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
 
