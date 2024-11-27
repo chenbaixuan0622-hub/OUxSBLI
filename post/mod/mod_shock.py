@@ -115,12 +115,16 @@ def reflected_shock(x, y, z, ny, u, v, w):
   div = divergence(x, y, z, u, v, w)
   Nx  = len(x)
   xi  = np.linspace(x[0], x[-1], 2*Nx-1)
+  ix  = np.zeros(Nz, dtype=np.int32)
+  ixi = np.zeros(Nz, dtype=np.int32)
   for k in range(Nz):
-    ls[k]  = x[np.argmin(div[k,ny,:])]
+    ix[k]  = np.argmin(div[k,ny,:])
+    ls[k]  = x[ix[k]]
     #divi   = MUSCL(xi, x, div[k,ny,:])
     f      = interp1d(x, div[k,ny,:], kind='linear')
     divi   = f(xi)
     #divi   = np.interp(xi, x, div[k,ny,:])
-    lsi[k] = xi[np.argmin(divi)]
-  return ls, lsi
+    ixi[k] = np.argmin(divi)
+    lsi[k] = xi[ixi[k]]
+  return ls, lsi, ix, ixi
 
