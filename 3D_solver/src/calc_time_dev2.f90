@@ -232,7 +232,11 @@ contains
           endif
           call nvtxEndRange
           call nvtxStartRange("set bc", 4)
-          call exchange(myrank,nranks,overlap,nx,ny,nz,QJs,Jacobian_cpu)
+          if (kind(id_rescale) == 2) then
+            call exchange(myrank,nranks,overlap,nx,ny,nz,QJs)
+          else
+            call exchange_re(myrank,nranks,overlap,nx,ny,nz,QJs)
+          endif
           call set_bc(myrank,nx,ny,nz,Jacobian,QJs,Qre)
           call nvtxEndRange
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
@@ -261,7 +265,11 @@ contains
             call MPI_RECV(Qre_cpu, 5*ny*nz, MPI_REAL8, rerank+1, 5, MPI_COMM_WORLD, istat, ierr)
             Qre = Qre_cpu
           endif
-          call exchange(myrank,nranks,overlap,nx,ny,nz,QJs,Jacobian_cpu)
+          if (kind(id_rescale) == 2) then
+            call exchange(myrank,nranks,overlap,nx,ny,nz,QJs)
+          else
+            call exchange_re(myrank,nranks,overlap,nx,ny,nz,QJs)
+          endif
           call set_bc(myrank,nx,ny,nz,Jacobian,QJs,Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call MPI_IRECV(Qre_cpu, 5*ny*nz, MPI_REAL8, rerank, 3, MPI_COMM_WORLD, ireqs(1), ierr)
@@ -285,7 +293,11 @@ contains
             call MPI_RECV(Qre_cpu, 5*ny*nz, MPI_REAL8, rerank+1, 8, MPI_COMM_WORLD, istat, ierr)
             Qre = Qre_cpu
           endif
-          call exchange(myrank,nranks,overlap,nx,ny,nz,QJs,Jacobian_cpu)
+          if (kind(id_rescale) == 2) then
+            call exchange(myrank,nranks,overlap,nx,ny,nz,QJs)
+          else
+            call exchange_re(myrank,nranks,overlap,nx,ny,nz,QJs)
+          endif
           call set_bc(myrank,nx,ny,nz,Jacobian,QJs,Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call MPI_IRECV(Qre_cpu, 5*ny*nz, MPI_REAL8, rerank, 6, MPI_COMM_WORLD, ireqs(1), ierr)
@@ -309,7 +321,11 @@ contains
             call MPI_RECV(Qre_cpu, 5*ny*nz, MPI_REAL8, rerank+1,11, MPI_COMM_WORLD, istat, ierr)
             Qre = Qre_cpu
           endif
-          call exchange(myrank,nranks,overlap,nx,ny,nz,QJ,Jacobian_cpu)
+          if (kind(id_rescale) == 2) then
+            call exchange(myrank,nranks,overlap,nx,ny,nz,QJ)
+          else
+            call exchange_re(myrank,nranks,overlap,nx,ny,nz,QJ)
+          endif
           call set_bc(myrank,nx,ny,nz,Jacobian,QJ,Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call MPI_IRECV(Qre_cpu, 5*ny*nz, MPI_REAL8, rerank, 9, MPI_COMM_WORLD, ireqs(1), ierr)
