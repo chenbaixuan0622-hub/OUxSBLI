@@ -1,48 +1,14 @@
 module set
-  use mod_globals, only : id_rescale, nx, ny, nz, nre, Lx, Ly, Lz, gamma, R, Cp, Pr, u0, p0, T0, M0, blt, rho2, p2, ux, uy
+  use mod_globals, only : id_rescale, nx, ny, nz, nre2, Lx, Ly, Lz, gamma, R, Cp, Pr, u0, p0, T0, M0, blt, rho2, p2, ux, uy
   implicit none
 contains
-  subroutine calc_Blasius(eta,d,u,v)
-    real(8), intent(in), value  :: eta, d
-    real(8), intent(out)        :: u, v
-    real(8) f, df, x
-    real(8) fs(45), dfs(45)
-    integer i
-    fs(:) = (/0.d0, 0.00664d0, 0.02656d0, 0.05974d0, 0.10611d0, 0.16557d0, 0.23795d0, &
-    & 0.32298d0, 0.42032d0, 0.52952d0, 0.65003d0, 0.78120d0, 0.92230d0, 1.07252d0, &
-    & 1.23099d0, 1.39682d0, 1.56911d0, 1.74696d0, 1.92954d0, 2.11605d0, 2.30576d0, &
-    & 2.49806d0, 2.69238d0, 2.88826d0, 3.08534d0, 3.28329d0, 3.48189d0, 3.68094d0, &
-    & 3.88031d0, 4.07990d0, 4.27964d0, 4.47948d0, 4.67938d0, 4.87931d0, 5.07928d0, &
-    & 5.27926d0, 5.47925d0, 5.67924d0, 5.87924d0, 6.07923d0, 6.27923d0, 6.47923d0, &
-    & 6.67923d0, 6.87923d0, 7.07923d0/)
-    dfs(:) = (/0.d0, 0.06641d0, 0.13277d0, 0.19894d0, 0.26471d0, 0.32979d0, 0.39378d0, &
-    & 0.45627d0, 0.51676d0, 0.57477d0, 0.62977d0, 0.68132d0, 0.72899d0, 0.77246d0, &
-    & 0.81152d0, 0.84605d0, 0.87609d0, 0.90177d0, 0.92333d0, 0.94112d0, 0.95552d0, &
-    & 0.96696d0, 0.97587d0, 0.98269d0, 0.98779d0, 0.99155d0, 0.99425d0, 0.99616d0, &
-    & 0.99748d0, 0.99838d0, 0.99898d0, 0.99937d0, 0.99961d0, 0.99977d0, 0.99987d0, &
-    & 0.99992d0, 0.99996d0, 0.99998d0, 0.99999d0, 1.00000d0, 1.00000d0, 1.00000d0, &
-    & 1.00000d0, 1.00000d0, 1.00000d0/)
-    do i = 1, 44
-      x = 0.2d0 * dble(i-1) 
-      if (x <= eta .and. eta <= x + 0.2d0) then
-        f = fs(i) + 5.d0 * (fs(i+1) - fs(i)) * (eta - x)
-        df = dfs(i) + 5.d0 * (dfs(i+1) - dfs(i)) * (eta - x)
-      elseif (8.8d0 <= eta) then
-        f = 7.07923d0
-        df = 1.d0
-      endif
-    enddo
-    u = u0 * df
-    v = 0.d0!0.5d0 * (nu0 / d) * (min(eta,8.8d0) * df - f)
-  end subroutine calc_Blasius
-
   subroutine set_grid(nx,ny,nz,x,y,z,dx,dy,dz)
     integer, intent(in)   :: nx, ny, nz
     real(8), intent(out)  :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     integer i, j, k
     real(8) dx1, dy1, dz1
     dx1 = Lx / dble(nx-1)
-    dy1 = 10.d-3 / dble(256)
+    dy1 = dx1
     dz1 = Lz / dble(nz-1)
     x(1) = 0.d0
     do i = 1, nx-1
@@ -51,15 +17,16 @@ contains
     enddo
 
     y(1) = 0.d0
-    do j = 1, 256
-      ! DNS
-      dy(j)  = min(1.d0, max(0.05d0, dble(j)/dble(128))) * dy1
-      y(j+1) = y(j) + dy(j)
-    enddo
-    ! buffer
-    do j = 257, ny-1
-      dy(j)  = 2.d0 * dy1
-      y(j+1) = y(j) + dy(j)
+    do j = 1, ny
+      if (y(j) <= 2.d0 * blt) then
+        ! DNS 0.05: yp=0.5
+        dy(j)  = min(1.d0, max(0.075d0, dble(j)/dble(128))) * dy1
+        y(j+1) = y(j) + dy(j)
+      else
+        ! buffer
+        dy(j)  = 2.d0 * dy1
+        y(j+1) = y(j) + dy(j)
+      endif
     enddo
 
     z(1) = 0.d0
@@ -152,7 +119,7 @@ contains
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: Jacobian(ny)
     real(8), intent(inout), device :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(in), device    :: Qre(ny,nz,5)
+    real(8), intent(in), device    :: Qre(ny,nz-6,5)
     integer i, j, k, l, No
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: p_wall
@@ -164,17 +131,17 @@ contains
     if (kind(id_rescale) == 4) then
       !$cuf kernel do(3)<<<*,*>>>
       do l = 1, 5
-        do k = 3, nz-2
+        do k = 4, nz-3
           do j = 2, ny-1
             ! inlet
-            QJ(1,j,k,l)  = Qre(j,k,l)
+            QJ(1,j,k,l)  = Qre(j,k-3,l)
             ! outlet
             QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
       enddo;enddo;enddo
     else
       !$cuf kernel do(3)<<<*,*>>>
       do l = 1, 5
-        do k = 3, nz-2
+        do k = 4, nz-3
           do j = 2, ny-1
             ! inlet
             QJ(1,j,k,l) = QJ(nx-5,j,k,l)
@@ -188,7 +155,7 @@ contains
     endif
 
     !$cuf kernel do(2)<<<*,*>>>
-    do k = 3, nz-2
+    do k = 4, nz-3
       do i = 1, nx
         ! top
         ! Riemann invariants
@@ -229,15 +196,15 @@ contains
         QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
     enddo;enddo
 
-    !$cuf kernel do(2)<<<*,*>>>
-    do k = 1, nz
-      do i = No, nx
-        QJ(i,ny,k,1) = rho2 / Jacobian(ny)
-        QJ(i,ny,k,2) = rho2 * ux / Jacobian(ny)
-        QJ(i,ny,k,3) = rho2 * uy / Jacobian(ny)
-        QJ(i,ny,k,4) = 0.d0
-        QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(ny)
-    enddo;enddo
+    !!$cuf kernel do(2)<<<*,*>>>
+    !do k = 1, nz
+    !  do i = No, nx
+    !    QJ(i,ny,k,1) = rho2 / Jacobian(ny)
+    !    QJ(i,ny,k,2) = rho2 * ux / Jacobian(ny)
+    !    QJ(i,ny,k,3) = rho2 * uy / Jacobian(ny)
+    !    QJ(i,ny,k,4) = 0.d0
+    !    QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(ny)
+    !enddo;enddo
 
     ! cyclic
     !$cuf kernel do(3)<<<*,*>>>
@@ -261,8 +228,8 @@ contains
     do k = 4, nz-3
       do j = 2, ny-1
         ! inlet
-        mut(1,j,k)  = mut(nre,j,k)
-        qc2(1,j,k)  = qc2(nre,j,k)
+        mut(1,j,k)  = mut(nre2,j,k)
+        qc2(1,j,k)  = qc2(nre2,j,k)
         ! outlet
         mut(nx,j,k) = mut(nx-1,j,k)
         qc2(nx,j,k) = qc2(nx-1,j,k)

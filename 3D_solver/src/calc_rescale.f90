@@ -1,11 +1,13 @@
 module calc_rescale
-  use mod_globals, only : nre1, nre2, nt, dt, gamma , R, Pr, u0, rho0, p0, M0, blt, start_rescale
+  use mpi
+  use mod_globals, only : nre1, nre2, rerank, nt, dt, gamma , R, Pr, u0, rho0, p0, M0, blt, start_rescale
 contains
-  subroutine calc_mean(nx,ny,nz,Jacobian,QJ,Qm)
-    integer, intent(in)          :: nx, ny, nz
-    real(8), intent(in), device  :: Jacobian(ny), QJ(nx,ny,nz,5)
-    real(8), intent(out), device :: Qm(ny,5)
+  subroutine calc_mean(nx, ny, nz, Jacobian, QJ, Qm_cpu)
+    integer, intent(in)         :: nx, ny, nz
+    real(8), intent(in), device :: Jacobian(ny), QJ(nx,ny,nz,5)
+    real(8), intent(out)        :: Qm_cpu(ny,5)
     real(8) Q1, Q2, Q3, Q4, Q5
+    real(8), device :: Qm(ny,5)
     integer i, k
     !$cuf kernel do <<<*,*>>>
     do j = 1, ny
@@ -14,7 +16,7 @@ contains
       Q3 = 0.d0
       Q4 = 0.d0
       Q5 = 0.d0
-      do k = 1, nz
+      do k = 4, nz-3
         do i = nre1, nre2
           Q1 = Q1 + QJ(i,j,k,1) * Jacobian(j)
           Q2 = Q2 + QJ(i,j,k,2) / QJ(i,j,k,1)
@@ -23,24 +25,48 @@ contains
           Q5 = Q5 + (gamma - 1.d0) * Jacobian(j) * (QJ(i,j,k,5) &
                     - 0.5d0 * (QJ(i,j,k,2)**2 + QJ(i,j,k,3)**2 + QJ(i,j,k,4)**2) / QJ(i,j,k,1))
       enddo;enddo
-      Qm(j,1) = Q1 / dble((nre2-nre1+1)*nz)
-      Qm(j,2) = Q2 / dble((nre2-nre1+1)*nz)
-      Qm(j,3) = Q3 / dble((nre2-nre1+1)*nz)
-      Qm(j,4) = Q4 / dble((nre2-nre1+1)*nz)
-      Qm(j,5) = Q5 / dble((nre2-nre1+1)*nz)
+      Qm(j,1) = Q1 / dble((nre2 - nre1 + 1) * (nz - 6))
+      Qm(j,2) = Q2 / dble((nre2 - nre1 + 1) * (nz - 6))
+      Qm(j,3) = Q3 / dble((nre2 - nre1 + 1) * (nz - 6))
+      Qm(j,4) = Q4 / dble((nre2 - nre1 + 1) * (nz - 6))
+      Qm(j,5) = Q5 / dble((nre2 - nre1 + 1) * (nz - 6))
     enddo
+    Qm_cpu = Qm
   end subroutine calc_mean
 
-  subroutine set_rescale(step,nx,ny,nz,y,Jacobian,Qm,Qre)
-    integer, intent(in)    :: step, nx, ny, nz
-    real(8), intent(in)    :: y(ny)
-    real(8), intent(in)    :: Jacobian(ny), Qm(ny,5)
+  subroutine copy(nx, ny, nz, QJ, Qre)
+    integer, intent(in)          :: nx, ny, nz
+    real(8), intent(in), device  :: QJ(nx,ny,nz,5)
+    real(8), intent(out), device :: Qre(ny,nz-6,5)
+    integer j, k, l
+    !$cuf kernel do <<<*,*>>>
+    do l = 1, 5
+      do k = 4, nz-3
+        do j = 1, ny
+          Qre(j,k-3,l) = QJ(nre2,j,k,l)
+    enddo;enddo;enddo
+  end subroutine copy
+
+  subroutine rescale_recv_send(nx, ny, nz, step, y, Jacobian)
+    integer, intent(in) :: nx, ny, nz, step
+    real(8), intent(in) :: y(ny), Jacobian(ny)
+    real(8) Qre(ny,nz-6,5), Qm(ny,5)
+    integer ierr, ireqs(2), istats(MPI_STATUS_SIZE,2)
+
+    call MPI_IRECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank, 0, MPI_COMM_WORLD, ireqs(1), ierr)
+    call MPI_IRECV(Qm,  5*ny,        MPI_REAL8, rerank, 1, MPI_COMM_WORLD, ireqs(2), ierr)
+    call MPI_WAITALL(2, ireqs, istats, ierr)
+    call set_rescale(step, nx, ny, nz-6, y, Jacobian, Qm, Qre)
+    call MPI_SEND(Qre, 5*ny*(nz-6), MPI_REAL8, 0, 0, MPI_COMM_WORLD, ierr)
+  end subroutine rescale_recv_send
+
+  subroutine set_rescale(step, nx, ny, nz, y, Jacobian, Qm, Qre)
+    integer, intent(in)    :: step, nx, ny, nz! nz-6
+    real(8), intent(in)    :: y(ny), Jacobian(ny), Qm(ny,5)
     real(8), intent(inout) :: Qre(ny,nz,5) ! Q / J
-    integer i, j, jj, k, kc, l
+    integer i, j, jj, k, kh, l
     real(8) :: mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0, Cp = gamma * R / (gamma - 1.d0)
     real(8) t, dudy, blt1, blt2, bltre, taure, utre, utin, beta, mu, nu, ady, ade 
-    ! divergence free disturbance
-    real(8) std, ustd, vstd, wstd
     ! mean properties at rescaling plane
     real(8), dimension(ny)    :: Um, Vm, Wm, rhom, Tm, pm
     ! fluctuating properties at rescaling plane
@@ -51,8 +77,6 @@ contains
     real(8)                   :: ufins, vfins, wfins, rhofins, ufouts, vfouts, wfouts, rhofouts
     ! mean properties at both inner and outer region
     real(8), dimension(ny)    :: Umin, Vmin, rhomin, pmin, Tmin, Umout, Vmout, rhomout, pmout, Tmout
-    ! Crocc-Busemann relation
-    real(8) Tw, Taw
     ! weighting function
     real(8), dimension(ny)    :: weight
     ! properties at rescaling plane
@@ -165,11 +189,11 @@ contains
           if (ypre(jj) > ypin(j)) then
             ady = (-ypre(jj-1) + ypin(j)) / (-ypre(jj-1) + ypre(jj))
             ! mean
-            Umin(j)   =   Um(jj-1) + ady * (-  Um(jj-1) +   Um(jj))
-            Vmin(j)   =   Vm(jj-1) + ady * (-  Vm(jj-1) +   Vm(jj))
-            rhomin(j) = rhom(jj-1) + ady * (-rhom(jj-1) + rhom(jj)) 
-            Tmin(j)   =   Tm(jj-1) + ady * (-  Tm(jj-1) +   Tm(jj))
-            pmin(j)   =   pm(jj-1) + ady * (-  pm(jj-1) +   pm(jj))
+            Umin(j)   = beta * (Um(jj-1) + ady * (-  Um(jj-1) +   Um(jj)))
+            Vmin(j)   =         Vm(jj-1) + ady * (-  Vm(jj-1) +   Vm(jj))
+            rhomin(j) =       rhom(jj-1) + ady * (-rhom(jj-1) + rhom(jj)) 
+            Tmin(j)   =         Tm(jj-1) + ady * (-  Tm(jj-1) +   Tm(jj))
+            pmin(j)   =         pm(jj-1) + ady * (-  pm(jj-1) +   pm(jj))
             do k = 1, nz
               ! fluctuating
               ufin(j,k)   = beta * (ufre(jj-1,k) + ady * (-  ufre(jj-1,k) +   ufre(jj,k)))
@@ -188,11 +212,11 @@ contains
           if (etre(jj) > etin(j)) then
             ade = (-etre(jj-1) + etin(j)) / (-etre(jj-1) + etre(jj))
             ! mean
-            Umout(j)   =   Um(jj-1) + ade * (-  Um(jj-1) +   Um(jj))
-            Vmout(j)   =   Vm(jj-1) + ade * (-  Vm(jj-1) +   Vm(jj))
-            rhomout(j) = rhom(jj-1) + ade * (-rhom(jj-1) + rhom(jj))
-            Tmout(j)   =   Tm(jj-1) + ade * (-  Tm(jj-1) +   Tm(jj))
-            pmout(j)   =   pm(jj-1) + ade * (-  pm(jj-1) +   pm(jj))
+            Umout(j)   = beta * (Um(jj-1) + ade * (-  Um(jj-1) +   Um(jj))) + (1.d0 - beta) * u0
+            Vmout(j)   =         Vm(jj-1) + ade * (-  Vm(jj-1) +   Vm(jj))
+            rhomout(j) =       rhom(jj-1) + ade * (-rhom(jj-1) + rhom(jj))
+            Tmout(j)   =         Tm(jj-1) + ade * (-  Tm(jj-1) +   Tm(jj))
+            pmout(j)   =         pm(jj-1) + ade * (-  pm(jj-1) +   pm(jj))
             do k = 1, nz
               ! fluctuating
               ufout(j,k)   = beta * (ufre(jj-1,k) + ade * (-  ufre(jj-1,k) +   ufre(jj,k)))
@@ -213,12 +237,13 @@ contains
   
       ! re-introducing
       do k = 1, nz
+        kh = mod(k+nz/2,nz) + 1
         do j = 1, ny
-          uin = (Umin(j) + ufin(j,k)) * (1.d0 - weight(j)) + (Umout(j) + ufout(j,k)) * weight(j)
-          vin = (Vmin(j) + vfin(j,k)) * (1.d0 - weight(j)) + (Vmout(j) + vfout(j,k)) * weight(j)
-          win =            wfin(j,k)  * (1.d0 - weight(j)) +             wfout(j,k)  * weight(j)
-          Tin = (Tmin(j) + Tfin(j,k)) * (1.d0 - weight(j)) + (Tmout(j) + Tfout(j,k)) * weight(j)
-          pin = (pmin(j) + pfin(j,k)) * (1.d0 - weight(j)) + (pmout(j) + pfout(j,k)) * weight(j)
+          uin = (Umin(j) + ufin(j,kh)) * (1.d0 - weight(j)) + (Umout(j) + ufout(j,kh)) * weight(j)
+          vin = (Vmin(j) + vfin(j,kh)) * (1.d0 - weight(j)) + (Vmout(j) + vfout(j,kh)) * weight(j)
+          win =            wfin(j,kh)  * (1.d0 - weight(j)) +             wfout(j,kh)  * weight(j)
+          Tin = (Tmin(j) + Tfin(j,kh)) * (1.d0 - weight(j)) + (Tmout(j) + Tfout(j,kh)) * weight(j)
+          pin = (pmin(j) + pfin(j,kh)) * (1.d0 - weight(j)) + (pmout(j) + pfout(j,kh)) * weight(j)
           rhoin      = pin / (R * Tin)
           Qre(j,k,1) = rhoin / Jacobian(j)
           Qre(j,k,2) = rhoin * uin / Jacobian(j)
