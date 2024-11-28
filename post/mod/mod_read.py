@@ -1,8 +1,15 @@
-import os
 import numpy as np
+import os
+import re
 import vtk
 from vtk.util import numpy_support
 from tqdm import tqdm
+
+def extract_number(filename):
+  match = re.search(r'Q(\d+)\.vtr$', filename)
+  if match:
+    return int(match.group(1))
+  return float('inf')
 
 def gridInfo(data_directory):
   file_path = os.path.join(data_directory, "x.npy")

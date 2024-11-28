@@ -8,16 +8,40 @@
 </head>
 
 <body>
-  <header>
-    <h1>
-      GPU Based Explicit solver
-    </h1>
-    <div id="SBLI">
-      <img src="./img/SBLI.png" alt="SBLI">
-    </div>
-  </header>
-
   <main>
+    <div id="top_menu">
+      <butto id="btn0">
+        <div id="hamburger-menu">
+          <div class="hamburger-line"></div>
+          <div class="hamburger-line"></div>
+          <div class="hamburger-line"></div>
+        </div>
+      </button>
+    </div>
+
+    <div id="toggleBlock0" style="display: none">
+      <h3>Content</h3>
+        <nav>
+          <ul>
+            <li><a href="#GBEX">GBEX</a></li>
+            <li><a href="#numerical_method">Numerical Method</a></li>
+            <li><a href="#validation_verification">Validation</a></li>
+            <li><a href="#Reference">Reference</a></li>
+          </ul>
+        </nav>
+    </div>
+
+    <header>
+      <h1 id="GBEX">
+        GPU Based Explicit solver
+      </h1>
+      <div id="SBLI">
+        <img src="./img/SBLI.png" alt="SBLI">
+      </div>
+      
+      <p>GBEX (GPU Based Explicit solver) is a CFD code solving large-scale simulations quickly by temporal and spatial explicit schemes. It aims to simulate shock-boundary layer interaction (SBLI), which requires both monotone schemes which are enable to capture shock waves and high-order accurate schemes resolving turbulent vorticies. Moreover, the large computational domain must be used to resolve three-dimensional flow structures caused by SBLI. To satisfy these requirements, it has been parallelized on GPU and written in CUDA Fortran. If necessary, MPI can be used. </p>
+    </header>
+
     <section id="numerical_method">
       <h2>
         Numerical method
@@ -25,9 +49,22 @@
         <h3>
           Convective term
         </h3>
+        <h4 class="upwind">SLAU scheme</h4>
+        <p>Simple and Low-dissipation AUSM (SLAU) was developed by E Shima and K Kitamura. It is robust to strong shocks and doesn't require matrix multiplication, which means simple. </p>
+        <h4 class="upwind">HR-SLAU2 scheme</h4>
+        <p>High Resolution-SLAU2 was developed by K Kitamura and A Hashimoto. Its pressure term contains less numerical viscosity than SLAU scheme and is more robust to strong shock than SLAU. </p>
+        <h4 class="central">KEP scheme</h4>
+        <p>Kinetic Energy Preserving scheme was developed by A Jameson. Its formulation is quite simple, therefore it was widely used. </p>
+        <h4 class="central">KEEP scheme</h4>
+        <p>Kinetic Energy and Entropy Preserving scheme was developed by Y Kuta and S Kawai. Its discritization of energy equation was more sophisticated than KEP scheme. Since analitical relationship is satisfied, it preserves not only kinetic energy but also entropy.</p>
+        <h3>
+          MUSCL interpolation
+        </h3>
+        <p>3rd-order TVD MUSCL, 3rd-order MUSCL, 4th-order compact TVD MUSCL and 5th-order compact MUSCL have been implemented. Minimod limiter is available for TVD schemes.</p>
         <h3>
           Viscous term
         </h3>
+        <p>ME4-Base and conservative flux derivative of midpoint are available. </p>
     </section>
 
     <section id="validation_verification">
@@ -51,7 +88,7 @@
         <ol id="vv">
           <li id="EVC" class="problem">Euler vortex convection</li>
             <ul>
-              <button type="button" id="btn1">Conditions</button>
+              <button type="button" class="button_condition" id="btn1">Conditions</button>
               <div id="toggleBlock1" style="display: none" class="condition">
                 <li>Computational grid</li>
                   <table>
@@ -122,7 +159,7 @@
             </ul>
           <li id="ST" class="problem">Sod shock tube</li>
             <ul>
-              <button type="button" id="btn2">Conditions</button>
+              <button type="button" class="button_condition" id="btn2">Conditions</button>
               <div id="toggleBlock2" style="display: none" class="condition">
                 <li>Computational grid</li>
                   <table>
@@ -174,7 +211,7 @@
             </ul>
           <li id="SO" class="problem">Shu-Osher problem</li>
             <ul>
-              <button type="button" id="btn3">Conditions</button>
+              <button type="button" class="button_condition" id="btn3">Conditions</button>
               <div id="toggleBlock3" style="display: none" class="condition">
                 <li>Computational grid</li>
                   <table>
@@ -221,7 +258,7 @@
             </ul>
           <li id="DSL" class="problem">Inviscid 2D double shear layer</li>
             <ul>
-              <button type="button" id="btn4">Conditions</button>
+              <button type="button" class="button_condition" id="btn4">Conditions</button>
               <div id="toggleBlock4" style="display: none" class="condition">
                 <li>Computational grid</li>
                   <table>
@@ -282,7 +319,7 @@
             </ul>
           <li id="KHI" class="problem">Inviscid 3D Kelvin-Helmholtz instability</li>
             <ul>
-              <button type="button" id="btn5">Conditions</button>
+              <button type="button" class="button_condition" id="btn5">Conditions</button>
               <div id="toggleBlock5" style="display: none" class="condition">
                 <li>Computational grid</li>
                   <table>
@@ -343,7 +380,7 @@
             </ul>
           <li id="VTGV" class="problem">3D viscous Taylor-Green vortex</li>
             <ul>
-              <button type="button" id="btn6">Conditions</button>
+              <button type="button" class="button_condition" id="btn6">Conditions</button>
               <div id="toggleBlock6" style="display: none" class="condition">
                 <li>Computational grid</li>
                   <table>
@@ -412,7 +449,7 @@
             </ul>
           <li id="TBL" class="problem">M=1.9 supersonic turbulent boundary layer</li>
             <ul>
-              <button type="button" id="btn7">Conditions</button>
+              <button type="button" class="button_condition" id="btn7">Conditions</button>
               <div id="toggleBlock7" style="display: none" class="condition">
                 <li>Computational grid</li>
                   <table>
@@ -436,34 +473,13 @@
                 <div class="results">
                 <ul>
                   <li>Visualization</li>
-                  <li>Turbulent statistics</li>
                     <ul>
                       <li>Log-law</li>
                         <figure>
                           <img src="./img/log_law.png" alt="log-law">
                           <figcaption>Distribution of Van Driest transformed mean streamwise velocity normalized by wall unit</figcaption>
                         </figure>
-                      <li>Thermal properties</li>
-                        <ul>
-                          <li>RMS</li>
-                            <figure>
-                              <img src="./img/density_rms.png" alt="density_rms">
-                              <figcaption></figcaption>
-                            </figure>
-                            <figure>
-                              <img src="./img/pressure_rms.png" alt="pressure_rms">
-                              <figcaption></figcaption>
-                            </figure>
-                          <li>Strong Reynolds analogy</li>
-                            <figure>
-                              <img src="./img/RuT.png" alt="RuT">
-                              <figcaption>Distribution of u-T correlation coefficient ad a function of wall-normal distance in outer scaling; blue lines for present simulation; black lines for Reference</figcaption>
-                            </figure>
-                            <figure>
-                              <img src="./img/Ruv_RvT.png" alt="Ruv_RvT">
-                              <figcaption>Distribution of u-v and v-T correlation coefficient as a function of wall-normal distance in outer scaling; blue lines for present simulation; black lines for Reference; solid lines for u-v correlation; dashed lines for v-T correlation</figcaption>
-                            </figure>
-                        </ul>
+                      
                       <li>Reynolds stress</li>
                         <figure>
                           <img src="./img/Reynolds_stress.png" alt="Reynolds-stress">
@@ -473,6 +489,7 @@
                           <img src="./img/stress_balance.png" alt="stress-balance">
                           <figcaption>Distribution of the normalized shear stress; blue lines for present simulation; black lines for Reference; solid lines for Reynolds stress; dashed lines for viscous stress; dotted lines for total stress</figcaption>
                         </figure>
+                      
                       <li>TKE budget</li>
                         <figure>
                           <img src="./img/TKE_budget.png" alt="TKE_budget">
@@ -512,7 +529,46 @@
     </section>
   </main>
 
-  <footer>
-  </footer>
+  <aside>
+    <h3>Content</h3>
+      <nav>
+        <ul>
+          <li><a href="#GBEX">GBEX</a></li>
+          <li><a href="#numerical_method">Numerical Method</a></li>
+          <li><a href="#validation_verification">Validation</a></li>
+          <li><a href="#Reference">Reference</a></li>
+        </ul>
+      </nav>
+    
+    <div>
+      <p>
+        i = (blockIdx%x-1)*blockDim%x + threadIdx%x
+      </p>
+      <p>
+        j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
+      </p>
+      <p>
+        k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
+      </p>
+      <p>
+        if (3 <= i .and. i <= nx-3 .and. 8 <= kind(id_accuracy)) then
+      </p>
+      <p>
+        rho6(:) = rho(i-2:i+3,j,k)
+      </p>
+      <p>
+        V6(:,1) =   u(i-2:i+3,j,k)
+      </p>
+      <p>
+        V6(:,2) =   v(i-2:i+3,j,k)
+      </p>
+      <p>
+        V6(:,3) =   w(i-2:i+3,j,k)
+      </p>
+      <p>
+        p6(:)   =   p(i-2:i+3,j,k)
+      </p>
+    </div>
+  </aside>
 </body>
 </html>

@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 #from group.p4m import RotatedConv1, RotatedConv, RotatedTConv, GPReLU, GSequential, Gdown, GBatchNorm2d, GMaxPool2d
 
+
 class ResNet(nn.Module):
   def __init__(self, block, layers, num_classes=1000):
     super().__init__()
@@ -40,6 +41,7 @@ class ResNet(nn.Module):
     x = self.dropout(x)
     x = F.interpolate(x,size=input_size, mode='bicubic',align_corners=False)
     return x
+
 
 class DenseNet(nn.Module):
   def __init__(self, block, layers, num_classes=1000):
@@ -163,5 +165,57 @@ class UNet(nn.Module):
 
     # dropout
     x = self.dropout(x)
+    return x
+
+
+class Encoder(nn.Module):
+  def __init__(self, block, num_of_ch, size_flatten):
+    super().__init__()
+    channels1, channels2, channels3, channels4 = num_of_ch
+    # layer1
+    self.conv1 = nn.Conv2d(1, channels1, kernel_size=3, stride=1, padding=0)
+    self.relu1 = nn.PReLU()
+    # layer2
+    self.conv2 = nn.Conv2d(channels1, channels2, kernel_size=3, stride=1, padding=0)
+    self.relu2 = nn.PReLU()
+    # layer3
+    self.conv3 = nn.Conv2d(channels2, channels3, kernel_size=3, stride=1, padding=0)
+    self.relu3 = nn.PReLU()
+    # layer4
+    self.conv4 = nn.Conv2d(channels3, channels4, kernel_size=3, stride=1, padding=0)
+    self.relu4 = nn.PReLU()
+    # Block
+    self.layer = self._make_layer(block, channels4)
+    # dropout
+    self.dropout = nn.Dropout(0.1)
+    # linear
+    self.fc = nn.Linear(size_flatten, 10)
+
+  def _make_layer(self, block, in_channels):
+    layers = []
+    layers.append(block(in_channels))
+    return nn.Sequential(*layers)
+  
+  def forward(self, x):
+    # layer1
+    x = self.conv1(x)
+    x = self.relu1(x)
+    # layer2
+    x = self.conv2(x)
+    x = self.relu2(x)
+    # layer3
+    x = self.conv3(x)
+    x = self.relu3(x)
+    # layer4
+    x = self.conv4(x)
+    x = self.relu4(x)
+    # block
+    x = self.layer(x)
+
+    # dropout
+    x = self.dropout(x)
+    x = x.view(x.size(0), -1)
+    #print(x.size())
+    x = self.fc(x)
     return x
 

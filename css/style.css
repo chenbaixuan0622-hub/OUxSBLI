@@ -1,17 +1,169 @@
-body {
-  font-family: Arial, Helvetica, sans-serif;
-  background: white;
+@media (min-width: 1000px) {
+  body {
+    width: 100%;
+    font-family: Arial, Helvetica, sans-serif;
+    background: white;
+    justify-content: space-between;
+    display: flex;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  main {
+    width: 80%;
+    height: auto;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  aside {
+    width: 20%;
+    height: 100vh;
+    position: sticky;
+    position: -webkit-sticky;
+    top: 0;
+    background: url(../img/density_side.png) center / cover;
+    background-position: center bottom;
+  }
+
+  #top_menu {
+    display: none;
+  }
+
+  #top_menu_content {
+    display: none;
+  }
+}
+
+@media (max-width: 1000px) {
+  body {
+    width: 100%;
+    font-family: Arial, Helvetica, sans-serif;
+    background: white;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  main {
+    width: 100%;
+    height: auto;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  aside {
+    display: none;
+  }
+
+  #top_menu {
+    height: 30px;
+    position: sticky;
+    position: -webkit-sticky;
+    top: 0;
+    background: url(../img/Kp.png) center / cover;
+    transform: scale(1,-1);
+    z-index: 10;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  #top_menu button_top_menu {
+    transform: scale(1, -1);
+    padding-top: 1%;
+    padding-bottom: 1%;
+  }
+
+  #hamburger-menu {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: left;
+    width: 100%;
+    height: 20px;
+    cursor: pointer;
+    padding: 1%;
+    position: sticky;
+    position: -webkit-sticky;
+    top: 0;
+  }
+  
+  .hamburger-line {
+    width: 30px;
+    height: 2px;
+    margin-bottom: 4px;
+    border: solid white;
+  }
+
+  #toggleBlock0 {
+    position: sticky;
+    position: -webkit-sticky;
+    top: 30px;
+    display: none;
+    color: white;
+    background: url(../img/density_side.png) center / cover;
+    background-position: center bottom;
+    padding-top: 1%;
+    padding-bottom: 1%;
+    text-align: center;
+    font-size: 28px;
+    z-index: 10;
+  }
+
+  #toggleBlock0 nav ul {
+    padding-left: 0;
+  }
+
+  #toggleBlock0 nav li {
+    list-style: none;
+    line-height: 2;
+  }
+
+  #toggleBlock0 nav li a {
+    text-decoration: none;
+    font-size: 24px;
+    color: white;
+  }
+
+  #toggleBlock0 nav li a:hover {
+    font-weight: bold;
+    color: pink;
+  }
+}
+
+aside h3 {
+  color: skyblue;
+  padding-top: 10%;
+  padding-bottom: 10%;
+  font-size: 28px;
+  text-align: center;
+}
+
+aside li {
+  text-align: left;
+  list-style: none;
+  line-height: 2;
+  border-bottom: solid white 1px;
+}
+
+aside nav li a {
+  font-size: 24px;
+  text-decoration: none;
+  color: white;
+}
+
+aside nav li a:hover {
+  font-weight: bold;
+}
+
+aside div {
+  width: 90%;
+  padding-top: 5%;
+  margin-left: 5%;
+  margin-right: 5%;
+  color: pink;
 }
 
 img {
   width: 60%;
   height: auto;
-}
-
-header {
-  width: 100%;
-  height: auto;
-  font-family: Arial, Helvetica, sans-serif;
 }
 
 #SBLI {
@@ -40,9 +192,9 @@ h1 {
   margin-bottom: 0%;
 }
 
-main {
-  width: 100%;
-  height: auto;
+header p {
+  padding-left: 2%;
+  font-size: 18px;
 }
 
 h2 {
@@ -59,16 +211,34 @@ h3 {
   font-size: 24px;
 }
 
+#numerical_method h3 {
+  width: fit-content;
+  color: white;
+  background-color: #000099;
+  padding: 1%;
+  font-weight: bold;
+}
+
+.upwind {
+  color: #C00000;
+  font-weight: bold;
+}
+
+.central {
+  color: #000099;
+  font-weight: bold;
+}
+
 section {
   color: black;
   font-family: Arial, Helvetica, sans-serif;
   font-size: 20px;
   text-align: left;
+  padding-left: 2%;
 }
 
-button {
+.button_condition {
   color: black;
-  background-color: white;
   font-family: Arial, Helvetica, sans-serif;
   font-size: 20px;
   border: hidden;
@@ -76,20 +246,20 @@ button {
   padding: 0px;
 }
 
-button::before, .Result::before {
+.button_condition::before, .Result::before {
   content: "";
   display: inline-block;
-  background-color: white;
   width: 14px;
   height: 14px;
   border-right: 2px solid black;
   border-bottom: 2px solid black;
   transform: rotate(-45deg);
   margin-right: 5px;
-  margin-left: 0px;
+  margin-left: 0;
+  z-index: 0;
 }
 
-button:hover {
+.button_condition:hover {
   font-weight: bold;
 }
 
@@ -168,6 +338,7 @@ nav li a {
 
 figure {
   width: 80%;
+  max-width: 800px;
   height: auto;
   text-align: center;
 }
