@@ -1,6 +1,8 @@
 import numpy as np
 import os
+import vtk
 import matplotlib.pyplot as plt
+
 
 def plot_causality(uu,title):
   x = np.linspace(1, 3, len(uu[:,0]))
@@ -11,6 +13,7 @@ def plot_causality(uu,title):
   plt.savefig(title)
   plt.close()
 
+
 def plot_hist(x,px,filename):
   X = []
   for i in range(1, len(x)):
@@ -18,6 +21,7 @@ def plot_hist(x,px,filename):
   plt.bar(X, px)
   plt.savefig(filename)
   plt.close()
+
 
 def plot_corr(x,Nx1,length,R11,R22):
   plt.plot(figsize=(8,6))
@@ -33,6 +37,7 @@ def plot_corr(x,Nx1,length,R11,R22):
   plt.savefig("data/lateral_corr.png")
   plt.close()
 
+
 def plot_scalar(x,y,u,title):
   plt.axis("equal")
   plt.axis("off")
@@ -41,22 +46,63 @@ def plot_scalar(x,y,u,title):
   plt.savefig(title)
   plt.close()
 
-'''
-#def plot_fluxtuating_velocity(directory_path,vtk_files,Nx,Ny,Nz,x,y,z,umean,vmean,wmean): 
-  i = 0
-  for vtk_file in vtk_files:
-    file_path = os.path.join(directory_path, vtk_file)
-    u, v, w = readVTK.getVelocity(file_path,Nx,Ny,Nz)
-    plt.axis("equal")
-    plt.axis("off")
-    plt.contourf(x, y, (u[0,:,:] - umean[0,:,:]), cmap=plt.cm.jet, levels=100)
-    plt.colorbar()
-    file_path = os.path.join("./img",u,str(i))
-    plt.savefig(file_path)
-    plt.contourf(x, y, (v[0,:,:] - vmean[0,:,:]), cmap=plt.cm.jet, levels=100)
-    plt.colorbar()
-    file_path = os.path.join("./img",v,str(i))
-    plt.savefig(file_path)
-    i += 1
-'''
+
+def print_slice(x, y, z, rho, u, v, w, p, directory, name):
+  rho1d = np.float32(rho.flatten())
+  u1d   = np.float32(u.flatten())
+  v1d   = np.float32(v.flatten())
+  w1d   = np.float32(w.flatten())
+  p1d   = np.float32(p.flatten())
+
+  os.makedirs(directory, exist_ok=True)
+  filename  = name + ".vtr" 
+  filepath  = os.path.join(directory, filename)
+
+  x_coords = vtk.vtkFloatArray()
+  y_coords = vtk.vtkFloatArray()
+  z_coords = vtk.vtkFloatArray()
+  x_coords.SetName("X-Axis")
+  y_coords.SetName("Y-Axis")
+  z_coords.SetName("Z-Axis")
+
+  nx = len(x)
+  ny = len(y)
+  nz = len(z)
+  
+  for i in range(nx):
+    x_coords.InsertNextValue(x[i])
+  for j in range(ny):
+    y_coords.InsertNextValue(y[j])
+  for k in range(nz):
+    z_coords.InsertNextValue(z[k])
+  
+  grid = vtk.vtkRectilinearGrid()
+  grid.SetDimensions(nx, ny, nz)
+  grid.SetXCoordinates(x_coords)
+  grid.SetYCoordinates(y_coords)
+  grid.SetZCoordinates(z_coords)
+
+  rho = vtk.vtkFloatArray()
+  rho.SetName("rho")
+  for i in range(nx * ny * nz):
+    rho.InsertNextValue(rho1d[i])
+  grid.GetPointData().AddArray(rho)
+
+  velocity = vtk.vtkFloatArray()
+  velocity.SetName("velocity")
+  velocity.SetNumberOfComponents(3)
+  for i in range(nx * ny * nz):
+    velocity.InsertNextTuple3(u1d[i], v1d[i], w1d[i])
+  grid.GetPointData().SetVectors(velocity)
+
+  p = vtk.vtkFloatArray()
+  p.SetName("p")
+  for i in range(nx * ny * nz):
+    p.InsertNextValue(p1d[i])
+  grid.GetPointData().AddArray(p)
+
+  writer = vtk.vtkXMLRectilinearGridWriter()
+  writer.SetFileName(filepath)
+  writer.SetInputData(grid)
+  writer.Write()
 
