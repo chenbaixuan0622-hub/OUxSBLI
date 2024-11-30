@@ -229,7 +229,7 @@ contains
             exit
           endif
       enddo;enddo
-      
+     
       ! weighting function
       do j = 1, ny
         weight(j) = min(1.d0, 0.5d0 * (1.d0 + tanh(4.d0 * (etin(j) - 0.2d0) / ((1.d0 - 0.4d0) * etin(j) + 0.2d0)) / tanh(4.d0)))
