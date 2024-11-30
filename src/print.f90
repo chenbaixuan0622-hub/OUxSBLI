@@ -1,4 +1,5 @@
 module print
+  use mpi
   use mod_globals, only : id_accuracy, nt, np, dt, step_offset, gamma, R, Lx
   implicit none
   interface
@@ -39,19 +40,7 @@ module print
   end interface
 
   interface print_vtk
-    subroutine print_vtk_2D(step,nx,ny,x,y,Jacobian,QJ)
-      integer, intent(in) :: step, nx, ny
-      real(8), intent(in) :: x(nx), y(ny)
-      real(8), intent(in) :: QJ(nx,ny,4)
-    end subroutine print_vtk_2D
-
-    subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,ke0,entropy0,myrank)
-      integer, intent(in)           :: step, nx, ny, nz
-      real(8), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(ny)
-      real(8), intent(in)           :: QJ(nx,ny,nz,5)
-      real(8), intent(inout)        :: ke0, entropy0
-      integer, intent(in), optional :: myrank
-    end subroutine print_vtk_3D
+    module procedure print_vtk_2D, print_vtk_3D
   end interface
 
   interface mean
@@ -356,13 +345,12 @@ contains
     call print_xml(nx,ny,1,2,real(x),real(y),real(z),rho1d,p1d,T1d,M1d,v1d)
   end subroutine print_vtk_2D
   
-  subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,mass0,ke0,entropy0,myrank)
-    integer, intent(in)           :: step, nx, ny, nz
-    real(8), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(ny)
-    real(8), intent(in)           :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(inout)        :: mass0, ke0, entropy0
-    integer, intent(in), optional :: myrank
-    integer i, j, k, l, m, len
+  subroutine print_vtk_3D(step,nx,ny,nz,myrank,nranks,x,y,z,Jacobian,QJ,mass0,ke0,entropy0)
+    integer, intent(in)    :: step, nx, ny, nz, myrank, nranks
+    real(8), intent(in)    :: x(nx), y(ny), z(nz), Jacobian(ny)
+    real(8), intent(in)    :: QJ(nx,ny,nz,5) ! Q / Jacobian
+    real(8), intent(inout) :: mass0, ke0, entropy0
+    integer i, j, k, l, m, len, ierr
     real(8) rho, u, v, w, p
     real(4), allocatable :: rho1d(:), p1d(:), T1d(:), M1d(:), v1d(:)
     character(len=40) filename
@@ -391,7 +379,7 @@ contains
           m = m + 3
     enddo;enddo;enddo
 
-    if (present(myrank)) then
+    if (nranks >= 4) then
       !call print_entropy(step,nx,ny,nz,rho,p,entropy0,myrank)
       call print_KE(step,nx,ny,nz,Jacobian,QJ,ke0,myrank)
       !call print_enstrophy(step,nx,ny,nz,x,y,z,rho,omega,myrank)
