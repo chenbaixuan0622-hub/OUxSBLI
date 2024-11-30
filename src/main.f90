@@ -1,7 +1,7 @@
 program main
   use, intrinsic :: iso_fortran_env
   use mpi
-  use mod_globals, only : id_recal, nx, ny, nz, Lx, Ly, Lz
+  use mod_globals, only : id_RungeKutta, id_recal, nx, ny, nz, Lx, Ly, Lz
   use set
   use set_coordinate
   use calc_time_dev
@@ -65,7 +65,7 @@ program main
   endif
 
   call cpu_time(t_start)
-  call RungeKutta(myrank,nx,ny,nz,x,dx,y,dy,z,dz,Jacobian,Q)
+  call RungeKutta(id_RungeKutta, myrank, nx, ny, nz, x, dx, y, dy, z, dz, Jacobian, Q)
   call cpu_time(t_end)
 
   if (mod(myrank,2) == 0) then
