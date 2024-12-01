@@ -10,7 +10,7 @@ contains
     integer i, j, k
     real(8) dx1, dy1, dz1
     dx1 = Lx / dble(nx-1)
-    dy1 = 10.d-3 / dble(256)
+    dy1 = dx1
     dz1 = Lz / dble(nz-1)
 
     x(1) = Lx * 0.5d0 * dble(myrank)
@@ -22,13 +22,16 @@ contains
     print *, "myrank is ", myrank, " x(1) = ", x(1)
 
     y(1) = 0.d0
-    do j = 1, 256
-      dy(j) = min(1.d0, max(0.05d0, dble(j)/dble(128))) * dy1
-      y(j+1) = y(j) + dy(j)
-    enddo
-    do j = 257, ny-1
-      dy(j) = 2.d0 * dy1
-      y(j+1) = y(j) + dy(j)
+    do j = 1, ny
+      if (y(j) <= 7.5d-3) then
+        ! DNS 0.05: yp=0.5, 0.075 yp=0.7
+        dy(j) = min(1.d0, max(0.075d0, dble(j)/dble(128))) * dy1
+        y(j+1) = y(j) + dy(j)
+      else
+        ! buffer
+        dy(j) = 2.d0 * dy1
+        y(j+1) = y(j) + dy(j)
+      endif
     enddo
 
     z(1) = 0.d0
@@ -118,7 +121,22 @@ contains
     integer i, j, k, l, No
     real(8) :: p_wall
 
-    No = int(0.5d0 * nx)
+    if (kind(id_rescale) == 4 .and. myrank == 0) then
+      !$cuf kernel do(3)<<<*,*>>>
+      do l = 1, 5
+        do k = 4, nz-3
+          do j = 2, ny-1
+            QJ(1,j,k,l) = Qre(j,k,l)
+      enddo;enddo;enddo
+    elseif (kind(id_rescale) == 4 .and. myrank == 14) then
+      !$cuf kernel do(3)<<<*,*>>>
+      do l = 1, 5
+        do k = 4, nz-3
+          do j = 2, ny-1
+            QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
+      enddo;enddo;enddo
+    endif
+
     !$cuf kernel do(2)<<<*,*>>>
     do k = 4, nz-3
       do i = 1, nx
@@ -137,15 +155,22 @@ contains
         QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
     enddo;enddo
 
-    !!$cuf kernel do(2)<<<*,*>>>
-    !do k = 1, nz
-    !  do i = No, nx
-    !    QJ(i,ny,k,1) = rho2 / Jacobian(ny)
-    !    QJ(i,ny,k,2) = rho2 * ux / Jacobian(ny)
-    !    QJ(i,ny,k,3) = rho2 * uy / Jacobian(ny)
-    !    QJ(i,ny,k,4) = 0.d0
-    !    QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(ny)
-    !enddo;enddo
+    !if (6 <= myrank) then
+    !  if (8 <= myrank) then
+    !    No = 1
+    !  else
+    !    No = int(0.2d0 * nx) 
+    !  endif
+    !  !$cuf kernel do(2)<<<*,*>>>
+    !  do k = 1, nz
+    !    do i = No, nx
+    !      QJ(i,ny,k,1) = rho2 / Jacobian(ny)
+    !      QJ(i,ny,k,2) = rho2 * ux / Jacobian(ny)
+    !      QJ(i,ny,k,3) = rho2 * uy / Jacobian(ny)
+    !      QJ(i,ny,k,4) = 0.d0
+    !      QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(ny)
+    !  enddo;enddo
+    !endif
 
     ! cyclic
     !$cuf kernel do(3)<<<*,*>>>
