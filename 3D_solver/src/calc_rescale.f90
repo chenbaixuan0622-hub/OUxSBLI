@@ -2,12 +2,11 @@ module calc_rescale
   use mpi
   use mod_globals, only : nre1, nre2, rerank, nt, dt, gamma , R, Pr, u0, rho0, p0, M0, blt, start_rescale
 contains
-  subroutine calc_mean(nx, ny, nz, Jacobian, QJ, Qm_cpu)
-    integer, intent(in)         :: nx, ny, nz
-    real(8), intent(in), device :: Jacobian(ny), QJ(nx,ny,nz,5)
-    real(8), intent(out)        :: Qm_cpu(ny,5)
+  subroutine calc_mean(nx, ny, nz, Jacobian, QJ, Qm)
+    integer, intent(in)          :: nx, ny, nz
+    real(8), intent(in), device  :: Jacobian(ny), QJ(nx,ny,nz,5)
+    real(8), intent(out), device :: Qm(ny,5)
     real(8) Q1, Q2, Q3, Q4, Q5
-    real(8), device :: Qm(ny,5)
     integer i, k
     !$cuf kernel do <<<*,*>>>
     do j = 1, ny
@@ -31,7 +30,6 @@ contains
       Qm(j,4) = Q4 / dble((nre2 - nre1 + 1) * (nz - 6))
       Qm(j,5) = Q5 / dble((nre2 - nre1 + 1) * (nz - 6))
     enddo
-    Qm_cpu = Qm
   end subroutine calc_mean
 
   subroutine copy(nx, ny, nz, QJ, Qre)
@@ -50,13 +48,17 @@ contains
   subroutine rescale_recv_send(nx, ny, nz, step, y, Jacobian)
     integer, intent(in) :: nx, ny, nz, step
     real(8), intent(in) :: y(ny), Jacobian(ny)
-    real(8) Qre(ny,nz-6,5), Qm(ny,5)
+    real(8)         :: Qre_cpu(ny,nz-6,5), Qm_cpu(ny,5)
+    real(8), device :: Qre(ny,nz-6,5), Qm(ny,5)
     integer ierr, ireqs(2), istats(MPI_STATUS_SIZE,2)
 
     call MPI_IRECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank, 0, MPI_COMM_WORLD, ireqs(1), ierr)
     call MPI_IRECV(Qm,  5*ny,        MPI_REAL8, rerank, 1, MPI_COMM_WORLD, ireqs(2), ierr)
     call MPI_WAITALL(2, ireqs, istats, ierr)
-    call set_rescale(step, nx, ny, nz-6, y, Jacobian, Qm, Qre)
+    Qre_cpu = Qre
+    Qm_cpu  = Qm
+    call set_rescale(step, nx, ny, nz-6, y, Jacobian, Qm_cpu, Qre_cpu)
+    Qre     = Qre_cpu
     call MPI_SEND(Qre, 5*ny*(nz-6), MPI_REAL8, 0, 0, MPI_COMM_WORLD, ierr)
   end subroutine rescale_recv_send
 
