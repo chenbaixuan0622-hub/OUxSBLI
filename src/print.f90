@@ -345,11 +345,11 @@ contains
     call print_xml(nx,ny,1,2,real(x),real(y),real(z),rho1d,p1d,T1d,M1d,v1d)
   end subroutine print_vtk_2D
   
-  subroutine print_vtk_3D(step,nx,ny,nz,myrank,nranks,x,y,z,Jacobian,QJ,mass0,ke0,entropy0)
+  subroutine print_vtk_3D(step,nx,ny,nz,myrank,nranks,x,y,z,Jacobian,QJ,ke0,entropy0)
     integer, intent(in)    :: step, nx, ny, nz, myrank, nranks
     real(8), intent(in)    :: x(nx), y(ny), z(nz), Jacobian(ny)
     real(8), intent(in)    :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(inout) :: mass0, ke0, entropy0
+    real(8), intent(inout) :: ke0, entropy0
     integer i, j, k, l, m, len, ierr
     real(8) rho, u, v, w, p
     real(4), allocatable :: rho1d(:), p1d(:), T1d(:), M1d(:), v1d(:)
