@@ -11,7 +11,7 @@ program main
   real(8), allocatable :: x(:), dx(:), y(:), dy(:), z(:), dz(:), Jacobian(:), Q(:,:,:,:)
   character(len=40) filename
   ! MPI
-  integer ierr, nranks, myrank, status(MPI_STATUS_SIZE)
+  integer nranks, myrank, ierr, ireq, istat(MPI_STATUS_SIZE)
 
   call MPI_INIT(ierr)
   call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
@@ -23,26 +23,8 @@ program main
 
   ! set grid information
   if (mod(myrank,2) == 0) then
-    call set_grid(myrank,nx,ny,nz,Lx,Ly,Lz,x,y,z,dx,dy,dz)
-    call set_Jacobian_y(nx,ny,nz,dx,dy,dz,Jacobian)
-    call MPI_SEND(x,        nx,   MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(dx,       nx-1, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(y,        ny,   MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(dy,       ny-1, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(z,        nz,   MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(dz,       nz-1, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(Jacobian, ny,   MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-  else
-    call MPI_RECV(x,        nx,   MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
-    call MPI_RECV(dx,       nx-1, MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
-    call MPI_RECV(y,        ny,   MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
-    call MPI_RECV(dy,       ny-1, MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
-    call MPI_RECV(z,        nz,   MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
-    call MPI_RECV(dz,       nz-1, MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
-    call MPI_RECV(Jacobian, ny,   MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
-  endif
-
-  if (mod(myrank,2) == 0) then
+    call set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
+    call set_Jacobian_y(nx, ny, nz, dx, dy, dz, Jacobian)
     if (kind(id_recal) == 4) then
       write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"
       write(*,*) "simulation restarted"
@@ -55,13 +37,9 @@ program main
     else
       write(*,*) "wrong paramater was found"
     endif
-  endif
-
-  ! share initial condition
-  if (mod(myrank,2) == 0) then
-    call MPI_SEND(Q, nx*ny*nz*5, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
   else
-    call MPI_RECV(Q, nx*ny*nz*5, MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, status, ierr)
+    call set_grid(myrank-1, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
+    call set_Jacobian_y(nx, ny, nz, dx, dy, dz, Jacobian)
   endif
 
   call cpu_time(t_start)
