@@ -128,7 +128,7 @@ contains
     real(8) :: Cp = gamma * R / (gamma - 1.d0), rf = 0.89d0
     real(8) :: p_wall
     ! Riemann invariants
-    real(8) :: rhoin, pin, cin, vin, Rp, Rm, rhob, vb, cb, pb
+    real(8) :: rhoin, pin, cin, vin, Rp, Rm, rhob, ub, vb, cb, pb
     real(8) :: rho0, c0, v0 = 0.d0, Taw, T
 
     if (kind(id_rescale) == 4 .and. myrank == 0) then
@@ -176,12 +176,6 @@ contains
         QJ(i,ny,k,4) = 0.d0
         QJ(i,ny,k,5) = (pb / (gamma - 1.d0) + 0.5d0 * rhob * (u0**2 + vb**2)) / Jacobian(ny)
 
-        ! Neumann boundary condition
-        !QJ(i,ny,k,1) = QJ(i,ny-1,k,1)
-        !QJ(i,ny,k,2) = QJ(i,ny-1,k,2)
-        !QJ(i,ny,k,3) = QJ(i,ny-1,k,3)
-        !QJ(i,ny,k,4) = QJ(i,ny-1,k,4)
-        !QJ(i,ny,k,5) = QJ(i,ny-1,k,5)
         ! NoSlip
         QJ(i,1,k,1) = QJ(i,2,k,1)
         QJ(i,1,k,2) = 0.d0
@@ -191,15 +185,43 @@ contains
         QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
     enddo;enddo
 
-    if (6 <= myrank) then
-      if (8 <= myrank) then
-        No = 1
-      else
-        No = int(0.2d0 * nx)
-      endif
+    if (6 == myrank) then
+      No = int(0.2d0 * nx)
       !$cuf kernel do(2)<<<*,*>>>
       do k = 1, nz
         do i = No, nx
+          QJ(i,ny,k,1) = rho2 / Jacobian(ny)
+          QJ(i,ny,k,2) = rho2 * ux / Jacobian(ny)
+          QJ(i,ny,k,3) = rho2 * uy / Jacobian(ny)
+          QJ(i,ny,k,4) = 0.d0
+          QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(ny)
+      enddo;enddo
+    elseif (8 <= myrank) then
+      !$cuf kernel do(2)<<<*,*>>>
+      do k = 1, nz
+        do i = 1, nx
+          !pin   = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) &
+          !        / QJ(i,ny-1,k,1)) * Jacobian(ny-1)
+          !rhoin = QJ(i,ny-1,k,1) * Jacobian(ny-1)
+          !cin   = sqrt(gamma * pin / rhoin)
+          !vin   = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
+          !c0    = sqrt(gamma * p2 / rho2)
+          !Rp    = vin + 2.d0 * cin / (gamma - 1.d0)
+          !Rm    = uy  - 2.d0 * c0  / (gamma - 1.d0)
+          !vb    = 0.5d0 * (Rp + Rm)
+          !cb    = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
+          !rhob  = cin * rhoin / cb
+          !if (c0 < cin) then
+          !  ub  = QJ(i,ny-1,k,2) / QJ(i,ny-1,k,1)
+          !else
+          !  ub  = ux
+          !endif
+          !pb = (rhob * cb**2) / gamma
+          !QJ(i,ny,k,1) = rhob / Jacobian(ny)
+          !QJ(i,ny,k,2) = rhob * ub / Jacobian(ny)
+          !QJ(i,ny,k,3) = rhob * vb / Jacobian(ny)
+          !QJ(i,ny,k,4) = 0.d0
+          !QJ(i,ny,k,5) = (pb / (gamma - 1.d0) + 0.5d0 * rhob * (ub**2 + vb**2)) / Jacobian(ny)
           QJ(i,ny,k,1) = rho2 / Jacobian(ny)
           QJ(i,ny,k,2) = rho2 * ux / Jacobian(ny)
           QJ(i,ny,k,3) = rho2 * uy / Jacobian(ny)
