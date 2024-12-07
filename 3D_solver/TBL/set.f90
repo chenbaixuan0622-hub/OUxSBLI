@@ -120,24 +120,24 @@ contains
     integer, intent(in), value     :: myrank, nx, ny, nz
     real(8), intent(in), device    :: Jacobian(ny)
     real(8), intent(inout), device :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(in), device    :: Qre(ny,nz-6,5)
+    real(8), intent(in), device    :: Qre(ny*(nz-6)*5)
     integer i, j, k, l, No
     real(8) :: Cp = gamma * R / (gamma - 1.d0), rf = 0.89d0
     real(8) :: p_wall
     ! Riemann invariants
-    real(8) :: rhoin, pin, cin, vin, Rp, Rm, rhob, vb, cb, pb
+    real(8) :: rhoin, pin, cin, vin, Rp, Rm, rhob, ub, vb, cb, pb
     real(8) :: rho0, c0, v0 = 0.d0, Taw, T
-    No = int(0.5 * nx)
+    No = int(0.4 * nx)
 
     if (kind(id_rescale) == 4) then
       !$cuf kernel do(3)<<<*,*>>>
       do l = 1, 5
-        do k = 4, nz-3
+        do k = 1, nz-6
           do j = 2, ny-1
             ! inlet
-            QJ(1,j,k,l)  = Qre(j,k-3,l)
+            QJ(1,j,k+3,l)  = Qre(ny*(nz-6)*(l-1)+ny*(k-1)+j)
             ! outlet
-            QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
+            QJ(nx,j,k+3,l) = QJ(nx-1,j,k+3,l)
       enddo;enddo;enddo
     else
       !$cuf kernel do(3)<<<*,*>>>
@@ -184,12 +184,6 @@ contains
         QJ(i,ny,k,4) = 0.d0
         QJ(i,ny,k,5) = (pb / (gamma - 1.d0) + 0.5d0 * rhob * (u0**2 + vb**2)) / Jacobian(ny)
 
-        ! Neumann boundary condition
-        !QJ(i,ny,k,1) = QJ(i,ny-1,k,1)
-        !QJ(i,ny,k,2) = QJ(i,ny-1,k,2)
-        !QJ(i,ny,k,3) = QJ(i,ny-1,k,3)
-        !QJ(i,ny,k,4) = QJ(i,ny-1,k,4)
-        !QJ(i,ny,k,5) = QJ(i,ny-1,k,5)
         ! NoSlip
         QJ(i,1,k,1) = QJ(i,2,k,1)
         QJ(i,1,k,2) = 0.d0
@@ -201,12 +195,35 @@ contains
 
     !$cuf kernel do(2)<<<*,*>>>
     do k = 1, nz
-      do i = No, nx
+      do i = No, nx/2
         QJ(i,ny,k,1) = rho2 / Jacobian(ny)
         QJ(i,ny,k,2) = rho2 * ux / Jacobian(ny)
         QJ(i,ny,k,3) = rho2 * uy / Jacobian(ny)
         QJ(i,ny,k,4) = 0.d0
         QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(ny)
+    enddo;enddo
+
+    !$cuf kernel do(2)<<<*,*>>>
+    do k = 1, nz
+      do i = nx/2, nx
+        pin   = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) &
+                / QJ(i,ny-1,k,1)) * Jacobian(ny-1)
+        rhoin = QJ(i,ny-1,k,1) * Jacobian(ny-1)
+        cin   = sqrt(gamma * pin / rhoin)
+        vin   = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
+        c0    = sqrt(gamma * p2 / rho2)
+        Rp    = vin + 2.d0 * cin / (gamma - 1.d0)
+        Rm    = uy  - 2.d0 * c0  / (gamma - 1.d0)
+        vb    = 0.5d0 * (Rp + Rm)
+        cb    = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
+        rhob  = cin * rhoin / cb
+        pb    = (rhob * cb**2) / gamma
+        ub    = sqrt(2.d0 * gamma * (p2 / rho2 - pb / rhob) / (gamma - 1.d0) + ux**2 + uy**2 - vb**2)
+        QJ(i,ny,k,1) = rhob / Jacobian(ny)
+        QJ(i,ny,k,2) = rhob * ub / Jacobian(ny)
+        QJ(i,ny,k,3) = rhob * vb / Jacobian(ny)
+        QJ(i,ny,k,4) = 0.d0
+        QJ(i,ny,k,5) = (pb / (gamma - 1.d0) + 0.5d0 * rhob * (ub**2 + vb**2)) / Jacobian(ny)
     enddo;enddo
 
     ! cyclic
