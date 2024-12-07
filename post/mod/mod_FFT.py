@@ -1,5 +1,7 @@
 import numpy as np
+import os
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 
 def PSD(data, t):
@@ -151,5 +153,57 @@ def reconstruct_u(x, z, U, V, W):
   plt.colorbar()
 
   plt.show()
+  plt.close()
+
+
+def calc_FFT_save_animation(Nk, Nt, Nz, z, data, dir, name):
+  # store data for animation and calc FFT
+  dz   = -z[0] + z[1]
+  freq = np.fft.fftfreq(Nz, d=dz)
+  amp  = np.zeros((Nk,Nz))
+
+  for k in range(Nk):
+    for i in range(Nt):
+      amp[k,:] += abs(np.fft.fft(data[k,i,:]) / (Nz / 2.e0))
+
+  amp /= Nt
+
+  # for plot
+  plt.rcParams['font.family'] = 'Times New Roman'
+  plt.rcParams['mathtext.fontset'] = 'stix'
+  plt.rcParams['xtick.direction'] = 'in'
+  plt.rcParams['ytick.direction'] = 'in'
+  plt.rcParams['font.size'] = 12
+
+  # plot FFT
+  plt.xlabel("Wavelength [mm]", fontsize='14', style='italic', color='black')
+  plt.ylabel("Amp [m/s]",  fontsize='14', style='italic', color='black')
+  colors = ['black', 'blue', 'red', 'green', 'purple', 'orange', 'pink']
+  for k in range(Nk):
+    plt.plot(1.e3 / freq[1:Nz//2], amp[k,1:Nz//2], color=colors[k])
+  save_path = os.path.join(dir, name+".png")
+  plt.savefig(save_path)
+  plt.show()
+  plt.close()
+
+  # plot animation
+  ims = []
+
+  fig = plt.figure()
+
+  plt.xlabel("z [mm]", fontsize='14', style='italic', color='black')
+  plt.ylabel("U [m/s]", fontsize='14', style='italic', color='black')
+
+  for i in range(Nt):
+    lines = []
+    for k in range(Nk):
+      line, = plt.plot(z*1e3, data[k,i,:], color=colors[k])
+      lines.append(line)
+    ims.append(lines)
+
+  ani = animation.ArtistAnimation(fig, ims, interval=200)
+  plt.show()
+  save_path = os.path.join(dir, name+".gif")
+  ani.save(save_path, writer='Pillow')
   plt.close()
 
