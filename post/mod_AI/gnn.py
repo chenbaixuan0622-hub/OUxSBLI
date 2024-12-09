@@ -11,14 +11,12 @@ class GATModel(torch.nn.Module):
     super(GATModel, self).__init__()
     self.gat1 = GATConv(in_channels, hidden_channels, heads=4)
     self.gat2 = GATConv(hidden_channels * 4, hidden_channels, heads=4)
-    self.gat3 = GATConv(hidden_channels * 4, hidden_channels, heads=4)
-    self.gat4 = GATConv(hidden_channels * 4, out_channels, heads=1, concat=False)
+    self.gat3 = GATConv(hidden_channels * 4, out_channels, heads=1, concat=False)
   
   def forward(self, x, edge_index, edge_attr):
-    x1 = F.elu(self.gat1(x,            edge_index, edge_attr))
-    x2 = F.elu(self.gat2(x1,           edge_index, edge_attr)) + x1
-    x3 = F.elu(self.gat3(x1 + x2,      edge_index, edge_attr)) + x1 + x2
-    x  = F.elu(self.gat4(x1 + x2 + x3, edge_index, edge_attr))
+    x1 = F.elu(self.gat1(x,       edge_index, edge_attr))
+    x2 = F.elu(self.gat2(x1,      edge_index, edge_attr)) + x1
+    x  = F.elu(self.gat3(x1 + x2, edge_index, edge_attr))
     return x
 
 
@@ -64,7 +62,7 @@ def trainGNN(device, model, optimizer, Nt, dt, data, features, threshold_remove,
     node_embeddings = model(data.x, data.edge_index, data.edge_attr)
     data.x = features[:,t + dt,:].to(device)
   
-    # [xi, xj, rho, u, v, w, p, rho', u', v', w', p']
+    # [xi, xj, rho, u, v, w, p]
     loss = F.mse_loss(node_embeddings, data.x[:,2:7])
     loss.backward()
     optimizer.step()
@@ -81,18 +79,18 @@ def trainGNN(device, model, optimizer, Nt, dt, data, features, threshold_remove,
 
 
 def plot_graph(data):
-  G = to_networkx(data)
-  x = data.x[:,0].numpy()
-  y = data.x[:,1].numpy()
-  w = data.edge_attr.detach().cpu().numpy()
-  num_nodes = len(x)
+  data_cpu = data.clone().cpu()
+  G = to_networkx(data_cpu)
+  x = data_cpu.x[:,0].numpy()
+  y = data_cpu.x[:,1].numpy()
+  w = data_cpu.edge_attr.detach().cpu().numpy()
+
   num_edges = len(w)
-  node_positions = {i: (x[i], y[i]) for i in range(num_nodes)}
+  node_positions = {i: (x[i], y[i]) for i in G.nodes}
   edge_widths    = {i: (2.e0 * np.arctan(w[i])) for i in range(num_edges)}
-  arrow_size     = [(5.e0 * np.arctan(w[i])) for i in range(num_edges)]
-  nx.draw_networkx_nodes(G, pos=node_positions, node_size=10, node_color='white', alpha=0.0)
+  arrow_size     = 5.e0#[(5.e0 * np.arctan(w[i])) for i in range(num_edges)]
+  nx.draw_networkx_nodes(G, pos=node_positions, node_size=10, node_color='blue', alpha=1.0)
   nx.draw_networkx_edges(G, pos=node_positions, edge_color='black', \
-                         width=edge_widths, arrowstyle='->', \
-                         arrowsize=arrow_size)
+                         width=edge_widths, arrowstyle='->', arrowsize=arrow_size)
   nx.draw_networkx_labels(G, pos=node_positions, font_size=0, alpha=0.0)
 
