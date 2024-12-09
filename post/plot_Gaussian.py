@@ -7,7 +7,7 @@ Nx, Ny, Nz, x, y, z = getGrid(Q_path)
 
 delta = 25.e0
 
-sigma = 3.e0
+sigma = 15.e0
 
 nx1 = int(10.e0 / delta * Nx)
 nx2 = int(22.e0 / delta * Nx)
