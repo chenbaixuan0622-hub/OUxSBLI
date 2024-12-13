@@ -165,13 +165,53 @@ def plot_reconstruction(Q_dir, x, z, data, SPOD, name, interval=200):
   ani.save(save_path, writer='Pillow')
 
 
+def plot_reconstruction_DMD(Q_dir, x, y, D, D2, name, interval=200):
+  # D, D2 [space, time]
+  nx   = len(x)
+  ny   = len(y)
+  Nt   = len(D) // (nx * ny)
+  x    = x * 1e3
+  y    = y * 1e3
+  x, y = np.meshgrid(x, y)
+
+  fig, ax  = plt.subplots(1, 3, figsize=(18, 6))
+  crange   = np.linspace(0, 500, 50)
+  contour1 = ax[0].contourf(x, y,  D[:,0].reshape([ny,nx]), crange, cmap='jet', extend='both')
+  contour2 = ax[1].contourf(x, y, D2[:,0].reshape([ny,nx]), crange, cmap='jet', extend='both')
+  contour3 = ax[2].contourf(x, y, (D2[:,0] - D[:,0]).reshape([ny,nx]), levels=50, cmap='jet')
+  cbar1    = fig.colorbar(contour1, ax=ax[0:1], extendrect=True, \
+                          orientation='horizontal', pad=0.1, fraction=0.046, location='top')
+  cbar1.set_label("u [m/s]")
+  cbar1.ax.xaxis.set_ticks_position('top')
+  cbar1.ax.xaxis.set_label_position('top')
+  cbar2    = fig.colorbar(contour3, ax=ax[2], extendrect=True, \
+                          orientation='horizontal', pad=0.1, fraction=0.046, location='top')
+  cbar2.set_label("DMD - u [m/s]")
+  cbar2.ax.xaxis.set_ticks_position('top')
+  cbar2.ax.xaxis.set_label_position('top')
+
+  def update(frame):
+    for a in ax:
+      a.clear()
+      a.set_aspect('equal', adjustable='box')
+    contour1 = ax[0].contourf(x, y,  D[:,frame].reshape([ny,nx]), crange, cmap="jet", extend='both')
+    contour2 = ax[1].contourf(x, y, D2[:,frame].reshape([ny,nx]), crange, cmap='jet', extend='both')
+    contour3 = ax[2].contourf(x, y, (D2[:,frame] - D[:,frame]).reshape([ny,nx]), levels=50, cmap='jet')
+    return contour1.collections + contour2.collections + contour3.collections
+
+  ani = FuncAnimation(fig, update, frames=Nt, interval=interval, blit=False)
+
+  save_path = os.path.join(Q_dir, name)
+  ani.save(save_path, writer='Pillow')
+
+
 def plot_energy_contribution(Q_dir, Sigma, freq, num_freq, name):
   # Sigma[Nf, Nt]
   fig, ax = plt.subplots(num_freq, figsize=(8, 8))
   for i in range(num_freq):
-    wl = 1.e3 / freq[i+1]
-    ax[i].plot(Sigma[i+1,:10].real / np.sum(Sigma[i+1,:].real) * 100, 'o-')
-    ax[i].set_title(f'Wavelength {wl:.1f}')
+    #wl = 1.e3 / freq[i+1]
+    ax[i].plot(range(1,11), Sigma[i+3,:10].real / np.sum(Sigma[i+3,:].real) * 100, 'o-')
+    ax[i].set_title(f'Frequency {freq[i+3]:.1f}')
     ax[i].set_xlabel('Mode Index')
     ax[i].set_ylabel('Energy (%)')
 

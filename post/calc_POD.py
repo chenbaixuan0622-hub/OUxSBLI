@@ -17,15 +17,22 @@ plt.rcParams['xtick.direction'] = 'in'
 plt.rcParams['ytick.direction'] = 'in'
 plt.rcParams['font.size'] = 12
 
+# parameter
+Q_dir = "../3D_solver/TBL/data"#"../../z6mm"
+Lx1   = 28.e-3
+Lx2   = 38.e-3
+Ly2   = 8.e-3
+endT  = 0.1e-3
 
-def plot_pod_results(Q_dir, x, z, data, eigenvalues, modes, time_coefficients, num_modes=3):
+
+def plot_pod_results(Q_dir, x, z, data, eigenvalues, modes, time_coefficients, num_modes=6):
     # energy
     plt.figure(figsize=(6, 4))
-    plt.plot(eigenvalues[:10] / np.sum(eigenvalues) * 100, 'o-')
+    plt.plot(range(1,11), eigenvalues[:10] / np.sum(eigenvalues) * 100, 'o-')
     plt.title('Energy Contribution of Modes')
     plt.xlabel('Mode Index')
     plt.ylabel('Energy (%)')
-    save_name = "energy_contribution.png"
+    save_name = "POD_energy_contribution.png"
     save_path = os.path.join(Q_dir, save_name)
     plt.savefig(save_path)
     plt.close()
@@ -40,20 +47,20 @@ def plot_pod_results(Q_dir, x, z, data, eigenvalues, modes, time_coefficients, n
     zmin = z[0]
     zmax = z[-1]
     x, z = np.meshgrid(x, z)
-    fig, ax = plt.subplots(num_modes//2, 2, figsize=(8, 8))
+    fig, ax = plt.subplots(num_modes//3, 3, figsize=(8, 8))
     for i in range(num_modes):
       u = np.reshape(modes[:,i], [nz, nx])
-      ax[i//2,i%2].set_xlim(xmin, xmax)
-      ax[i//2,i%2].set_ylim(zmin, zmax)
-      ax[i//2,i%2].set_aspect('equal', adjustable='box')
-      ax[i//2,i%2].set_title(f'POD MODE {i+1}')
-      im = ax[i//2,i%2].contourf(x, z, u, levels=50, cmap='jet', extend='both')
-      divider = make_axes_locatable(ax[i//2,i%2])
+      ax[i//3,i%3].set_xlim(xmin, xmax)
+      ax[i//3,i%3].set_ylim(zmin, zmax)
+      ax[i//3,i%3].set_aspect('equal', adjustable='box')
+      ax[i//3,i%3].set_title(f'POD MODE {i+1}', y=-0.5)
+      im = ax[i//3,i%3].contourf(x, z, u, levels=50, cmap='jet', extend='both')
+      divider = make_axes_locatable(ax[i//3,i%3])
       cax = divider.append_axes('right', '5%', pad='3%')
       fig.colorbar(im, cax=cax, extendrect=True)
       fig.tight_layout()
 
-    save_name = "Mode.png" 
+    save_name = "POD_Mode.png" 
     save_path = os.path.join(Q_dir, save_name)
     plt.savefig(save_path)
     plt.close()
@@ -63,7 +70,7 @@ def plot_pod_results(Q_dir, x, z, data, eigenvalues, modes, time_coefficients, n
     for i in range(num_modes):
       ax[i].plot(time_coefficients[:,i])
     
-    save_name = "time_coef.png"
+    save_name = "POD_time_coef.png"
     save_path = os.path.join(Q_dir, save_name)
     plt.savefig(save_path)
     plt.close()
@@ -85,7 +92,7 @@ def plot_reconstruction(Q_dir, x, z, data, modes, time_coef, num_modes=3, interv
   crange   = np.linspace(0, 500, 50)
   contour1 = ax[0].contourf(x, z,   u[:,:,0], crange, cmap='jet', extend='both')
   contour2 = ax[1].contourf(x, z, POD[0,:,:], crange, cmap='jet', extend='both')
-  contour3 = ax[2].contourf(x, z, POD[0,:,:] - u[:,:,0], cmap='jet')
+  contour3 = ax[2].contourf(x, z, POD[0,:,:] - u[:,:,0], levels=50, cmap='jet')
   cbar1    = fig.colorbar(contour1, ax=ax[0:1], extendrect=True, \
                           orientation='horizontal', pad=0.1, fraction=0.046, location='top')
   cbar1.set_label("u [m/s]")
@@ -103,7 +110,7 @@ def plot_reconstruction(Q_dir, x, z, data, modes, time_coef, num_modes=3, interv
       a.set_aspect('equal', adjustable='box')
     contour1 = ax[0].contourf(x, z,   u[:,:,frame], crange, cmap="jet", extend='both')
     contour2 = ax[1].contourf(x, z, POD[frame,:,:], crange, cmap='jet', extend='both')
-    contour3 = ax[2].contourf(x, z, POD[frame,:,:] - u[:,:,frame], cmap='jet')
+    contour3 = ax[2].contourf(x, z, POD[frame,:,:] - u[:,:,frame], levels=50, cmap='jet')
     return contour1.collections + contour2.collections + contour3.collections
 
   ani = FuncAnimation(fig, update, frames=Nt, interval=interval, blit=False)
@@ -113,21 +120,31 @@ def plot_reconstruction(Q_dir, x, z, data, modes, time_coef, num_modes=3, interv
   ani.save(save_path, writer='Pillow')
 
 
-def main(Lx1, Lx2):
-  Q_dir   = "../../yp269"
+def make_data(Lx1, Lx2, Ly2, endT, Q_dir):
   Q_files = [f for f in os.listdir(Q_dir) if f.endswith(".vtr")]
   Q_files.sort(key=extract_number)
-  Nt      = len(Q_files)
+  Nt = len(Q_files)
+  t  = np.linspace(0.e0, endT, Nt)
+
+  stridex = 4
+  stridey = 8
 
   first_path = os.path.join(Q_dir, Q_files[0])
   Nx, Ny, Nz, X, Y, Z = getGrid(first_path)
   nx1 = int(Lx1 / X[-1] * Nx)
   nx2 = int(Lx2 / X[-1] * Nx)
-  nx  = (nx2 - nx1) // 4
-  nz  = Nz // 4
-  
-  x   = np.linspace(X[nx1], X[nx2], nx)
-  z   = np.linspace(Z[0],   Z[-1],  nz)
+  for j in range(Ny):
+    if Ly2 < Y[j]:
+      ny2 = j
+      break
+  indicesx = np.arange(nx1, nx2, stridex)
+  indicesy = np.arange(0,   ny2, stridey)
+  nx = len(indicesx)
+  nz = len(indicesy)
+  x  = X[indicesx]
+  y  = Y[indicesy]
+
+  indicesx, indicesy = np.meshgrid(indicesx, indicesy)
 
   data = np.zeros((nx*nz,Nt), dtype=np.float32)
 
@@ -135,18 +152,15 @@ def main(Lx1, Lx2):
   for Q_file in tqdm(Q_files):
     file_path = os.path.join(Q_dir, Q_file)
     U, _, _ = getVector(file_path, Nx, Ny, Nz, 'velocity')
-    U = np.reshape(U[:,0,nx1:nx2], [Nz, nx2-nx1])
-    u = cv2.resize(U, (nx, nz))
+    u = U[-1,indicesy,indicesx]
     data[:,itr] = u.flatten()
     itr += 1
 
   eigenvalues, eigenvectors, modes = snapshot_pod(data)
   time_coef = calc_time_coef(data, modes)
 
-  plot_pod_results(Q_dir, x, z, data, eigenvalues, modes, time_coef, num_modes=6)
-  plot_reconstruction(Q_dir, x, z, data, modes, time_coef, num_modes=6, interval=200)
+  plot_pod_results(Q_dir, x, y, data, eigenvalues, modes, time_coef, num_modes=6)
+  plot_reconstruction(Q_dir, x, y, data, modes, time_coef, num_modes=6, interval=200)
 
-Lx1 = 25.e-3
-Lx2 = 35.e-3
-main(Lx1, Lx2)
+make_data(Lx1, Lx2, Ly2, endT, Q_dir)
 
