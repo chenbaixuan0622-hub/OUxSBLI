@@ -209,9 +209,9 @@ def plot_energy_contribution(Q_dir, Sigma, freq, num_freq, name):
   # Sigma[Nf, Nt]
   fig, ax = plt.subplots(num_freq, figsize=(8, 8))
   for i in range(num_freq):
-    wl = 1.e3 / freq[i+1]
-    ax[i].plot(Sigma[i+1,:10].real / np.sum(Sigma[i+1,:].real) * 100, 'o-')
-    ax[i].set_title(f'Wavelength {wl:.1f}')
+    #wl = 1.e3 / freq[i+1]
+    ax[i].plot(range(1,11), Sigma[i+3,:10].real / np.sum(Sigma[i+3,:].real) * 100, 'o-')
+    ax[i].set_title(f'Frequency {freq[i+3]:.1f}')
     ax[i].set_xlabel('Mode Index')
     ax[i].set_ylabel('Energy (%)')
 
