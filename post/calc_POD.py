@@ -18,7 +18,7 @@ plt.rcParams['ytick.direction'] = 'in'
 plt.rcParams['font.size'] = 12
 
 # parameter
-Q_dir = "../../z6mm"
+Q_dir = "../3D_solver/TBL/data"#"../../z6mm"
 Lx1   = 28.e-3
 Lx2   = 38.e-3
 Ly2   = 8.e-3
@@ -152,7 +152,7 @@ def make_data(Lx1, Lx2, Ly2, endT, Q_dir):
   for Q_file in tqdm(Q_files):
     file_path = os.path.join(Q_dir, Q_file)
     U, _, _ = getVector(file_path, Nx, Ny, Nz, 'velocity')
-    u = U[0,indicesy,indicesx]
+    u = U[-1,indicesy,indicesx]
     data[:,itr] = u.flatten()
     itr += 1
 

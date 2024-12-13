@@ -18,7 +18,8 @@ plt.rcParams['ytick.direction'] = 'in'
 plt.rcParams['font.size'] = 12
 
 # parameter
-Q_dir = "../../z6mm"
+#Q_dir = "../../z6mm"
+Q_dir = "../3D_solver/TBL/data"#"../../z6mm"
 Lx1   = 28.e-3
 Lx2   = 38.e-3
 Ly2   = 8.e-3
@@ -47,39 +48,6 @@ def plot_spanwise_spod_result(Q_dir, U, Sigma, freq, t, num_freq, num_modes):
   plt.close()
 
 
-def plot_timewise_spod_result(Q_dir, x, y, modes, eigenvalues, freq, t, num_freq, num_modes):
-  #        modes[Nf, Nx, Nm=Nb]
-  #  eigenvalues[Nf, Nb]
-  # eigenvectors[Nf, Nb, Nb]
-  name = "SPOD_energy_contribution_timewise.png"
-  plot_energy_contribution(Q_dir, eigenvalues, freq, num_freq, name)
-
-  nx   = len(x)
-  nz   = len(y)
-  x    = x * 1e3
-  y    = y * 1e3
-  x, y = np.meshgrid(x, y)
-  fig, ax = plt.subplots(num_modes, num_freq, figsize=(18, 18))
-  for j in range(num_freq):
-    for i in range(num_modes):
-      mode = ifft(modes[j+1,:,i])
-      mode = mode.reshape([nz,nx])
-      ax[i,j].set_xlabel('x [mm]')
-      ax[i,j].set_ylabel('z [mm]')
-      ax[i,j].set_title(f'Frequency {freq[j+1]:.1f} [Hz] Mode {i+1}')
-      ax[i,j].set_aspect('equal', adjustable='box')
-      im = ax[i,j].contourf(x, y, mode.real, levels=50, cmap='jet')
-      divider = make_axes_locatable(ax[i,j])
-      cax = divider.append_axes('right', '5%', pad='3%')
-      fig.colorbar(im, cax=cax)
-      fig.tight_layout()
-
-  save_name = "SPOD_Mode_timewise.png"
-  save_path = os.path.join(Q_dir, save_name)
-  plt.savefig(save_path)
-  plt.close()
-
-
 def calc_spanwise_spod(nx1, nx2, nx, nz, Nx, Ny, Nz, Nt, x, z, t, Q_dir, Q_files):
   data = np.zeros((Nt,nx,nz), dtype=np.float32)
 
@@ -93,7 +61,7 @@ def calc_spanwise_spod(nx1, nx2, nx, nz, Nx, Ny, Nz, Nt, x, z, t, Q_dir, Q_files
     itr += 1
 
   # spanwise SPOD: data[Nt, nx, nz]
-  num_divide = 2
+  num_divide = 4
   num_mode   = 6
   num_freq   = 3
   name       = "SPOD_spanwise.gif"
@@ -118,11 +86,21 @@ def calc_timewise_spod(indicesx, indicesy, Nx, Ny, Nz, x, y, t, Q_dir, Q_files):
     itr += 1
 
   # timewise SPOD: data[nx*ny, Nt]
-  num_divide = 2
+  num_divide = 4
   num_mode   = 6
   num_freq   = 3
   name       = "SPOD_timewise.gif"
   eigenvalues, eigenvectors, modes, freq = timewise_spod(data, num_divide, dt=-t[0]+t[1])
+  
+  save_path = os.path.join(Q_dir, "SPOD_eigenvalues")
+  np.save(save_path, eigenvalues)
+  save_path = os.path.join(Q_dir, "SPOD_eigenvectors")
+  np.save(save_path, eigenvectors)
+  save_path = os.path.join(Q_dir, "SPOD_modes")
+  np.save(save_path, modes)
+  save_path = os.path.join(Q_dir, "SPOD_freq")
+  np.save(save_path, freq)
+
   SPOD = reconstruct_timewise_spod(eigenvalues, eigenvectors, modes, num_divide, num_mode)
   # data[Nt, nx, ny]
   Nt   = (Nt // num_divide) * num_divide
@@ -132,7 +110,6 @@ def calc_timewise_spod(indicesx, indicesy, Nx, Ny, Nz, x, y, t, Q_dir, Q_files):
   SPOD = SPOD.reshape([Nt,ny,nx])
   data = data.transpose((0,2,1))
   SPOD = SPOD.transpose((0,2,1))
-  plot_timewise_spod_result(Q_dir, x, y, modes, eigenvalues, freq, t, num_freq=3, num_modes=2)
   plot_reconstruction(Q_dir, x, y, data, SPOD, name, interval=200)
 
 
