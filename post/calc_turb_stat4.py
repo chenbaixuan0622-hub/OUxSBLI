@@ -6,8 +6,8 @@ from mod.mod_turb_stat import non_dim_tbl
 from mod.mod_ReynoldsStress import ReynoldsStress, print_ReynoldsStress
 
 
-Q_directory = "../../../../../../media/user/HD-EDS-E/hatayama/TBL/SBLI_05delta/stat03ms_09ms_SLAU"
-#Q_directory = "../../SBLI_1delta/stat03ms_05ms_SLAU"
+#Q_directory = "../../../../../../media/user/HD-EDS-E/TBL/TBL_HRSLAU2_yp0.5/stat04ms_SLAU"
+Q_directory = "../3D_solver/TBL/data"
 Q_files   = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
 
 
@@ -21,6 +21,7 @@ def RS(Nx, Ny, Nz, x, y, z, Rho, U, V, W, rhow, ut):
   for Q_file in tqdm(Q_files):
     file_path = os.path.join(Q_directory, Q_file)
     if file_path == os.path.join(Q_directory, "TKE.vtr") \
+    or file_path == os.path.join(Q_directory, "ReynoldsStress.vtr") \
     or file_path == os.path.join(Q_directory, "Qmean.vtr"):
       continue
     rho     = getScalar(file_path, Nx, Ny, Nz, 'rho')

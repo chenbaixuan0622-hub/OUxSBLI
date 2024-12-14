@@ -8,7 +8,7 @@ from mod.mod_turb_stat import non_dim_tbl
 
 Q_directory = "../3D_solver/TBL/data"
 #Q_directory = "../../../../../media/user/HD-EDS-E/hatayama/TBL/TBL20240826_KEEP4thVisc2nd"
-target_path = os.path.join(Q_directory, "Q00100.vtr")
+target_path = os.path.join(Q_directory, "Q00020.vtr")
 save_path   = os.path.join(Q_directory, "yplus.d")
 hist_path   = os.path.join(Q_directory, "hist.png")
 

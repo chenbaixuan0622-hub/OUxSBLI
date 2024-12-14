@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import torch
+import torch.nn as nn
 from torch_geometric.data import Data
 from scipy.stats import zscore
 from tqdm import tqdm
@@ -15,8 +16,8 @@ def make_graph_data_xy(Lx1, Lx2, Ly2, device, Q_dir):
   Q_files.sort(key=extract_number)
   Nt = len(Q_files)
 
-  stridex = 4
-  stridey = 8
+  stridex = 8
+  stridey = 16
 
   first_path = os.path.join(Q_dir, Q_files[0])
   Nx, Ny, Nz, X, Y, Z = getGrid(first_path)
@@ -134,7 +135,7 @@ def main():
   threshold_remove  = 0.2 
   threshold_add     = 0.8
   max_edge_per_node = 6
-  num_epoch         = 200
+  num_epoch         = 1000
 
   device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
   model = GATModel(in_channels, hidden_channels, out_channels).to(device)
@@ -149,8 +150,9 @@ def main():
   data = data.to(device)
   optimizer = torch.optim.Adam(list(model.parameters()) + [data.edge_attr], \
                                lr=0.005, weight_decay=1e-4)
+  criteria  = nn.SmoothL1Loss()
 
-  data, pred, ans, loss_list = trainGNN(device, model, optimizer, num_epoch, Nt, dt, data, features, \
+  data, pred, ans, loss_list = trainGNN(device, model, optimizer, criteria, num_epoch, Nt, dt, data, features, \
                                         threshold_remove, threshold_add, max_edge_per_node)
 
   # plot loss

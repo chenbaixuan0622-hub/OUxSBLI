@@ -3,21 +3,25 @@ from networkx import from_numpy_array, draw
 import os
 import matplotlib.pyplot as plt
 from mod.mod_POD import make_data, make_grid
-
+from mod_AI.gnn import plot_graph_from_array
 
 Q_dir = "../3D_solver/TBL/data"
 Lx1   = 28.e-3
 Lx2   = 40.e-3
 Ly2   = 8.e-3
 endT  = 0.1e-3
+stridex = 8
+stridey = 16
 
 # D[space=nx*ny, time]
 save_path = os.path.join(Q_dir, "D.npy")
 if os.path.isfile(save_path):
   D = np.load(save_path)
-  _, _, _, _, _, x, y, t = make_grid(Lx1, Lx2, Ly2, endT, Q_dir)
+  stridex = 8
+  stridey = 16
+  _, _, _, _, _, x, y, t = make_grid(Lx1, Lx2, Ly2, stridex, stridey, endT, Q_dir)
 else:
-  x, y, t, D = make_data(Lx1, Lx2, Ly2, endT, Q_dir)
+  x, y, t, D = make_data(Lx1, Lx2, Ly2, stridex, stridey, endT, Q_dir)
   np.save(save_path, D)
 
 nx = len(x)
@@ -33,53 +37,23 @@ plt.rcParams['ytick.direction'] = 'in'
 plt.rcParams['font.size'] = 12
 
 
-# causal matrix
+# causal matrix: A[nx*ny, nx*ny]
 save_path = os.path.join(Q_dir, "GWN_causal_matrix.npy")
-A = np.load(save_path)
-# A[nx*ny, nx*ny]
+A         = np.load(save_path)
+save_path = os.path.join(Q_dir, "GWN_initial_matrix.npy")
+Ainit     = np.load(save_path)
 
-X, Y = np.meshgrid(x, y)
-X    = X.flatten()
-Y    = Y.flatten()
-A    = np.abs(A)
-for j in range(nx*ny):
-  for i in range(nx*ny):
-    d = np.sqrt((X[i] - X[j])**2 + (Y[i] - Y[j])**2)
-    if d == 0.e0:
-      A[j,i] = 0.e0
-    if A[j,i] > A[i,j]:
-      A[j,i] = A[j,i] - A[i,j]
-      A[i,j] = 0.e0
-    elif A[j,i] < A[i,j]:
-      A[i,j] = A[i,j] - A[j,i]
-      A[j,i] = 0.e0
+x, y = np.meshgrid(x*1e3, y*1e3)
+A    = np.abs(A + Ainit)
 
-threshold = np.sort(A)[-50]
-A = np.where(A <= threshold, 0, A)
-Amax = np.max(A)
-A = np.array(5.e0 * A / Amax, dtype=np.int32)
+plt.hist(np.abs(A).flatten(), bins=100)
+save_path = os.path.join(Q_dir, "GWN_hist_A.png")
+plt.savefig(save_path)
+plt.close()
 
-G   = from_numpy_array(A)
-pos = {i: (X[i], Y[i]) for i in range(nx*ny)}
+plt.figure(figsize=(8,4))
+plot_graph_from_array(A, x, y, num_edges=2)
+save_path = os.path.join(Q_dir, "GWN_causal_graph.png")
+plt.savefig(save_path)
+plt.close()
 
-print("num of nodes ", G.number_of_nodes())
-print("num of edges ", G.number_of_edges())
-
-edges_to_remove = [(u, v) for u, v, data in G.edges(data=True) if data.get('weight', 0) == 0]
-G.remove_edges_from(edges_to_remove)
-
-nodes_to_remove = [node for node in G.nodes if G.degree(node) == 0]
-G.remove_nodes_from(nodes_to_remove)
-
-print("num of nodes ", G.number_of_nodes())
-print("num of edges ", G.number_of_edges())
-
-edges = G.edges(data=True)
-edge_widths = [d['weight'] for _, _, d in edges]
-
-'''
-plt.figure(figsize=(6, 6))
-draw(G, pos, with_labels=False, node_size=10, edge_color='blue', \
-     width=edge_widths)
-plt.show()
-'''
