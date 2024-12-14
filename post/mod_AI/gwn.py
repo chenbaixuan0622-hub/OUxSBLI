@@ -41,7 +41,7 @@ class gwnet(nn.Module):
                                kernel_size=(1))
 
     # graph convolution
-    self.weight  = nn.Parameter(torch.randn(nx,1).to(device),  requires_grad=True).to(device)
+    #self.weight  = nn.Parameter(torch.randn(nx,1).to(device),  requires_grad=True).to(device)
     self.A       = nn.Parameter(torch.randn(nx,nx).to(device), requires_grad=True).to(device)
     self.dropout = nn.Dropout(dropout)
 
@@ -75,11 +75,14 @@ class gwnet(nn.Module):
       x = x + residual[:,:,:,-x.size(3):]
 
     # graph convolution
-    support = self.weight.unsqueeze(0).unsqueeze(0)
-    support = x * support
+    #support = self.weight.unsqueeze(0).unsqueeze(0)
+    support = x# * support
     A = Ainit + self.A
     x = torch.matmul(A, support)
     x = self.dropout(x)
+
+    # to make simple matrix
+    var = torch.var(torch.abs(A))
 
     x = self.residual_conv(x)
 
@@ -89,5 +92,5 @@ class gwnet(nn.Module):
     x = F.relu(x)
     x = F.relu(self.end_conv_1(x))
     x = self.end_conv_2(x)
-    return x
+    return x, var
 

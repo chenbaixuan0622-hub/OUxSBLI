@@ -5,7 +5,8 @@ from mod.mod_read import getGrid, getVector, getScalar
 from mod.mod_turb_stat import non_dim_tbl, Sutherland, tau
 from mod.mod_TKE import BudgetTerms, print_TKE
 
-Q_directory = "../../../../../../media/user/HD-EDS-E/hatayama/TBL/SBLI_05delta/stat03ms_09ms_SLAU"
+#Q_directory = "../../../../../../media/user/HD-EDS-E/hatayama/TBL/SBLI_05delta/stat03ms_09ms_SLAU"
+Q_directory = "../3D_solver/TBL/data"
 Q_files   = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
 
 Rgas  = 287.03
@@ -21,6 +22,7 @@ def TKE(Nx, Ny, Nz, nx0, nx, ny, nz, x, y, z, Rho, U, V, W, P, UF, VF, WF, yp, u
   for Q_file in tqdm(Q_files):
     file_path = os.path.join(Q_directory, Q_file)
     if file_path == os.path.join(Q_directory, "TKE.vtr") \
+    or file_path == os.path.join(Q_directory, "ReynoldsStress.vtr") \
     or file_path == os.path.join(Q_directory, "Qmean.vtr"):
       continue
     rhos       = getScalar(file_path, Nx, Ny, Nz, 'rho')
@@ -80,8 +82,8 @@ def main():
   nu   = np.mean(Sutherland(p[:,0,nx1:nx2] / (Rgas * rho[:,0,nx1:nx2])) / (rho[:,0,nx1:nx2]))
   Norm = np.mean(rho[:,0,nx1:nx2]) * ut**4 / nu
 
-  nx0 = 0#int(0.3 * Nx)
-  nx  = Nx#int(0.6 * Nx)
+  nx0 = int(0.e0 * Nx)
+  nx  = int(1.e0 * Nx)
   ny  = Ny
   nz  = Nz
 

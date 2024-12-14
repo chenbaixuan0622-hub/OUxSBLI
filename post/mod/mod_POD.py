@@ -4,6 +4,8 @@ from scipy.linalg import eigh, svd
 from scipy.fft import rfft, irfft, rfftfreq
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+from tqdm import tqdm
+from mod.mod_read import getGrid, getVector, extract_number
 
 
 def snapshot_pod(data):
@@ -219,4 +221,47 @@ def plot_energy_contribution(Q_dir, Sigma, freq, num_freq, name):
   save_path = os.path.join(Q_dir, name)
   plt.savefig(save_path)
   plt.close()
+
+
+def make_grid(Lx1, Lx2, Ly2, stridex, stridey, endT, Q_dir):
+  Q_files = [f for f in os.listdir(Q_dir) if f.endswith(".vtr")]
+  Q_files.sort(key=extract_number)
+  Nt = len(Q_files)
+  t  = np.linspace(0.e0, endT, Nt)
+
+  first_path = os.path.join(Q_dir, Q_files[0])
+  Nx, Ny, Nz, X, Y, Z = getGrid(first_path)
+  nx1 = int(Lx1 / X[-1] * Nx)
+  nx2 = int(Lx2 / X[-1] * Nx)
+  for j in range(Ny):
+    if Ly2 < Y[j]:
+      ny2 = j
+      break
+  indicesx = np.arange(nx1, nx2, stridex)
+  indicesy = np.arange(0,   ny2, stridey)
+  nx = len(indicesx)
+  ny = len(indicesy)
+  x  = X[indicesx]
+  y  = Y[indicesy]
+  indicesx, indicesy = np.meshgrid(indicesx, indicesy)
+  return Nx, Ny, Nz, indicesx, indicesy, x, y, t
+
+
+def make_data(Lx1, Lx2, Ly2, stridex, stridey, endT, Q_dir):
+  Nx, Ny, Nz, indicesx, indicesy, x, y, t = make_grid(Lx1, Lx2, Ly2, stridex, stridey, endT, Q_dir)
+  
+  print("nx = ", len(x), " ny = ", len(y))
+  D = np.zeros((len(x)*len(y), len(t)), dtype=np.float32)
+
+  Q_files = [f for f in os.listdir(Q_dir) if f.endswith(".vtr")]
+  Q_files.sort(key=extract_number)
+
+  itr = 0
+  for Q_file in tqdm(Q_files):
+    file_path = os.path.join(Q_dir, Q_file)
+    U, _, _ = getVector(file_path, Nx, Ny, Nz, 'velocity')
+    u = U[0,indicesy,indicesx]
+    D[:,itr] = u.flatten()
+    itr += 1
+  return x, y, t, D
 

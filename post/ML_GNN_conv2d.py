@@ -10,9 +10,11 @@ from mod_AI.gnn import GATModel, plot_graph, update_edge_index
 import matplotlib.pyplot as plt
 
 
-def conv(nx, Lx):
+def conv(nx, ny, Lx, Ly):
   x    = np.linspace(0.e0, Lx, nx)
+  y    = np.linspace(0.e0, Ly, ny)
   dx   = -x[0] + x[1]
+  dy   = -y[0] + y[1]
   c    = 1.e0
   CFL  = 0.1e0
   dt   = CFL * dx / c
