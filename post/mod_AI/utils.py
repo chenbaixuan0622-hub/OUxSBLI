@@ -160,3 +160,55 @@ def trainNN_classify(net,device,optimizer,criterion,train_batch,test_batch,epoch
     test_acc_list.append(batch_test_acc)
   return train_loss_list, test_loss_list
 
+
+def trainGWN(net,device,optimizer,criterion,train_batch,test_batch,epoch):
+  # make lists to store loss
+  train_loss_list = []
+  test_loss_list  = []
+
+  # do machine learning
+  for i in torch.arange(epoch):
+    # progress var
+    print('---------------------------------------------')
+    print("Epoch: {}/{}".format(i+1, epoch))
+
+    # initialize loss
+    train_loss = 0.e0
+    test_loss  = 0.e0
+
+    # train NN
+    net.train()
+    # load mini batch
+    for teaching_data, test_data in train_batch:
+      teaching_data = teaching_data.to(device)
+      test_data     = test_data.to(device)
+      optimizer.zero_grad()
+      y_pred, var   = net(test_data)
+      loss          = criterion(y_pred, teaching_data) / var
+      loss.backward()
+      optimizer.step()
+      train_loss += loss.item()
+
+    # calc mean loss
+    batch_train_loss = train_loss / len(train_batch)
+
+    # evaluate NN
+    net.eval()
+    with torch.no_grad():
+      for teaching_data, test_data in test_batch:
+        teaching_data = teaching_data.to(device)
+        test_data     = test_data.to(device)
+        y_pred, var   = net(test_data)
+        loss = criterion(y_pred, teaching_data) / var
+        test_loss += loss.item()
+
+    # calc mean loss
+    batch_test_loss = test_loss / len(test_batch)
+
+    print("Train_Loss: {:E}".format(batch_train_loss))
+    print("Test_Loss : {:E}".format(batch_test_loss))
+
+    train_loss_list.append(batch_train_loss)
+    test_loss_list.append(batch_test_loss)
+  return train_loss_list, test_loss_list
+

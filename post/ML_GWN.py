@@ -8,26 +8,29 @@ from tqdm import tqdm
 import os
 import matplotlib.pyplot as plt
 from mod_AI.plot  import plot_Dataset, plot_loss, plot_result
-from mod_AI.utils import Dataset, trainNN 
+from mod_AI.utils import Dataset, trainGWN 
 from mod_AI.gwn import gwnet
 from mod.mod_POD import make_data, make_grid
 
 
-Q_dir = "../3D_solver/TBL/data"
-Lx1   = 28.e-3
-Lx2   = 40.e-3
-Ly2   = 8.e-3
-endT  = 0.1e-3
-nt    = 10
-epoch = 1000
+Q_dir   = "../3D_solver/TBL/data"
+Lx1     = 28.e-3
+Lx2     = 40.e-3
+Ly2     = 8.e-3
+stridex = 32
+stridey = 16
+endT    = 0.1e-3
+nt      = 10
+epoch   = 500
+batch_size = 5
 
 # D[space=nx*ny, time]
 save_path = os.path.join(Q_dir, "D.npy")
 if os.path.isfile(save_path):
   D = np.load(save_path)
-  _, _, _, _, _, x, y, t = make_grid(Lx1, Lx2, Ly2, endT, Q_dir)
+  _, _, _, _, _, x, y, t = make_grid(Lx1, Lx2, Ly2, stridex, stridey, endT, Q_dir)
 else:
-  x, y, t, D = make_data(Lx1, Lx2, Ly2, endT, Q_dir)
+  x, y, t, D = make_data(Lx1, Lx2, Ly2, stridex, stridey, endT, Q_dir)
   np.save(save_path, D)
 
 nx = len(x)
@@ -54,20 +57,18 @@ for j in range(nx*ny):
     else:
       Ainit[j,i] = 0.e0
 
-im = plt.imshow(Ainit)
-plt.colorbar(im)
-plt.show()
-plt.close()
+save_path = os.path.join(Q_dir, "GWN_initial_matrix")
+np.save(save_path, Ainit)
 
 # set GPU and NN property
 device    = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 criterion = nn.L1Loss()
-Ainit = torch.tensor(Ainit, device=device)
+Ainit     = torch.tensor(Ainit, device=device)
 net       = gwnet(device, in_dim=1, out_dim=1, residual_channels=32, \
                   dilation_channels=32, skip_channels=32, \
                   end_channels=32, dropout=0.1, nx=nx*ny, nt=nt, Ainit=Ainit)
 net       = net.to(device)
-optimizer = optim.Adam(net.parameters(), lr=0.002, weight_decay=1e-4)
+optimizer = optim.RAdam(net.parameters(), lr=0.001)
 
 # teaching_data[data_len, feature=1 (u), space=nx*ny, time]
 #     test_data[data_len, feature=1 (u), space=nx*ny, time]
@@ -85,15 +86,15 @@ dataset                     = Dataset(teaching_data, test_data)
 train_dataset, test_dataset = train_test_split(dataset, test_size=0.2, shuffle=False)
 
 train_batch = torch.utils.data.DataLoader(dataset=train_dataset,
-                                          batch_size=1,
+                                          batch_size=batch_size,
                                           shuffle=False)
 test_batch  = torch.utils.data.DataLoader(dataset=test_dataset,
-                                          batch_size=1,
+                                          batch_size=batch_size,
                                           shuffle=False)
 
 print("train batch size: ", len(train_batch), " test batch size: ", len(test_batch))
 
-train_loss_list, test_loss_list = trainNN(net,device,optimizer,criterion,train_batch,test_batch,epoch)
+train_loss_list, test_loss_list = trainGWN(net,device,optimizer,criterion,train_batch,test_batch,epoch)
 plot_loss(epoch-1,train_loss_list[1:],test_loss_list[1:],Q_dir,0)
 
 # plot result
@@ -110,7 +111,7 @@ with torch.no_grad():
     teaching_data, test_data = tuple
     teaching_data = teaching_data.to(device)
     test_data     = test_data.to(device)
-    y_pred        = net(test_data)
+    y_pred, var   = net(test_data)
     loss          = criterion(y_pred, teaching_data)
 
     if loss < loss0:
@@ -118,8 +119,8 @@ with torch.no_grad():
       best  = itr
 
   teaching_data, test_data = list(test_batch)[best]
-  test_data = test_data.to(device)
-  pred      = net(test_data)
+  test_data                = test_data.to(device)
+  pred, var                = net(test_data)
   
   teaching = np.array(teaching_data)
   pred     = np.array(pred.to('cpu'))

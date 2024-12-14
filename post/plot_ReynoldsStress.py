@@ -2,8 +2,9 @@ import numpy as np
 import os
 from mod.mod_read import getGrid, getScalar
 
-#Q_directory = "../../../../../../media/user/HD-EDS-E/hatayama/TBL/SBLI_1delta/stat03ms_05ms_SLAU"
-Q_directory = "../../a100/"
+#Q_directory = "../../a100/"
+#Q_directory = "../../../../../../media/user/HD-EDS-E/TBL/data"
+Q_directory = "../3D_solver/TBL/data"
 
 file_path = os.path.join(Q_directory, "yp.npy")
 yp = np.load(file_path)
@@ -15,12 +16,10 @@ rvv = getScalar(file_path, Nx, Ny, Nz, 'rvv')
 rww = getScalar(file_path, Nx, Ny, Nz, 'rww')
 ruv = getScalar(file_path, Nx, Ny, Nz, 'ruv')
 
-Lx = 50.e0
+nx1 = int(0.1e0 * Nx)
+nx2 = int(0.9e0 * Nx)
 
-nx1 = int(42.e0 / Lx * Nx)
-nx2 = int(46.e0 / Lx * Nx)
-
-save_path = os.path.join(Q_directory, "ReynoldsStress_c.d")
+save_path = os.path.join(Q_directory, "Reynolds_Stress.d")
 with open(save_path, "w", encoding="UTF-8") as f:
   print("# yp      ruu        rvv       rww        ruv", file=f)
   for j in range(Ny):

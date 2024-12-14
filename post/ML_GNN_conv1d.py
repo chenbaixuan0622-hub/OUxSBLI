@@ -22,9 +22,10 @@ def conv(nx, Lx):
   no   = nt // 100
 
   U = np.zeros((no,nx), dtype=np.float32)
-  u = np.random.randn(nx)
+  u = np.zeros(nx)
 
   for i in range(nt):
+    t = i * dt
     u_old   = u.copy()
     # 2nd order
     u[2:-2] = u_old[2:-2] - c * dt / dx * 0.5e0 * \
@@ -34,10 +35,8 @@ def conv(nx, Lx):
     u[-1] = u_old[-1] - c * dt / dx * (-u_old[-2] + u_old[-1])
     u[1:-1] = u_old[1:-1] - c * dt / dx * (-u_old[:-2] + u_old[1:-1])
     # boundary condition
-    u[0]    = u_old[0] + 0.5e0 * np.random.randn(1)
+    u[0]    = u_old[0] + np.sin(2.e0 * np.pi * t)
     u[-1]   = u[-2]
-    # random disturbance
-    u += 0.1e0 * np.random.randn(nx)
     if i % 100 == 0:
       U[i//100,:]  = u
   U = zscore(U, axis=None)
@@ -65,6 +64,7 @@ def make_graph_data(nx, Lx, device):
       if itr == 0:
         if i < nx-1:
           index = np.array([i,i+1]).reshape(2,1)
+          #index = np.array([i+1,i]).reshape(2,1)
           edge_index = np.append(edge_index, index, axis=-1)
 
   num_edge     = nx-1
@@ -77,30 +77,32 @@ def make_graph_data(nx, Lx, device):
 
 
 def trainGNN(device, model, optimizer, Nt, dt, data, features, threshold_remove, threshold_add, max_edges_per_node):
-  t = 0
   loss_list = []
-  for epoch in range(Nt - dt):
+  for epoch in range(10): 
     model.train()
-    optimizer.zero_grad()
-    data.x = features[:,t,:].to(device)
+    loss_sum = 0.e0
+    for t in range(Nt - dt):
+      optimizer.zero_grad()
+      data.x = features[:,t,:].to(device)
 
-    node_embeddings = model(data.x, data.edge_index, data.edge_attr)
-    data.x = features[:,t + dt,:].to(device)
+      node_embeddings = model(data.x, data.edge_index, data.edge_attr)
+      data.x = features[:,t + dt,:].to(device)
   
-    # [xi, u]
-    loss = F.mse_loss(node_embeddings, data.x[:,1])
-    loss.backward()
-    optimizer.step()
-    data.edge_index, data.edge_attr = update_edge_index(device, \
-                                                        data.edge_index, \
-                                                        data.edge_attr, \
-                                                        node_embeddings, \
-                                                        threshold_remove, \
-                                                        threshold_add, \
-                                                        max_edges_per_node)
-    t = (t + 1) % Nt
+      # [xi, u]
+      loss = F.mse_loss(node_embeddings, data.x[:,1])
+      loss.backward()
+      loss_sum += loss.item()
+      optimizer.step()
+      data.edge_index, data.edge_attr = update_edge_index(device, \
+                                                          data.edge_index, \
+                                                          data.edge_attr, \
+                                                          node_embeddings, \
+                                                          threshold_remove, \
+                                                          threshold_add, \
+                                                          max_edges_per_node)
+    batch_loss = loss_sum / (Nt - dt)
+    loss_list.append(batch_loss)
     print(f'Epoch {epoch+1}, Loss: {loss.item():.4f}')
-    loss_list.append(loss)
   return data, node_embeddings, loss_list
 
 
@@ -123,7 +125,7 @@ def main():
   plt.show()
 
   # parameters for GNN
-  dt                 = 2
+  dt                 = 3
   in_channels        = 2
   out_channels       = 1
   hidden_channels    = 128
@@ -148,8 +150,7 @@ def main():
   optimizer = torch.optim.Adam(list(model.parameters()) + [data.edge_attr], \
                                lr=0.005, weight_decay=1e-4)
 
-  for i in range(3):
-    data, pred, loss_list = trainGNN(device, model, optimizer, Nt, dt, data, features, threshold_remove, threshold_add, max_edges_per_node)
+  data, pred, loss_list = trainGNN(device, model, optimizer, Nt, dt, data, features, threshold_remove, threshold_add, max_edges_per_node)
 
   # plot predicted contour
   u = pred.detach().cpu().numpy()

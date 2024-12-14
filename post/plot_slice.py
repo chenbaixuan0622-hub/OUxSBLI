@@ -7,10 +7,10 @@ from mod.mod_plot import print_slice
 
 
 #Q_directory = "../../SBLI/SBLI_4delta/stat03ms_04ms_SLAU"
-Q_directory = "../../../../../../media/user/HD-EDS-E/hatayama/TBL/SBLI_1delta/stat03ms_05ms_SLAU"
+Q_directory = "../../../../../../media/user/HD-EDS-E/hatayama/TBL/SBLI_05delta/stat03ms_09ms_SLAU"
 Q_files   = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
 
-yps = [5.e0, 30.e0, 80.e0, 590.e0]
+yps = [5.e0, 30.e0, 80.e0, 269.e0, 590.e0]
 
 delta = 2.e-3
 
