@@ -4,7 +4,7 @@ module mod_globals
   integer, parameter    :: dimension = 3
   integer, parameter    :: accuracy  = 2
   integer, parameter    :: offset    = accuracy / 2
-  integer(4), parameter :: id_visc   = 1
+  integer(4), parameter :: id_visc   = 2
   integer, parameter    :: id_turbulence = 0
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc     ! kind2 Euler         !
@@ -42,14 +42,14 @@ module mod_globals
   ! id_rescale  ! kind2 off           !
   !             ! kind4 on            !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(2), parameter      :: id_scheme   = 0
+  real(2), parameter         :: id_scheme   = 0
   real(8), parameter         :: threshold   = 0.4d0
-  integer(kind=2), parameter :: id_accuracy = 0
-  integer(kind=2), parameter :: id_tvd      = 0
+  integer(kind=8), parameter :: id_accuracy = 0
+  integer(kind=8), parameter :: id_tvd      = 0
   integer(kind=2), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
   integer(kind=2), parameter :: slau_wall   = 0
-  integer(kind=2), parameter :: id_rescale  = 0
+  integer(kind=4), parameter :: id_rescale  = 0
   real(8), parameter         :: blt         = 2.d-3
 
   ! mesh
@@ -59,10 +59,10 @@ module mod_globals
   integer, parameter :: nx = 161      ! * 8
   integer, parameter :: ny = 321
   integer, parameter :: nz = 2049
-  integer, parameter :: rerank = 6
-  integer, parameter :: nre1 = int(0.6d0 * nx) ! 4 delta for Lz = delta, 1 delta for Lz = 4 delta, 1/4 delta for Lz = 16 delta
-  integer, parameter :: nre2 = int(0.8d0 * nx)
-  integer, parameter :: overlap = 1
+  integer, parameter :: rerank = 4
+  integer, parameter :: nre1 = int(0.24d0 * nx) ! 4 delta for Lz = delta, 2 delta for Lz = 4 delta, 1 delta for Lz = 16 delta
+  integer, parameter :: nre2 = int(0.56d0 * nx)
+  integer, parameter :: overlap = 3
 
   ! RTX 4090
   type(dim3) :: blocksE   = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
@@ -89,14 +89,14 @@ module mod_globals
   !               ! kind4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_RungeKutta = 0
-  integer(kind=2), parameter :: id_recal      = 0
-  integer, parameter         :: step_offset   = 0
-  integer, parameter         :: start_rescale = 0
-  real(8), parameter :: endT = 0.01d-3
+  integer(kind=4), parameter :: id_recal      = 0
+  integer, parameter         :: step_offset   = 83
+  integer, parameter         :: start_rescale = 3 ! this parameter must be greater than 3
+  real(8), parameter :: endT = 0.005d-3
   integer, parameter :: np   = 1
   real(8), parameter :: u0   = 506.8d0
   real(8), parameter :: CFL  = 0.1d0
-  real(8), parameter :: dt   = 7.5d-9!CFL * Lx / (dble(nx-1) * u0) ! 7.7e-9
+  real(8), parameter :: dt   = 8d-9!7.5d-9!CFL * Lx / (dble(nx-1) * u0) ! 7.7e-9
   integer, parameter :: nt   = int(endT / (dble(np) * dt))
 
   ! physical properties
@@ -109,8 +109,7 @@ module mod_globals
   real(8), parameter :: M0    = 1.9d0
   real(8), parameter :: p0    = 14924.d0
   real(8), parameter :: T0    = 171.31d0
-  real(8), parameter :: rho0  = p0 / (R * T0)
-  real(8), parameter :: beta  = dacos(-1.d0) * 37.2d0 / 180.d0
+  real(8), parameter :: beta  = dacos(-1.d0) * 39.27d0 / 180.d0
   real(8), parameter :: Ms    = M0 * dsin(beta)
   real(8), parameter :: Ms2   = Ms**2
   real(8), parameter :: theta = datan(2.d0 * (1.d0 / dtan(beta)) * (Ms2 - 1.d0) / (M0**2 * (gamma + dcos(2.d0 * beta)) + 2.d0))
