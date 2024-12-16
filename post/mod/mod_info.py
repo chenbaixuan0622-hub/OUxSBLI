@@ -19,11 +19,29 @@ def KMeans(x, bin):
   return x_binned.indices
 
 
+def Hxy(x, y, bin):
+  # x and y are time-series data
+  # H(y|x), H(x|y)
+  if np.min(x) == np.max(x) or np.min(y) == np.max(y):
+    xs = np.zeros_like(x, dtype=np.int32)
+    ys = np.zeros_like(y, dtype=np.int32)
+  else:
+    xs = KMeans(x, bin)
+    ys = KMeans(y, bin)
+  Hyx = conditional_entropy(xs, ys)
+  Hxy = conditional_entropy(ys, xs)
+  return Hyx, Hxy
+
+
 def TE(x, y, history_len, bin):
   # x and y are time-series data
   # TEx_y = H(Yt|Yt-1:t-L) - H(Yt|Yt-1:t-L, Xt-1:t-L)
-  xs = KMeans(x, bin)
-  ys = KMeans(y, bin)
+  if np.min(x) == np.max(x) or np.min(y) == np.max(y):
+    xs = np.zeros_like(x, dtype=np.int32)
+    ys = np.zeros_like(y, dtype=np.int32)
+  else:
+    xs = KMeans(x, bin)
+    ys = KMeans(y, bin)
   TEx_y = transfer_entropy(xs, ys, k=history_len)
   TEy_x = transfer_entropy(ys, xs, k=history_len)
   return TEx_y, TEy_x
