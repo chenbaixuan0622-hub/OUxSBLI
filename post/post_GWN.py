@@ -6,12 +6,12 @@ from mod.mod_POD import make_data, make_grid
 from mod_AI.gnn import plot_graph_from_array
 
 Q_dir = "../3D_solver/TBL/data"
-Lx1   = 28.e-3
-Lx2   = 40.e-3
-Ly2   = 8.e-3
+Lx1   =  8.e-3
+Lx2   = 20.e-3
+Ly2   = 4.e-3
 endT  = 0.1e-3
-stridex = 8
-stridey = 16
+stridex = 32
+stridey = 8
 
 # D[space=nx*ny, time]
 save_path = os.path.join(Q_dir, "D.npy")

@@ -223,7 +223,7 @@ def plot_energy_contribution(Q_dir, Sigma, freq, num_freq, name):
   plt.close()
 
 
-def make_grid(Lx1, Lx2, Ly2, stridex, stridey, endT, Q_dir):
+def make_grid(Lx1, Lx2, Ly1, Ly2, stridex, stridey, endT, Q_dir):
   Q_files = [f for f in os.listdir(Q_dir) if f.endswith(".vtr")]
   Q_files.sort(key=extract_number)
   Nt = len(Q_files)
@@ -234,11 +234,15 @@ def make_grid(Lx1, Lx2, Ly2, stridex, stridey, endT, Q_dir):
   nx1 = int(Lx1 / X[-1] * Nx)
   nx2 = int(Lx2 / X[-1] * Nx)
   for j in range(Ny):
+    if Ly1 < Y[j]:
+      ny1 = j
+      break
+  for j in range(Ny):
     if Ly2 < Y[j]:
       ny2 = j
       break
   indicesx = np.arange(nx1, nx2, stridex)
-  indicesy = np.arange(0,   ny2, stridey)
+  indicesy = np.arange(ny1, ny2, stridey)
   nx = len(indicesx)
   ny = len(indicesy)
   x  = X[indicesx]
@@ -247,8 +251,41 @@ def make_grid(Lx1, Lx2, Ly2, stridex, stridey, endT, Q_dir):
   return Nx, Ny, Nz, indicesx, indicesy, x, y, t
 
 
-def make_data(Lx1, Lx2, Ly2, stridex, stridey, endT, Q_dir):
-  Nx, Ny, Nz, indicesx, indicesy, x, y, t = make_grid(Lx1, Lx2, Ly2, stridex, stridey, endT, Q_dir)
+def make_grid3D(Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, stridex, stridey, stridez, endT, Q_dir):
+  Q_files = [f for f in os.listdir(Q_dir) if f.endswith(".vtr")]
+  Q_files.sort(key=extract_number)
+  Nt = len(Q_files)
+  t  = np.linspace(0.e0, endT, Nt)
+
+  first_path = os.path.join(Q_dir, Q_files[0])
+  Nx, Ny, Nz, X, Y, Z = getGrid(first_path)
+  nx1 = int(Lx1 / X[-1] * Nx)
+  nx2 = int(Lx2 / X[-1] * Nx)
+  for j in range(Ny):
+    if Ly1 < Y[j]:
+      ny1 = j
+      break
+  for j in range(Ny):
+    if Ly2 < Y[j]:
+      ny2 = j
+      break
+  nz1 = int(Lz1 / Z[-1] * Nz)
+  nz2 = int(Lz2 / Z[-1] * Nz)
+  indicesx = np.arange(nx1, nx2, stridex)
+  indicesy = np.arange(ny1, ny2, stridey)
+  indicesz = np.arange(nz1, nz2, stridez)
+  nx = len(indicesx)
+  ny = len(indicesy)
+  nz = len(indicesz)
+  x  = X[indicesx]
+  y  = Y[indicesy]
+  z  = Z[indicesz]
+  indicesx, indicesy, indicesz = np.meshgrid(indicesx, indicesy, indicesz)
+  return Nx, Ny, Nz, indicesx, indicesy, indicesz, x, y, z, t
+
+
+def make_data(Lx1, Lx2, Ly1, Ly2, stridex, stridey, endT, Q_dir):
+  Nx, Ny, Nz, indicesx, indicesy, x, y, t = make_grid(Lx1, Lx2, Ly1, Ly2, stridex, stridey, endT, Q_dir)
   
   print("nx = ", len(x), " ny = ", len(y))
   D = np.zeros((len(x)*len(y), len(t)), dtype=np.float32)
@@ -264,4 +301,23 @@ def make_data(Lx1, Lx2, Ly2, stridex, stridey, endT, Q_dir):
     D[:,itr] = u.flatten()
     itr += 1
   return x, y, t, D
+
+
+def make_data3D(Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, stridex, stridey, stridez, endT, Q_dir):
+  Nx, Ny, Nz, indicesx, indicesy, indicesz, x, y, z, t = make_grid3D(Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, stridex, stridey, stridez, endT, Q_dir)
+  
+  print("nx = ", len(x), " ny = ", len(y), " nz = ", len(z))
+  D = np.zeros((len(x)*len(y)*len(z), len(t)), dtype=np.float32)
+
+  Q_files = [f for f in os.listdir(Q_dir) if f.endswith(".vtr")]
+  Q_files.sort(key=extract_number)
+
+  itr = 0
+  for Q_file in tqdm(Q_files):
+    file_path = os.path.join(Q_dir, Q_file)
+    U, _, _ = getVector(file_path, Nx, Ny, Nz, 'velocity')
+    u = U[indicesz,indicesy,indicesx]
+    D[:,itr] = u.flatten()
+    itr += 1
+  return x, y, z, t, D
 

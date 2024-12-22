@@ -106,3 +106,46 @@ def print_slice(x, y, z, rho, u, v, w, p, directory, name):
   writer.SetInputData(grid)
   writer.Write()
 
+
+def print_VTK(x, y, z, u, dir, name):
+  u1d = np.float32(u.flatten())
+
+  os.makedirs(dir, exist_ok=True)
+  filename  = name + ".vtr" 
+  filepath  = os.path.join(dir, filename)
+
+  x_coords = vtk.vtkFloatArray()
+  y_coords = vtk.vtkFloatArray()
+  z_coords = vtk.vtkFloatArray()
+  x_coords.SetName("X-Axis")
+  y_coords.SetName("Y-Axis")
+  z_coords.SetName("Z-Axis")
+
+  nx = len(x)
+  ny = len(y)
+  nz = len(z)
+  
+  for i in range(nx):
+    x_coords.InsertNextValue(x[i])
+  for j in range(ny):
+    y_coords.InsertNextValue(y[j])
+  for k in range(nz):
+    z_coords.InsertNextValue(z[k])
+  
+  grid = vtk.vtkRectilinearGrid()
+  grid.SetDimensions(nx, ny, nz)
+  grid.SetXCoordinates(x_coords)
+  grid.SetYCoordinates(y_coords)
+  grid.SetZCoordinates(z_coords)
+
+  u = vtk.vtkFloatArray()
+  u.SetName("u")
+  for i in range(nx * ny * nz):
+    u.InsertNextValue(u1d[i])
+  grid.GetPointData().AddArray(u)
+
+  writer = vtk.vtkXMLRectilinearGridWriter()
+  writer.SetFileName(filepath)
+  writer.SetInputData(grid)
+  writer.Write()
+

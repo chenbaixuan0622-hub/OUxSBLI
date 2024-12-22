@@ -14,11 +14,11 @@ from mod.mod_POD import make_data, make_grid
 
 
 Q_dir   = "../3D_solver/TBL/data"
-Lx1     = 28.e-3
-Lx2     = 40.e-3
-Ly2     = 8.e-3
+Lx1     = 8.e-3
+Lx2     = 20.e-3
+Ly2     = 4.e-3
 stridex = 32
-stridey = 16
+stridey = 8
 endT    = 0.1e-3
 nt      = 10
 epoch   = 500
