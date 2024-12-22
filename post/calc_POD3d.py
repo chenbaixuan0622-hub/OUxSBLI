@@ -5,17 +5,13 @@ from matplotlib.cm import ScalarMappable
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from tqdm import tqdm
+from mod.mod_plot import set_Params
 from mod.mod_read import getGrid, getVector, extract_number
 from mod.mod_POD import make_data3D, snapshot_pod, calc_time_coef
 from mod.mod_plot import print_VTK
 
 
-# for plot
-plt.rcParams['font.family'] = 'Times New Roman'
-plt.rcParams['mathtext.fontset'] = 'stix'
-plt.rcParams['xtick.direction'] = 'in'
-plt.rcParams['ytick.direction'] = 'in'
-plt.rcParams['font.size'] = 12
+set_Params()
 
 # parameter
 #Q_dir   = "../3D_solver/TBL/data"#"../../z6mm"

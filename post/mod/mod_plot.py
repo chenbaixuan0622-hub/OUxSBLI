@@ -4,6 +4,14 @@ import vtk
 import matplotlib.pyplot as plt
 
 
+def set_Params():
+  plt.rcParams['font.family'] = 'Times New Roman'
+  plt.rcParams['mathtext.fontset'] = 'stix'
+  plt.rcParams['xtick.direction'] = 'in'
+  plt.rcParams['ytick.direction'] = 'in'
+  plt.rcParams['font.size'] = 12
+
+
 def plot_causality(uu,title):
   x = np.linspace(1, 3, len(uu[:,0]))
   y = np.linspace(1, 3, len(uu[0,:]))
