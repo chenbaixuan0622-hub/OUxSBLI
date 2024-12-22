@@ -1,5 +1,4 @@
 import numpy as np
-import cv2
 import os
 import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
@@ -7,7 +6,7 @@ from matplotlib.animation import FuncAnimation
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from tqdm import tqdm
 from mod.mod_read import getGrid, getVector, extract_number
-from mod.mod_POD import snapshot_pod, calc_time_coef
+from mod.mod_POD import make_data, snapshot_pod, calc_time_coef
 
 
 # for plot
@@ -18,11 +17,15 @@ plt.rcParams['ytick.direction'] = 'in'
 plt.rcParams['font.size'] = 12
 
 # parameter
-Q_dir = "../3D_solver/TBL/data"#"../../z6mm"
-Lx1   = 28.e-3
-Lx2   = 38.e-3
-Ly2   = 8.e-3
-endT  = 0.1e-3
+#Q_dir   = "../3D_solver/TBL/data"#"../../z6mm"
+Q_dir   = "../../../../../../media/user/HD-EDS-E/TBL/SBLI_1delta"
+Lx1     = 24.e-3
+Lx2     = 40.e-3
+Ly1     = 0.e-3
+Ly2     = 10.e-3
+stridex = 4
+stridey = 8
+endT    = 0.1e-3
 
 
 def plot_pod_results(Q_dir, x, z, data, eigenvalues, modes, time_coefficients, num_modes=6):
@@ -47,7 +50,7 @@ def plot_pod_results(Q_dir, x, z, data, eigenvalues, modes, time_coefficients, n
     zmin = z[0]
     zmax = z[-1]
     x, z = np.meshgrid(x, z)
-    fig, ax = plt.subplots(num_modes//3, 3, figsize=(8, 8))
+    fig, ax = plt.subplots(num_modes//3, 3, figsize=(12, 8))
     for i in range(num_modes):
       u = np.reshape(modes[:,i], [nz, nx])
       ax[i//3,i%3].set_xlim(xmin, xmax)
@@ -70,13 +73,17 @@ def plot_pod_results(Q_dir, x, z, data, eigenvalues, modes, time_coefficients, n
     for i in range(num_modes):
       ax[i].plot(time_coefficients[:,i])
     
+    save_name = "POD_time_coef"
+    save_path = os.path.join(Q_dir, save_name)
+    np.save(save_path, time_coefficients)
+
     save_name = "POD_time_coef.png"
     save_path = os.path.join(Q_dir, save_name)
     plt.savefig(save_path)
     plt.close()
 
 
-def plot_reconstruction(Q_dir, x, z, data, modes, time_coef, num_modes=3, interval=200):
+def plot_reconstruction(Q_dir, x, z, mean, data, modes, time_coef, num_modes=3, interval=200):
   Nt   = len(time_coef[:,0])
   nx   = len(x)
   nz   = len(z)
@@ -87,6 +94,11 @@ def plot_reconstruction(Q_dir, x, z, data, modes, time_coef, num_modes=3, interv
 
   POD  = np.dot(time_coef[:,:num_modes], modes[:,:num_modes].T)
   POD  = np.reshape(POD, [Nt,nz,nx])
+
+  mean = np.reshape(mean, [nz,nx])
+  for i in range(Nt):
+    u[:,:,i]   = u[:,:,i]   + mean
+    POD[i,:,:] = POD[i,:,:] + mean
 
   fig, ax  = plt.subplots(1, 3, figsize=(18, 6))
   crange   = np.linspace(0, 500, 50)
@@ -120,47 +132,15 @@ def plot_reconstruction(Q_dir, x, z, data, modes, time_coef, num_modes=3, interv
   ani.save(save_path, writer='Pillow')
 
 
-def make_data(Lx1, Lx2, Ly2, endT, Q_dir):
-  Q_files = [f for f in os.listdir(Q_dir) if f.endswith(".vtr")]
-  Q_files.sort(key=extract_number)
-  Nt = len(Q_files)
-  t  = np.linspace(0.e0, endT, Nt)
+# D[space, time]
+x, y, t, D = make_data(Lx1, Lx2, Ly1, Ly2, stridex, stridey, endT, Q_dir)
+mean = np.mean(D, axis=-1)
+for i in range(len(D[0,:])):
+  D[:,i] = D[:,i] - mean
 
-  stridex = 4
-  stridey = 8
+eigenvalues, eigenvectors, modes = snapshot_pod(D)
+time_coef = calc_time_coef(D, modes)
 
-  first_path = os.path.join(Q_dir, Q_files[0])
-  Nx, Ny, Nz, X, Y, Z = getGrid(first_path)
-  nx1 = int(Lx1 / X[-1] * Nx)
-  nx2 = int(Lx2 / X[-1] * Nx)
-  for j in range(Ny):
-    if Ly2 < Y[j]:
-      ny2 = j
-      break
-  indicesx = np.arange(nx1, nx2, stridex)
-  indicesy = np.arange(0,   ny2, stridey)
-  nx = len(indicesx)
-  nz = len(indicesy)
-  x  = X[indicesx]
-  y  = Y[indicesy]
-
-  indicesx, indicesy = np.meshgrid(indicesx, indicesy)
-
-  data = np.zeros((nx*nz,Nt), dtype=np.float32)
-
-  itr = 0
-  for Q_file in tqdm(Q_files):
-    file_path = os.path.join(Q_dir, Q_file)
-    U, _, _ = getVector(file_path, Nx, Ny, Nz, 'velocity')
-    u = U[-1,indicesy,indicesx]
-    data[:,itr] = u.flatten()
-    itr += 1
-
-  eigenvalues, eigenvectors, modes = snapshot_pod(data)
-  time_coef = calc_time_coef(data, modes)
-
-  plot_pod_results(Q_dir, x, y, data, eigenvalues, modes, time_coef, num_modes=6)
-  plot_reconstruction(Q_dir, x, y, data, modes, time_coef, num_modes=6, interval=200)
-
-make_data(Lx1, Lx2, Ly2, endT, Q_dir)
+plot_pod_results(Q_dir, x, y, D, eigenvalues, modes, time_coef, num_modes=6)
+plot_reconstruction(Q_dir, x, y, mean, D, modes, time_coef, num_modes=6, interval=200)
 
