@@ -90,7 +90,7 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_RungeKutta = 0
   integer(kind=4), parameter :: id_recal      = 0
-  integer, parameter         :: step_offset   = 83
+  integer, parameter         :: step_offset   = 118
   integer, parameter         :: start_rescale = 3 ! this parameter must be greater than 3
   real(8), parameter :: endT = 0.005d-3
   integer, parameter :: np   = 1
