@@ -64,14 +64,15 @@ module mod_globals
   ! mesh
   real(8), parameter :: Lx = 50d-3  ! 20  delta
   real(8), parameter :: Ly = 10d-3  !  5  delta
-  real(8), parameter :: Lz = 0.5d-3 ! 1/4 delta
+  real(8), parameter :: Lz = 2d-3   ! 1/4 delta
   ! DNS
   integer, parameter :: nx = 1281 ! xp = 10   0.04   mm
   integer, parameter :: ny = 321  ! yp = 0.5, 0.002  mm
-  integer, parameter :: nz = 33   ! zp = 5    0.0156 mm
+  integer, parameter :: nz = 129  ! zp = 5    0.0156 mm
 
-  integer, parameter :: nre1 = int(0.20 * nx)
+  integer, parameter :: nre1 = int(0.24 * nx) ! 6 delta for Lz = 1/4 delta, 4 delta for Lz = delta
   integer, parameter :: nre2 = int(0.32 * nx)
+  integer, parameter :: rerank = 0
 
   ! RTX 4090
   type(dim3) :: blocksE   = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
@@ -97,30 +98,29 @@ module mod_globals
   ! id_recal      ! kind2 ! set 0   !
   !               ! kind4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=4), parameter :: id_RungeKutta = 0
-  integer(kind=2), parameter :: id_recal      = 0
-  integer, parameter         :: step_offset   = 0
+  integer(kind=2), parameter :: id_RungeKutta = 0
+  integer(kind=4), parameter :: id_recal      = 0
+  integer, parameter         :: step_offset   = 200
   integer, parameter         :: start_rescale = 0
-  real(8), parameter :: endT  = 0.1d-3
-  integer, parameter :: np    = 100
+  real(8), parameter :: endT  = 0.4d-3
+  integer, parameter :: np    = 200
   real(8), parameter :: R     = 287.03d0
   real(8), parameter :: gamma = 1.4d0
   real(8), parameter :: T0    = 171.31d0
   real(8), parameter :: u0    = 506.8d0
   real(8), parameter :: CFL   = 0.1d0
-  real(8), parameter :: dt    = 5d-9!CFL * Lx / (dble(nx-1) * u0)
+  real(8), parameter :: dt    = 8.d-9!CFL * Lx / (dble(nx-1) * u0)
   integer, parameter :: nt    = int(endT / (dble(np) * dt))
 
   ! physical properties
-  real(8), parameter :: Pr    = 0.71d0
+  real(8), parameter :: Pr    = 0.72d0
   real(8), parameter :: Prt   = 0.9d0
 
   ! initial condition
   real(8), parameter :: M0   = 1.9d0
   real(8), parameter :: p0   = 14924.d0
   ! oblique shock
-  real(8), parameter :: rho0  = p0 / (R * T0)
-  real(8), parameter :: beta  = dacos(-1.d0) * 37.2d0 / 180.d0
+  real(8), parameter :: beta  = dacos(-1.d0) * 39.27d0 / 180.d0
   real(8), parameter :: Ms    = M0 * dsin(beta)
   real(8), parameter :: Ms2   = Ms**2
   real(8), parameter :: theta = datan(2.d0 * (1.d0 / dtan(beta)) * (Ms2 - 1.d0) / (M0**2 * (gamma + dcos(2.d0 * beta)) + 2.d0))
