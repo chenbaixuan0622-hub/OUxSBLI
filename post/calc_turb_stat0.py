@@ -1,12 +1,13 @@
 import numpy as np
 import os
 from tqdm import tqdm
-from mod.mod_read import getGrid, getVector, getScalar
+from mod.mod_read import getGrid, getVector, getScalar, extract_number
 
-Q_directory = "../../../../../../media/user/HD-EDS-E/hatayama/TBL/SBLI_025delta/stat04ms_1_2ms_SLAU"
+#Q_directory = "../../../../../../media/user/HD-EDS-E/hatayama/TBL/SBLI_025delta/stat04ms_1_2ms_SLAU"
+Q_directory = "../3D_solver/TBL/data"
 
 Q_files   = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
-num_files = len(Q_files)
+Q_files.sort(key=extract_number)
 
 first_path          = os.path.join(Q_directory, Q_files[0])
 Nx, Ny, Nz, x, y, z = getGrid(first_path)
@@ -27,9 +28,11 @@ pF   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
 TF   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
 TtF  = np.zeros((Nz,Ny,Nx), dtype=np.float32)
 
+itr = 0
 for Q_file in tqdm(Q_files):
   file_path = os.path.join(Q_directory, Q_file)
   if file_path == os.path.join(Q_directory, "TKE.vtr") \
+  or file_path == os.path.join(Q_directory, "ReynoldsStress.vtr") \
   or file_path == os.path.join(Q_directory, "Qmean.vtr"):
     continue
   rho     = getScalar(file_path, Nx, Ny, Nz, 'rho')
@@ -48,18 +51,19 @@ for Q_file in tqdm(Q_files):
   pF   += rho * p
   TF   += rho * (p / (Rgas * rho))
   TtF  += rho * ((p / (Rgas * rho)) + 0.5e0 * (gamma - 1.e0) * (u**2 + v**2 + w**2) / gamma)
+  itr  += 1
 
-rhom /= np.float32(num_files)
-um   /= np.float32(num_files)
-vm   /= np.float32(num_files)
-wm   /= np.float32(num_files)
-pm   /= np.float32(num_files)
-uF   /= (np.float32(num_files) * rhom)
-vF   /= (np.float32(num_files) * rhom)
-wF   /= (np.float32(num_files) * rhom)
-pF   /= (np.float32(num_files) * rhom)
-TF   /= (np.float32(num_files) * rhom)
-TtF  /= (np.float32(num_files) * rhom)
+rhom /= np.float32(itr)
+um   /= np.float32(itr)
+vm   /= np.float32(itr)
+wm   /= np.float32(itr)
+pm   /= np.float32(itr)
+uF   /= (np.float32(itr) * rhom)
+vF   /= (np.float32(itr) * rhom)
+wF   /= (np.float32(itr) * rhom)
+pF   /= (np.float32(itr) * rhom)
+TF   /= (np.float32(itr) * rhom)
+TtF  /= (np.float32(itr) * rhom)
 
 # save Favre average
 rho_path = os.path.join(Q_directory, "rho")
