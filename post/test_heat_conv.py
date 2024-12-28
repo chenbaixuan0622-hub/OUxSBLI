@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import time
 from numba import njit
-from mod.mod_Poisson_jax import BiCGStab
+from mod.mod_Poisson_ue import BiCGStab
 #from mod.mod_Poisson import BiCGStab
 
 
@@ -63,7 +63,10 @@ start = time.time()
 #fj = jax.device_put(f, jax.devices()[0])
 Tj = jnp.array(T)
 fj = jnp.array(f)
-Tj, err = BiCGStab(Tj, fj, dx2dy2, dy2dz2, dz2dx2, err_tol, set_bc_jax)
+dx = jnp.array(-x[:-1] + x[1:])
+dy = jnp.array(-y[:-1] + y[1:])
+dz = jnp.array(-z[:-1] + z[1:])
+Tj, err = BiCGStab(Tj, fj, dx, dy, dz, err_tol, set_bc_jax)
 T = np.array(Tj)
 jax.block_until_ready(Tj)
 end = time.time()
