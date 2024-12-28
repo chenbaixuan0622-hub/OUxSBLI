@@ -1,7 +1,10 @@
 import numpy as np
 from sklearn.preprocessing import KBinsDiscretizer
+from sklearn.feature_selection import mutual_info_regression
 from pyinform.utils import bin_series
 from pyinform import transfer_entropy, conditional_entropy
+from pyinform.mutualinfo import mutual_info
+from mod.mod_ds import Takens_embedding, search_tau, kNN
 
 
 def cross_corr(x, y):
@@ -10,6 +13,43 @@ def cross_corr(x, y):
   corr = np.mean((x - X) * (y - Y)) \
          / (np.sqrt(np.mean((x - X)**2)) * np.sqrt(np.mean((y - Y)**2)))
   return corr
+
+
+def X_embedding(x, p, bin):
+  tau, _ = search_tau(x, bin, len(x))
+
+  X = np.zeros((len(x)-tau*p,p+1), dtype=np.float32)
+  for i in range(p+1):
+    X[:,i] = np.roll(x, tau*i)[tau*p:]
+  return X
+
+
+def Y_embedding(y, p, bin):
+  tau, _ = search_tau(y, bin, len(y))
+
+  Y = np.zeros((len(y)-tau*p,p), dtype=np.float32)
+  for i in range(1, p+1):
+    Y[:,i-1] = np.roll(y, tau*i)[tau*p:]
+  return Y
+
+
+def EE(x, y, p, bin=5):
+  # x[time], y[time]
+  # p: dimension
+  X = X_embedding(x, p, bin)
+  Y = Y_embedding(y, p, bin)
+
+  # X, Y: embedded time series data
+  # X[time,dim], Y[time,dim]
+
+  XNN = kNN(X, p)
+  XNN = np.reshape(XNN, [len(XNN[:,0,0]),-1])
+  nt  = min(len(XNN[:,0]), len(Y[:,0]))
+  MI  = 0.e0
+  for i in range(p):
+    MI += np.mean(mutual_info_regression(XNN[:nt,:], Y[:nt,i]))
+  MI /= p
+  return MI
 
 
 def KMeans(x, bin):

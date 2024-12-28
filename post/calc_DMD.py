@@ -4,16 +4,12 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from tqdm import tqdm
+from mod.mod_plot import set_Params
 from mod.mod_read import getGrid, getVector, extract_number
 from mod.mod_POD import make_data
 
 
-# for plot
-plt.rcParams['font.family'] = 'Times New Roman'
-plt.rcParams['mathtext.fontset'] = 'stix'
-plt.rcParams['xtick.direction'] = 'in'
-plt.rcParams['ytick.direction'] = 'in'
-plt.rcParams['font.size'] = 12
+set_Params()
 
 # parameter
 #Q_dir = "../../z6mm"
