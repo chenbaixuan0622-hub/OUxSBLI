@@ -1,10 +1,11 @@
 module set
-  use mod_globals, only : id_rescale, nx, ny, nz, nre2, Lx, Ly, Lz, gamma, R, Cp, Pr, u0, p0, T0, M0, blt, rho2, p2, ux, uy
+  use mod_globals, only : id_rescale, nx, ny, nz, nre2, gamma, R, Cp, Pr, u0, p0, T0, M0, blt, rho2, p2, ux, uy
   implicit none
 contains
-  subroutine set_grid(nx,ny,nz,x,y,z,dx,dy,dz)
-    integer, intent(in)   :: nx, ny, nz
-    real(8), intent(out)  :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
+  subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
+    integer, intent(in)  :: myrank, nx, ny, nz
+    real(8), intent(in)  :: Lx, Ly, Lz
+    real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     integer i, j, k
     real(8) dx1, dy1, dz1
     dx1 = Lx / dble(nx-1)
@@ -18,7 +19,7 @@ contains
 
     y(1) = 0.d0
     do j = 1, ny
-      if (y(j) <= 2.d0 * blt) then
+      if (y(j) <= 7.5e-3) then
         ! DNS 0.05: yp=0.5
         dy(j)  = min(1.d0, max(0.075d0, dble(j)/dble(128))) * dy1
         y(j+1) = y(j) + dy(j)
@@ -36,13 +37,13 @@ contains
     enddo
   end subroutine set_grid
 
-  subroutine set_init(nx,ny,nz,xs,ys,zs,Q)
-    integer, intent(in)  :: nx, ny, nz
+  subroutine set_init(myrank, nx, ny, nz, xs, ys, zs, Q)
+    integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: xs(nx), ys(ny), zs(nz)
     real(8), intent(out) :: Q(nx,ny,nz,5)
     integer i, j, k
     real(8) :: blt0 = 0.5d0 * blt
-    real(8) :: Cp   = gamma * R / (gamma - 1.d0)
+    real(8) :: Cp   = gamma * R / (gamma - 1.d0), rf = 0.89d0
     real(8) :: eta, rho, u, v, w, T, Tw, Taw, p_wall
     ! random
     real(8) :: std, ustd, vstd, wstd, Tstd
@@ -74,9 +75,9 @@ contains
           eta = 5.d0 * ys(j) / blt0
           u   = min(u0, u0 * (0.0015d0 * eta**4 - 0.0181d0 * eta**3 + 0.029d0 * eta**2 + 0.3192 * eta + 0.0003d0))
           v   = 0.d0
-          Taw  = T0 + 0.5d0 * u0**2 / Cp
-          Tw   = Taw
-          T    = Tw + (Taw - Tw) * u / u0 - 0.5d0 * Pr**(1.d0/3.d0) * u**2 / Cp
+          Taw = T0 * (1.d0 + rf * 0.5d0 * (gamma - 1.d0) * M0**2)
+          Tw  = Taw
+          T   = Tw + (Taw - Tw) * u / u0 - rf * u**2 / (2.d0 * (gamma * R / (gamma - 1.d0)))
           !call calc_Blasius(eta,d,u,v)
           if (10 < j .and. ys(j) <= blt) then
             ir = i / 10 + 1
@@ -115,28 +116,28 @@ contains
     Q(:,1,:,5) = p_wall / (gamma - 1.d0)
   end subroutine set_init
   
-  subroutine set_bc(nx,ny,nz,Jacobian,QJ,Qre)
-    integer, intent(in), value     :: nx, ny, nz
+  subroutine set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
+    integer, intent(in), value     :: myrank, nx, ny, nz
     real(8), intent(in), device    :: Jacobian(ny)
     real(8), intent(inout), device :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(in), device    :: Qre(ny,nz-6,5)
+    real(8), intent(in), device    :: Qre(ny*(nz-6)*5)
     integer i, j, k, l, No
-    real(8) :: Cp = gamma * R / (gamma - 1.d0)
+    real(8) :: Cp = gamma * R / (gamma - 1.d0), rf = 0.89d0
     real(8) :: p_wall
     ! Riemann invariants
-    real(8) :: pin, cin, vin, Rp, Rm, rhob, vb, cb, pb
-    real(8) :: Taw, Tw, T, v0 = 0.d0
+    real(8) :: rhoin, pin, cin, vin, Rp, Rm, rhob, ub, vb, cb, pb
+    real(8) :: rho0, c0, v0 = 0.d0, Taw, T
     No = int(0.4 * nx)
 
     if (kind(id_rescale) == 4) then
       !$cuf kernel do(3)<<<*,*>>>
       do l = 1, 5
-        do k = 4, nz-3
+        do k = 1, nz-6
           do j = 2, ny-1
             ! inlet
-            QJ(1,j,k,l)  = Qre(j,k-3,l)
+            QJ(1,j,k+3,l)  = Qre(ny*(nz-6)*(l-1)+ny*(k-1)+j)
             ! outlet
-            QJ(nx,j,k,l) = QJ(nx-1,j,k,l)
+            QJ(nx,j,k+3,l) = QJ(nx-1,j,k+3,l)
       enddo;enddo;enddo
     else
       !$cuf kernel do(3)<<<*,*>>>
@@ -159,34 +160,30 @@ contains
       do i = 1, nx
         ! top
         ! Riemann invariants
-        !pin  = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) / QJ(i,ny-1,k,1)) &
-        !      & * Jacobian(ny-1)
-        !cin  = sqrt(gamma * pin / (QJ(i,ny-1,k,1) * Jacobian(ny-1)))
-        !Taw  = T0 + 0.5d0 * u0**2 / Cp
-        !Tw   = p0 / (R * rho0)
-        !Tin  = Tw + (Taw - Tw) * Umin(j)  / u0 - 0.5d0 * (Pr**(1.d0/3.d0)) * Umin(j)**2  / Cp
-        !rho0 =
-        !c0   = sqrt(gamma * p0  / rho0)
-        !vin  = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
-        !Rp   = vin + 2.d0 * cin / (gamma - 1.d0)
-        !Rm   = v0  - 2.d0 * c0  / (gamma - 1.d0)
-        !vb   = v0 + (0.5d0 * (Rp + Rm) - v0)
+        pin   = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) &
+                / QJ(i,ny-1,k,1)) * Jacobian(ny-1)
+        rhoin = QJ(i,ny-1,k,1) * Jacobian(ny-1)
+        cin   = sqrt(gamma * pin / rhoin)
+        vin   = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
+        ! temperature and density at top
+        Taw   = T0 * (1.d0 + rf * 0.5d0 * (gamma - 1.d0) * M0**2)
+        T     = Taw - rf * u0**2 / (2.d0 * (gamma * R / (gamma - 1.d0)))
+        rho0  = p0 / (R * T)
+        c0    = sqrt(gamma * p0 / rho0)
 
-        !rhob         = QJ(i,ny-1,k,1) * Jacobian(ny-1)
-        !QJ(i,ny,k,1) = rhob / Jacobian(ny)
-        !QJ(i,ny,k,2) = QJ(i,ny-1,k,1) * u0 
-        !QJ(i,ny,k,3) = QJ(i,ny-1,k,1) * vb
-        !QJ(i,ny,k,4) = 0.d0
-        !cb           = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
-        !pb           = (rhob * cb**2) / gamma
-        !QJ(i,ny,k,5) = (pb / (gamma - 1.d0)) / Jacobian(ny)  + 0.5d0 * (QJ(i,ny,k,2)**2 + QJ(i,ny,k,3)**2 + QJ(i,ny,k,4)**2) / QJ(i,ny,k,1)
+        Rp    = vin + 2.d0 * cin / (gamma - 1.d0)
+        Rm    = v0  - 2.d0 * c0  / (gamma - 1.d0)
+        vb    = 0.5d0 * (Rp + Rm)
+        cb    = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
+        rhob  = (cb / c0)**(2.d0 / (gamma - 1.d0)) * rho0
+        pb    = (rhob * cb**2) / gamma
 
-        ! Neumann boundary condition
-        QJ(i,ny,k,1) = QJ(i,ny-1,k,1)
-        QJ(i,ny,k,2) = QJ(i,ny-1,k,2)
-        QJ(i,ny,k,3) = QJ(i,ny-1,k,3)
-        QJ(i,ny,k,4) = QJ(i,ny-1,k,4)
-        QJ(i,ny,k,5) = QJ(i,ny-1,k,5)
+        QJ(i,ny,k,1) = rhob / Jacobian(ny)
+        QJ(i,ny,k,2) = rhob * u0 / Jacobian(ny)
+        QJ(i,ny,k,3) = rhob * vb / Jacobian(ny)
+        QJ(i,ny,k,4) = 0.d0
+        QJ(i,ny,k,5) = (pb / (gamma - 1.d0) + 0.5d0 * rhob * (u0**2 + vb**2)) / Jacobian(ny)
+
         ! NoSlip
         QJ(i,1,k,1) = QJ(i,2,k,1)
         QJ(i,1,k,2) = 0.d0
@@ -196,15 +193,38 @@ contains
         QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
     enddo;enddo
 
-    !!$cuf kernel do(2)<<<*,*>>>
-    !do k = 1, nz
-    !  do i = No, nx
-    !    QJ(i,ny,k,1) = rho2 / Jacobian(ny)
-    !    QJ(i,ny,k,2) = rho2 * ux / Jacobian(ny)
-    !    QJ(i,ny,k,3) = rho2 * uy / Jacobian(ny)
-    !    QJ(i,ny,k,4) = 0.d0
-    !    QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(ny)
-    !enddo;enddo
+    !$cuf kernel do(2)<<<*,*>>>
+    do k = 1, nz
+      do i = No, nx/2
+        QJ(i,ny,k,1) = rho2 / Jacobian(ny)
+        QJ(i,ny,k,2) = rho2 * ux / Jacobian(ny)
+        QJ(i,ny,k,3) = rho2 * uy / Jacobian(ny)
+        QJ(i,ny,k,4) = 0.d0
+        QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(ny)
+    enddo;enddo
+
+    !$cuf kernel do(2)<<<*,*>>>
+    do k = 1, nz
+      do i = nx/2, nx
+        pin   = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) &
+                / QJ(i,ny-1,k,1)) * Jacobian(ny-1)
+        rhoin = QJ(i,ny-1,k,1) * Jacobian(ny-1)
+        cin   = sqrt(gamma * pin / rhoin)
+        vin   = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
+        c0    = sqrt(gamma * p2 / rho2)
+        Rp    = vin + 2.d0 * cin / (gamma - 1.d0)
+        Rm    = uy  - 2.d0 * c0  / (gamma - 1.d0)
+        vb    = 0.5d0 * (Rp + Rm)
+        cb    = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
+        rhob  = cin * rhoin / cb
+        pb    = (rhob * cb**2) / gamma
+        ub    = sqrt(2.d0 * gamma * (p2 / rho2 - pb / rhob) / (gamma - 1.d0) + ux**2 + uy**2 - vb**2)
+        QJ(i,ny,k,1) = rhob / Jacobian(ny)
+        QJ(i,ny,k,2) = rhob * ub / Jacobian(ny)
+        QJ(i,ny,k,3) = rhob * vb / Jacobian(ny)
+        QJ(i,ny,k,4) = 0.d0
+        QJ(i,ny,k,5) = (pb / (gamma - 1.d0) + 0.5d0 * rhob * (ub**2 + vb**2)) / Jacobian(ny)
+    enddo;enddo
 
     ! cyclic
     !$cuf kernel do(3)<<<*,*>>>

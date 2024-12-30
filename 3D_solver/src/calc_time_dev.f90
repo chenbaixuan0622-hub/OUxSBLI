@@ -110,34 +110,33 @@ contains
     real(8), intent(in)         :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)         :: z(nz), dz_cpu(nz-1), Jacobian_cpu(ny)
     real(8), intent(inout)      :: Q(nx,ny,nz,5)
-    integer i, j, k, t1, t2, overlap, itr, ierr, ilen, nranks, ndevices, stat, ireq, ireqs(2), istat(MPI_STATUS_SIZE)
+    integer i, j, k, t1, t2, overlap, itr, ierr, ilen, nranks, ndevices, stat, ireq, ireqs(2)
+    integer istat(MPI_STATUS_SIZE), istats(MPI_STATUS_SIZE,2)
+    real(8) xix_cpu(nx-1), etay_cpu(ny-1), zetaz_cpu(nz-1)
     ! rescale !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: Qre(:,:,:)
-    real(8), allocatable, pinned :: Qre_cpu(:,:,:), Qm_cpu(:,:)
+    integer :: step, flag_re = 0
+    real(8), allocatable, device :: Qre(:), Qm(:)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type(cudaDeviceProp)         :: prop
     real(8), allocatable, device :: QJ(:,:,:,:), QJ2(:,:,:,:), QJ3(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
     real(8), allocatable, device :: xix(:), etay(:), zetaz(:), Jacobian(:)
     ! for plot
-    real(8) :: mass0 = 1.d0, ke0 = 1.d0, entropy0 = 1.d0
+    real(8) :: ke0 = 1.d0, entropy0 = 1.d0
 
     call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
 
     ! check GPU
+    stat = cudaGetDeviceCount(ndevices)
+    if (myrank == 0) then
+      print '(2x, i2, a)', ndevices, " GPU devices are found"
+    endif
+
     if (mod(myrank,2) == 0) then
-      if (myrank == 0) then
-        stat = cudaGetDeviceCount(ndevices)
-        print '(2x, i2, a)', ndevices, " GPU devices are found"
-      endif
       stat = cudaSetDevice(myrank/2)
       stat = cudaGetDeviceProperties(prop,myrank/2)
       ilen = verify(prop%name, ' ', .true.)
       print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", myrank/2, ") is available"
-    endif
 
-    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-
-    if (myrank == 0) then
       allocate(QJ(nx,ny,nz,5),QJ2(nx,ny,nz,5),QJ3(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
       allocate(xix(nx-1),etay(ny-1),zetaz(nz-1),Jacobian(ny))
 
@@ -149,116 +148,129 @@ contains
       enddo;enddo;enddo
 
       ! print initial condition
-      call print_vtk(0, nx, ny, nz, x, y, z, Jacobian_cpu, Q, mass0, ke0, entropy0)
+      call MPI_ISEND(Q, nx*ny*nz*5, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ireq, ierr) 
 
       ! copy on GPU
-      QJ       = Q
-      xix      = 1.d0 / dx_cpu
-      etay     = 1.d0 / dy_cpu
-      zetaz    = 1.d0 / dz_cpu
+      xix_cpu   = 1.d0 / dx_cpu
+      etay_cpu  = 1.d0 / dy_cpu
+      zetaz_cpu = 1.d0 / dz_cpu
+      !stat = cudaMemcpyAsync(xix,      xix_cpu,      nx-1, cudaMemcpyDeviceToHost, 1)
+      !stat = cudaMemcpyAsync(etay,     etay_cpu,     ny-1, cudaMemcpyDeviceToHost, 2)
+      !stat = cudaMemcpyAsync(zetaz,    zetaz_cpu,    nz-1, cudaMemcpyDeviceToHost, 3)
+      !stat = cudaMemcpyAsync(Jacobian, Jacobian_cpu, ny,   cudaMemcpyDeviceToHost, 4)
+      xix      = xix_cpu
+      etay     = etay_cpu
+      zetaz    = zetaz_cpu
       Jacobian = Jacobian_cpu
+      QJ = Q
+      
+      ! for multi GPU
+      if (kind(id_accuracy) == 8) then
+        overlap = 3
+      elseif (kind(id_accuracy) == 4) then
+        overlap = 2
+      else
+        overlap = 1
+      endif
+      
+      stat = cudaDeviceSynchronize()
+      call MPI_WAIT(ireq, istat, ierr)
+    else
+      call MPI_IRECV(Q, nx*ny*nz*5, MPI_REAL8, myrank-1, myrank, MPI_COMM_WORLD, ireq, ierr)
+      call MPI_WAIT(ireq, istat, ierr)
+      call print_vtk(0, nx, ny, nz, myrank, nranks, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
     endif
-
-    ! share necessary data
-    call MPI_BCAST(mass0,    1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
-    call MPI_BCAST(ke0,      1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
-    call MPI_BCAST(entropy0, 1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
     
     ! rescale
-    if (myrank == 0 .and. kind(id_rescale) == 4) then
-      allocate(Qre(ny,nz-6,5), Qre_cpu(ny,nz-6,5), Qm_cpu(ny,5))
-    endif
-
-    ! for multi GPU
-    if (kind(id_accuracy) == 8) then
-      overlap = 3
-    elseif (kind(id_accuracy) == 4) then
-      overlap = 2
-    else
-      overlap = 1
+    if (mod(myrank,2) == 0 .and. kind(id_rescale) == 4) then
+      allocate(Qre(ny*(nz-6)*5), Qm(ny*5))
+      if (myrank == rerank+1) then
+        stat = cudaSetDevice(rerank/2)
+      endif
     endif
 
     do t2 = 1, np
       do t1 = 1, nt
+        step = np * (t2-1) + t1
         if (mod(myrank,2) == 0) then
           if (myrank == rerank .and. kind(id_rescale) == 4) then
             call copy(nx, ny, nz, QJ, Qre)
             call MPI_ISEND(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr)
-            call calc_mean(nx, ny, nz, Jacobian, QJ, Qm_cpu)
-            call MPI_ISEND(Qm_cpu, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
+            call calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJ, Qm)
+            call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
           endif
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
           call calc_step(nx, ny, nz, 1.d0, 0.d0, xix, etay, zetaz, E, F, G, QJ, QJ2)
           if (myrank == 0 .and. kind(id_rescale) == 4) then
-            call MPI_RECV(Qre_cpu, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
-            Qre = Qre_cpu
+            call MPI_RECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
           endif
           if (ndevices >= 2) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ2)
           endif
-          call set_bc(nx, ny, nz, Jacobian, QJ2, Qre)
+          call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(nx, ny, nz, t2, y, Jacobian_cpu)
+          call rescale_recv_send(flag_re, nx, ny, nz, step, y, Jacobian_cpu)
         endif
 
         if (mod(myrank,2) == 0) then
           if (myrank == rerank .and. kind(id_rescale) == 4) then
             call copy(nx, ny, nz, QJ2, Qre)
             call MPI_ISEND(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr)
-            call calc_mean(nx, ny, nz, Jacobian, QJ2, Qm_cpu)
-            call MPI_ISEND(Qm_cpu, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
+            call calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJ2, Qm)
+            call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
           endif
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G)
           call calc_step2(nx, ny, nz, 0.75d0, 0.25d0, 0.25d0, 1.d0, xix, etay, zetaz, E, F, G, QJ, QJ2, QJ3)
           if (myrank == 0 .and. kind(id_rescale) == 4) then
-            call MPI_RECV(Qre_cpu, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
-            Qre = Qre_cpu
+            call MPI_RECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
           endif
           if (ndevices >= 2) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ3)
           endif
-          call set_bc(nx, ny, nz, Jacobian, QJ3, Qre)
+          call set_bc(myrank, nx, ny, nz, Jacobian, QJ3, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(nx, ny, nz, t2, y, Jacobian_cpu)
+          call rescale_recv_send(flag_re, nx, ny, nz, step, y, Jacobian_cpu)
         endif
 
         if (mod(myrank,2) == 0) then
           if (myrank == rerank .and. kind(id_rescale) == 4) then
             call copy(nx, ny, nz, QJ3, Qre)
             call MPI_ISEND(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr)
-            call calc_mean(nx, ny, nz, Jacobian, QJ3, Qm_cpu)
-            call MPI_ISEND(Qm_cpu, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
+            call calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJ3, Qm)
+            call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
           endif
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ3, E, F, G)
           call calc_step3(nx, ny, nz, xix, etay, zetaz, E, F, G, QJ3, QJ)
           if (myrank == 0 .and. kind(id_rescale) == 4) then
-            call MPI_RECV(Qre_cpu, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
-            Qre = Qre_cpu
+            call MPI_RECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
           endif
           if (ndevices >= 2) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ)
           endif
-          call set_bc(nx, ny, nz, Jacobian, QJ, Qre)
+          call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(nx, ny, nz, t2, y, Jacobian_cpu)
+          call rescale_recv_send(flag_re, nx, ny, nz, step, y, Jacobian_cpu)
         endif
       enddo
 
       ! send and recv device arrays
       if (mod(myrank,2) == 0) then
         Q = QJ
-        call MPI_SEND(Q, nx*ny*nz*5, MPI_REAL8, 1, 0, MPI_COMM_WORLD, ierr) 
+        call MPI_ISEND(Q, nx*ny*nz*5, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ireq, ierr) 
       else
-        call MPI_RECV(Q, nx*ny*nz*5, MPI_REAL8, 0, 0, MPI_COMM_WORLD, istat, ierr)
-        call print_vtk(t2, nx, ny, nz, x, y, z, Jacobian_cpu, Q, mass0, ke0, entropy0)
+        call MPI_IRECV(Q, nx*ny*nz*5, MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, ireq, ierr)
+        call MPI_WAIT(ireq, istat, ierr)
+        call print_vtk(t2, nx, ny, nz, myrank, nranks, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
       endif
     enddo
+
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
     
     if (mod(myrank,2) == 0) then
       deallocate(QJ, QJ2, QJ3, E, F, G, xix, etay, zetaz, Jacobian)
     endif
-    if (myrank == 0 .and. kind(id_rescale) == 4) then
-      deallocate(Qre, Qre_cpu, Qm_cpu)
+    if (mod(myrank,2) == 0 .and. kind(id_rescale) == 4) then
+      deallocate(Qre, Qm)
     endif
   end subroutine RungeKutta_3rd
 
@@ -270,32 +282,33 @@ contains
     real(8), intent(in)         :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)         :: z(nz), dz_cpu(nz-1), Jacobian_cpu(ny)
     real(8), intent(inout)      :: Q(nx,ny,nz,5)
-    integer i, j, k, t1, t2, itr, overlap, ierr, ilen, nranks, ndevices, stat, ireq, ireqs(2), istat(MPI_STATUS_SIZE)
+    integer i, j, k, t1, t2, itr, overlap, ierr, ilen, nranks, ndevices, stat, ireq, ireqs(2)
+    integer istat(MPI_STATUS_SIZE), istats(MPI_STATUS_SIZE,2)
+    real(8) xix_cpu(nx-1), etay_cpu(ny-1), zetaz_cpu(nz-1)
     ! rescale !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: Qre(:,:,:)
-    real(8), allocatable, pinned :: Qre_cpu(:,:,:), Qm_cpu(:,:)
+    integer :: step, flag_re = 0
+    real(8), allocatable, device :: Qre(:), Qm(:)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type(cudaDeviceProp)         :: prop
     real(8), allocatable, device :: QJ(:,:,:,:), QJs(:,:,:,:), Rs(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
     real(8), allocatable, device :: xix(:), etay(:), zetaz(:), Jacobian(:)
     ! for plot
-    real(8) :: mass0 = 1.d0, ke0 = 1.d0, entropy0 = 1.d0
+    real(8) :: ke0 = 1.d0, entropy0 = 1.d0
 
     call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
 
     ! check GPU
+    stat = cudaGetDeviceCount(ndevices)
+    if (myrank == 0) then
+      print '(2x, i2, a)', ndevices, " GPU devices are found"
+    endif
+
     if (mod(myrank,2) == 0) then
-      if (myrank == 0) then
-        stat = cudaGetDeviceCount(ndevices)
-        print '(2x, i2, a)', ndevices, " GPU devices are found"
-      endif
       stat = cudaSetDevice(myrank/2)
       stat = cudaGetDeviceProperties(prop,myrank/2)
       ilen = verify(prop%name, ' ', .true.)
       print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", myrank/2, ") is available"
-    endif
 
-    if (myrank == 0) then
       allocate(QJ(nx,ny,nz,5),QJs(nx,ny,nz,5),Rs(nx-2,ny-2,nz-2,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
       allocate(xix(nx-1),etay(ny-1),zetaz(nz-1),Jacobian(ny))
 
@@ -307,45 +320,58 @@ contains
       enddo;enddo;enddo
 
       ! print initial condition
-      call print_vtk(0, nx, ny, nz, x, y, z, Jacobian_cpu, Q, mass0, ke0, entropy0)
+      call MPI_ISEND(Q, nx*ny*nz*5, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ireq, ierr) 
 
       ! copy on GPU
-      QJ       = Q
-      Rs       = 0.d0
-      xix      = 1.d0 / dx_cpu
-      etay     = 1.d0 / dy_cpu
-      zetaz    = 1.d0 / dz_cpu
+      xix_cpu   = 1.d0 / dx_cpu
+      etay_cpu  = 1.d0 / dy_cpu
+      zetaz_cpu = 1.d0 / dz_cpu
+      !stat = cudaMemcpyAsync(xix,      xix_cpu,      nx-1, cudaMemcpyDeviceToHost, 1)
+      !stat = cudaMemcpyAsync(etay,     etay_cpu,     ny-1, cudaMemcpyDeviceToHost, 2)
+      !stat = cudaMemcpyAsync(zetaz,    zetaz_cpu,    nz-1, cudaMemcpyDeviceToHost, 3)
+      !stat = cudaMemcpyAsync(Jacobian, Jacobian_cpu, ny,   cudaMemcpyDeviceToHost, 4)
+      xix      = xix_cpu
+      etay     = etay_cpu
+      zetaz    = zetaz_cpu
       Jacobian = Jacobian_cpu
-    endif
+      QJ   = Q
+      Rs   = 0.d0
+    
+      ! for multi GPU
+      if (kind(id_accuracy) == 8) then
+        overlap = 3
+      elseif (kind(id_accuracy) == 4) then
+        overlap = 2
+      else
+        overlap = 1
+      endif
 
-    ! share necessary data
-    call MPI_BCAST(mass0,    1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
-    call MPI_BCAST(ke0,      1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
-    call MPI_BCAST(entropy0, 1, MPI_REAL8, 0, MPI_COMM_WORLD, ierr)
+      stat = cudaDeviceSynchronize()
+      call MPI_WAIT(ireq, istat, ierr)
+    else
+      call MPI_IRECV(Q, nx*ny*nz*5, MPI_REAL8, myrank-1, myrank, MPI_COMM_WORLD, ireq, ierr)
+      call MPI_WAIT(ireq, istat, ierr)
+      call print_vtk(0, nx, ny, nz, myrank, nranks, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
+    endif
 
     ! rescale
-    if (myrank == 0 .and. kind(id_rescale) == 4) then
-      allocate(Qre(ny,nz-6,5), Qre_cpu(ny,nz-6,5), Qm_cpu(ny,5))
-    endif
-
-    ! for multi GPU
-    if (kind(id_accuracy) == 8) then
-      overlap = 3
-    elseif (kind(id_accuracy) == 4) then
-      overlap = 2
-    else
-      overlap = 1
+    if (mod(myrank,2) == 0 .and. kind(id_rescale) == 4) then
+      allocate(Qre(ny*(nz-6)*5), Qm(ny*5))
+      if (myrank == rerank+1) then
+        stat = cudaSetDevice(rerank/2)
+      endif
     endif
 
     do t2 = 1, np
       do t1 = 1, nt
+        step = np * (t2-1) + t1
         if (mod(myrank,2) == 0) then
           call nvtxStartRange("Send Qre", 1)
           if (myrank == rerank .and. kind(id_rescale) == 4) then
             call copy(nx, ny, nz, QJ, Qre)
             call MPI_ISEND(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr)
-            call calc_mean(nx, ny, nz, Jacobian, QJ, Qm_cpu)
-            call MPI_ISEND(Qm_cpu, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
+            call calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJ, Qm)
+            call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
           endif
           call nvtxEndRange
           call nvtxStartRange("calc flux", 2)
@@ -354,91 +380,88 @@ contains
           call nvtxEndRange
           call nvtxStartRange("Recv Qre", 3)
           if (myrank == 0 .and. kind(id_rescale) == 4) then
-            call MPI_RECV(Qre_cpu, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
-            Qre = Qre_cpu
+            call MPI_RECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
           endif
           call nvtxEndRange
           call nvtxStartRange("set bc", 4)
           if (ndevices >= 2) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJs)
           endif
-          call set_bc(nx, ny, nz, Jacobian, QJs, Qre)
+          call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
           call nvtxEndRange
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(nx, ny, nz, t2, y, Jacobian_cpu)
+          call rescale_recv_send(flag_re, nx, ny, nz, step, y, Jacobian_cpu)
         endif
 
         if (mod(myrank,2) == 0) then
           if (myrank == rerank .and. kind(id_rescale) == 4) then
             call copy(nx, ny, nz, QJs, Qre)
             call MPI_ISEND(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr)
-            call calc_mean(nx, ny, nz, Jacobian, QJs, Qm_cpu)
-            call MPI_ISEND(Qm_cpu, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
+            call calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJs, Qm)
+            call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
           endif
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
           call calc_step(nx, ny, nz, 0.5d0, 2.d0, xix, etay, zetaz, E, F, G, QJ, QJs, Rs) ! QJs = Q3
           if (myrank == 0 .and. kind(id_rescale) == 4) then
-            call MPI_RECV(Qre_cpu, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
-            Qre = Qre_cpu
+            call MPI_RECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
           endif
           if (ndevices >= 2) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJs)
           endif
-          call set_bc(nx, ny, nz, Jacobian, QJs, Qre)
+          call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(nx, ny, nz, t2, y, Jacobian_cpu)
+          call rescale_recv_send(flag_re, nx, ny, nz, step, y, Jacobian_cpu)
         endif
 
         if (mod(myrank,2) == 0) then
           if (myrank == rerank .and. kind(id_rescale) == 4) then
             call copy(nx, ny, nz, QJs, Qre)
             call MPI_ISEND(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr)
-            call calc_mean(nx, ny, nz, Jacobian, QJs, Qm_cpu)
-            call MPI_ISEND(Qm_cpu, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
+            call calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJs, Qm)
+            call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
           endif
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
           call calc_step(nx, ny, nz, 1.0d0, 2.d0, xix, etay, zetaz, E, F, G, QJ, QJs, Rs) ! QJs = Q4
           if (myrank == 0 .and. kind(id_rescale) == 4) then
-            call MPI_RECV(Qre_cpu, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
-            Qre = Qre_cpu
+            call MPI_RECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
           endif
           if (ndevices >= 2) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJs)
           endif
-          call set_bc(nx, ny, nz, Jacobian, QJs, Qre)
+          call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(nx, ny, nz, t2, y, Jacobian_cpu)
+          call rescale_recv_send(flag_re, nx, ny, nz, step, y, Jacobian_cpu)
         endif
 
         if (mod(myrank,2) == 0) then
           if (myrank == rerank .and. kind(id_rescale) == 4) then
             call copy(nx, ny, nz, QJs, Qre)
             call MPI_ISEND(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr) 
-            call calc_mean(nx, ny, nz, Jacobian, QJs, Qm_cpu)
-            call MPI_ISEND(Qm_cpu, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
+            call calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJs, Qm)
+            call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
           endif
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
           call calc_step4(nx, ny, nz, xix, etay, zetaz, E, F, G, Rs, QJ)
           if (myrank == 0 .and. kind(id_rescale) == 4) then
-            call MPI_RECV(Qre_cpu, 5*ny*(nz-6), MPI_REAL8, rerank+1,0, MPI_COMM_WORLD, istat, ierr)
-            Qre = Qre_cpu
+            call MPI_RECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1,0, MPI_COMM_WORLD, istat, ierr)
           endif
           if (ndevices >= 2) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ)
           endif
-          call set_bc(nx, ny, nz, Jacobian, QJ, Qre)
+          call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(nx, ny, nz, t2, y, Jacobian_cpu)
+          call rescale_recv_send(flag_re, nx, ny, nz, step, y, Jacobian_cpu)
         endif
       enddo
 
       ! send and recv device arrays
       if (mod(myrank,2) == 0) then
         Q = QJ
-        call MPI_SEND(Q, nx*ny*nz*5, MPI_REAL8, 1, 0, MPI_COMM_WORLD, ierr) 
+        call MPI_ISEND(Q, nx*ny*nz*5, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ireq, ierr) 
       else
-        call MPI_RECV(Q, nx*ny*nz*5, MPI_REAL8, 0, 0, MPI_COMM_WORLD, istat, ierr)
-        call print_vtk(t2, nx, ny, nz, x, y, z, Jacobian_cpu, Q, mass0, ke0, entropy0)
+        call MPI_IRECV(Q, nx*ny*nz*5, MPI_REAL8, myrank-1, myrank,   MPI_COMM_WORLD, ireq, ierr)
+        call MPI_WAIT(ireq, istat, ierr)
+        call print_vtk(t2, nx, ny, nz, myrank, nranks, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
       endif
     enddo
 
@@ -448,7 +471,7 @@ contains
       deallocate(QJ, QJs, Rs, E, F, G, xix, etay, zetaz, Jacobian)
     endif
     if (myrank == 0 .and. kind(id_rescale) == 4) then
-      deallocate(Qre, Qre_cpu, Qm_cpu)
+      deallocate(Qre, Qm)
     endif
   end subroutine RungeKutta_4th
 end module calc_time_dev
