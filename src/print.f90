@@ -1,4 +1,5 @@
 module print
+  use mpi
   use mod_globals, only : id_accuracy, nt, np, dt, step_offset, gamma, R, Lx
   implicit none
   interface
@@ -39,19 +40,7 @@ module print
   end interface
 
   interface print_vtk
-    subroutine print_vtk_2D(step,nx,ny,x,y,Jacobian,QJ)
-      integer, intent(in) :: step, nx, ny
-      real(8), intent(in) :: x(nx), y(ny)
-      real(8), intent(in) :: QJ(nx,ny,4)
-    end subroutine print_vtk_2D
-
-    subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,ke0,entropy0,myrank)
-      integer, intent(in)           :: step, nx, ny, nz
-      real(8), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(ny)
-      real(8), intent(in)           :: QJ(nx,ny,nz,5)
-      real(8), intent(inout)        :: ke0, entropy0
-      integer, intent(in), optional :: myrank
-    end subroutine print_vtk_3D
+    module procedure print_vtk_2D, print_vtk_3D
   end interface
 
   interface mean
@@ -251,7 +240,7 @@ contains
     real(4), intent(in), dimension(ni*nj*nk), optional  :: Q1d
     integer(4) byte_x, byte_y, byte_z, byte_rho, byte_p, byte_T, byte_M, byte_v, byte_Q
     character :: lf*1, str1*4, str2*4, str3*4, str4*1
-    character :: offset1*10, offset2*10, offset3*10, offset4*10, offset5*10, offset6*10, offset7*10, offset8*10
+    character :: offset1*12, offset2*12, offset3*12, offset4*12, offset5*12, offset6*12, offset7*12, offset8*12
     lf = char(10)
     write(str1(1:4),'(i4)') ni-1
     write(str2(1:4),'(i4)') nj-1
@@ -266,14 +255,19 @@ contains
     byte_M   = byte_rho
     byte_v   = 4 + 4 * (dimension * ni * nj * nk)
     byte_Q   = byte_rho
-    write(offset1(1:10),'(i10)') byte_x
-    write(offset2(1:10),'(i10)') byte_x + byte_y
-    write(offset3(1:10),'(i10)') byte_x + byte_y + byte_z
-    write(offset4(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho
-    write(offset5(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho + byte_p
-    write(offset6(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho + byte_p + byte_T
-    write(offset7(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho + byte_P + byte_T + byte_M
-    write(offset8(1:10),'(i10)') byte_x + byte_y + byte_z + byte_rho + byte_P + byte_T + byte_M + byte_v
+    write(offset1(1:12),'(i12)') int(byte_x, kind=8)
+    write(offset2(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8)
+    write(offset3(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8)
+    write(offset4(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8) + &
+                                 int(byte_rho, kind=8)
+    write(offset5(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8) + &
+                                 int(byte_rho, kind=8) + int(byte_p, kind=8)
+    write(offset6(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8) + &
+                                 int(byte_rho, kind=8) + int(byte_p, kind=8) + int(byte_T, kind=8)
+    write(offset7(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8) + &
+                                 int(byte_rho, kind=8) + int(byte_P, kind=8) + int(byte_T, kind=8) + int(byte_M, kind=8)
+    write(offset8(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8) + int(byte_rho, kind=8) + &
+                                 int(byte_P, kind=8) + int(byte_T, kind=8) + int(byte_M, kind=8) + int(byte_v, kind=8)
 
     write(10) '<?xml version="1.0"?>'//lf
     write(10) '<VTKFile type="RectilinearGrid" version="1.0" byte_order="LittleEndian">'//lf
@@ -351,13 +345,12 @@ contains
     call print_xml(nx,ny,1,2,real(x),real(y),real(z),rho1d,p1d,T1d,M1d,v1d)
   end subroutine print_vtk_2D
   
-  subroutine print_vtk_3D(step,nx,ny,nz,x,y,z,Jacobian,QJ,mass0,ke0,entropy0,myrank)
-    integer, intent(in)           :: step, nx, ny, nz
-    real(8), intent(in)           :: x(nx), y(ny), z(nz), Jacobian(ny)
-    real(8), intent(in)           :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(inout)        :: mass0, ke0, entropy0
-    integer, intent(in), optional :: myrank
-    integer i, j, k, l, m, len
+  subroutine print_vtk_3D(step,nx,ny,nz,myrank,nranks,x,y,z,Jacobian,QJ,ke0,entropy0)
+    integer, intent(in)    :: step, nx, ny, nz, myrank, nranks
+    real(8), intent(in)    :: x(nx), y(ny), z(nz), Jacobian(ny)
+    real(8), intent(in)    :: QJ(nx,ny,nz,5) ! Q / Jacobian
+    real(8), intent(inout) :: ke0, entropy0
+    integer i, j, k, l, m, len, ierr
     real(8) rho, u, v, w, p
     real(4), allocatable :: rho1d(:), p1d(:), T1d(:), M1d(:), v1d(:)
     character(len=40) filename
@@ -386,7 +379,7 @@ contains
           m = m + 3
     enddo;enddo;enddo
 
-    if (present(myrank)) then
+    if (nranks >= 4) then
       !call print_entropy(step,nx,ny,nz,rho,p,entropy0,myrank)
       call print_KE(step,nx,ny,nz,Jacobian,QJ,ke0,myrank)
       !call print_enstrophy(step,nx,ny,nz,x,y,z,rho,omega,myrank)
@@ -399,7 +392,6 @@ contains
     endif
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
     call print_xml(nx,ny,nz,3,real(x),real(y),real(z),rho1d,p1d,T1d,M1d,v1d)
-    !call print_1d(step+step_offset,nx,ny,nz,real(x),real(y),real(z),Jacobian,QJ)
 
     deallocate(rho1d,p1d,T1d,M1d,v1d)
   end subroutine print_vtk_3D
