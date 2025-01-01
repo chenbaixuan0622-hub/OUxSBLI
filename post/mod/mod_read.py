@@ -5,11 +5,13 @@ import vtk
 from vtk.util import numpy_support
 from tqdm import tqdm
 
+
 def extract_number(filename):
   match = re.search(r'Q(\d+)\.vtr$', filename)
   if match:
     return int(match.group(1))
   return float('inf')
+
 
 def gridInfo(data_directory):
   file_path = os.path.join(data_directory, "x.npy")
@@ -23,6 +25,7 @@ def gridInfo(data_directory):
   Nz        = len(z)
   return np.float32(x), np.float32(y), np.float32(z), Nx, Ny, Nz
 
+
 def getGrid(file_path):
   # make VTK Structured Grid Reader
   reader = vtk.vtkXMLRectilinearGridReader()
@@ -35,6 +38,7 @@ def getGrid(file_path):
   y = numpy_support.vtk_to_numpy(grid.GetYCoordinates())
   z = numpy_support.vtk_to_numpy(grid.GetZCoordinates())
   return len(x), len(y), len(z), np.float32(x), np.float32(y), np.float32(z)
+
 
 def getVector(file_path,Nx,Ny,Nz,name):
   reader = vtk.vtkXMLRectilinearGridReader()
@@ -50,6 +54,7 @@ def getVector(file_path,Nx,Ny,Nz,name):
   w = np.reshape(V[:,2], [Nz,Ny,Nx])
   return np.float32(u), np.float32(v), np.float32(w)
 
+
 def getScalar(file_path,Nx,Ny,Nz,name):
   reader = vtk.vtkXMLRectilinearGridReader()
   reader.SetFileName(file_path)
@@ -60,6 +65,7 @@ def getScalar(file_path,Nx,Ny,Nz,name):
   a = numpy_support.vtk_to_numpy(Q.GetPointData().GetArray(name))
   a = np.reshape(a, [Nz,Ny,Nx])
   return np.float32(a)
+
 
 def getMeanVector(directory_path,vtk_files,Nx,Ny,Nz,name):
   um = np.zeros((Nz,Ny,Nx), dtype=np.float32)
@@ -77,6 +83,7 @@ def getMeanVector(directory_path,vtk_files,Nx,Ny,Nz,name):
   vm = vm / n
   wm = wm / n
   return um, vm, wm
+
 
 def getMeanScalar(directory_path,vtk_files,Nx,Ny,Nz,name):
   am = np.zeros((Nz,Ny,Nx), dtype=np.float32)

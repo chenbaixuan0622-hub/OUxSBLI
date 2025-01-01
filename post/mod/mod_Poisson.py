@@ -1,53 +1,133 @@
-import numpy as np
-from numba import njit
+import jax
+import jax.numpy as jnp
+from jax import lax
+from functools import partial
 
 
-@njit(cache=True, nogil=True)
-def Laplacian(A1, A2, A3, p):
+@jax.jit
+def Laplacian2D(A1, A2, A3, A4, p):
   # p[nz, ny, nx]
-  return A1 * (p[1:-1,1:-1,:-2] + p[1:-1,1:-1,2:]) + \
-         A2 * (p[1:-1,:-2,1:-1] + p[1:-1,2:,1:-1]) + \
-         A3 * (p[:-2,1:-1,1:-1] + p[2:,1:-1,1:-1]) + \
+  return A1 * p[1:-1,:-2] + A2 * p[1:-1,2:] + \
+         A3 * p[:-2,1:-1] + A4 * p[2:,1:-1] + \
+         p[1:-1,1:-1]
+
+
+@jax.jit
+def Laplacian3D(A1, A2, A3, A4, A5, A6, p):
+  # p[nz, ny, nx]
+  return A1 * p[1:-1,1:-1,:-2] + A2 * p[1:-1,1:-1,2:] + \
+         A3 * p[1:-1,:-2,1:-1] + A4 * p[1:-1,2:,1:-1] + \
+         A5 * (p[:-2,1:-1,1:-1] + p[2:,1:-1,1:-1]) + \
          p[1:-1,1:-1,1:-1]
 
 
-@njit(cache=True, nogil=True)
-def BiCGStab(p, f, dx2dy2, dy2dz2, dz2dx2, err_tol, set_bc):
-  A1 = dy2dz2 / (-2.e0 * (dy2dz2 + dz2dx2 + dx2dy2))
-  A2 = dz2dx2 / (-2.e0 * (dy2dz2 + dz2dx2 + dx2dy2))
-  A3 = dx2dy2 / (-2.e0 * (dy2dz2 + dz2dx2 + dx2dy2))
-  B  = f / (-2.e0 * (dy2dz2 + dz2dx2 + dx2dy2))
+@jax.jit
+def safe_divide(numerator, denominator):
+  safe_denom = jnp.where(denominator < 1e-30, 1.e0, denominator)
+  result = numerator / safe_denom
+  return jnp.where(denominator < 1e-30, 0.e0, result)
 
-  r0 = np.zeros_like(p, dtype=np.float32)
-  d  = np.zeros_like(p, dtype=np.float32)
-  r  = np.zeros_like(p, dtype=np.float32)
-  Ad = np.zeros_like(p, dtype=np.float32)
-  s  = np.zeros_like(p, dtype=np.float32)
-  As = np.zeros_like(p, dtype=np.float32)
-  rs = np.zeros_like(p, dtype=np.float32)
-  dp = np.zeros_like(p, dtype=np.float32)
 
-  r0[1:-1,1:-1,1:-1] = B[1:-1,1:-1,1:-1] - Laplacian(A1, A2, A3, p)
+@partial(jax.jit, static_argnums=(4, 5))
+def BiCGStab2D(p, f, dx, dy, err_tol, set_bc):
+  Ax = 0.5e0 * (dx[:-1] + dx[1:]) * dx[:-1] * dx[1:]
+  Ay = 0.5e0 * (dy[:-1] + dy[1:]) * dy[:-1] * dy[1:]
+  A  = - (dx[None,:-1] + dx[None,1]) / Ax[None,:] \
+       - (dy[:-1,None] + dy[1,None]) / Ay[:,None]
+  A1 = dx[None,1:]  / (A * Ax[None,:]) 
+  A2 = dx[None,:-1] / (A * Ax[None,:])
+  A3 = dy[1:,None]  / (A * Ay[:,None])
+  A4 = dy[:-1,None] / (A * Ay[:,None])
+  B  = f[1:-1,1:-1] / A
+
+  r0 = jnp.zeros_like(p)
+  r0 = r0.at[1:-1,1:-1].set(B - Laplacian2D(A1, A2, A3, A4, p))
 
   r = r0
   d = r0
   err_r = 1.e0
 
-  while err_r > err_tol:
-    Ad[1:-1,1:-1,1:-1] = Laplacian(A1, A2, A3, d)
-    alpha = np.sum(r0 * r) / np.sum(r0 * Ad)
+  def condition_fun(x):
+    A1, A2, A3, A4, p, r, r0, d, err_r, err_tol = x
+    return err_r > err_tol
+
+  def body_fun(x):
+    A1, A2, A3, A4, p, r, r0, d, err_r, err_tol = x
+    Ad = jnp.zeros_like(p)
+    Ad = Ad.at[1:-1,1:-1].set(Laplacian2D(A1, A2, A3, A4, d))
+    alpha = safe_divide(jnp.sum(r0 * r), jnp.sum(r0 * Ad))
     s     = r - alpha * Ad
     set_bc(s)
-    As[1:-1,1:-1,1:-1] = Laplacian(A1, A2, A3, s)
-    w     = np.sum(As * s) / np.sum(As * As)
+    As = jnp.zeros_like(p)
+    As = As.at[1:-1,1:-1].set(Laplacian2D(A1, A2, A3, A4, s))
+    w     = safe_divide(jnp.sum(As * s), jnp.sum(As * As))
     dp    = alpha * d + w * s
     p    += dp
     set_bc(p)
     rs    = r
     r     = s - w * As
-    beta  = alpha * np.sum(r0 * r) / (w * np.sum(r0 * rs))
+    beta  = alpha * safe_divide(jnp.sum(r0 * r), w * jnp.sum(r0 * rs))
     d     = r + beta * (d - w * Ad)
     set_bc(d)
-    err_r = np.sqrt(np.sum(dp**2) / np.sum(p**2))
+    err_r = jnp.sqrt(jnp.sum(dp**2) / jnp.sum(p**2))
+    return (A1, A2, A3, A4, p, r, r0, d, err_r, err_tol)
+
+  x0 = (A1, A2, A3, A4, p, r, r0, d, err_r, err_tol)
+  x  = lax.while_loop(condition_fun, body_fun, x0)
+  A1, A2, A3, A4, p, r, r0, d, err_r, err_tol = x
+  return p, err_r
+
+
+@partial(jax.jit, static_argnums=(5, 6))
+def BiCGStab3D(p, f, dx, dy, dz, err_tol, set_bc):
+  Ax = 0.5e0 * (dx[:-1] + dx[1:]) * dx[:-1] * dx[1:]
+  Ay = 0.5e0 * (dy[:-1] + dy[1:]) * dy[:-1] * dy[1:]
+  Az = 0.5e0 * (dz[:-1] + dz[1:]) * dz[:-1] * dz[1:]
+  A  = - (dx[None,None,:-1] + dx[None,None,1]) / Ax[None,None,:] \
+       - (dy[None,:-1,None] + dy[None,1,None]) / Ay[None,:,None] \
+       - (dz[:-1,None,None] + dz[1,None,None]) / Az[:,None,None]
+  A1 = dx[None,None,1:]  / (A * Ax[None,None,:]) 
+  A2 = dx[None,None,:-1] / (A * Ax[None,None,:])
+  A3 = dy[None,1:,None]  / (A * Ay[None,:,None])
+  A4 = dy[None,:-1,None] / (A * Ay[None,:,None])
+  A5 = dz[1:,None,None]  / (A * Az[:,None,None])
+  A6 = dz[:-1,None,None] / (A * Az[:,None,None])
+  B  = f[1:-1,1:-1,1:-1] / A
+
+  r0 = jnp.zeros_like(p)
+  r0 = r0.at[1:-1,1:-1,1:-1].set(B - Laplacian3D(A1, A2, A3, A4, A5, A6, p))
+
+  r = r0
+  d = r0
+  err_r = 1.e0
+
+  def condition_fun(x):
+    A1, A2, A3, A4, A5, A6, p, r, r0, d, err_r, err_tol = x
+    return err_r > err_tol
+
+  def body_fun(x):
+    A1, A2, A3, A4, A5, A6, p, r, r0, d, err_r, err_tol = x
+    Ad = jnp.zeros_like(p)
+    Ad = Ad.at[1:-1,1:-1,1:-1].set(Laplacian3D(A1, A2, A3, A4, A5, A6, d))
+    alpha = jnp.sum(r0 * r) / jnp.sum(r0 * Ad)
+    s     = r - alpha * Ad
+    set_bc(s)
+    As = jnp.zeros_like(p)
+    As = As.at[1:-1,1:-1,1:-1].set(Laplacian3D(A1, A2, A3, A4, A5, A6, s))
+    w     = jnp.sum(As * s) / jnp.sum(As * As)
+    dp    = alpha * d + w * s
+    p    += dp
+    set_bc(p)
+    rs    = r
+    r     = s - w * As
+    beta  = alpha * jnp.sum(r0 * r) / (w * jnp.sum(r0 * rs))
+    d     = r + beta * (d - w * Ad)
+    set_bc(d)
+    err_r = jnp.sqrt(jnp.sum(dp**2) / jnp.sum(p**2))
+    return (A1, A2, A3, A4, A5, A6, p, r, r0, d, err_r, err_tol)
+
+  x0 = (A1, A2, A3, A4, A5, A6, p, r, r0, d, err_r, err_tol)
+  x = lax.while_loop(condition_fun, body_fun, x0)
+  A1, A2, A3, A4, A5, A6, p, r, r0, d, err_r, err_tol = x
   return p, err_r
 

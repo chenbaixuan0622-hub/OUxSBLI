@@ -316,7 +316,7 @@ def make_data3D(Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, stridex, stridey, stridez, endT, Q
   for Q_file in tqdm(Q_files):
     file_path = os.path.join(Q_dir, Q_file)
     U, _, _ = getVector(file_path, Nx, Ny, Nz, 'velocity')
-    u = U[indicesz,indicesy,indicesx]
+    u = U[indicesz,indicesy,indicesx].transpose(2,0,1)
     D[:,itr] = u.flatten()
     itr += 1
   return x, y, z, t, D
