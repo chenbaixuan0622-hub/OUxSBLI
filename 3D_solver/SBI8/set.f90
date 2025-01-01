@@ -200,33 +200,24 @@ contains
       !$cuf kernel do(2)<<<*,*>>>
       do k = 1, nz
         do i = 1, nx
-          !pin   = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) &
-          !        / QJ(i,ny-1,k,1)) * Jacobian(ny-1)
-          !rhoin = QJ(i,ny-1,k,1) * Jacobian(ny-1)
-          !cin   = sqrt(gamma * pin / rhoin)
-          !vin   = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
-          !c0    = sqrt(gamma * p2 / rho2)
-          !Rp    = vin + 2.d0 * cin / (gamma - 1.d0)
-          !Rm    = uy  - 2.d0 * c0  / (gamma - 1.d0)
-          !vb    = 0.5d0 * (Rp + Rm)
-          !cb    = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
-          !rhob  = cin * rhoin / cb
-          !if (c0 < cin) then
-          !  ub  = QJ(i,ny-1,k,2) / QJ(i,ny-1,k,1)
-          !else
-          !  ub  = ux
-          !endif
-          !pb = (rhob * cb**2) / gamma
-          !QJ(i,ny,k,1) = rhob / Jacobian(ny)
-          !QJ(i,ny,k,2) = rhob * ub / Jacobian(ny)
-          !QJ(i,ny,k,3) = rhob * vb / Jacobian(ny)
-          !QJ(i,ny,k,4) = 0.d0
-          !QJ(i,ny,k,5) = (pb / (gamma - 1.d0) + 0.5d0 * rhob * (ub**2 + vb**2)) / Jacobian(ny)
-          QJ(i,ny,k,1) = rho2 / Jacobian(ny)
-          QJ(i,ny,k,2) = rho2 * ux / Jacobian(ny)
-          QJ(i,ny,k,3) = rho2 * uy / Jacobian(ny)
+          pin   = (gamma - 1.d0) * (QJ(i,ny-1,k,5) - 0.5d0 * (QJ(i,ny-1,k,2)**2 + QJ(i,ny-1,k,3)**2 + QJ(i,ny-1,k,4)**2) &
+                  / QJ(i,ny-1,k,1)) * Jacobian(ny-1)
+          rhoin = QJ(i,ny-1,k,1) * Jacobian(ny-1)
+          cin   = sqrt(gamma * pin / rhoin)
+          vin   = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
+          c0    = sqrt(gamma * p2 / rho2)
+          Rp    = vin + 2.d0 * cin / (gamma - 1.d0)
+          Rm    = uy  - 2.d0 * c0  / (gamma - 1.d0)
+          vb    = 0.5d0 * (Rp + Rm)
+          cb    = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
+          rhob  = cin * rhoin / cb
+          pb    = (rhob * cb**2) / gamma
+          ub    = sqrt(2.d0 * gamma * (p2 / rho2 - pb / rhob) / (gamma - 1.d0) + ux**2 + uy**2 - vb**2)
+          QJ(i,ny,k,1) = rhob / Jacobian(ny)
+          QJ(i,ny,k,2) = rhob * ub / Jacobian(ny)
+          QJ(i,ny,k,3) = rhob * vb / Jacobian(ny)
           QJ(i,ny,k,4) = 0.d0
-          QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(ny)
+          QJ(i,ny,k,5) = (pb / (gamma - 1.d0) + 0.5d0 * rhob * (ub**2 + vb**2)) / Jacobian(ny)
       enddo;enddo
     endif
 
