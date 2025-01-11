@@ -96,3 +96,109 @@ def getMeanScalar(directory_path,vtk_files,Nx,Ny,Nz,name):
   am = am / n
   return am
 
+
+class Data:
+  def __init__(self, dir, endT, Lx1=None, Lx2=None, Ly1=None, Ly2=None, Lz1=None, Lz2=None, \
+               stridex=1, stridey=1, stridez=1):
+    self.dir  = dir
+    self.endT = endT
+    
+    if Lx1 is not None:
+      self.Lx1 = Lx1
+    else:
+      self.Lx1 = None
+    if Lx2 is not None:
+      self.Lx2 = Lx2
+    else:
+      self.Lx2 = None
+    if Ly1 is not None:
+      self.Ly1 = Ly1
+    else:
+      self.Ly1 = None
+    if Ly2 is not None:
+      self.Ly2 = Ly2
+    else:
+      self.Ly2 = None
+    if Lz1 is not None:
+      self.Lz1 = Lz1
+    else:
+      self.Lz1 = None
+    if Lz2 is not None:
+      self.Lz2 = Lz2
+    else:
+      self.Lz2 = None
+
+    self.stridex = stridex
+    self.stridey = stridey
+    self.stridez = stridez
+
+
+  @staticmethod
+  def indices(X, stride, L1=None, L2=None):
+    def index(x, L):
+      if L >= x[-1]:
+        n = len(x)
+      elif L <= x[0]:
+        n = 0
+      else:
+        for i in range(len(x)):
+          if L < x[i]:
+            n = i
+            break
+      return n
+    
+    if L1 is None:
+      n1 = 0
+    else:
+      n1 = index(X, L1)
+    if L2 is None:
+      n2 = len(X)
+    else:
+      n2 = index(X, L2)
+    return np.arange(n1, n2, stride)
+ 
+
+  def make_grid(self):
+    files = [f for f in os.listdir(self.dir) if f.endswith(".vtr")]
+    files.sort(key=extract_number)
+    Nx, Ny, Nz, X, Y, Z = getGrid(os.path.join(self.dir, files[0]))
+    t = np.linspace(0.e0, self.endT, len(files))
+      
+    if self.Lx1 is None:
+      if self.Lx2 is None:
+        indicesx = np.arange(0, len(X), self.stridex)
+      else:
+        indicesx = self.indices(X, self.stridex, L1=None, L2=self.Lx2)
+    else:
+      if self.Lx2 is None:
+        indicesx = self.indices(X, self.stridex, L1=self.Lx1, L2=None)
+      else:
+        indicesx = self.indices(X, self.stridex, self.Lx1, self.Lx2)
+    x = X[indicesx]
+    
+    if self.Ly1 is None:
+      if self.Ly2 is None:
+        indicesy = np.arange(0, len(Y), self.stridey)
+      else:
+        indicesy = self.indices(Y, self.stridey, L1=None, L2=self.Ly2)
+    else:
+      if self.Ly2 is None:
+        indicesy = self.indices(Y, self.stridey, L1=self.Ly1, L2=None)
+      else:
+        indicesy = self.indices(Y, self.stridey, self.Ly1, self.Ly2)
+    y = Y[indicesy]
+    
+    if self.Lz1 is None:
+      if self.Lz2 is None:
+        indicesz = np.arange(0, len(Z), self.stridez)
+      else:
+        indicesz = self.indices(Z, self.stridez, L1=None, L2=self.Lz2)
+    else:
+      if self.Lz2 is None:
+        indicesz = self.indices(Z, self.stridez, L1=self.Lz1, L2=None)
+      else:
+        indicesz = self.indices(Z, self.stridez, self.Lz1, self.Lz2)
+    z = Z[indicesz]
+    indicesx, indicesy, indicesz = np.meshgrid(indicesx, indicesy, indicesz)
+    return Nx, Ny, Nz, indicesx, indicesy, indicesz, x, y, z, t
+

@@ -2,7 +2,7 @@ import numpy as np
 import os
 import vtk
 import matplotlib.pyplot as plt
-from mod.mod_nabla import Scalar, Vector
+from mod.mod_nabla import Scalar, Vector, bc
 
 
 def plot_Helmholtz_decomposition(U, phi, x, y, z=None):
@@ -10,7 +10,7 @@ def plot_Helmholtz_decomposition(U, phi, x, y, z=None):
 
   if z is None:
     gradPhi    = Scalar(phi, x, y).gradient()
-    rotA       = U - gradPhi
+    rotA       = U + gradPhi
     rotgradPhi = Vector(gradPhi, x, y).rotation()
     divgradPhi = Vector(gradPhi, x, y).divergence()
     divrotA    = Vector(rotA, x, y).divergence()
@@ -66,8 +66,19 @@ def plot_Helmholtz_decomposition(U, phi, x, y, z=None):
 
 
 def save_Helmholtz_decomposition(U, phi, X, Y, Z, dir, name):
-  gradPhi   = Scalar(phi, X, Y, Z).gradient()
-  rotA      = U - gradPhi
+  gradPhi = Scalar(phi, X, Y, Z).gradient()
+  for i in range(3):
+    gradPhi[i,:,:,:] = bc(gradPhi[i,:,:,:]).periodic(z=True)
+    gradPhi[i,:,:,:] = bc(gradPhi[i,:,:,:]).Neumann(x1=True, x2=True, y2=True)
+    gradPhi[i,:,:,:] = bc(gradPhi[i,:,:,:]).Dirichlet(y1=0.e0)
+  rotA    = U - gradPhi
+
+  phi1d = np.float32(phi[1:-1,1:-1,1:-1].flatten())
+  
+  '''
+  rotA = Vector(A, X, Y, Z).rotation()
+  gradPhi = U - rotA
+  '''
 
   gradPhix = np.float32(gradPhi[0,1:-1,1:-1,1:-1].flatten())
   gradPhiy = np.float32(gradPhi[1,1:-1,1:-1,1:-1].flatten())
@@ -113,6 +124,12 @@ def save_Helmholtz_decomposition(U, phi, X, Y, Z, dir, name):
   grid.SetXCoordinates(x_coords)
   grid.SetYCoordinates(y_coords)
   grid.SetZCoordinates(z_coords)
+
+  phi = vtk.vtkFloatArray()
+  phi.SetName("phi")
+  for i in range(nx*ny*nz):
+    phi.InsertNextValue(phi1d[i])
+  grid.GetPointData().AddArray(phi)
 
   grad = vtk.vtkFloatArray()
   grad.SetName("gradPhi")
