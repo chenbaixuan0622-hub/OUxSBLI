@@ -5,7 +5,7 @@ from scipy.fft import rfft, irfft, rfftfreq
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from tqdm import tqdm
-from mod.mod_read import getGrid, getVector, extract_number
+from mod.mod_read import getGrid, getVector, extract_number, Data
 
 
 def snapshot_pod(data):
@@ -237,12 +237,13 @@ def make_grid(Lx1, Lx2, Ly1, Ly2, stridex, stridey, endT, Q_dir):
     if Ly1 < Y[j]:
       ny1 = j
       break
+  ny2 = Ny
   for j in range(Ny):
-    if Ly2 < Y[j]:
+    if Ly2 <= Y[j]:
       ny2 = j
       break
-  indicesx = np.arange(nx1, nx2, stridex)
-  indicesy = np.arange(ny1, ny2, stridey)
+  indicesx = np.arange(nx1, min(nx2, Nx), stridex)
+  indicesy = np.arange(ny1, min(ny2, Ny), stridey)
   nx = len(indicesx)
   ny = len(indicesy)
   x  = X[indicesx]
@@ -265,15 +266,16 @@ def make_grid3D(Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, stridex, stridey, stridez, endT, Q
     if Ly1 < Y[j]:
       ny1 = j
       break
+  ny2 = Ny
   for j in range(Ny):
-    if Ly2 < Y[j]:
+    if Ly2 <= Y[j]:
       ny2 = j
       break
   nz1 = int(Lz1 / Z[-1] * Nz)
   nz2 = int(Lz2 / Z[-1] * Nz)
-  indicesx = np.arange(nx1, nx2, stridex)
-  indicesy = np.arange(ny1, ny2, stridey)
-  indicesz = np.arange(nz1, nz2, stridez)
+  indicesx = np.arange(nx1, min(nx2, Nx), stridex)
+  indicesy = np.arange(ny1, min(ny2, Ny), stridey)
+  indicesz = np.arange(nz1, min(nz2, Nz), stridez)
   nx = len(indicesx)
   ny = len(indicesy)
   nz = len(indicesz)
@@ -303,8 +305,9 @@ def make_data(Lx1, Lx2, Ly1, Ly2, stridex, stridey, endT, Q_dir):
   return x, y, t, D
 
 
-def make_data3D(Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, stridex, stridey, stridez, endT, Q_dir):
-  Nx, Ny, Nz, indicesx, indicesy, indicesz, x, y, z, t = make_grid3D(Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, stridex, stridey, stridez, endT, Q_dir)
+def make_data3D(Q_dir, endT, Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, stridex, stridey, stridez):
+  data = Data(Q_dir, endT, Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, stridex, stridey, stridez)
+  Nx, Ny, Nz, indicesx, indicesy, indicesz, x, y, z, t = data.make_grid()
   
   print("nx = ", len(x), " ny = ", len(y), " nz = ", len(z))
   D = np.zeros((len(x)*len(y)*len(z), len(t)), dtype=np.float32)
@@ -315,8 +318,8 @@ def make_data3D(Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, stridex, stridey, stridez, endT, Q
   itr = 0
   for Q_file in tqdm(Q_files):
     file_path = os.path.join(Q_dir, Q_file)
-    U, _, _ = getVector(file_path, Nx, Ny, Nz, 'velocity')
-    u = U[indicesz,indicesy,indicesx]
+    U, _, _ = getVector(file_path, Nx, Ny, Nz, 'rotA')
+    u = U[indicesz,indicesy,indicesx].transpose(2,0,1)
     D[:,itr] = u.flatten()
     itr += 1
   return x, y, z, t, D
