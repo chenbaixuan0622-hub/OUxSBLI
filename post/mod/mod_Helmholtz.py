@@ -10,7 +10,7 @@ def plot_Helmholtz_decomposition(U, phi, x, y, z=None):
 
   if z is None:
     gradPhi    = Scalar(phi, x, y).gradient()
-    rotA       = U + gradPhi
+    rotA       = U - gradPhi
     rotgradPhi = Vector(gradPhi, x, y).rotation()
     divgradPhi = Vector(gradPhi, x, y).divergence()
     divrotA    = Vector(rotA, x, y).divergence()
