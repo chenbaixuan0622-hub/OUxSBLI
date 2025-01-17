@@ -60,6 +60,7 @@ class Poisson:
     return idct(p_hat, norm='ortho')
 
 
+  '''
   def Dirichlet_Neumann(self, dp1, p2, f_hat=None, my=0.e0):
     if f_hat is None:
       f = self.f
@@ -72,7 +73,7 @@ class Poisson:
     mx = 2.e0 * (np.cos(np.pi * k / self.nx) - 1.e0) / self.dx**2
     p_hat = fhat / (mx + my)
     return idct(p_hat, type=4, norm='ortho')
-
+  '''
 
   # y Dirichlet
   def __y_Dirichlet(self, f, v1, v2, py1, py2, Poisson_1D, mz=0.e0):

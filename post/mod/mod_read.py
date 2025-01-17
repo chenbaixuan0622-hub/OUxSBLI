@@ -149,21 +149,24 @@ class Vector_Data:
         wi[k,:,i] = np.interp(y, self.Y, w[k,:,i])
     return np.float32(ui), np.float32(vi), np.float32(wi), x, y, z
   
-  def getMeanVector_interp(self, name, Lx1, Lx2, Ly1, Ly2, stridex, stridez, ny):
-    ix, iy, iz, x, y, z = self.interp_xz(Lx1, Lx2, Ly1, Ly2, stridex, stridez, ny)
-    nx, ny, nz = len(x), len(y), len(z)
-    umean = np.zeros((nz,ny,nx), dtype=np.float32)
-    vmean = np.zeros((nz,ny,nx), dtype=np.float32)
-    wmean = np.zeros((nz,ny,nx), dtype=np.float32)
-    for file in tqdm(self.files):
-      file_path = os.path.join(self.dir, file)
-      u, v, w, x, y, z = self.getVector_interp(file_path, name, Lx1, Lx2, Ly1, Ly2, stridex, stridez, ny)
-      umean += u
-      vmean += v
-      wmean += w
-    umean /= len(self.files)
-    vmean /= len(self.files)
-    wmean /= len(self.files)
+  def getMeanVector_interp(self, name, Lx1, Lx2, Ly1, Ly2, stridex, stridez, ny, path=None):
+    if path is not None:
+      umean, vmean, wmean, x, y, z = self.getVector_interp(path, 'velocity', Lx1, Lx2, Ly1, Ly2, stridex, stridez, ny)
+    else:
+      ix, iy, iz, x, y, z = self.interp_xz(Lx1, Lx2, Ly1, Ly2, stridex, stridez, ny)
+      nx, ny, nz = len(x), len(y), len(z)
+      umean = np.zeros((nz,ny,nx), dtype=np.float32)
+      vmean = np.zeros((nz,ny,nx), dtype=np.float32)
+      wmean = np.zeros((nz,ny,nx), dtype=np.float32)
+      for file in tqdm(self.files):
+        file_path = os.path.join(self.dir, file)
+        u, v, w, x, y, z = self.getVector_interp(file_path, name, Lx1, Lx2, Ly1, Ly2, stridex, stridez, ny)
+        umean += u
+        vmean += v
+        wmean += w
+      umean /= len(self.files)
+      vmean /= len(self.files)
+      wmean /= len(self.files)
     return umean, vmean, wmean, x, y, z
 
 
