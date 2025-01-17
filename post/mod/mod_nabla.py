@@ -1,5 +1,6 @@
 import numpy as np
 from numba import njit
+from mod.mod_MUSCL import u_staggered, v_staggered, w_staggered
 
 
 class bc:
@@ -86,7 +87,7 @@ def df(f, h1, h2):
   return (-h2**2 * f[0] + (h2**2 - h1**2) * f[1] + h1**2 * f[2]) / (h1 * h2 * (h1 + h2))
 
 
-class Scalar:
+class Scalar():
   def __init__(self, p, x, y, z=None):
     self.p  = p
     self.x  = x
@@ -94,33 +95,35 @@ class Scalar:
     self.z  = z
     self.dx = -x[:-1] + x[1:]
     self.dy = -y[:-1] + y[1:]
+    self.nx = len(x)
+    self.ny = len(y)
     if self.z is not None:
       self.dz = -z[:-1] + z[1:]
       self.nz = len(z)
 
   @staticmethod
   @njit(cache=True, nogil=True)
-  def gradient2D(p, x, y, dx, dy):
-    grad = np.zeros((2,len(y),len(x)))
-    for j in range(1,len(y)-1):
-      for i in range(1,len(x)-1):
+  def gradient2D(p, nx, ny, dx, dy):
+    grad = np.zeros((2,ny,nx), dtype=np.float32)
+    for j in range(1,ny-1):
+      for i in range(1,nx-1):
         grad[0,j,i] = df(p[j,i-1:i+1], dx[i-1], dx[i])
         grad[1,j,i] = df(p[j-1:j+1,i], dy[j-1], dy[j])
     return grad
 
   @staticmethod
   @njit(cache=True, nogil=True)
-  def gradient3D(p, x, y, z, dx, dy, dz, periodic_z=False):
-    grad = np.zeros((3,len(z),len(y),len(x)))
-    for k in range(1,len(z)-1):
-      for j in range(1,len(y)-1):
-        for i in range(1,len(x)-1):
+  def gradient3D(p, nx, ny, nz, dx, dy, dz, periodic_z=False):
+    grad = np.zeros((3,nz,ny,nx), dtype=np.float32)
+    for k in range(1,nz-1):
+      for j in range(1,ny-1):
+        for i in range(1,nx-1):
           grad[0,k,j,i] = df(p[k,j,i-1:i+1], dx[i-1], dx[i])
           grad[1,k,j,i] = df(p[k,j-1:j+1,i], dy[j-1], dy[j])
           grad[2,k,j,i] = df(p[k-1:k+1,j,i], dz[k-1], dz[k])
     if periodic_z is True:
-      for j in range(1,len(y)-1):
-        for i in range(1,len(x)-1):
+      for j in range(1,ny-1):
+        for i in range(1,nx-1):
           grad[0,0,j,i]  = df(p[0,j,i-1:i+1], dx[i-1], dx[i])
           grad[1,0,j,i]  = df(p[0,j-1:j+1,i], dy[j-1], dy[j])
           grad[2,0,j,i]  = df(np.array([p[-1,j,i], p[1,j,i]]), dz[-1], dz[0])
@@ -129,14 +132,32 @@ class Scalar:
           grad[2,-1,j,i] = df(np.array([p[-2,j,i], p[0,j,i]]), dz[-1], dz[0])
     return grad
 
-  def gradient(self, periodic_z=False):
-    if self.z is None:
-      return self.gradient2D(self.p, self.x, self.y, self.dx, self.dy)
+  @staticmethod
+  @njit(cache=True, nogil=True)
+  def gradient_MUSCL(px, py, pz, nx, ny, nz, dx, dy, dz):
+    grad = np.zeros((3,nz,ny,nx), dtype=np.float32)
+    for k in range(1,nz-1):
+      for j in range(1,ny-1):
+        for i in range(1,nx-1):
+          grad[0,k,j,i] = (-px[k-1,j-1,i-1] + px[k-1,j-1,i]) / (0.5e0 * (dx[i-1] + dx[i]))
+          grad[1,k,j,i] = (-py[k-1,j-1,i-1] + py[k-1,j,i-1]) / (0.5e0 * (dy[j-1] + dy[j]))
+          grad[2,k,j,i] = (-pz[k-1,j-1,i-1] + pz[k,j-1,i-1]) / (0.5e0 * (dz[k-1] + dz[k]))
+    return grad
+
+  def gradient(self, periodic_z=False, TVD=False):
+    if TVD is False:
+      if self.z is None:
+        return self.gradient2D(self.p, self.nx, self.ny, self.dx, self.dy)
+      else:
+        return self.gradient3D(self.p, self.nx, self.ny, self.nz, self.dx, self.dy, self.dz, periodic_z)
     else:
-      return self.gradient3D(self.p, self.x, self.y, self.z, self.dx, self.dy, self.dz, periodic_z)
+      px = u_staggered(self.nx, self.ny, self.nz, self.p)
+      py = v_staggered(self.nx, self.ny, self.nz, self.p)
+      pz = w_staggered(self.nx, self.ny, self.nz, self.p)
+      return self.gradient_MUSCL(px, py, pz, self.nx, self.ny, self.nz, self.dx, self.dy, self.dz)
 
 
-class Vector:
+class Vector():
   def __init__(self, u, x, y, z=None):
     self.u  = u
     self.x  = x
@@ -179,6 +200,16 @@ class Vector:
           div[-1,j,i] = df(u[0,-1,j,i-1:i+1], dx[i-1], dx[i]) \
                       + df(u[1,-1,j-1:j+1,i], dy[j-1], dy[j]) \
                       + df(np.array([u[2,-2,j,i], u[2,-1,j,i], u[2,0,j,i]]),  dz[-1], dz[0])
+    return div
+
+  @staticmethod
+  @njit(cache=True, nogil=True)
+  def divergence_MUSCL(nx, ny, nz, dx, dy, dz, us, vs, ws):
+    # us[nz-2,ny-2,nx-1], vs[nz-2,ny-1,nx-2], ws[nz-1,ny-2,nx-2]
+    div = np.zeros((nz,ny,nx), dtype=np.float32)
+    div[1:-1,1:-1,1:-1] = (-us[:,:,:-1] + us[:,:,1:]) / (0.5e0 * (dx[None,None,:-1] + dx[None,None,1:])) \
+                        + (-vs[:,:-1,:] + vs[:,1:,:]) / (0.5e0 * (dy[None,:-1,None] + dy[None,1:,None])) \
+                        + (-ws[:-1,:,:] + ws[1:,:,:]) / (0.5e0 * (dz[:-1,None,None] + dz[1:,None,None]))
     return div
 
   @staticmethod
@@ -268,11 +299,17 @@ class Vector:
           c[j,i] = a[j,i] / b[j,i]
     return c
 
-  def divergence(self, periodic_z=None):
-    if self.z is None:
-      return self.divergence2D(self.u, self.nx, self.ny, self.dx, self.dy)
+  def divergence(self, periodic_z=None, TVD=False):
+    if TVD is False:
+      if self.z is None:
+        return self.divergence2D(self.u, self.nx, self.ny, self.dx, self.dy)
+      else:
+        return self.divergence3D(self.u, self.nx, self.ny, self.nz, self.dx, self.dy, self.dz, periodic_z)
     else:
-      return self.divergence3D(self.u, self.nx, self.ny, self.nz, self.dx, self.dy, self.dz, periodic_z)
+      us = u_staggered(self.nx, self.ny, self.nz, self.u[0,:,:,:])
+      vs = v_staggered(self.nx, self.ny, self.nz, self.u[1,:,:,:])
+      ws = w_staggered(self.nx, self.ny, self.nz, self.u[2,:,:,:])
+      return self.divergence_MUSCL(self.nx, self.ny, self.nz, self.dx, self.dy, self.dz, us, vs, ws)
 
   def rotation(self, periodic_z=None):
     if self.z is None:

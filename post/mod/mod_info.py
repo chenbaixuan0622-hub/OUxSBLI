@@ -15,8 +15,9 @@ def cross_corr(x, y):
   return corr
 
 
-def X_embedding(x, p, bin):
-  tau, _ = search_tau(x, bin, len(x))
+def X_embedding(x, p, tau=None, bin=10):
+  if tau is None:
+    tau, _ = search_tau(x, bin, len(x))
 
   X = np.zeros((len(x)-tau*p,p+1), dtype=np.float32)
   for i in range(p+1):
@@ -24,27 +25,29 @@ def X_embedding(x, p, bin):
   return X
 
 
-def Y_embedding(y, p, bin):
-  tau, _ = search_tau(y, bin, len(y))
+def Y_embedding(y, p, tau=None, bin=10):
+  if tau is None:
+    tau, _ = search_tau(y, bin, len(y))
+    Y = X_embedding(y, p-1, tau, bin=10)
+  else:
+    Y = X_embedding(y, p-1, tau)
+  return np.delete(Y, 0, axis=0)
 
-  Y = np.zeros((len(y)-tau*p,p), dtype=np.float32)
-  for i in range(1, p+1):
-    Y[:,i-1] = np.roll(y, tau*i)[tau*p:]
-  return Y
 
-
-def EE(x, y, p, bin=5):
+def EE(x, y, p, bin=10):
   # x[time], y[time]
   # p: dimension
   X = X_embedding(x, p, bin)
   Y = Y_embedding(y, p, bin)
 
   # X, Y: embedded time series data
-  # X[time,dim], Y[time,dim]
+  # X[time, dim], Y[time, dim]
 
-  XNN = kNN(X, p)
-  XNN = np.reshape(XNN, [len(XNN[:,0,0]),-1])
-  nt  = min(len(XNN[:,0]), len(Y[:,0]))
+  # length of X must be longer than or equal to p+2
+  XNN, X, Y = kNN(p+2, X, Y)
+  # XNN[time, k, dim], Y[time, dim]
+  XNN = np.reshape(XNN, [XNN.shape[0],-1])
+  nt  = min(XNN.shape[0], Y.shape[0])
   MI  = 0.e0
   for i in range(p):
     MI += np.mean(mutual_info_regression(XNN[:nt,:], Y[:nt,i]))
