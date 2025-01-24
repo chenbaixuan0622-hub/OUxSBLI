@@ -1,9 +1,10 @@
 module set
-  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, dtn
+  use mod_globals, only : nx, ny, nz, gamma, R, dtn
   implicit none
 contains
-  subroutine set_grid(nx,ny,nz,xc,yc,zc,dx,dy,dz)
-    integer, intent(in)  :: nx, ny, nz
+  subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, xc, yc, zc, dx, dy, dz)
+    integer, intent(in)  :: myrank, nx, ny, nz
+    real(8), intent(in)  :: Lx, Ly, Lz
     real(8), intent(out) :: xc(nx), yc(ny), zc(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     real(8) x(nx+1), y(ny+1), z(nz+1)
     integer i, j, k
@@ -56,9 +57,9 @@ contains
     enddo
   end subroutine set_grid
   
-  subroutine set_init(nx,ny,nz,x,y,z,Q)
+  subroutine set_init(myrank, nx, ny, nz, x, y, z, Q)
     use mod_globals, only : pi, M0, rho0, u0, d1, d2
-    integer, intent(in)  :: nx, ny, nz
+    integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
     real(8), intent(out) :: Q(nx,ny,nz,5)
     integer i, j
@@ -81,11 +82,11 @@ contains
     enddo;enddo
   end subroutine set_init
   
-  subroutine set_bc(nx,ny,nz,Jacobian,Q,Qre)
-    integer, intent(in), value      :: nx, ny, nz
-    real(8), intent(in), device     :: Jacobian(ny)
-    real(8), intent(inout), device  :: Q(nx,ny,nz,5)
-    real(8), intent(in), device     :: Qre(2,ny,nz,5)
+  subroutine set_bc(myrank, nx, ny, nz, Jacobian, Q, Qre)
+    integer, intent(in), value     :: myrank, nx, ny, nz
+    real(8), intent(in), device    :: Jacobian(ny)
+    real(8), intent(inout), device :: Q(nx,ny,nz,5)
+    real(8), intent(in), device    :: Qre(2,ny,nz,5)
     integer i, j, k, l
     !$cuf kernel do(3)<<<*,*>>>
     do l = 1, 5

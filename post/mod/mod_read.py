@@ -97,6 +97,79 @@ def getMeanScalar(directory_path,vtk_files,Nx,Ny,Nz,name):
   return am
 
 
+class Vector_Data:
+  def __init__(self, dir):
+    self.dir = dir
+    files = [f for f in os.listdir(self.dir) if f.endswith(".vtr")]
+    files.sort(key=extract_number)
+    self.files = files
+    file = os.path.join(self.dir, files[0])
+    self.Nx, self.Ny, self.Nz, self.X, self.Y, self.Z = getGrid(file)
+
+  def getVector(self, file_path, name):
+    reader = vtk.vtkXMLRectilinearGridReader()
+    reader.SetFileName(file_path)
+    reader.Update()
+
+    # get dataset
+    Q = reader.GetOutput()
+    V = numpy_support.vtk_to_numpy(Q.GetPointData().GetArray(name))
+
+    u = np.reshape(V[:,0], [self.Nz,self.Ny,self.Nx])
+    v = np.reshape(V[:,1], [self.Nz,self.Ny,self.Nx])
+    w = np.reshape(V[:,2], [self.Nz,self.Ny,self.Nx])
+    return np.float32(u), np.float32(v), np.float32(w)
+  
+  def interp_xz(self, Lx1, Lx2, Ly1, Ly2, stridex, stridez, ny):
+    nx1 = int(Lx1 / self.X[-1] * self.Nx)
+    nx2 = int(Lx2 / self.X[-1] * self.Nx)
+    ix  = np.arange(nx1,  nx2, stridex)
+    iy  = np.arange(0, len(self.Y), 1)
+    iz  = np.arange(0, len(self.Z), stridez)
+    x   = self.X[ix]
+    z   = self.Z[iz]
+    y   = np.linspace(Ly1, Ly2, ny)
+    ix, iy, iz = np.meshgrid(ix, iy, iz)
+    return ix, iy, iz, x, y, z
+
+  def getVector_interp(self, file_path, name, Lx1, Lx2, Ly1, Ly2, stridex, stridez, ny):
+    U, V, W = self.getVector(file_path, name)
+    ix, iy, iz, x, y, z = self.interp_xz(Lx1, Lx2, Ly1, Ly2, stridex, stridez, ny)
+    u = U[iz,iy,ix].transpose(2,0,1)
+    v = V[iz,iy,ix].transpose(2,0,1)
+    w = W[iz,iy,ix].transpose(2,0,1)
+    nx, nz = len(x), len(z)
+    ui = np.zeros((nz,ny,nx), dtype=np.float32)
+    vi = np.zeros((nz,ny,nx), dtype=np.float32)
+    wi = np.zeros((nz,ny,nx), dtype=np.float32)
+    for k in range(nz):
+      for i in range(nx):
+        ui[k,:,i] = np.interp(y, self.Y, u[k,:,i])
+        vi[k,:,i] = np.interp(y, self.Y, v[k,:,i])
+        wi[k,:,i] = np.interp(y, self.Y, w[k,:,i])
+    return np.float32(ui), np.float32(vi), np.float32(wi), x, y, z
+  
+  def getMeanVector_interp(self, name, Lx1, Lx2, Ly1, Ly2, stridex, stridez, ny, path=None):
+    if path is not None:
+      umean, vmean, wmean, x, y, z = self.getVector_interp(path, 'velocity', Lx1, Lx2, Ly1, Ly2, stridex, stridez, ny)
+    else:
+      ix, iy, iz, x, y, z = self.interp_xz(Lx1, Lx2, Ly1, Ly2, stridex, stridez, ny)
+      nx, ny, nz = len(x), len(y), len(z)
+      umean = np.zeros((nz,ny,nx), dtype=np.float32)
+      vmean = np.zeros((nz,ny,nx), dtype=np.float32)
+      wmean = np.zeros((nz,ny,nx), dtype=np.float32)
+      for file in tqdm(self.files):
+        file_path = os.path.join(self.dir, file)
+        u, v, w, x, y, z = self.getVector_interp(file_path, name, Lx1, Lx2, Ly1, Ly2, stridex, stridez, ny)
+        umean += u
+        vmean += v
+        wmean += w
+      umean /= len(self.files)
+      vmean /= len(self.files)
+      wmean /= len(self.files)
+    return umean, vmean, wmean, x, y, z
+
+
 class Data:
   def __init__(self, dir, endT, Lx1=None, Lx2=None, Ly1=None, Ly2=None, Lz1=None, Lz2=None, \
                stridex=1, stridey=1, stridez=1):

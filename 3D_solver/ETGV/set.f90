@@ -2,10 +2,11 @@ module set
   use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, RHO0, M0, V0, p0, T, dtn
   implicit none
 contains
-  subroutine set_grid(nx,ny,nz,xc,yc,zc,dx,dy,dz)
+  subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, xc, yc, zc, dx, dy, dz)
     use mod_globals, only : id_accuracy
-    integer, intent(in)  :: nx, ny, nz
-    real(8), intent(out) :: xc(nx), yc(ny), zc(nz), dx(nx), dy(ny), dz(nz)
+    integer, intent(in)  :: myrank, nx, ny, nz
+    real(8), intent(in)  :: Lx, Ly, Lz
+    real(8), intent(out) :: xc(nx), yc(ny), zc(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     real(8) dx1, dy1, dz1, x(nx+1), y(ny+1), z(nz+1)
     integer i, j, k
     if (kind(id_accuracy) == 2) then
@@ -123,9 +124,9 @@ contains
     enddo
   end subroutine set_grid
   
-  subroutine set_init(nx,ny,nz,x,y,z,Q)
+  subroutine set_init(myrank, nx, ny, nz, x, y, z, Q)
     use mod_globals, only : id_accuracy
-    integer, intent(in)  :: nx, ny, nz
+    integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
     real(8), intent(out) :: Q(nx,ny,nz,5)
     integer i, j, k, offset
@@ -250,11 +251,12 @@ contains
     enddo;enddo
   end subroutine set_bc_init6
 
-  subroutine set_bc(nx,ny,nz,Jacobian,Q)
+  subroutine set_bc(myrank, nx, ny, nz, Jacobian, Q, Qre)
     use mod_globals, only : id_accuracy
-    integer, intent(in), value     :: nx, ny, nz
-    real(8), intent(in), device    :: Jacobian(nx,ny,nz)
+    integer, intent(in), value     :: myrank, nx, ny, nz
+    real(8), intent(in), device    :: Jacobian(ny)
     real(8), intent(inout), device :: Q(nx,ny,nz,5)
+    real(8), intent(in), device    :: Qre(ny*(nz-6)*5)
     integer i, j, k, l
     if (kind(id_accuracy) == 2) then
       !$cuf kernel do(3)<<<*,*>>>
