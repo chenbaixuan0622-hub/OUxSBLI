@@ -19,7 +19,7 @@ def X_embedding(x, p, tau=None, bin=10):
   if tau is None:
     tau, _ = search_tau(x, bin, len(x))
 
-  X = np.zeros((len(x)-tau*p,p+1), dtype=np.float32)
+  X = np.zeros((len(x)-tau*p,p+1), dtype=np.float64)
   for i in range(p+1):
     X[:,i] = np.roll(x, tau*i)[tau*p:]
   return X
@@ -50,7 +50,7 @@ def EE(x, y, p, bin=10):
   nt  = min(XNN.shape[0], Y.shape[0])
   MI  = 0.e0
   for i in range(p):
-    MI += np.mean(mutual_info_regression(XNN[:nt,:], Y[:nt,i]))
+    MI += np.mean(mutual_info_regression(XNN[:nt,:], Y[:nt,i], n_neighbors=5))
   MI /= p
   return MI
 

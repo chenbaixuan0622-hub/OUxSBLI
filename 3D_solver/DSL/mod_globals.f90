@@ -56,7 +56,7 @@ module mod_globals
   integer(kind=8), parameter :: id_accuracy = 0
   integer(kind=2), parameter :: id_tvd      = 0
   integer(kind=2), parameter :: id_keep     = 0
-  integer(kind=2), parameter :: id_slau     = 0
+  integer(kind=4), parameter :: id_slau     = 0
   integer(kind=2), parameter :: slau_wall   = 0
   integer(kind=2), parameter :: id_rescale  = 0
   real(8), parameter         :: blt         = 2.d-3
@@ -66,27 +66,28 @@ module mod_globals
   real(8), parameter :: Lx = 2.d0 * pi
   real(8), parameter :: Ly = 2.d0 * pi
   real(8), parameter :: Lz = 0.1 * Lx
-  integer, parameter :: nx = 129!257!513
-  integer, parameter :: ny = 129!257!513
+  integer, parameter :: nx = 513!129!257!513
+  integer, parameter :: ny = 513!129!257!513
   integer, parameter :: nz = 7
 
   integer, parameter :: nre1 = int(1.d0 * dble(nx) / 7.d0)
   integer, parameter :: nre2 = int(2.d0 * dble(nx) / 7.d0)
+  integer, parameter :: rerank = 0
 
-  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
-  type(dim3) :: blocksF   = dim3((nx-accuracy)/1,(ny-accuracy+1)/32,(nz-accuracy)/1)
-  type(dim3) :: blocksG   = dim3((nx-accuracy)/127,(ny-accuracy)/1,(nz-accuracy+1)/1)
-  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
-  type(dim3) :: blocksFv  = dim3((nx-accuracy)/1,(ny-accuracy+1)/32,(nz-accuracy)/1)
-  type(dim3) :: blocksGv  = dim3((nx-accuracy)/127,(ny-accuracy)/1,(nz-accuracy+1)/1)
-  type(dim3) :: blocks    = dim3((nx-accuracy)/127,(ny-accuracy)/1,(nz-accuracy)/1)
-  type(dim3) :: threadsE  = dim3(32,1,1)
-  type(dim3) :: threadsF  = dim3(1,32,1)
-  type(dim3) :: threadsG  = dim3(127,1,1)
-  type(dim3) :: threadsEv = dim3(32,1,1)
-  type(dim3) :: threadsFv = dim3(1,32,1)
-  type(dim3) :: threadsGv = dim3(127,1,1)
-  type(dim3) :: threads   = dim3(127,1,1)
+  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/64,(ny-accuracy)/1,(nz-accuracy)/1)
+  type(dim3) :: blocksF   = dim3((nx-accuracy)/1,(ny-accuracy+1)/64,(nz-accuracy)/1)
+  type(dim3) :: blocksG   = dim3((nx-accuracy)/73,(ny-accuracy)/1,(nz-accuracy+1)/1)
+  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/64,(ny-accuracy)/1,(nz-accuracy)/1)
+  type(dim3) :: blocksFv  = dim3((nx-accuracy)/1,(ny-accuracy+1)/64,(nz-accuracy)/1)
+  type(dim3) :: blocksGv  = dim3((nx-accuracy)/73,(ny-accuracy)/1,(nz-accuracy+1)/1)
+  type(dim3) :: blocks    = dim3((nx-accuracy)/73,(ny-accuracy)/1,(nz-accuracy)/1)
+  type(dim3) :: threadsE  = dim3(64,1,1)
+  type(dim3) :: threadsF  = dim3(1,64,1)
+  type(dim3) :: threadsG  = dim3(73,1,1)
+  type(dim3) :: threadsEv = dim3(64,1,1)
+  type(dim3) :: threadsFv = dim3(1,64,1)
+  type(dim3) :: threadsGv = dim3(73,1,1)
+  type(dim3) :: threads   = dim3(73,1,1)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -112,14 +113,14 @@ module mod_globals
   ! JAXA-SP-14-010
 
   ! initial condition
-  real(8), parameter :: M0   = 0.01d0
+  real(8), parameter :: M0   = 0.1d0
   real(8), parameter :: rho0 = 1.d0
   real(8), parameter :: u0   = 1.d0
   real(8), parameter :: d1   = pi / 15.d0
   real(8), parameter :: d2   = 0.05d0
-  real(8), parameter :: dt   = 0.25d0 * 1.d-3
+  real(8), parameter :: dt   = 0.25d0 * 0.25d0 * 1.d-3
   real(8), parameter :: endT = 8.d0
-  integer, parameter :: np   = 100
+  integer, parameter :: np   = 10
   integer, parameter :: nt   = int(endT / (dble(np) * dt))
 end module mod_globals
 

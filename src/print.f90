@@ -87,12 +87,12 @@ contains
     ans(:) = (/dwdy - dvdz, dudz - dwdx, dvdx - dudy/)
   end function vorticity
   
-  subroutine print_entropy(step,nx,ny,nz,rho,p,entropy0,myrank)
-    integer, intent(in)                       :: step, nx, ny, nz
-    real(8), intent(in), dimension(nx,ny,nz)  :: rho, p
-    real(8), intent(inout)                    :: entropy0
-    integer, intent(in), optional             :: myrank
-    real(8) entropy, t
+  subroutine print_entropy(step,nx,ny,nz,Jacobian,QJ,entropy0,myrank)
+    integer, intent(in)           :: step, nx, ny, nz
+    real(8), intent(in)           :: Jacobian(ny), QJ(nx,ny,nz,5)
+    real(8), intent(inout)        :: entropy0
+    integer, intent(in), optional :: myrank
+    real(8) rho, u, v, w, p, entropy, t
     character(len=40) filename
     integer i, j, k, accuracy, offset
     if (kind(id_accuracy) == 8) then
@@ -109,7 +109,12 @@ contains
     do k = 1+offset, nz-offset
       do j = 1+offset, ny-offset
         do i = 1+offset, nx-offset
-          entropy = entropy + rho(i,j,k) * log(p(i,j,k) * (rho(i,j,k)**(-gamma)))
+          rho     = Jacobian(j) * QJ(i,j,k,1)
+          u       = QJ(i,j,k,2) / QJ(i,j,k,1)
+          v       = QJ(i,j,k,3) / QJ(i,j,k,1)
+          w       = QJ(i,j,k,4) / QJ(i,j,k,1)
+          p       = (gamma - 1.d0) * (Jacobian(j) * QJ(i,j,k,5) - 0.5d0 * rho * (u**2 + v**2 + w**2))
+          entropy = entropy + rho * log(p * (rho**(-gamma)))
     enddo;enddo;enddo
     entropy = entropy / dble((nx-accuracy) * (ny-accuracy) * (nz-accuracy))
 
@@ -380,12 +385,12 @@ contains
     enddo;enddo;enddo
 
     if (nranks >= 4) then
-      !call print_entropy(step,nx,ny,nz,rho,p,entropy0,myrank)
+      call print_entropy(step,nx,ny,nz,Jacobian,QJ,entropy0,myrank)
       call print_KE(step,nx,ny,nz,Jacobian,QJ,ke0,myrank)
       !call print_enstrophy(step,nx,ny,nz,x,y,z,rho,omega,myrank)
       write(filename, "(a, i0, a, i5.5, a)") "data/",int(myrank),"/Q",int(step+step_offset),".vtr"
     else
-      !call print_entropy(step,nx,ny,nz,rho,p,entropy0)
+      call print_entropy(step,nx,ny,nz,Jacobian,QJ,entropy0)
       call print_KE(step,nx,ny,nz,Jacobian,QJ,ke0)
       !call print_enstrophy(step,nx,ny,nz,x,y,z,rho,omega)
       write(filename, "(a, i5.5, a)") "data/Q",int(step+step_offset),".vtr"
