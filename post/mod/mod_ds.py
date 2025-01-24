@@ -1,7 +1,9 @@
 import numpy as np
 from scipy.spatial.distance import euclidean
 from sklearn.preprocessing import KBinsDiscretizer
+from sklearn.feature_selection import mutual_info_regression
 from pyinform.mutualinfo import mutual_info
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 
@@ -70,8 +72,8 @@ def coupling_system(nt, x0, y0, bxy, byx, gx=3.7e0, gy=3.72e0):
   x[0] = x0
   y[0] = y0
   for i in range(nt):
-    epsx = np.random.normal(0.e0, 0.002e0)
-    epsy = np.random.normal(0.e0, 0.002e0)
+    epsx = np.random.normal(0.e0, 0.01e0)
+    epsy = np.random.normal(0.e0, 0.01e0)
     x[i+1] = x[i] * (gx - (gx - byx) * x[i] - byx * y[i]) + epsx
     y[i+1] = y[i] * (gy - (gy - bxy) * y[i] - bxy * x[i]) + epsy
   return x, y
@@ -102,25 +104,30 @@ def Takens_embedding(x, tau, dim):
   return xe
 
 
-def search_tau(x, bin, tau_max=100):
-  xs = KMeans(x, bin)
+def search_tau(time_series, plot=False):
+  n = len(time_series)
+  max_lag = n//2
+  mutual_info_values = []
 
-  nmi = []
-  res = None
+  for lag in range(1, max_lag + 1):
+    x  = time_series[:-lag].reshape(-1,1)
+    y  = time_series[lag:]
+    mi = mutual_info_regression(x, y, n_neighbors=5)
+    mutual_info_values.append(mi[0])
+  
+  mutual_info_values = np.array(mutual_info_values)
+  dmi = -mutual_info_values[:-1] + mutual_info_values[1:]
+  for lag in range(len(dmi)):
+    if dmi[lag] >= 0.e0:
+      tau = lag + 1
+      break
 
-  for tau in range(1, tau_max):
-    unlagged = xs[:-tau]
-    lagged   = np.roll(xs, -tau)[:-tau]
-    mi = mutual_info(unlagged, lagged)
-    nmi.append(mi)
-
-    if res is None and len(nmi) > 1 and nmi[-2] < nmi[-1]:
-      res = tau - 1
-
-  if res is None:
-    res = tau_max // 2
-
-  return res, nmi
+  if plot:
+    plt.plot(range(1, max_lag+1), mutual_info_values)
+    plt.xlabel("Lag")
+    plt.ylabel("MI")
+    plt.show()
+  return tau
 
 
 def KMeans(x, bin):

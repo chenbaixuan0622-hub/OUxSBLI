@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from mod.mod_plot import set_Params
 from mod.mod_info import EE
-from mod.mod_ds import case1, case2, case3, case4, coupling_system, discrete_logistic_map
+from mod.mod_ds import case1, case2, case3, case4, coupling_system, discrete_logistic_map, search_tau
 
 set_Params()
 
@@ -46,12 +46,12 @@ print("case 4 y->z:", EE4yz, "z->y", EE4zy)
 print("case 4 z->x:", EE4zx, "x->z", EE4xz)
 '''
 
-nt  = 250
+nt  = 1000
 
 # coupling system
 n   = 41
 byx = 0.e0
-bxy = np.linspace(0.e0, 0.4e0, n)
+bxy = np.linspace(0.e0, 0.40e0, n)
 
 x0  = 0.5e0
 y0  = 0.5e0
@@ -60,8 +60,8 @@ z0  = 0.5e0
 EExy = np.zeros(n)
 EEyx = np.zeros(n)
 
-trial = 100
-
+trial = 1
+ 
 for j in range(n):
   for i in range(trial):
     x, y = coupling_system(nt, x0, y0, bxy[j], byx)
@@ -71,15 +71,18 @@ for j in range(n):
   EEyx[j] /= trial
   print(EExy[j], EEyx[j])
 
+plt.plot(bxy, np.zeros_like(bxy), color='black')
 plt.plot(bxy, EExy, color='blue')
 plt.plot(bxy, EEyx, color='red')
+plt.plot(bxy, EExy - EEyx, color='green')
 plt.savefig("byx00.png")
 plt.show()
 
 
 byx = 0.1e0
-EExy = 0.e0
-EEyx = 0.e0
+
+EExy = np.zeros(n)
+EEyx = np.zeros(n)
 
 for j in range(n):
   for i in range(trial):
@@ -90,11 +93,14 @@ for j in range(n):
   EEyx[j] /= trial
   print(EExy[j], EEyx[j])
 
+plt.plot(bxy, np.zeros_like(bxy), color='black')
 plt.plot(bxy, EExy, color='blue')
 plt.plot(bxy, EEyx, color='red')
+plt.plot(bxy, EExy - EEyx, color='green')
 plt.savefig("byx01.png")
 plt.show()
 
+'''
 
 nt  = 500
 
@@ -117,4 +123,4 @@ plt.plot(bxz, EExz, color='blue')
 plt.plot(bxz, EEzx, color='red')
 plt.savefig("bxy02.png")
 plt.show()
-
+'''
