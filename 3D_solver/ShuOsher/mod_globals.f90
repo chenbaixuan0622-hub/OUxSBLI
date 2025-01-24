@@ -5,16 +5,12 @@ module mod_globals
   integer, parameter    :: accuracy  = 2
   integer, parameter    :: offset    = accuracy / 2
   integer(2), parameter :: id_visc   = 1
-  integer, parameter    :: id_turbulence = 0
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! kind2 Euler       !
   !               ! kind4 NS          !
   !               ! kind8 LES         !
   !               ! 1 2nd             !
   !               ! 2 4th             !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_turbulence ! 0 laminar         !
-  !               ! 1 SMS             !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_av         ! 0 no              !
   !               ! 1 Neumann         !
@@ -42,7 +38,6 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_slau     ! kind2 SLAU          !
   !             ! kind4 HR-SLAU2      !
-  !             ! kind8 VHR-SLAU2     !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! slau_wall   ! kind2 off           !
   !             ! kind4 on            !
@@ -54,9 +49,9 @@ module mod_globals
   integer, parameter         :: id_sensor   = 1
   real(8), parameter         :: threshold   = 0.4d0
   integer(kind=8), parameter :: id_accuracy = 0
-  integer(kind=4), parameter :: id_tvd      = 0
+  integer(kind=8), parameter :: id_tvd      = 0
   integer(kind=2), parameter :: id_keep     = 0
-  integer(kind=2), parameter :: id_slau     = 0
+  integer(kind=4), parameter :: id_slau     = 0
   integer(kind=2), parameter :: slau_wall   = 0
   integer(kind=2), parameter :: id_rescale  = 0
   real(8), parameter         :: blt         = 2.d-3
@@ -73,6 +68,7 @@ module mod_globals
 
   integer, parameter :: nre1 = int(1.d0 * dble(nx) / 7.d0)
   integer, parameter :: nre2 = int(2.d0 * dble(nx) / 7.d0)
+  integer, parameter :: rerank = 0
 
   ! GPU
   type(dim3) :: blocksE   = dim3((nx-accuracy+1)/128,(ny-accuracy)/1,(nz-accuracy)/1)
