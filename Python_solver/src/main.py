@@ -19,11 +19,11 @@ def main(nx, ny, nz, Lx, Ly, Lz, gamma, Rgas, dt, Nt, Np, M0, rho0, u0, p0, T0, 
   print_vtk(x, y, z, gamma, Q, 0, dir)
 
   # copy on device
-  dxj = jnp.array(dx, dtype=jnp.float32, device=device)
-  dyj = jnp.array(dy, dtype=jnp.float32, device=device)
-  dzj = jnp.array(dz, dtype=jnp.float32, device=device)
-  Jj  = jnp.array(J,  dtype=jnp.float32, device=device)
-  Qj  = jnp.array(Q / J[:,:,:,None], dtype=jnp.float32, device=device)
+  dxj = jnp.array(dx, dtype=jnp.float64, device=device)
+  dyj = jnp.array(dy, dtype=jnp.float64, device=device)
+  dzj = jnp.array(dz, dtype=jnp.float64, device=device)
+  Jj  = jnp.array(J,  dtype=jnp.float64, device=device)
+  Qj  = jnp.array(Q / J[:,:,:,None], dtype=jnp.float64, device=device)
 
   Cp = gamma * Rgas / (gamma - 1.e0)
   Pr = 0.71e0

@@ -3,7 +3,7 @@ import jax.numpy as jnp
 
 
 @jax.jit
-def calc_E(gamma:float, rho:jnp.float32, u:jnp.float32, v:jnp.float32, w:jnp.float32, p:jnp.float32):
+def calc_E(gamma:float, rho:jnp.float64, u:jnp.float64, v:jnp.float64, w:jnp.float64, p:jnp.float64):
   # rho, u, v, w, p [nz-2,ny-2,nx]
   E1 = 0.25e0 * (rho[:,:,:-1] + rho[:,:,1:]) * (u[:,:,:-1] + u[:,:,1:])
   E2 = E1 * 0.5e0 * (u[:,:,:-1] + u[:,:,1:]) + 0.5e0 * (p[:,:,:-1] + p[:,:,1:])
@@ -16,7 +16,7 @@ def calc_E(gamma:float, rho:jnp.float32, u:jnp.float32, v:jnp.float32, w:jnp.flo
 
 
 @jax.jit
-def calc_F(gamma:float, rho:jnp.float32, u:jnp.float32, v:jnp.float32, w:jnp.float32, p:jnp.float32):
+def calc_F(gamma:float, rho:jnp.float64, u:jnp.float64, v:jnp.float64, w:jnp.float64, p:jnp.float64):
   # rho, u, v, w, p [nz-2,ny,nx-2]
   F1 = 0.25e0 * (rho[:,:-1,:] + rho[:,1:,:]) * (v[:,:-1,:] + v[:,1:,:])
   F2 = F1 * 0.5e0 * (u[:,:-1,:] + u[:,1:,:])
@@ -29,7 +29,7 @@ def calc_F(gamma:float, rho:jnp.float32, u:jnp.float32, v:jnp.float32, w:jnp.flo
 
 
 @jax.jit
-def calc_G(gamma:float, rho:jnp.float32, u:jnp.float32, v:jnp.float32, w:jnp.float32, p:jnp.float32):
+def calc_G(gamma:float, rho:jnp.float64, u:jnp.float64, v:jnp.float64, w:jnp.float64, p:jnp.float64):
   # rho, u, v, w, p [nz,ny-2,nx-2]
   G1 = 0.25e0 * (rho[:-1,:,:] + rho[1:,:,:]) * (w[:-1,:,:] + w[1:,:,:])
   G2 = G1 * 0.5e0 * (u[:-1,:,:] + u[1:,:,:])

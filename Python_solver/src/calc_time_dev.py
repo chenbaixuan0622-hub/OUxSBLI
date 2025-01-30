@@ -8,8 +8,8 @@ from calc_visc import calc_Ev, calc_Fv, calc_Gv
 
 
 @jax.jit
-def calcR(dt:float, dx:jnp.float32, dy:jnp.float32, dz:jnp.float32, \
-          E:jnp.float32, F:jnp.float32, G:jnp.float32):
+def calcR(dt:float, dx:jnp.float64, dy:jnp.float64, dz:jnp.float64, \
+          E:jnp.float64, F:jnp.float64, G:jnp.float64):
   R = dt * (dy[None,:-1,None,None] * dz[:-1,None,None,None] * (-E[:,:,:-1,:] + E[:,:,1:,:]) \
           + dz[:-1,None,None,None] * dx[None,None,:-1,None] * (-F[:,:-1,:,:] + F[:,1:,:,:]) \
           + dx[None,None,:-1,None] * dy[None,:-1,None,None] * (-G[:-1,:,:,:] + G[1:,:,:,:]))
@@ -17,8 +17,8 @@ def calcR(dt:float, dx:jnp.float32, dy:jnp.float32, dz:jnp.float32, \
 
 
 @jax.jit
-def step1(dt:float, dx:jnp.float32, dy:jnp.float32, dz:jnp.float32, \
-          E:jnp.float32, F:jnp.float32, G:jnp.float32, Q:jnp.float32):
+def step1(dt:float, dx:jnp.float64, dy:jnp.float64, dz:jnp.float64, \
+          E:jnp.float64, F:jnp.float64, G:jnp.float64, Q:jnp.float64):
   R  = calcR(dt, dx, dy, dz, E, F, G)
   Q2 = jnp.zeros_like(Q)
   Q2 = Q2.at[1:-1,1:-1,1:-1,:].set(Q[1:-1,1:-1,1:-1,:] - R)
@@ -26,8 +26,8 @@ def step1(dt:float, dx:jnp.float32, dy:jnp.float32, dz:jnp.float32, \
 
 
 @jax.jit
-def step2(dt:float, dx:jnp.float32, dy:jnp.float32, dz:jnp.float32, \
-          E:jnp.float32, F:jnp.float32, G:jnp.float32, Q:jnp.float32, Q2:jnp.float32):
+def step2(dt:float, dx:jnp.float64, dy:jnp.float64, dz:jnp.float64, \
+          E:jnp.float64, F:jnp.float64, G:jnp.float64, Q:jnp.float64, Q2:jnp.float64):
   R  = calcR(dt, dx, dy, dz, E, F, G)
   Q3 = jnp.zeros_like(Q)
   Q3 = Q3.at[1:-1,1:-1,1:-1,:].set((0.25e0 * (3.e0 * Q[1:-1,1:-1,1:-1,:] + Q2[1:-1,1:-1,1:-1,:] - R)))
@@ -35,15 +35,15 @@ def step2(dt:float, dx:jnp.float32, dy:jnp.float32, dz:jnp.float32, \
 
 
 @jax.jit
-def step3(dt:float, dx:jnp.float32, dy:jnp.float32, dz:jnp.float32, \
-          E:jnp.float32, F:jnp.float32, G:jnp.float32, Q:jnp.float32, Q3:jnp.float32):
+def step3(dt:float, dx:jnp.float64, dy:jnp.float64, dz:jnp.float64, \
+          E:jnp.float64, F:jnp.float64, G:jnp.float64, Q:jnp.float64, Q3:jnp.float64):
   R = calcR(dt, dx, dy, dz, E, F, G)
   Q = Q.at[1:-1,1:-1,1:-1,:].set((Q[1:-1,1:-1,1:-1,:] + 2.e0 * Q3[1:-1,1:-1,1:-1,:] - 2.e0 * R) / 3.e0)
   return Q
 
 
 @jax.jit
-def calc_EFG(dx:jnp.float32, dy:jnp.float32, dz:jnp.float32, gamma:float, Rgas:float, Cp:float, Pr:float, J:jnp.float32, Q:jnp.float32):
+def calc_EFG(dx:jnp.float64, dy:jnp.float64, dz:jnp.float64, gamma:float, Rgas:float, Cp:float, Pr:float, J:jnp.float64, Q:jnp.float64):
   rho = Q[:,:,:,0] * J
   u   = Q[:,:,:,1] / Q[:,:,:,0]
   v   = Q[:,:,:,2] / Q[:,:,:,0]

@@ -1,7 +1,7 @@
 import numpy as np
 
 def set_J(nx, ny, nz, dx, dy, dz):
-  J = np.zeros((nz,ny,nx), dtype=np.float32)
+  J = np.zeros((nz,ny,nx), dtype=np.float64)
   for k in range(1,nz-1):
     for j in range(1,ny-1):
       for i in range(1,nx-1):
