@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from tqdm import tqdm
 from mod.mod_read import getGrid, getVector, extract_number, Data
+from mod.mod_plot import print_scalar
 
 
 def snapshot_pod(data):
@@ -86,6 +87,47 @@ def timewise_spod(data, num_divide, dt):
   return eigenvalues, eigenvectors, modes, freq
 
 
+def plot_reconstruction(POD_dir, x, y, z, modes, time_coef, num_modes, mean=None):
+  Nt = len(time_coef[:,0])
+  nx = len(x)
+  ny = len(y)
+  nz = len(z)
+  POD = np.dot(time_coef[:,:num_modes], modes[:,:num_modes].T)
+  if mean is not None:
+    POD = POD + mean[None,:]
+  POD = np.reshape(POD, [Nt,nz,ny,nx])
+  for i in range(Nt):
+    name = "POD" + str(i+1).zfill(5)
+    print_scalar(x, y, z, POD[i,:,:,:], POD_dir, "Mode", name)
+
+
+def plot_pod_results(POD_dir, x, y, z, t, eigenvalues, modes, time_coefficients, num_modes):
+  # energy
+  plt.figure(figsize=(4, 4))
+  plt.plot(range(1,11), eigenvalues[:num_modes*2] / np.sum(eigenvalues) * 100, 'o-')
+  plt.title('Energy Contribution of Modes')
+  plt.xlabel('Mode Index')
+  plt.ylabel('Energy (%)')
+  save_name = "energy_contribution.png"
+  save_path = os.path.join(POD_dir, save_name)
+  plt.savefig(save_path)
+  plt.close()
+
+  # space mode
+  nx = len(x)
+  ny = len(y)
+  nz = len(z)
+  for i in range(num_modes):
+    u = np.reshape(modes[:,i], [nz, ny, nx])
+    # write VTK file
+    name = "Mode" + str(i+1)
+    print_scalar(x, y, z, u, POD_dir, "Mode", name)
+
+  save_name = "POD_time_coef"
+  save_path = os.path.join(POD_dir, save_name)
+  np.save(save_path, time_coefficients)
+
+
 def reconstruct_spanwise_spod(U, Sigma, Vt, num_divide, num_modes):
   #  data[Nt, Nb, Nf]
   #     U[Nf, Nt, Nt]
@@ -126,7 +168,7 @@ def reconstruct_timewise_spod(eigenvalues, eigenvectors, modes, num_divide, num_
   data = data.reshape([Nx,Nt])
   return data
 
-
+'''
 def plot_reconstruction(Q_dir, x, z, data, SPOD, name, interval=200):
   # data[Nt, nx, nz]
   Nt   = len(data[:,0,0])
@@ -165,7 +207,7 @@ def plot_reconstruction(Q_dir, x, z, data, SPOD, name, interval=200):
 
   save_path = os.path.join(Q_dir, name)
   ani.save(save_path, writer='Pillow')
-
+'''
 
 def plot_reconstruction_DMD(Q_dir, x, y, D, D2, name, interval=200):
   # D, D2 [space, time]
@@ -323,4 +365,43 @@ def make_data3D(Q_dir, endT, Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, stridex, stridey, str
     D[:,itr] = u.flatten()
     itr += 1
   return x, y, z, t, D
+
+
+def make_data_combine(Q_dir, endT, Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, stridex, stridey, stridez):
+  data1 = Data(Q_dir[0], endT, Lx1=Lx1, Lx2=None, Ly1=Ly1, Ly2=Ly2, Lz1=Lz1, Lz2=Lz2, \
+               stridex=1, stridey=stridey, stridez=stridez)
+  data2 = Data(Q_dir[1], endT, Lx1=None, Lx2=Lx2, Ly1=Ly1, Ly2=Ly2, Lz1=Lz1, Lz2=Lz2, \
+               stridex=1, stridey=stridey, stridez=stridez)
+  Nx1, Ny, Nz, indicesx1, indicesy1, indicesz1, x1, y, z, t = data1.make_grid()
+  Nx2, _,  _,  indicesx2, indicesy2, indicesz2, x2, _, _, _ = data2.make_grid()
+ 
+  def read_data(Q_dir, t, Nx, Ny, Nz, indicesx, indicesy, indicesz):
+    Q_files = [f for f in os.listdir(Q_dir) if f.endswith(".vtr")]
+    Q_files.sort(key=extract_number)
+    ny, nx, nz = indicesx.shape
+
+    U = np.zeros((len(t), nz, ny, nx), dtype=np.float32)
+    V = np.zeros((len(t), nz, ny, nx), dtype=np.float32)
+    W = np.zeros((len(t), nz, ny, nx), dtype=np.float32)
+    
+    itr = 0
+    for Q_file in tqdm(Q_files):
+      file_path = os.path.join(Q_dir, Q_file)
+      u, v, w = getVector(file_path, Nx, Ny, Nz, 'velocity')
+      U[itr,:,:,:] = u[indicesz,indicesy,indicesx].transpose(2,0,1)
+      V[itr,:,:,:] = v[indicesz,indicesy,indicesx].transpose(2,0,1)
+      W[itr,:,:,:] = w[indicesz,indicesy,indicesx].transpose(2,0,1)
+      itr += 1
+    return U, V, W
+  
+  U1, V1, W1 = read_data(Q_dir[0], t, Nx1, Ny, Nz, indicesx1, indicesy1, indicesz1)
+  U2, V2, W2 = read_data(Q_dir[1], t, Nx2, Ny, Nz, indicesx2, indicesy2, indicesz2)
+  U = np.concatenate([U1, U2[:,:,:,3:]], axis=3)
+  V = np.concatenate([V1, V2[:,:,:,3:]], axis=3)
+  W = np.concatenate([W1, W2[:,:,:,3:]], axis=3)
+  U = U[:,:,:,::stridex]
+  V = V[:,:,:,::stridex]
+  W = W[:,:,:,::stridex]
+  x = np.linspace(x1[0], x2[-1], U.shape[-1])
+  return x, y, z, t, U, V, W
 
