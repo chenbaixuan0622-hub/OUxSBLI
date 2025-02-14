@@ -1,7 +1,8 @@
 import numpy as np
+import os
 import vtk
 
-def print_vtk(x, y, z, gamma, Q, num):
+def print_vtk(x, y, z, gamma, Q, num, dir):
   rho1d = np.float32(Q[:,:,:,0].flatten())
   u1d   = np.float32((Q[:,:,:,1] / Q[:,:,:,0]).flatten())
   v1d   = np.float32((Q[:,:,:,2] / Q[:,:,:,0]).flatten())
@@ -9,7 +10,7 @@ def print_vtk(x, y, z, gamma, Q, num):
   p1d   = np.float32((gamma - 1.e0) * \
           (Q[:,:,:,4] - 0.5e0 * (Q[:,:,:,1]**2 + Q[:,:,:,2]**2 + Q[:,:,:,3]**2) / Q[:,:,:,0]).flatten())
   
-  directory = "data"
+  directory = dir
   os.makedirs(directory, exist_ok=True)
   filename  = "Q" + str(num).zfill(5) + ".vtr" 
   filepath  = os.path.join(directory, filename)

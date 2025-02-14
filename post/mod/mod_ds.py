@@ -1,114 +1,66 @@
 import numpy as np
 from scipy.spatial.distance import euclidean
-from sklearn.preprocessing import KBinsDiscretizer
+from sklearn.feature_selection import mutual_info_regression
 from pyinform.mutualinfo import mutual_info
-from tqdm import tqdm
-
-
-def lorenz(x, y, z, s=10.e0, r=28.e0, b=8.e0/3.e0):
-  dot_x = s * (y - x)
-  dot_y = r * x - y - x * z
-  dot_z = x * y - b * z
-  return dot_x, dot_y, dot_z
-
-
-def case1(nt):
-  x = np.zeros(nt+1)
-  y = np.zeros(nt+1)
-  x[0] = 0.1e0
-  y[0] = 0.2e0
-  for i in range(nt):
-    x[i+1] = 3.81e0 * x[i] * (1.e0 - x[i])
-    y[i+1] = 3.82e0 * y[i] * (1.e0 - y[i])
-  return x, y
-
-
-def case2(nt, w):
-  x = np.zeros(nt+1)
-  y = np.zeros(nt+1)
-  x[0] = 0.1e0
-  y[0] = 0.2e0
-  for i in range(nt):
-    x[i+1] = 3.81e0 * x[i] * (1.e0 - x[i])
-    y[i+1] = (1.e0 - w) * 3.82e0 * y[i] * (1.e0 - y[i]) \
-            + w * 3.81e0 * x[i] * (1.e0 - x[i])
-  return x, y
-
-
-def case3(nt, w):
-  x = np.zeros(nt+1)
-  y = np.zeros(nt+1)
-  x[0] = 0.1e0
-  y[0] = 0.2e0
-  for i in range(nt):
-    x[i+1] = (1.e0 - w) * 3.81e0 * x[i] * (1.e0 - x[i]) \
-            + w * 3.82e0 * y[i] * (1.e0 - y[i])
-    y[i+1] = (1.e0 - w) * 3.82e0 * y[i] * (1.e0 - y[i]) \
-            + w * 3.81e0 * x[i] * (1.e0 - x[i])
-  return x, y
-
-
-def case4(nt, w):
-  x = np.zeros(nt+1)
-  y = np.zeros(nt+1)
-  z = np.zeros(nt+1)
-  x[0] = 0.1e0
-  y[0] = 0.2e0
-  z[0] = 0.3e0
-  for i in range(nt):
-    z[i+1] = 3.8e0 * z[i] * (1.e0 - z[i])
-    x[i+1] = (1.e0 - w) * 3.81e0 * x[i] * (1.e0 - x[i]) \
-            + w * 3.82e0 * z[i] * (1.e0 - z[i])
-    y[i+1] = (1.e0 - w) * 3.82e0 * y[i] * (1.e0 - y[i]) \
-            + w * 3.81e0 * z[i] * (1.e0 - z[i])
-  return x, y, z
+import matplotlib.pyplot as plt
 
 
 def Takens_embedding(x, tau, dim):
-  xe = np.zeros((len(x)-(dim-1),dim), dtype=np.float32)
-  xe[:,0] = x[:-(dim-1)]
+  xe = np.zeros((len(x)-tau*(dim-1),dim), dtype=np.float64)
+  xe[:,0] = x[:-tau*(dim-1)]
   for i in range(1,dim):
-    xe[:,i] = np.roll(x, -tau*i)[:-(dim-1)]
+    xe[:,i] = np.roll(x, -tau*i)[:-tau*(dim-1)]
   return xe
 
 
-def search_tau(x, bin, tau_max=100):
-  xs = KMeans(x, bin)
+def search_tau(time_series, plot=False):
+  n = len(time_series)
+  max_lag = n//2
+  mutual_info_values = []
 
-  nmi = []
-  res = None
+  if plot:
+    for lag in range(1, max_lag + 1):
+      x  = time_series[:-lag].reshape(-1,1)
+      y  = time_series[lag:]
+      mi = mutual_info_regression(x, y, n_neighbors=5)
+      mutual_info_values.append(mi[0])
+    mutual_info_values = np.array(mutual_info_values)
+    dmi = -mutual_info_values[:-1] + mutual_info_values[1:]
+    for lag in range(len(dmi)):
+      if dmi[lag] >= 0.e0:
+        tau = lag
+        break
+    plt.plot(range(1, max_lag+1), mutual_info_values)
+    plt.xlabel("Lag")
+    plt.ylabel("MI")
+    plt.show()
+  else:
+    mi_old = 1e10
+    for lag in range(1, max_lag + 1):
+      x  = time_series[:-lag].reshape(-1,1)
+      y  = time_series[lag:]
+      mi = mutual_info_regression(x, y, n_neighbors=5)
+      if mi - mi_old >= 0.e0:
+        tau = lag
+        break
+      mi_old = mi
+  return tau
 
-  for tau in range(1, tau_max):
-    unlagged = xs[:-tau]
-    lagged   = np.roll(xs, -tau)[:-tau]
-    mi = mutual_info(unlagged, lagged)
-    nmi.append(mi)
 
-    if res is None and len(nmi) > 1 and nmi[-2] < nmi[-1]:
-      res = tau - 1
-
-  if res is None:
-    res = tau_max // 2
-
-  return res, nmi
-
-
-def KMeans(x, bin):
-  est = KBinsDiscretizer(n_bins=bin, encode='onehot', strategy='kmeans')
-  x = x.reshape(-1, 1)
-  x_binned = est.fit_transform(x)
-  return x_binned.indices
-
-
-def kNN(X, k):
-  nt  = len(X[:,0])
-  dim = len(X[0,:])
-  XNN = np.zeros((nt,k,dim), dtype=np.float32)
-  for i in tqdm(range(nt)):
-    distance   = [euclidean(X[i,:], X[j,:]) if i != j else np.inf for j in range(nt)]
-    nn_indices = np.argsort(distance)[:k]
-    XNN[i,:,:] = X[nn_indices,:]
-  return XNN
+def kNN(k, X, Y=None):
+  if X.shape[0] < k:
+    raise Exception("time series data is too short")
+  nt  = X.shape[0] - k + 1
+  dim = X.shape[1]
+  XNN = np.zeros((nt, k, dim), dtype=np.float64)
+  for i in range(k, nt + k):
+    d = [euclidean(X[i-1,:], X[j,:]) for j in range(i)]
+    indices = np.argsort(d)[:k]
+    XNN[i-k,:,:] = X[indices,:]
+  if Y is not None:
+    return XNN, X[k-1:,:], Y[k-1:,:]
+  else:
+    return XNN, X[k-1:,:]
 
 
 def local_constant_pred(t, x, m, dim, k):
