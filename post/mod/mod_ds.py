@@ -47,6 +47,24 @@ def search_tau(time_series, plot=False):
   return tau
 
 
+def X_embedding(x, p, tau=None):
+  if tau is None:
+    tau = search_tau(x)
+  X = np.zeros((len(x)-tau*p,p+1))
+  for i in range(p+1):
+    X[:,i] = np.roll(x, tau*i)[tau*p:]
+  return X, tau
+
+
+def Y_embedding(y, p, tau=None):
+  if tau is None:
+    tau = search_tau(y)
+    Y, _ = X_embedding(y, p-1, tau)
+  else:
+    Y, _ = X_embedding(y, p-1, tau)
+  return np.delete(Y, 0, axis=0)
+
+
 def kNN(k, X, Y=None):
   if X.shape[0] < k:
     raise Exception("time series data is too short")

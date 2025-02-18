@@ -4,7 +4,7 @@ from sklearn.metrics.pairwise import pairwise_distances
 from scipy.stats import norm
 
 
-@njit(cache=True, fastmath=True, nogil=True)
+#@njit(cache=True, fastmath=True, nogil=True)
 def recurrence_plot(x):
   n = len(x)
   D = np.zeros((n,n), dtype=np.float32)
