@@ -1,9 +1,12 @@
 import numpy as np
+import jax
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from mod.mod_Poisson import Poisson
+from mod.mod_BiCGStab import BiCGStab
 
-
+'''
 #1D problems###################################################
 # parameters
 n   = 30
@@ -50,7 +53,7 @@ p_th = 0.5e0 * x**2 + x - 0.5e0
 plt.plot(x, p3, color='blue')
 plt.plot(x, p_th,  'o', color='black', markerfacecolor='white')
 plt.show()
-
+'''
 
 #2D problems###################################################
 nx = 33
@@ -140,6 +143,24 @@ fig, ax = plt.subplots(figsize=(8, 8))
 ax.set_aspect('equal', adjustable='box')
 X, Y = np.meshgrid(xc, yc)
 im = ax.contourf(X, Y, p6, levels=100, cmap='jet')
+divider = make_axes_locatable(ax)
+cax = divider.append_axes('right', '5%', pad='3%')
+fig.colorbar(im, cax=cax, extendrect=True)
+fig.tight_layout()
+
+plt.show()
+
+
+p7 = np.zeros_like(p6, dtype=np.float32)
+f  = np.zeros_like(p7, dtype=np.float32)
+p7 = jnp.array(p7)
+f  = jnp.array(f)
+p7 = BiCGStab(p7, f, dx, dy)
+
+fig, ax = plt.subplots(figsize=(8, 8))
+ax.set_aspect('equal', adjustable='box')
+X, Y = np.meshgrid(xc, yc)
+im = ax.contourf(X, Y, p7, levels=100, cmap='jet')
 divider = make_axes_locatable(ax)
 cax = divider.append_axes('right', '5%', pad='3%')
 fig.colorbar(im, cax=cax, extendrect=True)

@@ -3,6 +3,25 @@ from numba import njit
 import matplotlib.pyplot as plt
 
 
+def RK4(func, X0, sets):
+  """
+  Runge Kutta 4 solver.
+  """
+  n_x, dt, n_data, h, c, A, sigma = sets
+  func_sets = (n_x, h, c, A, sigma)
+  X  = np.zeros([n_data, len(X0)])
+  X[0] = X0
+  ti = 0
+  for i in range(n_data-1):
+    k1 = func(X[i], ti, func_sets)
+    k2 = func(X[i] + dt/2. * k1, ti + dt/2., func_sets)
+    k3 = func(X[i] + dt/2. * k2, ti + dt/2., func_sets)
+    k4 = func(X[i] + dt    * k3, ti + dt, func_sets)
+    X[i+1] = X[i] + dt / 6. * (k1 + 2. * k2 + 2. * k3 + k4)
+    ti += dt
+  return X
+
+
 @njit(cache=True, nogil=True)
 def lorenz(nt=1000, dt=0.01e0, x0=0.e0, y0=1.e0, z0=1.05e0, s=10.e0, r=28.e0, b=8.e0/3.e0):
   x = np.zeros(nt+1)
@@ -19,6 +38,15 @@ def lorenz(nt=1000, dt=0.01e0, x0=0.e0, y0=1.e0, z0=1.05e0, s=10.e0, r=28.e0, b=
     y[i+1] = y[i] + dot_y * dt
     z[i+1] = z[i] + dot_z * dt
   return x, y, z
+
+
+@njit(cache=True, nogil=True)
+def logistic_map(nt, x, r):
+  data = np.zeros(n, dtype=np.float64)
+  for i in range(n):
+    x = r * x * (1.e0 - x)
+    data[i] = x
+  return data
 
 
 @njit(cache=True, nogil=True)
@@ -48,8 +76,20 @@ def discrete_logistic_map(nt, x0, y0, z0, bxy, byz, bxz, gx=3.7e0, gy=3.72e0, gz
   return x, y, z
 
 
+def coupled_Lorenz(x, t, sets):
+  # Lorenz system is time-invariant, no need to use the input t
+  n_x, h, c, A, sigma = sets
+  r = np.zeros(x.shape)
+  noise = np.random.normal(loc=0, scale=sigma, size=3*n_x)
+  for k in range(n_x):
+    r[k*3+0]= -10*(x[k*3+0]-x[k*3+1] +c*A[k]@(x[1::3]-x[k*3+1])) + noise[0+k*3]
+    r[k*3+1]= 28*(1+h[k])*x[k*3+0]-x[k*3+1] - x[k*3+0]*x[k*3+2] + noise[1+k*3]
+    r[k*3+2]= -8/3*x[k*3+2]+x[k*3+0]*x[k*3+1] + noise[2+k*3]
+  return r
+
+
 @njit(cache=True, nogil=True)
-def coupled_lorenz(nt=1000, dt=0.01e0, a=10.e0, b=28.e0, c=8.e0/3.e0, bxy=0.3e0, bxz=0.2e0):
+def coupled_lorenz9(nt=1000, dt=0.01e0, a=10.e0, b=28.e0, c=8.e0/3.e0, bxy=0.3e0, bxz=0.2e0):
   byz = bxy
   x1 = np.zeros(nt+1)
   x2 = np.zeros(nt+1)
@@ -89,4 +129,26 @@ def coupled_lorenz(nt=1000, dt=0.01e0, a=10.e0, b=28.e0, c=8.e0/3.e0, bxy=0.3e0,
     z2[i+1] = z2[i] + dot_z2 * dt
     z3[i+1] = z3[i] + dot_z3 * dt
   return x1, x2, x3, y1, y2, y3, z1, z2, z3
+
+
+def gen_data_norm(n_x, A, n_data, c = 0.3, sigma_dyn = 0, sigma_obs = 0, dt = 0.01):
+  h  = 2*(np.random.rand(n_x)-0.5)*0.06
+    
+  setting = (n_x, dt, n_data, h, c, A, sigma_dyn)
+  u0 = np.array([7.432487609628195, 10.02071718705213, 29.62297428638419])
+  x0 = u0 + np.random.random((n_x,3))*0.3
+
+  # X = gen_data(setting, x0)
+  X = RK4(coupled_Lorenz, x0.flatten(), setting)
+    
+  q1 = np.percentile(X, 25, interpolation='midpoint', axis=0)
+  q2 = np.percentile(X, 50, interpolation='midpoint', axis=0)
+  q3 = np.percentile(X, 75, interpolation='midpoint', axis=0)
+
+  X = (X - q2)/(q3 - q1)
+    
+  if sigma_obs != 0:
+    noise_obs = np.random.normal(loc=0, scale=sigma_obs, size=X.shape)
+    X += noise_obs
+  return X
 

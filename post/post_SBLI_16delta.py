@@ -1,10 +1,12 @@
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+from scipy.signal import welch
 from tqdm import tqdm
 from mod.mod_plot import set_Params
 from mod.mod_read import getGrid, getScalar, getVector, extract_number
 from mod.mod_POD import snapshot_pod, calc_time_coef, plot_pod_results, plot_reconstruction
+from mod.mod_DMD import DMD
 from mod.mod_shannon_nn import embedding_entropy_surrogate as embedding_entropy
 from mod.mod_shannon_nn import transfer_entropy_surrogate as transfer_entropy
 from mod.mod_plot import print_scalar
@@ -12,8 +14,9 @@ from mod.mod_plot import print_scalar
 
 set_Params()
 
+
 # parameter
-dir   = "../../SBLI"
+dir   = "../../SBLI_16delta"
 Q_dir = [os.path.join(dir, "9"), os.path.join(dir, "11")]
 Lx1   = 29.e-3
 Lx2   = 36.e-3
@@ -103,40 +106,23 @@ def calc_POD(dir, name, endT, num_modes):
   plot_reconstruction(POD_dir, x, y, z, modes, time_coef, num_modes, mean=mean)
 
 
-def time_series(div_dir, sepa_dir, endT, lx1, lx2, ly, lz1, lz2):
-  files1 = [f for f in os.listdir(div_dir)  if f.endswith(".vtr")]
-  files2 = [f for f in os.listdir(sepa_dir) if f.endswith(".vtr")]
-  files1.sort(key=extract_number)
-  files2.sort(key=extract_number)
-  Nx1, Ny1, Nz1, x1, y1, z1 = getGrid(os.path.join(div_dir,  files1[0]))
-  Nx2, Ny2, Nz2, x2, y2, z2 = getGrid(os.path.join(sepa_dir, files2[0]))
-  Nt = len(files1)
-  t  = np.linspace(0.e0, endT, Nt)
-  nx1 = int(Nx1 * lx1 / x1[-1])
-  nx2 = int(Nx1 * lx2 / x1[-1])
-  nz1 = int(Nz1 * lz1 / z1[-1])
-  nz2 = int(Nz1 * lz2 / z1[-1])
-  for j in range(len(y1)):
-    if ly < y1[j]:
-      ny = j
-      break
+def calc_DMD(dir, name, endT, num_ranks):
+  files = [f for f in os.listdir(dir) if f.endswith(".vtr")]
+  files.sort(key=extract_number)
+  Nx, Ny, Nz, x, y, z = getGrid(os.path.join(dir, files[0]))
+  Nt = len(files)
+  dt = endT / Nt
+  D  = np.zeros((Nx*Ny*Nz, Nt), dtype=np.float32)
   itr = 0
-  x_div  = np.zeros(Nt)
-  x_sepa = np.zeros(Nt)
-  for file in tqdm(files1):
-    file_path1 = os.path.join(div_dir,  file)
-    file_path2 = os.path.join(sepa_dir, file)
-    Div = getScalar(file_path1, Nx1, Ny1, Nz1, "div")
-    U   = getScalar(file_path2, Nx2, Ny2, Nz2, "u")
-    div = np.mean(Div[nz1:nz2,ny,nx1:nx2], axis=0)
-    u   = np.mean(  U[nz1:nz2,1,:],        axis=0)
-    #x_div[itr]  = x1[]
-    #x_sepa[itr] = x2[]
-  np.save(os.path.join(div_dir,  "div_time_series"),  x_div)
-  np.save(os.path.join(sepa_dir, "sepa_time_series"), x_sepa)
-  plt.plot(t, x_div)
-  plt.plot(t, x_sepa)
-  plt.show()
+  for file in tqdm(files):
+    file_path = os.path.join(dir, file)
+    p = getScalar(file_path, Nx, Ny, Nz, name)
+    D[:,itr] = p.flatten()
+    itr += 1
+  dmd = DMD(D, dt)
+  dmd.exec(num_ranks)
+  dmd.plot_energy()
+  dmd.plot_eig()
 
 
 def calc_causality_POD(div_dir, sepa_dir, endT, num_modes):
@@ -145,9 +131,25 @@ def calc_causality_POD(div_dir, sepa_dir, endT, num_modes):
   time_coef_div  = np.load(path_div)
   time_coef_sepa = np.load(path_sepa)
   data = np.concatenate((time_coef_div[:,:num_modes], time_coef_sepa[:,:num_modes]), axis=-1)
-  for i in range(data.shape[0]):
+
+  
+  Nt = 500
+  dt = endT / Nt
+  '''
+  for i in range(num_modes):
+    freq, psd_div  = welch(time_coef_div[:,i],  fs=1.e0 / dt, nperseg=Nt//2)
+    freq, psd_sepa = welch(time_coef_sepa[:,i], fs=1.e0 / dt, nperseg=Nt//2)
+
+    plt.loglog(freq, psd_div)
+    plt.show()
+    plt.loglog(freq, psd_sepa)
+    plt.show()
+
+  for i in range(num_modes):
     plt.plot(data[:,i])
     plt.show()
+  '''
+
   # causal map
   n   = data.shape[1]
   Map = np.zeros((n,n))
@@ -156,8 +158,8 @@ def calc_causality_POD(div_dir, sepa_dir, endT, num_modes):
       if i == j:
         Map[j,i] = np.inf
       else:
-        #Map[j,i] = embedding_entropy(data[:,i], data[:,j], p=2*num_modes, k=5, Thei=1)
-        Map[j,i] = transfer_entropy(data[:,i], data[:,j], k=5, Thei=1)
+        Map[j,i] = embedding_entropy(data[:,i], data[:,j], p=2*num_modes, k=5, Thei=1)
+        #Map[j,i] = min(transfer_entropy(data[:,i], data[:,j], k=5, Thei=1), 0.5)
   plt.imshow(Map, cmap='jet', extent=None, origin='lower')
   plt.xlabel("Effect", fontsize=24)
   plt.ylabel("Cause", fontsize=24)
@@ -172,16 +174,11 @@ os.makedirs(sepa_dir, exist_ok=True)
 
 
 num_modes = 9
-make_div_separation(Q_dir, Lx1, Lx2, Ly1, Ly2, Lz1, Lz2)
-calc_POD(div_dir, "div", endT, num_modes)
-calc_POD(sepa_dir, "u", endT, num_modes)
-'''
-lx1 =
-lx2 =
-ly  =
-lz1 =
-lz2 =
-time_series(div_dir, sepa_dir, endT, lx1, lx2, ly, lz1, lz2)
-'''
-calc_causality_POD(div_dir, sepa_dir, endT, num_modes)
+num_ranks = 9
+#make_div_separation(Q_dir, Lx1, Lx2, Ly1, Ly2, Lz1, Lz2)
+#calc_POD(div_dir, "div", endT, num_modes)
+#calc_POD(sepa_dir,  "u", endT, num_modes)
+#calc_causality_POD(div_dir, sepa_dir, endT, num_modes)
+calc_DMD(div_dir, "div", endT, num_ranks)
+#calc_DMD(sepa_dir,  "u", endT, num_ranks)
 
