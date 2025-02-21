@@ -217,16 +217,19 @@ def train_ESN(N_washout, N_train, N_tstart, N_test, net, X):
   '''
     arg: X[time, dim]
   '''
-  N_dim   = X.shape[1] # dimension of inputs (and outputs)
-  N_units = 100 * N_dim #units in the reservoir 
+  N_dim     = X.shape[1]  # dimension of inputs (and outputs)
+  N_units   = 100 * N_dim #units in the reservoir 
+  N_evo     = 20
+  offset    = np.random.randint(N_test - N_evo)
   
   X_washout = X[:N_washout]
-  X_t = X[N_washout:N_washout+N_train-1]
-  Y_t = X[N_washout+1:N_washout+N_train]
-  X_test = X[N_tstart:]
+  X_t       = X[N_washout:N_washout+N_train-1]
+  Y_t       = X[N_washout+1:N_washout+N_train]
+  X_test    = X[N_tstart:]
 
   esn = net(N_units, N_dim, N_dim)
-  esn.train(X_washout, X_t, Y_t)
+  #esn.train(X_washout, X_t, Y_t)
+  esn.train_optim(X, N_washout, N_train, N_test, N_evo, N_tstart, offset)
 
   r0s = []
   for pic in range(10):
@@ -234,11 +237,8 @@ def train_ESN(N_washout, N_train, N_tstart, N_test, net, X):
 
     axs = fig.subplots(1, 2)
 
-    N_evo = 20
-    offset = np.random.randint(N_test - N_evo)
     X_test_washout = X[N_tstart - N_washout + offset:N_tstart + offset]
     Y = X[N_tstart + offset : N_tstart + offset + N_evo + 1]
-    X_delay = Y[:0]
 
     # idle iteration
     r0 = esn.open_loop(X_test_washout, np.zeros(N_units))[-1]
