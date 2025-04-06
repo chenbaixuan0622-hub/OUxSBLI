@@ -8,3 +8,5 @@
 *.err
 post/__pycache__/
 post/mod/__pycache__/
+post/mod_AI/__pycache__/
+

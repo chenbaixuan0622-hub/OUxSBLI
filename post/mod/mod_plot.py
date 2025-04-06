@@ -115,11 +115,11 @@ def print_slice(x, y, z, rho, u, v, w, p, directory, name):
   writer.Write()
 
 
-def print_VTK(x, y, z, u, dir, name):
-  u1d = np.float32(u.flatten())
+def print_scalar(x, y, z, p, dir, name, filename):
+  p1d = np.float32(p.flatten())
 
   os.makedirs(dir, exist_ok=True)
-  filename  = name + ".vtr" 
+  filename  = filename + ".vtr" 
   filepath  = os.path.join(dir, filename)
 
   x_coords = vtk.vtkFloatArray()
@@ -146,11 +146,11 @@ def print_VTK(x, y, z, u, dir, name):
   grid.SetYCoordinates(y_coords)
   grid.SetZCoordinates(z_coords)
 
-  u = vtk.vtkFloatArray()
-  u.SetName("u")
+  p = vtk.vtkFloatArray()
+  p.SetName(name)
   for i in range(nx * ny * nz):
-    u.InsertNextValue(u1d[i])
-  grid.GetPointData().AddArray(u)
+    p.InsertNextValue(p1d[i])
+  grid.GetPointData().AddArray(p)
 
   writer = vtk.vtkXMLRectilinearGridWriter()
   writer.SetFileName(filepath)

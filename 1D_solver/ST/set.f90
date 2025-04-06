@@ -1,17 +1,14 @@
 module set
-  use mod_globals, only : nx, Lx, gamma, R, rho0, rho1, p0, p1
+  use mod_globals, only : nx, Lx, dx, gamma, R, rho0, rho1, p0, p1
   implicit none
 contains
-  subroutine set_grid(nx,x,dx)
+  subroutine set_grid(nx, x)
     integer, intent(in)  :: nx
-    real(8), intent(out) :: x(nx), dx(nx)
+    real(8), intent(out) :: x(nx)
     integer i
-    real(8) dx1
-    dx1 = Lx / dble(nx-5)
     x(1) = 0.d0
     do i = 1, nx-1
-      dx(i) = dx1
-      x(i+1) = x(i) + dx(i)
+      x(i+1) = x(i) + dx
     enddo
   end subroutine set_grid
   

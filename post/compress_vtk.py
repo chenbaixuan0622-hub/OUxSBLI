@@ -1,17 +1,21 @@
 import numpy as np
 import os
 import vtk
-from mod.mod_read import getGrid
+from tqdm import tqdm
+from mod.mod_read import getGrid, getScalar, getVector, extract_number
 
-def print_vtk(x, y, z, rho, u, v, w, p, directory, name):
-  rho1d  = np.float32(rho.flatten())
-  u1d    = np.float32(u.flatten())
-  v1d    = np.float32(v.flatten())
-  w1d    = np.float32(w.flatten())
-  p1d    = np.float32(p.flatten())
+
+dir = "../../SBLI/SBLI_16delta/data00500/7"
+
+
+def print_data(x, y, z, rho, u, v, w, p, directory, filename):
+  rho1d = np.float32(rho.flatten())
+  u1d   = np.float32(u.flatten())
+  v1d   = np.float32(v.flatten())
+  w1d   = np.float32(w.flatten())
+  p1d   = np.float32(p.flatten())
 
   os.makedirs(directory, exist_ok=True)
-  filename  = name + ".vtr" 
   filepath  = os.path.join(directory, filename)
 
   x_coords = vtk.vtkFloatArray()
@@ -24,7 +28,7 @@ def print_vtk(x, y, z, rho, u, v, w, p, directory, name):
   nx = len(x)
   ny = len(y)
   nz = len(z)
-
+  
   for i in range(nx):
     x_coords.InsertNextValue(x[i])
   for j in range(ny):
@@ -50,7 +54,7 @@ def print_vtk(x, y, z, rho, u, v, w, p, directory, name):
   for i in range(nx * ny * nz):
     velocity.InsertNextTuple3(u1d[i], v1d[i], w1d[i])
   grid.GetPointData().SetVectors(velocity)
-  
+
   p = vtk.vtkFloatArray()
   p.SetName("p")
   for i in range(nx * ny * nz):
@@ -63,23 +67,22 @@ def print_vtk(x, y, z, rho, u, v, w, p, directory, name):
   writer.Write()
 
 
-Q_directory = "../../SBLI/SBLI_16delta/2.2ms/5"
-Q_files = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
+def compress_data(dir):
+  files = [f for f in os.listdir(dir) if f.endswith(".vtr")]
+  files.sort(key=extract_number)
+  Nx, Ny, Nz, x, y, z = getGrid(os.path.join(dir, files[0]))
+  for file in tqdm(files):
+    file_path = os.path.join(dir, file)
+    rho       = getScalar(file_path, Nx, Ny, Nz, 'rho')
+    u, v, w   = getVector(file_path, Nx, Ny, Nz, 'velocity')
+    p         = getScalar(file_path, Nx, Ny, Nz, 'p')
+    base_name = os.path.basename(file_path)
+    temp_name = base_name + "_tmp" + ".vtr"
+    temp_path = os.path.join(dir, temp_name)
+    print_data(x, y, z, rho, u, v, w, p, dir, temp_name)
+    os.remove(file_path)
+    os.rename(temp_path, file_path)
 
-first_path       = os.path.join(Q_directory, Q_files[0])
-_, _, _, x, y, z = getGrid(os.path.join(first_path))
 
-rho_path  = os.path.join(Q_directory, "rhorms.npy")
-u_path    = os.path.join(Q_directory, "urms.npy"  )
-v_path    = os.path.join(Q_directory, "vrms.npy"  )
-w_path    = os.path.join(Q_directory, "wrms.npy"  )
-p_path    = os.path.join(Q_directory, "prms.npy"  )
-
-rho  = np.load(rho_path)
-u    = np.load(u_path  )
-v    = np.load(v_path  )
-w    = np.load(w_path  )
-p    = np.load(p_path  )
-
-print_vtk(np.float32(x), np.float32(y), np.float32(z), rho, u, v, w, p, Q_directory, "Qrms")
+compress_data(dir)
 
