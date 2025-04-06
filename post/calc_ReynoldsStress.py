@@ -6,9 +6,12 @@ from mod.mod_turb_stat import non_dim_tbl
 from mod.mod_ReynoldsStress import ReynoldsStress, print_ReynoldsStress
 
 
-#Q_directory = "../../../../../../media/user/HD-EDS-E/TBL/TBL_HRSLAU2_yp0.5/stat04ms_SLAU"
-Q_directory = "../3D_solver/TBL/data"
-Q_files   = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
+Q_directory = "../../SBLI/SBLI_16delta/2.2ms/5"
+Q_files = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
+
+# wall unit
+rhow = 0.1886e0
+ut   = 23.33e0
 
 
 def RS(Nx, Ny, Nz, x, y, z, Rho, U, V, W, rhow, ut):
@@ -16,7 +19,6 @@ def RS(Nx, Ny, Nz, x, y, z, Rho, U, V, W, rhow, ut):
   rvv = np.zeros((Nz,Ny,Nx), dtype=np.float32)
   rww = np.zeros((Nz,Ny,Nx), dtype=np.float32)
   ruv = np.zeros((Nz,Ny,Nx), dtype=np.float32)
-
   itr = 0.e0
   for Q_file in tqdm(Q_files):
     file_path = os.path.join(Q_directory, Q_file)
@@ -39,10 +41,10 @@ def RS(Nx, Ny, Nz, x, y, z, Rho, U, V, W, rhow, ut):
   ruv /= itr
   print_ReynoldsStress(x, y, z, ruu, rvv, rww, ruv, Q_directory, "ReynoldsStress")
 
-def main():
+
+def main(rhow=None, ut=None):
   first_path          = os.path.join(Q_directory, Q_files[0])
   Nx, Ny, Nz, x, y, z = getGrid(first_path)
-  
   rho_path = os.path.join(Q_directory, "rho.npy")
   u_path   = os.path.join(Q_directory, "u.npy")
   v_path   = os.path.join(Q_directory, "v.npy")
@@ -53,15 +55,16 @@ def main():
   V    = np.load(v_path)
   W    = np.load(w_path)
   P    = np.load(p_path)
+  if rhow is None and ut is None:
+    Q = np.zeros((5,Nz,Ny,Nx), dtype=np.float32)
+    Q[0,:,:,:], Q[1,:,:,:], Q[2,:,:,:], Q[3,:,:,:], Q[4,:,:,:] = Rho, U, V, W, P
+    yp, _, _, _, ut, _ = non_dim_tbl(Q, x, y, z)
+    rhow = np.mean(Rho[:,0,:])
+    save_path = os.path.join(Q_directory, "yp.npy")
+    np.save(save_path, yp)
+    del Q
+  RS(Nx, Ny, Nz, x, y, z, Rho, U, V, W, rhow, ut)
 
-  Q = np.zeros((5,Nz,Ny,Nx), dtype=np.float32)
-  Q[0,:,:,:], Q[1,:,:,:], Q[2,:,:,:], Q[3,:,:,:], Q[4,:,:,:] = Rho, U, V, W, P
-  yp, _, _, _, ut, _ = non_dim_tbl(Q, x, y, z)
-  save_path = os.path.join(Q_directory, "yp.npy")
-  np.save(save_path, yp)
-  del Q
 
-  RS(Nx, Ny, Nz, x, y, z, Rho, U, V, W, np.mean(Rho[:,0,:]), ut)
-
-main()
+main(rhow, ut)
 

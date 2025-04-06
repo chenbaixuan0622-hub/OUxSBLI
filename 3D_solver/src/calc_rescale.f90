@@ -76,20 +76,23 @@ contains
     integer, intent(in)    :: nx, ny, nz, step
     real(8), intent(in)    :: y(ny), Jacobian(ny)
     real(8)         :: Qre_cpu(ny*(nz-6)*5), Qm_cpu(ny*5)
-    real(8), device ::     Qre(ny*(nz-6)*5),     Qm(ny*5)
+    !real(8), device ::     Qre(ny*(nz-6)*5),     Qm(ny*5)
     integer stat, ierr, ireqs(2), istats(MPI_STATUS_SIZE,2)
 
-    call MPI_IRECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank, 0, MPI_COMM_WORLD, ireqs(1), ierr)
-    call MPI_IRECV(Qm,  5*ny,        MPI_REAL8, rerank, 1, MPI_COMM_WORLD, ireqs(2), ierr)
+    !call MPI_IRECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank, 0, MPI_COMM_WORLD, ireqs(1), ierr)
+    !call MPI_IRECV(Qm,  5*ny,        MPI_REAL8, rerank, 1, MPI_COMM_WORLD, ireqs(2), ierr)
+    call MPI_IRECV(Qre_cpu, 5*ny*(nz-6), MPI_REAL8, rerank, 0, MPI_COMM_WORLD, ireqs(1), ierr)
+    call MPI_IRECV(Qm_cpu,  5*ny,        MPI_REAL8, rerank, 1, MPI_COMM_WORLD, ireqs(2), ierr)
     call MPI_WAITALL(2, ireqs, istats, ierr)
-    stat = cudaMemcpyAsync(Qm_cpu,  Qm,  5*ny,        cudaMemcpyDeviceToHost, 1)
-    stat = cudaMemcpyAsync(Qre_cpu, Qre, 5*ny*(nz-6), cudaMemcpyDeviceToHost, 2)
-    stat = cudaDeviceSynchronize()
+    !stat = cudaMemcpyAsync(Qm_cpu,  Qm,  5*ny,        cudaMemcpyDeviceToHost, 1)
+    !stat = cudaMemcpyAsync(Qre_cpu, Qre, 5*ny*(nz-6), cudaMemcpyDeviceToHost, 2)
+    !stat = cudaDeviceSynchronize()
     call set_rescale(flag_re, step, nx, ny, nz-6, y, Jacobian, Qm_cpu, Qre_cpu)
-    if (flag_re >= 1) then
-      stat = cudaMemcpy(Qre, Qre_cpu, 5*ny*(nz-6), cudaMemcpyHostToDevice)
-    endif
-    call MPI_SEND(Qre, 5*ny*(nz-6), MPI_REAL8, 0, 0, MPI_COMM_WORLD, ierr)
+    !if (flag_re >= 1) then
+    !  stat = cudaMemcpy(Qre, Qre_cpu, 5*ny*(nz-6), cudaMemcpyHostToDevice)
+    !endif
+    !call MPI_SEND(Qre, 5*ny*(nz-6), MPI_REAL8, 0, 0, MPI_COMM_WORLD, ierr)
+    call MPI_SEND(Qre_cpu, 5*ny*(nz-6), MPI_REAL8, 0, 0, MPI_COMM_WORLD, ierr)
   end subroutine rescale_recv_send
 
   subroutine set_rescale(flag_re, step, nx, ny, nz, y, Jacobian, Qm, Qre)
