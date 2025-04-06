@@ -6,6 +6,8 @@ sys.path.append("../src")
 from main import main
 from set import set_grid, set_init
 
+jax.config.update("jax_enable_x64", True)
+
 # grid info
 nx    = 65
 ny    = 65

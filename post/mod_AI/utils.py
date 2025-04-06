@@ -212,3 +212,68 @@ def trainGWN(net,device,optimizer,criterion,train_batch,test_batch,epoch):
     test_loss_list.append(batch_test_loss)
   return train_loss_list, test_loss_list
 
+
+def train_ESN(N_washout, N_train, N_tstart, N_test, net, X):
+  '''
+    arg: X[time, dim]
+  '''
+  N_dim     = X.shape[1]  # dimension of inputs (and outputs)
+  N_units   = 100 * N_dim #units in the reservoir 
+  N_evo     = 20
+  offset    = np.random.randint(N_test - N_evo)
+  
+  X_washout = X[:N_washout]
+  X_t       = X[N_washout:N_washout+N_train-1]
+  Y_t       = X[N_washout+1:N_washout+N_train]
+  X_test    = X[N_tstart:]
+
+  esn = net(N_units, N_dim, N_dim)
+  #esn.train(X_washout, X_t, Y_t)
+  esn.train_optim(X, N_washout, N_train, N_test, N_evo, N_tstart, offset)
+
+  r0s = []
+  for pic in range(10):
+    fig = plt.figure(constrained_layout=True, figsize=(10, 4))
+
+    axs = fig.subplots(1, 2)
+
+    X_test_washout = X[N_tstart - N_washout + offset:N_tstart + offset]
+    Y = X[N_tstart + offset : N_tstart + offset + N_evo + 1]
+
+    # idle iteration
+    r0 = esn.open_loop(X_test_washout, np.zeros(N_units))[-1]
+    r0s.append(r0)
+
+    # the unintervened sequence x_CL
+    Yh = esn.evolve(r0, N_evo)
+
+    pairs = [[1,0],[0,1]]
+    locs = ['upper left', 'lower right']
+
+    for p in range(len(pairs)):
+      i = pairs[p][0]
+      j = pairs[p][1]
+
+      targetI = 3*i
+      targetJ = 3*j+1
+
+      # the intervened sequence x_j->i 
+      Yhji = esn.evolve_edge_removal(r0, targetJ, targetI, N_evo)
+
+      ax = axs[p]
+
+      ax.plot(Yh.T[targetI], '-', label="closed-loop", linewidth=4.0, color='blue', alpha=1, ms=10)
+      ax.plot(Yhji.T[targetI], '-', label="intervened-loop", linewidth=4.0, color='red', ms=10)
+      ax.plot(Y.T[targetI], label="ground truth", linewidth=2.0, color='#989A9E', linestyle='--', alpha=1)
+
+      ax.set_xlabel('Time step')
+      ax.set_ylabel(f'$x_{i+1}$')
+      ax.set_xticks(ticks=[0, (Yh.shape[0]-1) / 2, Yh.shape[0]-1])
+      if p == 1:
+        ax.yaxis.set_label_position('right')
+        ax.yaxis.set_ticks_position('right')
+      if p == 0:
+        ax.legend(loc=locs[p])
+
+    plt.show()
+
