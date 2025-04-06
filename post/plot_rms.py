@@ -1,53 +1,58 @@
-import os
 import numpy as np
-import mod.mod_plot as myplt
-from mod.mod_read import gridInfo
+import os
+from mod.mod_read import getGrid, getScalar, getVector
 
-data_directory = "./np_data"
-Qrms_directory = os.path.join(data_directory, "Qrms")
-file_name      = "Qrms.npy"
+Q_directory = "../../SBLI/SBLI_16delta/2.2ms/5"
 
-x, y, z, Nx, Ny, Nz = gridInfo(data_directory)
-file_path = os.path.join(data_directory, "yplus.npy")
-yp        = np.load(file_path)
+file_path = os.path.join(Q_directory, "yp.npy")
+yp = np.load(file_path)
 
-file_path = os.path.join(data_directory, "Q", "Q00100.npy")
-Q         = np.load(file_path)
-u0        = np.mean(Q[1,:,-1,:])
-del Q
+gamma = 1.4e0
+rhow  = 1.886e-1
+tau   = 1.075e2
+Mt    = 6.978e-2
 
-file_path = os.path.join(Qrms_directory, file_name)
-Qrms      = np.load(file_path)
+file_path           = os.path.join(Q_directory, "Qrms.vtr")
+Nx, Ny, Nz, x, y, z = getGrid(file_path)
+rho = getScalar(file_path, Nx, Ny, Nz, 'rho')
+p   = getScalar(file_path, Nx, Ny, Nz, 'p')
+print(np.min(rho), np.max(rho))
+print(np.min(p), np.max(p))
+rhorms = rho / (gamma * rhow * Mt**2)
+prms   = p / tau
 
-X, Z = np.meshgrid(x,z)
-
-# pressure rms at wall
-save_path = os.path.join(Qrms_directory, "p_at_wall.png")
-myplt.plot_scalar(X,Z,Qrms[4,:,0,:],save_path)
-
-X, Y = np.meshgrid(x,y)
-
-save_path = os.path.join(Qrms_directory, "rho.png")
-myplt.plot_scalar(X,Y,Qrms[0,int(0.5*Nz),:,:],save_path)
-save_path = os.path.join(Qrms_directory, "u.png")
-myplt.plot_scalar(X,Y,Qrms[1,int(0.5*Nz),:,:],save_path)
-save_path = os.path.join(Qrms_directory, "v.png")
-myplt.plot_scalar(X,Y,Qrms[2,int(0.5*Nz),:,:],save_path)
-save_path = os.path.join(Qrms_directory, "w.png")
-myplt.plot_scalar(X,Y,Qrms[3,int(0.5*Nz),:,:],save_path)
-save_path = os.path.join(Qrms_directory, "p.png")
-myplt.plot_scalar(X,Y,Qrms[4,int(0.5*Nz),:,:],save_path)
-
-save_path = os.path.join(Qrms_directory, "p_at_wall.d")
+nx1 = 0
+nx2 = Nx
+'''
+Lx1 = 18.75e-3
+Lx2 = 25.e-3
+for i in range(Nx):
+  if x[i] > Lx1:
+    nx1 = i
+    break
+for i in range(Nx):
+  if x[i] > Lx2:
+    nx2 = i
+    break
+'''
+nz1 = 0
+nz2 = Nz
+'''
+Lz1 = 4.5e-3
+Lz2 = 5.5e-3
+for k in range(Nz):
+  if z[k] > Lz1:
+    nz1 = k
+    break
+for k in range(Nz):
+  if z[k] > Lz2:
+    nz2 = k
+    break
+'''
+save_path = os.path.join(Q_directory, "rms_mean.d")
 with open(save_path, "w", encoding="UTF-8") as f:
-  print('# x       prms', file=f)
-  for i in range(Nx):
-    print(f'{x[i]:.3e}', f'{np.mean(Qrms[4,:,0,i]):.3e}', file=f)
-
-save_path = os.path.join(Qrms_directory, "velocity_rms.d")
-with open(save_path, "w", encoding="UTF-8") as f:
-  print('# yplus   urms/u0   vrms/u0   wrms/u0', file=f)
-  for j in range(Ny):
-    print(f'{yp[j]:.3e}', f'{np.mean(Qrms[1,:,j,:])/u0:.3e}', \
-    f'{np.mean(Qrms[2,:,j,:])/u0:.3e}', f'{np.mean(Qrms[3,:,j,:])/u0:.3e}', file=f)
+  print("# yp      rhorms      prms", file=f)
+  for j in range(1,Ny):
+    print(f'{yp[j]:.3e}', f'{np.mean(rhorms[nz1:nz2,j-1,nx1:nx2]):.3e}', \
+          f'{np.mean(prms[nz1:nz2,j-1,nx1:nx2]):.3e}', file=f)
 

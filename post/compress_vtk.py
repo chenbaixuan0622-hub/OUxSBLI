@@ -5,7 +5,7 @@ from tqdm import tqdm
 from mod.mod_read import getGrid, getScalar, getVector, extract_number
 
 
-dir = "../../SBLI/11_copy"
+dir = "../../SBLI/SBLI_16delta/data00500/7"
 
 
 def print_data(x, y, z, rho, u, v, w, p, directory, filename):
