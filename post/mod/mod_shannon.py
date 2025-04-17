@@ -129,18 +129,19 @@ def transfer_entropy_timeseries(X, Y, k=3):
   return TE
 '''
 
-def transfer_entropy(x, y, p=1, k=2, Thei=None):
+def transfer_entropy(x, y, p=1, tau=1, k=2, Thei=None):
   '''
-  x: ndarray, shape (T) time series
-  y: ndarray, shape (T) time series
-  p: int, order of the modelt to estimate causality
-  k: int, k-th nearest neighbor number
+  x   : ndarray, shape (T) time series
+  y   : ndarray, shape (T) time series
+  p   : int, order of the model to estimate causality
+  tau : int, time delay for embedding
+  k   : int, k-th nearest neighbor number
   Thei: int, half-length of Theiler correction window
-  out: float, embedding entropy x->y
+  out : float, embedding entropy x->y
   '''
  
-  if Thei is None or Thei < p:
-    Thei = p
+  if Thei is None or Thei < p * tau:
+    Thei = p * tau
   
   if y.ndim == 1:
     dy = 1
@@ -150,11 +151,11 @@ def transfer_entropy(x, y, p=1, k=2, Thei=None):
     x  = x.reshape(1,-1)
   T = y.shape[1]
 
-  Y = y[:,p:T].T
-  X = np.hstack([x[:, (p - i):(T - i)].T for i in range(1, p + 1)])
-  Z = np.hstack([y[:, (p - i):(T - i)].T for i in range(1, p + 1)])
-  
-  N = T - p
+  Y = y[:,p*tau:T].T
+  X = np.hstack([x[:,(p-i)*tau:T-i*tau].T for i in range(1, p + 1)])
+  Z = np.hstack([y[:,(p-i)*tau:T-i*tau].T for i in range(1, p + 1)])
+
+  N = T - p * tau
 
   nZ, nYZ, nXZ = np.zeros(N), np.zeros(N), np.zeros(N)
 
@@ -184,26 +185,27 @@ def transfer_entropy(x, y, p=1, k=2, Thei=None):
   return TE
 
 
-def transfer_entropy_surrogate(x, y, k=5, Thei=10):
+def transfer_entropy_surrogate(x, y, p=1, tau=1, k=5, Thei=10):
   # informtion flow y -> x
   x0  = np.random.permutation(x)
-  TE  = transfer_entropy(y, x,  k=k, Thei=Thei)
-  TE0 = transfer_entropy(y, x0, k=k, Thei=Thei)
+  TE  = transfer_entropy(y, x,  p=p, tau=tau, k=k, Thei=Thei)
+  TE0 = transfer_entropy(y, x0, p=p, tau=tau, k=k, Thei=Thei)
   return TE - TE0
 
 
-def embedding_entropy(x, y, p=1, k=5, Thei=None):
+def embedding_entropy(x, y, p=1, tau=1, k=5, Thei=None):
   '''
-  x: ndarray, shape (T) time series
-  y: ndarray, shape (T) time series
-  p: int, order of the modelt to estimate causality
-  k: int, k-th nearest neighbor number
+  x   : ndarray, shape (T) time series
+  y   : ndarray, shape (T) time series
+  p   : int, order of the model to estimate causality
+  tau : int, time delay for embedding
+  k   : int, k-th nearest neighbor number
   Thei: int, half-length of Theiler correction window
-  out: float, embedding entropy x->y
+  out : float, embedding entropy x->y
   '''
   
-  if Thei is None or Thei < p:
-    Thei = p
+  if Thei is None or Thei < p * tau:
+    Thei = p * tau
   
   if x.ndim == 1:
     dx = 1
@@ -218,9 +220,9 @@ def embedding_entropy(x, y, p=1, k=5, Thei=None):
  
   T = x.shape[1]
 
-  X = np.hstack([x[:, (p - i):(T - i)].T for i in range(p + 1)])
-  Y = np.hstack([y[:, (p - i):(T - i)].T for i in range(1, p + 1)])
-  N = T - p
+  X = np.hstack([x[:,(p-i)*tau:T-i*tau].T for i in range(p + 1)])
+  Y = np.hstack([y[:,(p-i)*tau:T-i*tau].T for i in range(1, p + 1)])
+  N = T - p * tau
 
   XNN = np.zeros((N, X.shape[1] * (dx * (p + 1) + 1)))
   
@@ -239,10 +241,10 @@ def embedding_entropy(x, y, p=1, k=5, Thei=None):
   return EE
 
 
-def embedding_entropy_surrogate(x, y, p=1, k=5, Thei=10):
+def embedding_entropy_surrogate(x, y, p=1, tau=1, k=5, Thei=10):
   # informtion flow y -> x
   y0  = np.random.permutation(y)
-  EE  = embedding_entropy(x, y,  p=p, k=k, Thei=Thei)
-  EE0 = embedding_entropy(x, y0, p=p, k=k, Thei=Thei)
+  EE  = embedding_entropy(x, y,  p=p, tau=tau, k=k, Thei=Thei)
+  EE0 = embedding_entropy(x, y0, p=p, tau=tau, k=k, Thei=Thei)
   return EE - EE0
 

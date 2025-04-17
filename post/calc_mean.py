@@ -3,8 +3,7 @@ import os
 from tqdm import tqdm
 from mod.mod_read import getGrid, getVector, getScalar, extract_number
 
-#Q_directory = "../../../../../../media/user/HD-EDS-E/hatayama/TBL/SBLI_025delta/stat04ms_1_2ms_SLAU"
-Q_directory = "../3D_solver/TBL/data"
+Q_directory = "../../SBLI/SBLI_16delta/2.2ms/5"
 
 Q_files   = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
 Q_files.sort(key=extract_number)
