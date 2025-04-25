@@ -7,18 +7,18 @@ module calc_flux
   use calc_muscl
   implicit none
   interface flux6
-    module procedure flux_KEEP6, flux_SLAU6, flux_Weighted6, flux_Threshold6
+    module procedure flux_KEEP6, flux_SLAU6, flux_Roe6, flux_Weighted6, flux_Threshold6
   end interface flux6
 
   interface flux4
-    module procedure flux_KEEP4, flux_SLAU4, flux_Weighted4, flux_Threshold4
+    module procedure flux_KEEP4, flux_SLAU4, flux_Roe4, flux_Weighted4, flux_Threshold4
   end interface flux4
 
   interface flux2
-    module procedure flux_KEEP2, flux_SLAU2, flux_Weighted2, flux_Threshold2
+    module procedure flux_KEEP2, flux_SLAU2, flux_Roe2, flux_Weighted2, flux_Threshold2
   end interface flux2
 contains
-  attributes(device) function flux_KEEP6(id_scheme,id,rho,p,V,Normal,sensor) result(F)
+  attributes(device) function flux_KEEP6(id_scheme, id, rho, p, V, Normal, sensor) result(F)
     integer(kind=2), intent(in), value          :: id_scheme
     integer, intent(in), value                  :: id
     real(8), intent(in), dimension(6), device   :: rho, p
@@ -26,10 +26,10 @@ contains
     real(8), intent(in), dimension(5), device   :: Normal
     real(8), intent(in), value                  :: sensor
     real(8) F(5)
-    F = KEEP6(id,rho,p,V,Normal)
+    F = KEEP6(id, rho, p, V, Normal)
   end function flux_KEEP6
 
-  attributes(device) function flux_KEEP4(id_scheme,id,rho,p,V,Normal,sensor) result(F)
+  attributes(device) function flux_KEEP4(id_scheme, id, rho, p, V, Normal, sensor) result(F)
     integer(kind=2), intent(in), value          :: id_scheme
     integer, intent(in), value                  :: id
     real(8), intent(in), dimension(4), device   :: rho, p
@@ -37,10 +37,10 @@ contains
     real(8), intent(in), dimension(5), device   :: Normal
     real(8), intent(in), value                  :: sensor
     real(8) F(5)
-    F = KEEP4(id,rho,p,V,Normal)
+    F = KEEP4(id, rho, p, V, Normal)
   end function flux_KEEP4
   
-  attributes(device) function flux_KEEP2(id_scheme,id,rho,p,V,Normal,sensor) result(F)
+  attributes(device) function flux_KEEP2(id_scheme, id, rho, p, V, Normal, sensor) result(F)
     integer(kind=2), intent(in), value          :: id_scheme
     integer, intent(in), value                  :: id
     real(8), intent(in), dimension(2), device   :: rho, p
@@ -48,10 +48,10 @@ contains
     real(8), intent(in), dimension(5), device   :: Normal
     real(8), intent(in), value                  :: sensor
     real(8) F(5)
-    F = KEEP2(id,rho,p,V,Normal)
+    F = KEEP2(id, rho, p, V, Normal)
   end function flux_KEEP2
 
-  attributes(device) function flux_SLAU6(id_scheme,id,rho,p,V,Normal,sensor) result(F)
+  attributes(device) function flux_SLAU6(id_scheme, id, rho, p, V, Normal, sensor) result(F)
     use mod_globals, only : id_slau
     real(kind=2), intent(in), value             :: id_scheme
     integer, intent(in), value                  :: id
@@ -62,11 +62,11 @@ contains
     real(8) wiggle, rho2(2), p2(2), V2(2,3), p4(4), F(5)
     p4(:)  = p(2:5)
     wiggle = wiggle_detector(p4)
-    call calc_6points(sensor,rho,p,V,rho2,p2,V2)
-    F = SLAU(id_slau,id,rho2,p2,V2,Normal,wiggle,sensor)
+    call calc_6points(sensor, rho, p, V, rho2, p2, V2)
+    F = SLAU(id_slau, id, rho2, p2, V2, Normal, wiggle, sensor)
   end function flux_SLAU6
 
-  attributes(device) function flux_SLAU4(id_scheme,id,rho,p,V,Normal,sensor) result(F)
+  attributes(device) function flux_SLAU4(id_scheme, id, rho, p, V, Normal, sensor) result(F)
     use mod_globals, only : id_slau
     real(kind=2), intent(in), value             :: id_scheme
     integer, intent(in), value                  :: id
@@ -76,11 +76,11 @@ contains
     real(8), intent(in), value                  :: sensor
     real(8) wiggle, rho2(2), p2(2), V2(2,3), F(5)
     wiggle = wiggle_detector(p)
-    call calc_4points(1.d0,1.d0,1.d0/3.d0,sensor,rho,p,V,rho2,p2,V2)
-    F = SLAU(id_slau,id,rho2,p2,V2,Normal,wiggle,sensor)
+    call calc_4points(1.d0, 1.d0, 1.d0 / 3.d0, sensor, rho, p, V, rho2, p2, V2)
+    F = SLAU(id_slau, id, rho2, p2, V2, Normal, wiggle, sensor)
   end function flux_SLAU4
 
-  attributes(device) function flux_SLAU2(id_scheme,id,rho,p,V,Normal,sensor) result(F)
+  attributes(device) function flux_SLAU2(id_scheme, id, rho, p, V, Normal, sensor) result(F)
     use mod_globals, only : id_slau
     real(kind=2), intent(in), value             :: id_scheme
     integer, intent(in), value                  :: id
@@ -89,10 +89,45 @@ contains
     real(8), intent(in), dimension(5), device   :: Normal
     real(8), intent(in), value                  :: sensor
     real(8) F(5)
-    F = SLAU(id_slau,id,rho,p,V,Normal,1.d0,sensor)
+    F = SLAU(id_slau, id, rho, p, V, Normal, 1.d0, sensor)
   end function flux_SLAU2
 
-  attributes(device) function flux_Weighted6(id_scheme,id,rho,p,V,Normal,sensor) result(F)
+  attributes(device) function flux_Roe6(id_scheme, id, rho, p, V, Normal, sensor) result(F)
+    integer(kind=4), intent(in), value          :: id_scheme
+    integer, intent(in), value                  :: id
+    real(8), intent(in), dimension(6), device   :: rho, p
+    real(8), intent(in), dimension(6,3), device :: V
+    real(8), intent(in), dimension(5), device   :: Normal
+    real(8), intent(in), value                  :: sensor
+    real(8) rho2(2), p2(2), V2(2,3), p4(4), F(5)
+    call calc_6points(sensor, rho, p, V, rho2, p2, V2)
+    F = Roe(id, rho2, p2, V2, Normal)
+  end function flux_Roe6
+
+  attributes(device) function flux_Roe4(id_scheme, id, rho, p, V, Normal, sensor) result(F)
+    integer(kind=4), intent(in), value          :: id_scheme
+    integer, intent(in), value                  :: id
+    real(8), intent(in), dimension(4), device   :: rho, p
+    real(8), intent(in), dimension(4,3), device :: V
+    real(8), intent(in), dimension(5), device   :: Normal
+    real(8), intent(in), value                  :: sensor
+    real(8) rho2(2), p2(2), V2(2,3), F(5)
+    call calc_4points(1.d0, 1.d0, 1.d0 / 3.d0, sensor, rho, p, V, rho2, p2, V2)
+    F = Roe(id, rho2, p2, V2, Normal)
+  end function flux_Roe4
+
+  attributes(device) function flux_Roe2(id_scheme, id, rho, p, V, Normal, sensor) result(F)
+    integer(kind=4), intent(in), value          :: id_scheme
+    integer, intent(in), value                  :: id
+    real(8), intent(in), dimension(2), device   :: rho, p
+    real(8), intent(in), dimension(2,3), device :: V
+    real(8), intent(in), dimension(5), device   :: Normal
+    real(8), intent(in), value                  :: sensor
+    real(8) F(5)
+    F = Roe(id, rho, p, V, Normal)
+  end function flux_Roe2
+
+  attributes(device) function flux_Weighted6(id_scheme, id, rho, p, V, Normal, sensor) result(F)
     real(4), intent(in), value                  :: id_scheme
     integer, intent(in), value                  :: id
     real(8), intent(in), dimension(6), device   :: rho, p
@@ -101,11 +136,11 @@ contains
     real(8), intent(in), value                  :: sensor
     real(8) F(5)
     real(2) slau
-    F = (1.d0 - sensor) * KEEP6(id,rho,p,V,Normal) &
-        + sensor * flux_SLAU6(slau,id,rho,p,V,Normal,sensor)
+    F = (1.d0 - sensor) * KEEP6(id, rho, p, V, Normal) &
+        + sensor * flux_SLAU6(slau, id, rho, p, V, Normal, sensor)
   end function flux_Weighted6
 
-  attributes(device) function flux_Weighted4(id_scheme,id,rho,p,V,Normal,sensor) result(F)
+  attributes(device) function flux_Weighted4(id_scheme, id, rho, p, V, Normal, sensor) result(F)
     real(4), intent(in), value                  :: id_scheme
     integer, intent(in), value                  :: id
     real(8), intent(in), dimension(4), device   :: rho, p
@@ -114,11 +149,11 @@ contains
     real(8), intent(in), value                  :: sensor
     real(8) F(5)
     real(2) slau
-    F = (1.d0 - sensor) * KEEP4(id,rho,p,V,Normal) &
-        + sensor * flux_SLAU4(slau,id,rho,p,V,Normal,sensor)
+    F = (1.d0 - sensor) * KEEP4(id, rho, p, V, Normal) &
+        + sensor * flux_SLAU4(slau, id, rho, p, V, Normal, sensor)
   end function flux_Weighted4
 
-  attributes(device) function flux_Weighted2(id_scheme,id,rho,p,V,Normal,sensor) result(F)
+  attributes(device) function flux_Weighted2(id_scheme, id, rho, p, V, Normal, sensor) result(F)
     use mod_globals, only : id_slau
     real(4), intent(in), value                 :: id_scheme
     integer, intent(in), value                  :: id
@@ -127,11 +162,11 @@ contains
     real(8), intent(in), dimension(5), device   :: Normal
     real(8), intent(in), value                  :: sensor
     real(8) F(5)
-    F = (1.d0 - sensor) * KEEP2(id,rho,p,V,Normal) &
-        + sensor * SLAU(id_slau,id,rho,p,V,Normal,1.d0,sensor)
+    F = (1.d0 - sensor) * KEEP2(id, rho, p, V, Normal) &
+        + sensor * SLAU(id_slau, id, rho, p, V, Normal, 1.d0, sensor)
   end function flux_Weighted2
 
-  attributes(device) function flux_Threshold6(id_scheme,id,rho,p,V,Normal,sensor) result(F)
+  attributes(device) function flux_Threshold6(id_scheme, id, rho, p, V, Normal, sensor) result(F)
     real(8), intent(in), value                  :: id_scheme
     integer, intent(in), value                  :: id
     real(8), intent(in), dimension(6), device   :: rho, p
@@ -141,13 +176,13 @@ contains
     real(8) F(5)
     real(2) slau
     if (sensor < threshold) then
-      F = KEEP6(id,rho,p,V,Normal)
+      F = KEEP6(id, rho, p, V, Normal)
     else
-      F = flux_SLAU6(slau,id,rho,p,V,Normal,sensor)
+      F = flux_SLAU6(slau, id, rho, p, V, Normal, sensor)
     endif
   end function flux_Threshold6
 
-  attributes(device) function flux_Threshold4(id_scheme,id,rho,p,V,Normal,sensor) result(F)
+  attributes(device) function flux_Threshold4(id_scheme, id, rho, p, V, Normal, sensor) result(F)
     real(8), intent(in), value                  :: id_scheme
     integer, intent(in), value                  :: id
     real(8), intent(in), dimension(4), device   :: rho, p
@@ -157,13 +192,13 @@ contains
     real(8) F(5)
     real(2) slau
     if (sensor < threshold) then
-      F = KEEP4(id,rho,p,V,Normal)
+      F = KEEP4(id, rho, p, V, Normal)
     else
-      F = flux_SLAU4(slau,id,rho,p,V,Normal,sensor)
+      F = flux_SLAU4(slau, id, rho, p, V, Normal, sensor)
     endif
   end function flux_Threshold4
 
-  attributes(device) function flux_Threshold2(id_scheme,id,rho,p,V,Normal,sensor) result(F)
+  attributes(device) function flux_Threshold2(id_scheme, id, rho, p, V, Normal, sensor) result(F)
     use mod_globals, only : id_slau
     real(8), intent(in), value                  :: id_scheme
     integer, intent(in), value                  :: id
@@ -173,9 +208,9 @@ contains
     real(8), intent(in), value                  :: sensor
     real(8) F(5)
     if (sensor < threshold) then
-      F = KEEP2(id,rho,p,V,Normal)
+      F = KEEP2(id, rho, p, V, Normal)
     else
-      F = SLAU(id_slau,id,rho,p,V,Normal,1.d0,sensor)
+      F = SLAU(id_slau, id, rho, p, V, Normal, 1.d0, sensor)
     endif
   end function flux_Threshold2
 

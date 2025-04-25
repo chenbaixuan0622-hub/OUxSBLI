@@ -3,7 +3,7 @@ import os
 from tqdm import tqdm
 from mod.mod_read import getGrid, getVector, getScalar, extract_number
 
-Q_directory = "../../SBLI/SBLI_16delta/2.2ms/5"
+Q_directory = "../../../../../mnt/data1/SBLI_16delta_05mm"
 
 Q_files   = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
 Q_files.sort(key=extract_number)
@@ -19,6 +19,11 @@ um   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
 vm   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
 wm   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
 pm   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
+rho2 = np.zeros((Nz,Ny,Nx), dtype=np.float32)
+u2   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
+v2   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
+w2   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
+p2   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
 # Farvre average
 uF   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
 vF   = np.zeros((Nz,Ny,Nx), dtype=np.float32)
@@ -43,6 +48,11 @@ for Q_file in tqdm(Q_files):
   vm   += v
   wm   += w
   pm   += p
+  rho2 += rho**2
+  u2   += u**2
+  v2   += v**2
+  w2   += w**2
+  p2   += p**2
   # Favre average
   uF   += rho * u
   vF   += rho * v
@@ -57,6 +67,11 @@ um   /= np.float32(itr)
 vm   /= np.float32(itr)
 wm   /= np.float32(itr)
 pm   /= np.float32(itr)
+rho2 /= np.float32(itr)
+u2   /= np.float32(itr)
+v2   /= np.float32(itr)
+w2   /= np.float32(itr)
+p2   /= np.float32(itr)
 uF   /= (np.float32(itr) * rhom)
 vF   /= (np.float32(itr) * rhom)
 wF   /= (np.float32(itr) * rhom)
@@ -64,27 +79,43 @@ pF   /= (np.float32(itr) * rhom)
 TF   /= (np.float32(itr) * rhom)
 TtF  /= (np.float32(itr) * rhom)
 
+rhorms = np.sqrt(abs(rho2 - rhom**2))
+urms   = np.sqrt(abs(u2   - um**2))
+vrms   = np.sqrt(abs(v2   - vm**2))
+wrms   = np.sqrt(abs(w2   - wm**2))
+prms   = np.sqrt(abs(p2   - pm**2))
+
 # save Favre average
-rho_path = os.path.join(Q_directory, "rho")
-u_path   = os.path.join(Q_directory, "u")
-v_path   = os.path.join(Q_directory, "v")
-w_path   = os.path.join(Q_directory, "w")
-p_path   = os.path.join(Q_directory, "p")
-uF_path  = os.path.join(Q_directory, "uF")
-vF_path  = os.path.join(Q_directory, "vF")
-wF_path  = os.path.join(Q_directory, "wF")
-pF_path  = os.path.join(Q_directory, "pF")
-TF_path  = os.path.join(Q_directory, "TF")
-TtF_path = os.path.join(Q_directory, "TtF")
-np.save(rho_path, rhom)
-np.save(u_path,   um)
-np.save(v_path,   vm)
-np.save(w_path,   wm)
-np.save(p_path,   pm)
-np.save(uF_path,  uF)
-np.save(vF_path,  vF)
-np.save(wF_path,  wF)
-np.save(pF_path,  pF)
-np.save(TF_path,  TF)
-np.save(TtF_path, TtF)
+rho_path    = os.path.join(Q_directory, "rho")
+u_path      = os.path.join(Q_directory, "u")
+v_path      = os.path.join(Q_directory, "v")
+w_path      = os.path.join(Q_directory, "w")
+p_path      = os.path.join(Q_directory, "p")
+rhorms_path = os.path.join(Q_directory, "rhorms")
+urms_path   = os.path.join(Q_directory, "urms")
+vrms_path   = os.path.join(Q_directory, "vrms")
+wrms_path   = os.path.join(Q_directory, "wrms")
+prms_path   = os.path.join(Q_directory, "prms")
+uF_path     = os.path.join(Q_directory, "uF")
+vF_path     = os.path.join(Q_directory, "vF")
+wF_path     = os.path.join(Q_directory, "wF")
+pF_path     = os.path.join(Q_directory, "pF")
+TF_path     = os.path.join(Q_directory, "TF")
+TtF_path    = os.path.join(Q_directory, "TtF")
+np.save(rho_path,    rhom)
+np.save(u_path,      um)
+np.save(v_path,      vm)
+np.save(w_path,      wm)
+np.save(p_path,      pm)
+np.save(rhorms_path, rhorms)
+np.save(urms_path,   urms)
+np.save(vrms_path,   vrms)
+np.save(wrms_path,   wrms)
+np.save(prms_path,   prms)
+np.save(uF_path,     uF)
+np.save(vF_path,     vF)
+np.save(wF_path,     wF)
+np.save(pF_path,     pF)
+np.save(TF_path,     TF)
+np.save(TtF_path,    TtF)
 
