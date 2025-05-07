@@ -58,16 +58,16 @@ module mod_globals
   integer(kind=2), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
   integer(kind=2), parameter :: slau_wall   = 0
-  integer(kind=2), parameter :: id_rescale  = 0
+  integer(kind=4), parameter :: id_rescale  = 0
   real(8), parameter         :: blt         = 1.d-3
 
   ! boundary layer
   real(8), parameter :: Lx1 = 20.d0 * blt
   real(8), parameter :: Ly1 = 5.d0 * blt
-  real(8), parameter :: Lz1 = 1.d0 * blt
+  real(8), parameter :: Lz1 = 5.d0 * blt
   integer, parameter :: nx1 = 513
   integer, parameter :: ny1 = 161
-  integer, parameter :: nz1 = 17
+  integer, parameter :: nz1 = 257
 
   ! shock + boundary layer
   real(8), parameter :: Lx2 = 30.d0 * blt
@@ -77,8 +77,8 @@ module mod_globals
   integer, parameter :: ny2 = 257
   integer, parameter :: nz2 = nz1
 
-  integer, parameter :: nre1 = int(0.7 * nx1)
-  integer, parameter :: nre2 = int(0.8 * nx1)
+  integer, parameter :: nre1 = int(0.8 * nx1)
+  integer, parameter :: nre2 = int(0.9 * nx1)
   integer, parameter :: rerank = 0
 
   type(dim3) :: blocksE, blocksF, blocksG, blocksEv, blocksFv, blocksGv, blocks
@@ -95,15 +95,15 @@ module mod_globals
   integer(kind=2), parameter :: id_RungeKutta = 0
   integer(kind=2), parameter :: id_recal      = 0
   integer, parameter         :: step_offset   = 0
-  integer, parameter         :: start_rescale = 3
-  real(8), parameter :: endT  = 0.34d-3
-  integer, parameter :: np    = 10!34
+  integer, parameter         :: start_rescale = 10000
+  real(8), parameter :: endT  = 0.1d-3
+  integer, parameter :: np    = 10
   real(8), parameter :: R     = 287.03d0
   real(8), parameter :: gamma = 1.4d0
   real(8), parameter :: T0    = 171.31d0
   real(8), parameter :: u0    = 506.8d0
   real(8), parameter :: dt    = 4.d-9
-  integer, parameter :: nt    = 10000!int(endT / (dble(np) * dt))
+  integer, parameter :: nt    = 150!int(endT / (dble(np) * dt))
 
   ! physical properties
   real(8), parameter :: Pr    = 0.72d0
@@ -113,7 +113,7 @@ module mod_globals
   real(8), parameter :: M0   = 1.9d0
   real(8), parameter :: p0   = 14924.d0
   ! oblique shock
-  real(8), parameter :: beta  = dacos(-1.d0) * 40.03d0 / 180.d0
+  real(8), parameter :: beta  = dacos(-1.d0) * 39.27d0 / 180.d0
   real(8), parameter :: Ms    = M0 * dsin(beta)
   real(8), parameter :: Ms2   = Ms**2
   real(8), parameter :: theta = datan(2.d0 * (1.d0 / dtan(beta)) * (Ms2 - 1.d0) / (M0**2 * (gamma + dcos(2.d0 * beta)) + 2.d0))
