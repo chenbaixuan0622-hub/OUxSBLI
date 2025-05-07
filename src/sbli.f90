@@ -1,13 +1,15 @@
 program main
   use, intrinsic :: iso_fortran_env
+  use cudafor
   use mpi
-  use mod_globals, only : id_RungeKutta, id_recal, nx, ny, nz, Lx, Ly, Lz
-  use set
+  use mod_globals,  only : id_RungeKutta, id_recal, nx1, nx2, ny1, ny2, nz1, nz2, Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, &
+  & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
+  & blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv
   use set_coordinate
   use calc_time_dev
   implicit none
-  integer i, j, l, m, s, mygpu
-  real(8) t_start, t_end
+  integer i, j, l, mygpu, m, s, nx, ny, nz
+  real(8) Lx, Ly, Lz, t_start, t_end
   real(8), allocatable :: x(:), dx(:), y(:), dy(:), z(:), dz(:), Jacobian(:), Q(:,:,:,:)
   character(len=40) filename
   ! MPI
@@ -16,33 +18,52 @@ program main
   call MPI_INIT(ierr)
   call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
   call MPI_COMM_RANK(MPI_COMM_WORLD, myrank, ierr)
-  mygpu = myrank / 2
 
-  print *, "my rank is", myrank
+  if (myrank <= 1) then
+    ! boundary layer
+    nx = nx1
+    ny = ny1
+    nz = nz1
+    Lx = Lx1
+    Ly = Ly1
+    Lz = Lz1
+    mygpu = 0
+  elseif (2 <= myrank) then
+    ! boundary layer + oblique shock
+    nx = nx2
+    ny = ny2
+    nz = nz2
+    Lx = Lx2
+    Ly = Ly2
+    Lz = Lz2
+    mygpu = 0
+  endif
+  call set_block_thread(myrank, accuracy, nx, ny, nz, blocks, threads, blocksE, blocksF, blocksG, &
+                        & threadsE, threadsF, threadsG, blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv)
 
-  allocate(Q(nx,ny,nz,5),x(nx),dx(nx),y(ny),dy(ny),z(nz),dz(nz),Jacobian(ny))
+  allocate(Q(nx,ny,nz,5), x(nx), dx(nx), y(ny), dy(ny), z(nz), dz(nz), Jacobian(ny))
 
   ! set grid information
   if (mod(myrank,2) == 0) then
-    call set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
-    call set_Jacobian_y(nx, ny, nz, dx, dy, dz, Jacobian)
+    call set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, 0.9d0 * Lx1, x, y, z, dx, dy, dz)
     if (kind(id_recal) == 4) then
       write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"
-      write(*,*) "simulation restarted"
+      print *, "myrank is ", myrank, "simulation restarted"
       open(10,file=filename,action="read",form="unformatted",access="stream")
       read(10) Q
       close(10)
     elseif (kind(id_recal) == 2) then
-      write(*,*) "set initial condition"
-      call set_init(myrank,nx,ny,nz,x,y,z,Q)
+      print *, "myrank is ", myrank, "set initial condition"
+      call set_init(myrank, nx, ny, nz, x, y, z, Q)
     else
-      write(*,*) "wrong paramater was found"
+      print *, "wrong paramater was found"
     endif
   else
-    call set_grid(myrank-1, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
-    call set_Jacobian_y(nx, ny, nz, dx, dy, dz, Jacobian)
+    call set_grid(myrank-1, nx, ny, nz, Lx, Ly, Lz, 0.9d0 * Lx1, x, y, z, dx, dy, dz)
   endif
+  call set_Jacobian_y(nx, ny, nz, dx, dy, dz, Jacobian)
 
+  call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   call cpu_time(t_start)
   call RungeKutta(id_RungeKutta, myrank, mygpu, nx, ny, nz, x, dx, y, dy, z, dz, Jacobian, Q)
   call cpu_time(t_end)
