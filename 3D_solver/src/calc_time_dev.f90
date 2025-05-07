@@ -45,6 +45,7 @@ contains
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_Euler
 
+
   subroutine calc_EFG_visc(id_visc,nx,ny,nz,dx,dy,dz,Jacobian,QJ,E,F,G)
     integer(kind=4), intent(in), value :: id_visc
     integer, intent(in), value         :: nx, ny, nz
@@ -70,7 +71,8 @@ contains
     call calc_Gv<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, rho, u, v, w, p, G)
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_visc
-  
+ 
+
   subroutine calc_EFG_LES(id_visc,nx,ny,nz,dx,dy,dz,Jacobian,QJ,E,F,G)
     integer(kind=8), intent(in), value :: id_visc
     integer, intent(in), value         :: nx, ny, nz
@@ -102,10 +104,11 @@ contains
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_LES
 
-  subroutine RungeKutta_3rd(id_RungeKutta,myrank,nx,ny,nz,x,dx_cpu,y,dy_cpu,z,dz_cpu,Jacobian_cpu,Q)
+
+  subroutine RungeKutta_3rd(id_RungeKutta, myrank, mygpu, nx, ny, nz, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q)
     use mod_globals, only : id_visc
     integer(kind=2), intent(in) :: id_RungeKutta
-    integer, intent(in)         :: myrank, nx, ny, nz
+    integer, intent(in)         :: myrank, mygpu, nx, ny, nz
     real(8), intent(in)         :: x(nx), dx_cpu(nx-1)
     real(8), intent(in)         :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)         :: z(nz), dz_cpu(nz-1), Jacobian_cpu(ny)
@@ -127,28 +130,22 @@ contains
 
     ! check GPU
     stat = cudaGetDeviceCount(ndevices)
-    if (myrank == 0) then
-      print '(2x, i2, a)', ndevices, " GPU devices are found"
-    endif
+    print *, "rank", myrank, " has found ", ndevices, " GPU devices"
 
     if (mod(myrank,2) == 0) then
-      stat = cudaSetDevice(myrank/2)
-      stat = cudaGetDeviceProperties(prop,myrank/2)
+      stat = cudaSetDevice(mygpu)
+      stat = cudaGetDeviceProperties(prop, mygpu)
       ilen = verify(prop%name, ' ', .true.)
-      print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", myrank/2, ") is available"
-
-      allocate(QJ(nx,ny,nz,5),QJ2(nx,ny,nz,5),QJ3(nx,ny,nz,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
-      allocate(xix(nx-1),etay(ny-1),zetaz(nz-1),Jacobian(ny))
-
+      print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", mygpu, ") is available"
+      allocate(QJ(nx,ny,nz,5), QJ2(nx,ny,nz,5), QJ3(nx,ny,nz,5), E(nx-1,ny-2,nz-2,5), F(nx-2,ny-1,nz-2,5), G(nx-2,ny-2,nz-1,5))
+      allocate(xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(ny))
+      print *, "myrank is ", myrank, " memory allocation has completed"
       ! set Q / Jacobian
       do k = 1, nz
         do j = 1, ny
           do i = 1, nx
             Q(i,j,k,:) = Q(i,j,k,:) / Jacobian_cpu(j)
       enddo;enddo;enddo
-
-      ! print initial condition
-      call MPI_ISEND(Q, nx*ny*nz*5, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ireq, ierr) 
 
       ! copy on GPU
       xix_cpu   = 1.d0 / dx_cpu
@@ -172,13 +169,7 @@ contains
       else
         overlap = 1
       endif
-      
-      stat = cudaDeviceSynchronize()
-      call MPI_WAIT(ireq, istat, ierr)
-    else
-      call MPI_IRECV(Q, nx*ny*nz*5, MPI_REAL8, myrank-1, myrank, MPI_COMM_WORLD, ireq, ierr)
-      call MPI_WAIT(ireq, istat, ierr)
-      call print_vtk(0, nx, ny, nz, myrank, nranks, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
+      call print_vtk(0, nx, ny, nz, myrank+1, nranks, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
     endif
     
     ! rescale
@@ -189,6 +180,8 @@ contains
       endif
     endif
 
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+    print *, "myrank is ", myrank, " start Runge-Kutta"
     do t2 = 1, np
       do t1 = 1, nt
         step = np * (t2-1) + t1
@@ -265,6 +258,7 @@ contains
     enddo
 
     call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+    print *, "myrank is ", myrank, " finish Runge-Kutta"
     
     if (mod(myrank,2) == 0) then
       deallocate(QJ, QJ2, QJ3, E, F, G, xix, etay, zetaz, Jacobian)
@@ -272,12 +266,14 @@ contains
     if (mod(myrank,2) == 0 .and. kind(id_rescale) == 4) then
       deallocate(Qre, Qm)
     endif
+    print *, "myrank is ", myrank, " deallocate GPU memory"
   end subroutine RungeKutta_3rd
 
-  subroutine RungeKutta_4th(id_RungeKutta,myrank,nx,ny,nz,x,dx_cpu,y,dy_cpu,z,dz_cpu,Jacobian_cpu,Q)
+
+  subroutine RungeKutta_4th(id_RungeKutta, myrank, mygpu, nx, ny, nz, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q)
     use mod_globals, only : id_visc
     integer(kind=4), intent(in) :: id_RungeKutta
-    integer, intent(in)         :: myrank, nx, ny, nz
+    integer, intent(in)         :: myrank, mygpu, nx, ny, nz
     real(8), intent(in)         :: x(nx), dx_cpu(nx-1)
     real(8), intent(in)         :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)         :: z(nz), dz_cpu(nz-1), Jacobian_cpu(ny)
@@ -304,10 +300,10 @@ contains
     endif
 
     if (mod(myrank,2) == 0) then
-      stat = cudaSetDevice(myrank/2)
-      stat = cudaGetDeviceProperties(prop,myrank/2)
+      stat = cudaSetDevice(mygpu)
+      stat = cudaGetDeviceProperties(prop, mygpu)
       ilen = verify(prop%name, ' ', .true.)
-      print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", myrank/2, ") is available"
+      print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", mygpu, ") is available"
 
       allocate(QJ(nx,ny,nz,5),QJs(nx,ny,nz,5),Rs(nx-2,ny-2,nz-2,5),E(nx-1,ny-2,nz-2,5),F(nx-2,ny-1,nz-2,5),G(nx-2,ny-2,nz-1,5))
       allocate(xix(nx-1),etay(ny-1),zetaz(nz-1),Jacobian(ny))
