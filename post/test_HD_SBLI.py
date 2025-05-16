@@ -6,7 +6,27 @@ from mod.mod_plot import print_scalar, print_vector
 from mod.mod_Poisson import Poisson_CND, Poisson_Spectral
 
 
-def simple_test():
+def simple_test2D():
+  nx = 129
+  ny = 129
+  Lx = 1.e0
+  Ly = 1.e0
+  dx = Lx / (nx-1)
+  dy = Ly / (ny-1)
+  x  = np.linspace(-Lx/2 + 0.5e0 * dx, Lx/2 - 0.5e0 * dx, nx, dtype=np.float64)
+  y  = np.linspace(-Ly/2 + 0.5e0 * dy, Ly/2 - 0.5e0 * dy, ny, dtype=np.float64)
+  xc = 0.5e0 * (x[:-1] + x[1:])
+  yc = 0.5e0 * (y[:-1] + y[1:])
+  f2D = np.zeros((ny-1,nx-1), dtype=np.float64)
+  for j in range(ny-1):
+    for i in range(nx-1):
+      f2D[j,i] = np.exp(-1.e0*(xc[i]**2 + yc[j]**2))
+      #f2D[j,i] = -5.e0 * np.pi**2 * np.sin(np.pi * xc[i]) * np.sin(2.e0 * np.pi * yc[j])
+  p2D = Poisson_CND(f2D, dx=dx, loop_x='C', dy=dy, loop_y='C', check=True)
+  
+
+
+def simple_test3D():
   nx = 129
   ny = 129
   nz = 129
@@ -100,7 +120,8 @@ def Helmholtz_Decomposition(x, y, z, u, v, w, loop_x, loop_y, loop_z):
   return gradPhi, rotA
 
 
-simple_test()
+simple_test2D()
+#simple_test3D()
 
 '''
 #Q_dir = "../../SBLI"
