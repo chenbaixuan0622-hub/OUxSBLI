@@ -4,6 +4,7 @@ from tqdm import tqdm
 from mod.mod_read import getGrid, getVector, getScalar
 from mod.mod_turb_stat import non_dim_tbl, Sutherland
 
+#Q_directory = "../../../../../mnt/data1/TBL_HRSLAU2_LES"
 Q_directory = "../3D_solver/TBL/data"
 
 Q_files   = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
@@ -15,7 +16,7 @@ Nx, Ny, Nz, x, y, z = getGrid(first_path)
 # parameters
 Rgas  = 287.03e0
 gamma = 1.4e0
-delta = 2.e-3
+delta = 0.5e-3
 
 rho_path = os.path.join(Q_directory, "rho.npy")
 u_path   = os.path.join(Q_directory, "u.npy")
@@ -29,10 +30,9 @@ v   = np.load(v_path)
 w   = np.load(w_path)
 p   = np.load(p_path)
 
-Q = np.zeros((5,Nz,Ny,Nx), dtype=np.float32)
-
-nx1 = int(0.5*Nx)
-nx2 = int(0.9*Nx)
+nx1 = int(0.1*Nx)
+nx2 = int(0.4*Nx)
+Q = np.zeros((5,Nz,Ny,nx2-nx1), dtype=np.float32)
 
 Nm   = int(0.8*Ny)
 rhow = np.mean(rho[:,0, nx1:nx2])
@@ -44,12 +44,12 @@ muw  = Sutherland(Tw)
 mu0  = Sutherland(T0)
 
 # non dim
-Q[0,:,:,:], Q[1,:,:,:], Q[2,:,:,:], Q[3,:,:,:], Q[4,:,:,:] = rho, u, v, w, p
-yp, _, _, tw, ut, up = non_dim_tbl(Q, x, y, z)
+Q[0,:,:,:], Q[1,:,:,:], Q[2,:,:,:], Q[3,:,:,:], Q[4,:,:,:] = rho[:,:,nx1:nx2], u[:,:,nx1:nx2], v[:,:,nx1:nx2], w[:,:,nx1:nx2], p[:,:,nx1:nx2]
+yp, _, _, tw, ut, up = non_dim_tbl(Q, x[nx1:nx2], y, z)
 
 theta = 0.e0
 for j in range(1,Ny):
-  theta += np.mean(rho[:,j,:] * u[:,j,:]) / (rho0 * u0) * (1.e0 - np.mean(u[:,j,:]) / u0) * (-y[j-1] + y[j])
+  theta += np.mean(rho[:,j,nx1:nx2] * u[:,j,nx1:nx2]) / (rho0 * u0) * (1.e0 - np.mean(u[:,j,nx1:nx2]) / u0) * (-y[j-1] + y[j])
 
 Retau    = rhow * ut * delta / muw
 Retheta  = rho0 * u0 * theta / mu0

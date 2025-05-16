@@ -220,9 +220,9 @@ def embedding_entropy(x, y, p=1, tau=1, k=5, Thei=None):
  
   T = x.shape[1]
 
-  X = np.hstack([x[:,(p-i):T-i*tau].T for i in range(p + 1)])
-  Y = np.hstack([y[:,(p-i):T-i*tau].T for i in range(1, p + 1)])
-  N = T - p
+  X = np.hstack([x[:,(p-i)*tau:T-i*tau].T for i in range(p + 1)])
+  Y = np.hstack([y[:,(p-i)*tau:T-i*tau].T for i in range(1, p + 1)])
+  N = T - p * tau
 
   XNN = np.zeros((N, X.shape[1] * (dx * (p + 1) + 1)))
   

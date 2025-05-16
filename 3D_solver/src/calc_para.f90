@@ -59,6 +59,23 @@ contains
     enddo;enddo;enddo;enddo
   end subroutine flatten_right
   
+  subroutine flatten_rescale(nx, ny, nz, nre, overlap, Q, Q1d_right)
+    integer, intent(in), value   :: nx, ny, nz, nre, overlap
+    real(8), intent(in), device  :: Q(nx,ny,nz,5)
+    real(8), intent(out), device :: Q1d_right(overlap*(ny-2)*(nz-6)*5)
+    integer i, j, k, l, ni, nj, nk
+    ni = overlap
+    nj = ny-2
+    nk = nz-6
+    !$cuf kernel do(4)<<<*,*>>>
+    do l = 1, 5
+      do k = 1, nk
+        do j = 1, nj
+          do i = 1, ni
+            Q1d_right(ni*nj*nk*(l-1)+ni*nj*(k-1)+ni*(j-1)+i) = Q(nre-2*overlap+i,j+1,k+3,l)
+    enddo;enddo;enddo;enddo
+  end subroutine flatten_rescale
+  
   subroutine reconstruct(nx, ny, nz, overlap, Q1d_left, Q1d_right, Q)
     integer, intent(in), value   :: nx, ny, nz, overlap
     real(8), intent(in), device  :: Q1d_left(overlap*(ny-2)*(nz-6)*5)
@@ -111,6 +128,23 @@ contains
             Q(nx-overlap+i,j+1,k+3,l) = Q1d_right(ni*nj*nk*(l-1)+ni*nj*(k-1)+ni*(j-1)+i)
     enddo;enddo;enddo;enddo
   end subroutine reconstruct_right
+
+  subroutine reconstruct_sbli_inlet(nx, ny1, ny2, nz, overlap, Q1d, Q)
+    integer, intent(in), value     :: nx, ny1, ny2, nz, overlap
+    real(8), intent(in), device    :: Q1d(overlap*(ny1-2)*(nz-6)*5)
+    real(8), intent(inout), device :: Q(nx,ny2,nz,5)
+    integer i, j, k, l, ni, nj, nk
+    ni = overlap
+    nj = ny1-2
+    nk = nz-6
+    !$cuf kernel do(4)<<<*,*>>>
+    do l = 1, 5
+      do k = 1, nk
+        do j = 1, nj
+          do i = 1, overlap
+            Q(i,j+1,k+3,l) = Q1d(ni*nj*nk*(l-1)+ni*nj*(k-1)+ni*(j-1)+i)
+    enddo;enddo;enddo;enddo
+  end subroutine reconstruct_sbli_inlet
 
   subroutine exchange_cyclic(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ)
     integer(kind=2), intent(in), value :: id_rescale

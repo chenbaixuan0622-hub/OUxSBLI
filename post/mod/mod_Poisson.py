@@ -1,4 +1,5 @@
 import numpy as np
+import scipy
 from scipy.fftpack import dct, idct, dst, idst
 from scipy.linalg import solve_banded
 import matplotlib.pyplot as plt
@@ -188,4 +189,114 @@ class Poisson:
       return self.__z_periodic(self.f, self.nz, self.dz, p1x, p2x, dp1y, dp2y, self.x_Dirichlet_y_Neumann)
     else:
       raise Exception('Invalid shape')
+
+
+
+def Poisson_CND(RHS, dx, loop_x, dy, loop_y, dz=None, loop_z=None, check=False):
+  def fft(x):
+    return np.fft.fft(x, axis=0)
+  def ifft(x):
+    return np.fft.ifft(x, axis=0)
+  def dct(x):
+    return scipy.fftpack.dct(x, type=2, norm='ortho', axis=0)
+  def idct(x):
+    return scipy.fftpack.idct(x, type=2, norm='ortho', axis=0)
+  def dst(x):
+    return scipy.fftpack.dst(x, type=2, norm='ortho', axis=0)
+  def idst(x):
+    return scipy.fftpack.dst(x, type=3, norm='ortho', axis=0)
+
+  def set_func(loop_num):
+    if loop_num == 'C' or loop_num == 'c':
+      func  = fft
+      ifunc = ifft
+    elif loop_num == 'N' or loop_num == 'n':
+      func  = dct
+      ifunc = idct
+    elif loop_num == 'D' or loop_num == 'd':
+      func  = dst
+      ifunc = idst
+    else:
+      print("Invalid arg")
+    return func, ifunc
+
+  def loop(RHS, d, func, ifunc, m1=0.e0, d2=None, func2=None, ifunc2=None):
+    n   = RHS.shape[0]
+    RHS = func(RHS)
+    p   = np.zeros_like(RHS)
+    kd   = 2.e0 * np.pi * np.fft.fftfreq(n, d)
+    for i in range(n):
+      #m2 = -2.e0 * (1.e0 - np.cos(2.e0 * np.pi * i / n)) / d**2
+      m2 = -2.e0 * (1.e0 - np.cos(kd[i] * d)) / d**2
+      if d2 is not None:# 3D Poisson equation
+        p[i] = loop(RHS[i], d2, func2, ifunc2, m1+m2)
+      else:# 2D Poisson equation
+        if m1 + m2 != 0.e0:
+          p[i] = RHS[i] / (m1 + m2)
+        else:
+          p[i] = 0.e0
+    return ifunc(p)
+
+  if RHS.ndim == 2:
+    n1, n2 = RHS.shape
+    d1, d2 = dy, dx
+    func1, ifunc1 = set_func(loop_y)
+    func2, ifunc2 = set_func(loop_x)
+    RHSf = func1(RHS)
+    p    = np.zeros_like(RHSf)
+    kd   = 2.e0 * np.pi * np.fft.fftfreq(n1, d1)
+    for i in range(n1):
+      #m1 = -2.e0 * (1.e0 - np.cos(2.e0 * np.pi * i / n1)) / d1**2
+      m1 = -2.e0 * (1.e0 - np.cos(kd[i] * d1)) / d1**2
+      p[i] = loop(RHSf[i], d2, func2, ifunc2, m1)
+    P = np.real(ifunc1(p))
+    if check is True:
+      LapP = (P[1:-1,:-2] -2.e0 * P[1:-1,1:-1] + P[1:-1,2:]) / dx**2 \
+           + (P[:-2,1:-1] -2.e0 * P[1:-1,1:-1] + P[2:,1:-1]) / dy**2
+      L1 = np.abs(LapP - RHS[1:-1,1:-1])
+      print("L1 norm mean: ", np.mean(L1), " max: ", np.max(L1))
+  else:
+    n1, n2, n3 = RHS.shape
+    d1, d2, d3 = dz, dy, dx
+    func1, ifunc1 = set_func(loop_z)
+    func2, ifunc2 = set_func(loop_y)
+    func3, ifunc3 = set_func(loop_x)
+    RHSf = func1(RHS)
+    p    = np.zeros_like(RHSf)
+    kd   = 2.e0 * np.pi * np.fft.fftfreq(n1, d1)
+    for i in range(n1):
+      #m1 = -2.e0 * (1.e0 - np.cos(2.e0 * np.pi * i / n1)) / d1**2
+      m1 = -2.e0 * (1.e0 - np.cos(kd[i] * d1)) / d1**2
+      p[i] = loop(RHSf[i], d2, func2, ifunc2, m1, d3, func3, ifunc3)
+    P = np.real(ifunc1(p))
+    if check is True:
+      LapP = (P[1:-1,1:-1,:-2] -2.e0 * P[1:-1,1:-1,1:-1] + P[1:-1,1:-1,2:]) / dx**2 \
+           + (P[1:-1,:-2,1:-1] -2.e0 * P[1:-1,1:-1,1:-1] + P[1:-1,2:,1:-1]) / dy**2 \
+           + (P[:-2,1:-1,1:-1] -2.e0 * P[1:-1,1:-1,1:-1] + P[2:,1:-1,1:-1]) / dz**2
+      L1 = np.abs(LapP - RHS[1:-1,1:-1,1:-1])
+      print("L1 norm mean: ", np.mean(L1), " max: ", np.max(L1))
+  return P
+
+
+def Poisson_Spectral(RHS, dx, dy, dz):
+  nz, ny, nx = RHS.shape
+  RHS_hat = np.fft.fftn(RHS)
+  kx = 2.e0 * np.pi * np.fft.fftfreq(nx, d=dx)
+  ky = 2.e0 * np.pi * np.fft.fftfreq(ny, d=dy)
+  kz = 2.e0 * np.pi * np.fft.fftfreq(nz, d=dz)
+  Kx, Ky, Kz = np.meshgrid(kx, ky, kz, indexing='ij')
+  k2 = Kx**2 + Ky**2 + Kz**2
+  k2[0,0,0] = 1.e0
+  p_hat = -RHS_hat / k2
+  p_hat[0,0,0] = 0.e0
+  p = np.fft.ifftn(p_hat).real
+  LapP = (p[1:-1,1:-1,:-2] -2.e0 * p[1:-1,1:-1,1:-1] + p[1:-1,1:-1,2:]) / dx**2 \
+       + (p[1:-1,:-2,1:-1] -2.e0 * p[1:-1,1:-1,1:-1] + p[1:-1,2:,1:-1]) / dy**2 \
+       + (p[:-2,1:-1,1:-1] -2.e0 * p[1:-1,1:-1,1:-1] + p[2:,1:-1,1:-1]) / dz**2
+  L1 = np.abs(LapP - RHS[1:-1,1:-1,1:-1])
+  print("L1 norm mean: ", np.mean(L1), " max: ", np.max(L1))
+  return p
+
+
+def 
 
