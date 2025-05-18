@@ -3,15 +3,16 @@ import os
 from tqdm import tqdm
 from mod.mod_read import getGrid, getVector, getScalar
 from mod.mod_turb_stat import non_dim_tbl
-from mod.mod_ReynoldsStress import ReynoldsStress, print_ReynoldsStress
+from mod.ReynoldsStress import ReynoldsStress, print_ReynoldsStress
 
 
-Q_directory = "../../SBLI/SBLI_16delta/2.2ms/5"
+#Q_directory = "../../SBLI/SBLI_16delta/2.2ms/5"
+Q_directory = "../3D_solver/TBL/data"
 Q_files = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
 
 # wall unit
-rhow = 0.1886e0
-ut   = 23.33e0
+rhow = 0.1871e0
+ut   = 25.08e0
 
 
 def RS(Nx, Ny, Nz, x, y, z, Rho, U, V, W, rhow, ut):
@@ -24,6 +25,8 @@ def RS(Nx, Ny, Nz, x, y, z, Rho, U, V, W, rhow, ut):
     file_path = os.path.join(Q_directory, Q_file)
     if file_path == os.path.join(Q_directory, "TKE.vtr") \
     or file_path == os.path.join(Q_directory, "ReynoldsStress.vtr") \
+    or file_path == os.path.join(Q_directory, "SRA.vtr") \
+    or file_path == os.path.join(Q_directory, "Qrms.vtr") \
     or file_path == os.path.join(Q_directory, "Qmean.vtr"):
       continue
     rho     = getScalar(file_path, Nx, Ny, Nz, 'rho')
@@ -33,7 +36,7 @@ def RS(Nx, Ny, Nz, x, y, z, Rho, U, V, W, rhow, ut):
     vf = v - V
     wf = w - W
     # calc Reynolds Stress
-    ReynoldsStress(Nx, Ny, Nz, Rho, uf, vf, wf, rhow, ut, ruu, rvv, rww, ruv)
+    ReynoldsStress(Rho, uf, vf, wf, rhow, ut, ruu, rvv, rww, ruv)
     itr += 1.e0
   ruu /= itr
   rvv /= itr

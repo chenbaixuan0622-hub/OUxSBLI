@@ -7,9 +7,9 @@ from main import main
 from set import set_grid, set_init
 
 # grid info
-nx    = 130
-ny    = 130
-nz    = 130
+nx    = 66
+ny    = 66
+nz    = 66
 L0    = 1.524e-3
 Lx    = 2.e0 * np.pi * L0
 Ly    = 2.e0 * np.pi * L0
@@ -35,7 +35,7 @@ Np    = 100
 Nt    = int(20.e0 / (float(Np) * dtn))
 
 # device 'cpu' or 'cuda'
-device = jax.devices('gpu')[0]
+device = jax.devices('cpu')[0]
 
 dir = os.path.join(os.getcwd(), 'data')
 os.makedirs(dir, exist_ok = True)
