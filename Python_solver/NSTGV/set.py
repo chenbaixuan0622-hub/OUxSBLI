@@ -60,7 +60,7 @@ def set_init(nx, ny, nz, x, y, z, gamma, Rgas, M0, rho0, u0, p0, T0):
 
 
 @jax.jit
-def set_bc(Q):
+def set_bc(gamma, Rgas, M0, rho0, u0, p0, T0, J, Q):
   Q = Q.at[1:-1,1:-1,0,:].set(Q[1:-1,1:-1,-2,:])
   Q = Q.at[1:-1,1:-1,-1,:].set(Q[1:-1,1:-1,1,:])
   Q = Q.at[1:-1,0,1:-1,:].set(Q[1:-1,-2,1:-1,:])
