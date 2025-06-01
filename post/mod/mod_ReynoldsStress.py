@@ -72,5 +72,7 @@ def print_ReynoldsStress(x, y, z, ruu, rvv, rww, ruv, directory, name):
   writer = vtk.vtkXMLRectilinearGridWriter()
   writer.SetFileName(filepath)
   writer.SetInputData(grid)
+  writer.SetDataModeToAppended()
+  writer.EncodeAppendedDataOff()
   writer.Write()
 

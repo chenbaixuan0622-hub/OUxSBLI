@@ -155,5 +155,7 @@ def print_scalar(x, y, z, p, dir, name, filename):
   writer = vtk.vtkXMLRectilinearGridWriter()
   writer.SetFileName(filepath)
   writer.SetInputData(grid)
+  writer.SetDataModeToAppended()
+  writer.EncodeAppendedDataOff()
   writer.Write()
 

@@ -5,7 +5,7 @@ from tqdm import tqdm
 from mod.mod_read import getGrid, getScalar, getVector, extract_number
 
 
-dir = "../../SBLI/SBLI_16delta/data00500/7"
+dir = "../3D_solver/SBLI/data/3/init"
 
 
 def print_data(x, y, z, rho, u, v, w, p, directory, filename):
@@ -64,6 +64,8 @@ def print_data(x, y, z, rho, u, v, w, p, directory, filename):
   writer = vtk.vtkXMLRectilinearGridWriter()
   writer.SetFileName(filepath)
   writer.SetInputData(grid)
+  writer.SetDataModeToAppended()
+  writer.EncodeAppendedDataOff()
   writer.Write()
 
 
