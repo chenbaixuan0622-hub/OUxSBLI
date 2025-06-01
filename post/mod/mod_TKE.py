@@ -314,5 +314,7 @@ def print_TKE(x, y, z, P, T, PI, D, eps, directory, name):
   writer = vtk.vtkXMLRectilinearGridWriter()
   writer.SetFileName(filepath)
   writer.SetInputData(grid)
+  writer.SetDataModeToAppended()
+  writer.EncodeAppendedDataOff()
   writer.Write()
 
