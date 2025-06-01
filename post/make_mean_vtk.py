@@ -60,20 +60,22 @@ def print_vtk(x, y, z, rho, u, v, w, p, directory, name):
   writer = vtk.vtkXMLRectilinearGridWriter()
   writer.SetFileName(filepath)
   writer.SetInputData(grid)
+  writer.SetDataModeToAppended()
+  writer.EncodeAppendedDataOff()
   writer.Write()
 
 
-Q_directory = "../../SBLI/SBLI_16delta/2.2ms/5"
+Q_directory = "../3D_solver/SBLI/data/3"
 Q_files = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
 
 first_path       = os.path.join(Q_directory, Q_files[0])
 _, _, _, x, y, z = getGrid(os.path.join(first_path))
 
-rho_path  = os.path.join(Q_directory, "rhorms.npy")
-u_path    = os.path.join(Q_directory, "urms.npy"  )
-v_path    = os.path.join(Q_directory, "vrms.npy"  )
-w_path    = os.path.join(Q_directory, "wrms.npy"  )
-p_path    = os.path.join(Q_directory, "prms.npy"  )
+rho_path  = os.path.join(Q_directory, "rho.npy")
+u_path    = os.path.join(Q_directory, "u.npy"  )
+v_path    = os.path.join(Q_directory, "v.npy"  )
+w_path    = os.path.join(Q_directory, "w.npy"  )
+p_path    = os.path.join(Q_directory, "p.npy"  )
 
 rho  = np.load(rho_path)
 u    = np.load(u_path  )
@@ -81,5 +83,5 @@ v    = np.load(v_path  )
 w    = np.load(w_path  )
 p    = np.load(p_path  )
 
-print_vtk(np.float32(x), np.float32(y), np.float32(z), rho, u, v, w, p, Q_directory, "Qrms")
+print_vtk(np.float32(x), np.float32(y), np.float32(z), rho, u, v, w, p, Q_directory, "Qmean")
 
