@@ -3,18 +3,19 @@ import os
 from tqdm import tqdm
 from mod.mod_read import getGrid, getVector, getScalar
 from mod.mod_turb_stat import non_dim_tbl, Sutherland, tau
-from mod.mod_TKE import BudgetTerms, print_TKE
+from mod.TKE import BudgetTerms, print_TKE
 
 
-Q_directory = "../../SBLI/SBLI_16delta/2.2ms/5"
+#Q_directory = "../../SBLI/SBLI_16delta/2.2ms/5"
+Q_directory = "../3D_solver/TBL/data"
 Q_files = [f for f in os.listdir(Q_directory) if f.endswith(".vtr")]
 
-Rgas  = 287.03
+Rgas  = 287.03e0
 
 # wall unit
-rhow = 0.1886e0
-ut   = 23.33e0
-mu   = 1.74e-5
+rhow = 0.1871e0
+ut   = 25.08e0
+mu   = 1.757e-5
 
 
 def TKE(Nx, Ny, Nz, x, y, z, Rho, U, V, W, P, UF, VF, WF, Norm):
@@ -30,6 +31,7 @@ def TKE(Nx, Ny, Nz, x, y, z, Rho, U, V, W, P, UF, VF, WF, Norm):
     file_path = os.path.join(Q_directory, Q_file)
     if file_path == os.path.join(Q_directory, "TKE.vtr") \
     or file_path == os.path.join(Q_directory, "ReynoldsStress.vtr") \
+    or file_path == os.path.join(Q_directory, "Qrms.vtr") \
     or file_path == os.path.join(Q_directory, "Qmean.vtr"):
       continue
     rho     = getScalar(file_path, Nx, Ny, Nz, 'rho')
