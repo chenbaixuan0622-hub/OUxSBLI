@@ -2,6 +2,7 @@ import numpy as np
 from scipy.special import psi, gamma
 from scipy.spatial import KDTree
 from scipy.spatial.distance import cdist
+from pyunicorn.timeseries import surrogates
 from mod.mod_ds import search_tau
 
 
@@ -48,21 +49,19 @@ def shannon_entropy(X, k=3, Thei=1, Z=None):
 
 
 def mutual_info(X, Y, k=5, Thei=10):
+  X, _ = reshape_matrix(X)
+  Y, _ = reshape_matrix(Y)
   N = X.shape[0]
   nX, nY, nN = np.zeros(N), np.zeros(N), np.zeros(N)
-  
   for i in range(N):
     idx = np.ones(N, dtype=bool)
     idx[max(0, i - Thei):min(i + Thei + 1, N)] = False
-    
     tree_XY = KDTree(np.hstack((X[idx], Y[idx])))
     dist, _ = tree_XY.query(np.hstack((X[i], Y[i])), k=k, p=np.inf, workers=-1)
     half_epsilon_XYkNN = dist[-1]
-    
     nX[i] = np.sum(cdist(X[idx], X[i].reshape(1,-1), metric='chebyshev') < half_epsilon_XYkNN)
     nY[i] = np.sum(cdist(Y[idx], Y[i].reshape(1,-1), metric='chebyshev') < half_epsilon_XYkNN)
     nN[i] = np.sum(idx)
-  
   valid_idx = (nX > 0) & (nY > 0)
   I = psi(k) - np.mean(psi(nX[valid_idx] + 1)) - np.mean(psi(nY[valid_idx] + 1)) + np.mean(psi(nN[valid_idx] + 1))
   return I 
@@ -187,10 +186,24 @@ def transfer_entropy(x, y, p=1, tau=1, k=2, Thei=None):
 
 def transfer_entropy_surrogate(x, y, p=1, tau=1, k=5, Thei=10):
   # informtion flow y -> x
-  x0  = np.random.permutation(x)
-  TE  = transfer_entropy(y, x,  p=p, tau=tau, k=k, Thei=Thei)
-  TE0 = transfer_entropy(y, x0, p=p, tau=tau, k=k, Thei=Thei)
-  return TE - TE0
+  TE  = np.maximum(transfer_entropy(y, x, p=p, tau=tau, k=k, Thei=Thei), 0.e0)
+  TE0 = 0.e0
+  trial = 1
+  for i in range(trial):
+    #sur = surrogates.Surrogates(original_data=y.reshape(1,-1))
+    #ys  = sur.AAFT_surrogates()
+    #ys  = ys[0,:]
+    ys  = np.random.permutation(y)
+    TE0 += np.maximum(transfer_entropy(ys, x, p=p, tau=tau, k=k, Thei=Thei), 0.e0)
+  TE0 /= trial
+  '''
+  # conditional entropy
+  xf = x[tau:]
+  xp = x[:-tau]
+  H_c = shannon_entropy(xf) - mutual_info(xf, xp)
+  TE0 /= trial
+  '''
+  return np.maximum(TE - TE0, 0.e0)# / H_c
 
 
 def embedding_entropy(x, y, p=1, tau=1, k=5, Thei=None):
