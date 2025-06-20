@@ -43,12 +43,12 @@ def getGrid(file_path):
 def getVector(file_path,Nx,Ny,Nz,name):
   reader = vtk.vtkXMLRectilinearGridReader()
   reader.SetFileName(file_path)
+  reader.GetPointDataArraySelection().DisableAllArrays()
+  reader.GetPointDataArraySelection().EnableArray(name)
   reader.Update()
-
   # get dataset
   Q = reader.GetOutput()
   V = numpy_support.vtk_to_numpy(Q.GetPointData().GetArray(name))
-
   u = np.reshape(V[:,0], [Nz,Ny,Nx])
   v = np.reshape(V[:,1], [Nz,Ny,Nx])
   w = np.reshape(V[:,2], [Nz,Ny,Nx])
@@ -58,8 +58,9 @@ def getVector(file_path,Nx,Ny,Nz,name):
 def getScalar(file_path,Nx,Ny,Nz,name):
   reader = vtk.vtkXMLRectilinearGridReader()
   reader.SetFileName(file_path)
+  reader.GetPointDataArraySelection().DisableAllArrays()
+  reader.GetPointDataArraySelection().EnableArray(name)
   reader.Update()
-
   # get dataset
   Q = reader.GetOutput()
   a = numpy_support.vtk_to_numpy(Q.GetPointData().GetArray(name))

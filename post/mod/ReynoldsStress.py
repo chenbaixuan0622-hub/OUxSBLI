@@ -5,11 +5,12 @@ from numba import njit
 
 
 @njit(cache=True, fastmath=True, nogil=True)
-def ReynoldsStress(Nx, Ny, Nz, Rho, uf, vf, wf, rhow, ut, ruu, rvv, rww, ruv):
+def ReynoldsStress(Rho, uf, vf, wf, rhow, ut, ruu, rvv, rww, ruv):
   ruu += Rho * uf**2 / (rhow * ut**2)
   rvv += Rho * vf**2 / (rhow * ut**2)
   rww += Rho * wf**2 / (rhow * ut**2)
   ruv += Rho * uf * vf / (rhow * ut**2)
+
 
 def print_ReynoldsStress(x, y, z, ruu, rvv, rww, ruv, directory, name):
   ruu1d = np.float32(ruu.flatten())
@@ -72,5 +73,7 @@ def print_ReynoldsStress(x, y, z, ruu, rvv, rww, ruv, directory, name):
   writer = vtk.vtkXMLRectilinearGridWriter()
   writer.SetFileName(filepath)
   writer.SetInputData(grid)
+  writer.SetDataModeToAppended()
+  writer.EncodeAppendedDataOff()
   writer.Write()
 

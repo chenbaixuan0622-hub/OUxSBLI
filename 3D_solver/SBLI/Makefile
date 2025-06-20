@@ -34,7 +34,7 @@ OBJ =	mod_globals.o \
       calc_para.o \
       print.o \
       calc_time_dev.o \
-      main.o
+      sbli.o
 
 a.out: $(OBJ)
 		$(FC) -cuda -acc -fast -Minfo -lnvhpcwrapnvtx -I./ $^
@@ -58,5 +58,5 @@ calc_steps.o: mod_globals.mod
 calc_rescale.o: mod_globals.mod
 calc_time_dev.o: mod_globals.mod calc_physical_quantities.mod set.mod calc_flux.mod calc_hybrid.mod calc_visc.mod calc_les.mod calc_steps.mod calc_rescale.mod calc_para.mod print.mod
 print.o: mod_globals.mod
-main.o: main.f90 mod_globals.mod set_coordinate.mod set.mod calc_time_dev.mod
+sbli.o: main.f90 mod_globals.mod set_coordinate.mod set.mod calc_time_dev.mod
 
