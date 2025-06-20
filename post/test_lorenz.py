@@ -2,39 +2,26 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from mod.mod_plot import set_Params
-from mod.mod_info import EE
-from mod.mod_recurrence import recurrence_plot, excessive_recurrence_test
-from mod.mod_ds import lorenz, search_tau, Takens_embedding, local_constant_pred
+#from mod.mod_info import EE
+#from mod.mod_recurrence import recurrence_plot, excessive_recurrence_test
+#from mod.mod_ds import lorenz, search_tau, Takens_embedding, local_constant_pred
+from mod.mod_ds_test import lorenz
 
 
 set_Params()
 
 
-dt = 0.01
-nt = 10000
-
-xs = np.empty(nt + 1, dtype=np.float32)
-ys = np.empty(nt + 1, dtype=np.float32)
-zs = np.empty(nt + 1, dtype=np.float32)
-
-t  = np.zeros(nt+1)
-
-xs[0], ys[0], zs[0] = (0.e0, 1.e0, 1.05e0)
-
-for i in range(nt):
-  dot_x, dot_y, dot_z = lorenz(xs[i], ys[i], zs[i])
-  xs[i+1] = xs[i] + dot_x * dt
-  ys[i+1] = ys[i] + dot_y * dt
-  zs[i+1] = zs[i] + dot_z * dt
-  t[i+1]  = t[i]  + dt
-
+dynamics = lorenz(s=10.e0, r=28.e0, b=8.e0/3.e0)
+xf, yf, zf = dynamics.GaussRK2(nt=100000, dt= 0.001e0)
+xb, yb, zb = dynamics.GaussRK2(nt=2500,   dt=-0.001e0, x0=xf[-1], y0=yf[-1], z0=zf[-1])
 
 ax = plt.axes(projection='3d')
 ax.view_init(elev=30, azim=-60)
-ax.plot3D(xs, ys, zs, 'blue', lw=0.5)
-ax.set_xlabel('$\it{x}$', fontsize=16)
-ax.set_ylabel('$\it{y}$', fontsize=16)
-ax.set_zlabel('$\it{z}$', fontsize=16)
+ax.plot3D(xf, yf, zf, 'blue', lw=0.5)
+ax.plot3D(xb, yb, zb, 'red', lw=0.5)
+ax.set_xlabel('x', fontsize=16)
+ax.set_ylabel('y', fontsize=16)
+ax.set_zlabel('z', fontsize=16)
 plt.show()
 plt.close()
 
@@ -44,8 +31,6 @@ plt.close()
 #     x     y    0    1
 #     x     z    0    2
 #     y     z    0    2
-
-noise = np.random.normal(0, 1, len(xs))
 
 '''
 fig, ax = plt.subplots(1,3, figsize=(12,4), tight_layout=True)
@@ -134,7 +119,7 @@ ax[2].set_ylabel('$\it{t}$')
 plt.show()
 plt.close()
 '''
-
+'''
 # local constatnt prediction
 m = 20
 taux, _ = search_tau(xs, bin=5, tau_max=len(xs)-1)
@@ -150,7 +135,7 @@ plt.xlabel(r'$\it{\tau}$', fontsize=16)
 plt.ylabel('$\it{x}$', fontsize=16)
 plt.xticks([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20])
 plt.show()
-
+'''
 '''
 data = [xs, ys, zs, noise]
 
