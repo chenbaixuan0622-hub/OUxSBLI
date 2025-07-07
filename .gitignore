@@ -9,4 +9,5 @@
 post/__pycache__/
 post/mod/__pycache__/
 post/mod_AI/__pycache__/
+CUDA_solver/__pycache__/
 
