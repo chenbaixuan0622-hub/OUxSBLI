@@ -64,9 +64,9 @@ contains
     enddo
 
     y(1) = 0.d0
-    do j = 1, ny
+    do j = 1, ny-1
       if (y(j) <= 3.d0 * blt) then
-        dy(j) = min(1.d0, max(0.05d0, dble(j)/dble(128))) * dy1
+        dy(j) = min(1.d0, max(0.07d0, dble(j)/dble(128))) * dy1
       elseif (3.d0 * blt <= y(j) .and. y(j) <= 8.d0 * blt) then
         dy(j) = 1.5d0 * dy1
       else
@@ -74,6 +74,7 @@ contains
       endif
       y(j+1) = y(j) + dy(j)
     enddo
+    print *, y(ny)
 
     z(1) = 0.d0
     do k = 1, nz-1
@@ -130,7 +131,7 @@ contains
             ustd = 0.2d0 * u0 * randum(ir,jr,kr,1)
             vstd = 0.1d0 * u0 * randum(ir,jr,kr,2)
             wstd = 0.1d0 * u0 * randum(ir,jr,kr,3)
-            Tstd = T0 * (gamma - 1.d0) * M0**2 * 0.2d0 * randum(ir,jr,kr,4)
+            Tstd = T0 * (gamma - 1.d0) * M0**2 * randum(ir,jr,kr,4) * 0.1d0!0.2d0
           else
             ustd = 0.d0
             vstd = 0.d0
@@ -207,11 +208,11 @@ contains
         enddo;enddo;enddo
       endif
       call flatten_rescale(nx, ny1, nz, nre2, 3, QJ, Q1d)
-      Q_cpu = Q1d
-      call MPI_SEND(Q_cpu, 5*3*(ny1-2)*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ierr)
+      !Q_cpu = Q1d ! This is safe but very slow
+      call MPI_SEND(Q1d, 5*3*(ny1-2)*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ierr)
     else
-      call MPI_RECV(Q_cpu, 5*3*(ny1-2)*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, istat, ierr)
-      Q1d = Q_cpu
+      call MPI_RECV(Q1d, 5*3*(ny1-2)*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, istat, ierr)
+      !Q1d = Q_cpu ! This is safe but very slow
       ! inlet boundary layer
       call reconstruct_sbli_inlet(nx, ny1, ny, nz, 3, Q1d, QJ)
       !$cuf kernel do(2)<<<*,*>>>
@@ -264,7 +265,7 @@ contains
     enddo;enddo
 
     if (myrank == 2) then
-      No = int(0.1 * nx)
+      No = int(dble(nx) * 0.33d0 / 35.d0)
       !$cuf kernel do(2)<<<*,*>>>
       do k = 1, nz
         do i = No, nx/2

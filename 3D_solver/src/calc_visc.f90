@@ -60,7 +60,7 @@ contains
 
   attributes(device) function flux4(a) result(ans)
     real(8), intent(in), device :: a(3)
-    real(8), intent(out)        :: ans
+    real(8) ans
     ans = 0.125d0 * ((9.d0 - 1.d0 / 3.d0) * a(2) - (a(1) + a(3)) / 3.d0)
   end function flux4
 
