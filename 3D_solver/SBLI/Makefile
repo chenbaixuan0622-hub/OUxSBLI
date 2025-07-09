@@ -15,7 +15,6 @@ vpath %f90 ../src:../../src
 
 OBJ =	mod_globals.o \
       set_coordinate.o \
-      set.o \
       calc_common_dim.o \
       calc_mat.o \
       calc_physical_quantities.o \
@@ -32,6 +31,7 @@ OBJ =	mod_globals.o \
       calc_steps.o \
       calc_rescale.o \
       calc_para.o \
+      set.o \
       print.o \
       calc_time_dev.o \
       sbli.o

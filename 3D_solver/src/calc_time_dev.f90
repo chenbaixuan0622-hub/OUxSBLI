@@ -2,7 +2,7 @@ module calc_time_dev
   use cudafor
   use mpi
   use nvtx
-  use mod_globals, only : accuracy, id_accuracy, id_scheme, id_turbulence, id_rescale, nt, np, nre2, rerank, &
+  use mod_globals, only : accuracy, id_accuracy, id_scheme, id_turbulence, id_rescale, id_exchange, nt, np, nre2, rerank, &
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
   & blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv
   use calc_physical_quantities
@@ -193,30 +193,37 @@ contains
             call calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJ, Qm)
             call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
             call nvtxEndRange
+            !print *, "myrank=", myrank, "send Qre"
           endif
           call nvtxStartRange("calc flux", 2)
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
           call nvtxEndRange
+          !print *, "myrank=", myrank, "calc flux"
           call nvtxStartRange("calc step", 3)
           call calc_step(nx, ny, nz, 1.d0, 0.d0, xix, etay, zetaz, E, F, G, QJ, QJ2)
           call nvtxEndRange
+          !print *, "myrank=", myrank, "calc step"
           if (myrank == 0 .and. kind(id_rescale) == 4) then
             call nvtxStartRange("recv Qre", 4)
             call MPI_RECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
             call nvtxEndRange
+            !print *, "myrank=", myrank, "recv Qre"
           endif
-          if (ndevices >= 2) then
+          if (ndevices >= 2 .and. kind(id_exchange) == 4) then
             call nvtxStartRange("exchange", 5)
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ2)
             call nvtxEndRange
+            !print *, "myrank=", myrank, "exchange"
           endif
           call nvtxStartRange("set bc", 6)
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
           call nvtxEndRange
+          !print *, "myrank=", myrank, "set bc"
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call nvtxStartRange("calc rescale", 7)
           call rescale_recv_send(flag_re, nx, ny, nz, step, y, Jacobian_cpu)
           call nvtxEndRange
+          !print *, "myrank=", myrank, "calc rescale"
         endif
 
         if (mod(myrank,2) == 0) then
@@ -231,7 +238,7 @@ contains
           if (myrank == 0 .and. kind(id_rescale) == 4) then
             call MPI_RECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
           endif
-          if (ndevices >= 2) then
+          if (ndevices >= 2 .and. kind(id_exchange) == 4) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ2)
           endif
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
@@ -251,7 +258,7 @@ contains
           if (myrank == 0 .and. kind(id_rescale) == 4) then
             call MPI_RECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
           endif
-          if (ndevices >= 2) then
+          if (ndevices >= 2 .and. kind(id_exchange) == 4) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ)
           endif
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
