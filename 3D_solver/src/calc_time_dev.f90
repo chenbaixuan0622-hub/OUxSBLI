@@ -285,9 +285,6 @@ contains
       endif
     enddo
 
-    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-    print *, "myrank is ", myrank, " finish Runge-Kutta"
-    
     deallocate(rho1d, p1d, v1d)
     if (mod(myrank,2) == 0) then
       deallocate(QJ, QJ2, E, F, G, xix, etay, zetaz, Jacobian)
@@ -485,8 +482,6 @@ contains
         call print_vtk(t2, nx, ny, nz, myrank, nranks, x, y, z, rho1d, p1d, v1d, ke0, entropy0)
       endif
     enddo
-
-    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 
     deallocate(rho1d, p1d, v1d)
     if (mod(myrank,2) == 0) then
