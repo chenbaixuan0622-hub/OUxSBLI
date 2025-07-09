@@ -6,10 +6,12 @@ program main
   use set_coordinate
   use calc_time_dev
   implicit none
-  integer i, j, l, m, s, mygpu
+  integer i, j, l, m, s, mygpu, ios
   real(8) t_start, t_end
   real(8), allocatable :: x(:), dx(:), y(:), dy(:), z(:), dz(:), Jacobian(:), Q(:,:,:,:)
+  character(len=8) header
   character(len=40) filename
+  logical is_sequential
   ! MPI
   integer nranks, myrank, ierr, ireq, istat(MPI_STATUS_SIZE)
 
