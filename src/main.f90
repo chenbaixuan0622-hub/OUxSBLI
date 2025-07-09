@@ -6,10 +6,12 @@ program main
   use set_coordinate
   use calc_time_dev
   implicit none
-  integer i, j, l, m, s, mygpu
+  integer i, j, l, m, s, mygpu, ios
   real(8) t_start, t_end
   real(8), allocatable :: x(:), dx(:), y(:), dy(:), z(:), dz(:), Jacobian(:), Q(:,:,:,:)
+  character(len=8) header
   character(len=40) filename
+  logical is_sequential
   ! MPI
   integer nranks, myrank, ierr, ireq, istat(MPI_STATUS_SIZE)
 
@@ -73,11 +75,12 @@ program main
       print *, "calculation time:", m, " [min] ", s, " [sec]"
     endif
     ! save data
-    do l = 1, nz
-      do j = 1, ny
-        do i = 1, nx
-          Q(i,j,l,:) = Jacobian(j) * Q(i,j,l,:)
-    enddo;enddo;enddo
+    do m = 1, 5
+      do l = 1, nz
+        do j = 1, ny
+          do i = 1, nx
+            Q(i,j,l,m) = Jacobian(j) * Q(i,j,l,m)
+    enddo;enddo;enddo;enddo
     call cpu_time(t_start)
     write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"
     open(10,file=filename,status="replace",action="write",form="unformatted",access="sequential")
