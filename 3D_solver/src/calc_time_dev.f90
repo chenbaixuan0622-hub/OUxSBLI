@@ -191,37 +191,41 @@ contains
             call nvtxStartRange("send Qre", 1)
             call copy(nx, ny, nz, QJ, Qre)
             call MPI_ISEND(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr)
+            call nvtxEndRange
+            call nvtxStartRange("calc mean", 2)
             call calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJ, Qm)
+            call nvtxEndRange
+            call nvtxStartRange("send Qmean", 3)
             call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
             call nvtxEndRange
             !print *, "myrank=", myrank, "send Qre"
           endif
-          call nvtxStartRange("calc flux", 2)
+          call nvtxStartRange("calc flux", 4)
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
           call nvtxEndRange
           !print *, "myrank=", myrank, "calc flux"
-          call nvtxStartRange("calc step", 3)
+          call nvtxStartRange("calc step", 5)
           call calc_step(nx, ny, nz, 1.d0, 0.d0, xix, etay, zetaz, E, F, G, QJ, QJ2)
           call nvtxEndRange
           !print *, "myrank=", myrank, "calc step"
           if (myrank == 0 .and. kind(id_rescale) == 4) then
-            call nvtxStartRange("recv Qre", 4)
+            call nvtxStartRange("recv Qre", 6)
             call MPI_RECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
             call nvtxEndRange
             !print *, "myrank=", myrank, "recv Qre"
           endif
           if (ndevices >= 2 .and. kind(id_exchange) == 4) then
-            call nvtxStartRange("exchange", 5)
+            call nvtxStartRange("exchange", 7)
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ2)
             call nvtxEndRange
             !print *, "myrank=", myrank, "exchange"
           endif
-          call nvtxStartRange("set bc", 6)
+          call nvtxStartRange("set bc", 8)
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
           call nvtxEndRange
           !print *, "myrank=", myrank, "set bc"
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call nvtxStartRange("calc rescale", 7)
+          call nvtxStartRange("calc rescale", 9)
           call rescale_recv_send(flag_re, nx, ny, nz, step, y, Jacobian_cpu)
           call nvtxEndRange
           !print *, "myrank=", myrank, "calc rescale"
