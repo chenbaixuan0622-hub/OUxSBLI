@@ -98,7 +98,7 @@ contains
     integer, intent(in)    :: step, nx, ny, nz! nz-6
     real(8), intent(in)    :: y(ny), Jacobian(ny), Qm(ny*5)
     real(8), intent(inout) :: Qre(ny*nz*5) ! Q / J
-    integer i, j, jj, k, kh, l, errorcode, ierr
+    integer i, j, jj, k, kh, l, k_offset, l_offset, errorcode, ierr
     real(8) :: mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0, Cp = gamma * R / (gamma - 1.d0)
     real(8) t, dudy, bltre, taure, utre, utin, beta, mu, nu, ady, ade 
     ! mean properties at rescaling plane
@@ -116,32 +116,41 @@ contains
     real(8) ure, vre, wre, rhore, Tre, pre
     ! rescaled properties at inlet
     real(8) uin, vin, win, rhoin, Tin, pin
+    ! cache
+    real(8) u_tmp, v_tmp, p_tmp, T_tmp, weight_tmp, Jacobian_tmp
     character(len=40) filename
     write(filename, "(a)") "data/rescaling.d"
 
     t = nt * step * dt
 
     do l = 1, 5
+      l_offset = ny * nz * (l-1)
       do k = 1, nz
+        k_offset = ny * (k-1)
         do j = 1, ny
-          Qre(ny*nz*(l-1)+ny*(k-1)+j) = Qre(ny*nz*(l-1)+ny*(k-1)+j) * Jacobian(j)
+          i = l_offset + k_offset + j
+          Qre(i) = Qre(i) * Jacobian(j)
     enddo;enddo;enddo
 
     do j = 1, ny
-      rhom(j) = Qm(ny*0+j)
-      Um(j)   = Qm(ny*1+j)
-      Vm(j)   = Qm(ny*2+j)
+      rhom(j) = Qm(     j)
+      u_tmp   = Qm(ny  +j)
+      v_tmp   = Qm(ny*2+j)
       Wm(j)   = Qm(ny*3+j)
-      pm(j)   = Qm(ny*4+j)
-      Tm(j)   = pm(j) / (R * rhom(j))
-      Umin(j)  = Um(j)
-      Vmin(j)  = Vm(j)
-      Tmin(j)  = Tm(j)
-      pmin(j)  = pm(j)
-      Umout(j) = Um(j)
-      Vmout(j) = Vm(j)
-      Tmout(j) = Tm(j)
-      pmout(j) = pm(j)
+      p_tmp   = Qm(ny*4+j)
+      T_tmp   = p_tmp / (R * rhom(j))
+      Um(j)    = u_tmp
+      Umin(j)  = u_tmp
+      Umout(j) = u_tmp
+      Vm(j)    = v_tmp
+      Vmin(j)  = v_tmp
+      Vmout(j) = v_tmp
+      pm(j)    = p_tmp
+      pmin(j)  = p_tmp
+      pmout(j) = p_tmp
+      Tm(j)    = T_tmp
+      Tmin(j)  = T_tmp
+      Tmout(j) = T_tmp
     enddo
 
     ! check boundary layer thickness at rescaling plane
@@ -173,13 +182,15 @@ contains
       open(10, file=filename, position="append")
       write(10, "(2e12.4, a)") t*1d3, bltre, "rescale"
       close(10)
+      l_offset = ny * nz
       do k = 1, nz
+        k_offset = ny * (k-1)
         do j = 1, ny
-          rhore = Qre(ny*nz*0+ny*(k-1)+j)
-          ure   = Qre(ny*nz*1+ny*(k-1)+j) / rhore
-          vre   = Qre(ny*nz*2+ny*(k-1)+j) / rhore
-          wre   = Qre(ny*nz*3+ny*(k-1)+j) / rhore
-          pre   = (gamma - 1.d0) * (Qre(ny*nz*4+ny*(k-1)+j) - 0.5d0 * rhore * (ure**2 + vre**2 + wre**2)) 
+          rhore = Qre(          +k_offset+j)
+          ure   = Qre(l_offset*1+k_offset+j) / rhore
+          vre   = Qre(l_offset*2+k_offset+j) / rhore
+          wre   = Qre(l_offset*3+k_offset+j) / rhore
+          pre   = (gamma - 1.d0) * (Qre(l_offset*4+k_offset+j) - 0.5d0 * rhore * (ure**2 + vre**2 + wre**2)) 
           Tre   = pre / (rhore * R)
           ufre(j,k) = ure - Um(j)
           vfre(j,k) = vre - Vm(j)
@@ -262,20 +273,24 @@ contains
       enddo;enddo
   
       ! re-introducing
+      l_offset = ny * nz
       do k = 1, nz
         kh = mod(k+nz/2,nz) + 1
+        k_offset = ny * (k-1)
         do j = 1, ny
-          uin = (Umin(j) + ufin(j,kh)) * (1.d0 - weight(j)) + (Umout(j) + ufout(j,kh)) * weight(j)
-          vin = (Vmin(j) + vfin(j,kh)) * (1.d0 - weight(j)) + (Vmout(j) + vfout(j,kh)) * weight(j)
-          win =            wfin(j,kh)  * (1.d0 - weight(j)) +             wfout(j,kh)  * weight(j)
-          Tin = (Tmin(j) + Tfin(j,kh)) * (1.d0 - weight(j)) + (Tmout(j) + Tfout(j,kh)) * weight(j)
-          pin = (pmin(j) + pfin(j,kh)) * (1.d0 - weight(j)) + (pmout(j) + pfout(j,kh)) * weight(j)
-          rhoin      = pin / (R * Tin)
-          Qre(ny*nz*0+ny*(k-1)+j) = rhoin / Jacobian(j)
-          Qre(ny*nz*1+ny*(k-1)+j) = rhoin * uin / Jacobian(j)
-          Qre(ny*nz*2+ny*(k-1)+j) = rhoin * vin / Jacobian(j)
-          Qre(ny*nz*3+ny*(k-1)+j) = rhoin * win / Jacobian(j)
-          Qre(ny*nz*4+ny*(k-1)+j) = (pin / (gamma - 1.d0) + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) / Jacobian(j)
+          weight_tmp   = weight(j)
+          Jacobian_tmp = Jacobian(j)
+          uin = (Umin(j) + ufin(j,kh)) * (1.d0 - weight_tmp) + (Umout(j) + ufout(j,kh)) * weight_tmp
+          vin = (Vmin(j) + vfin(j,kh)) * (1.d0 - weight_tmp) + (Vmout(j) + vfout(j,kh)) * weight_tmp
+          win =            wfin(j,kh)  * (1.d0 - weight_tmp) +             wfout(j,kh)  * weight_tmp
+          Tin = (Tmin(j) + Tfin(j,kh)) * (1.d0 - weight_tmp) + (Tmout(j) + Tfout(j,kh)) * weight_tmp
+          pin = (pmin(j) + pfin(j,kh)) * (1.d0 - weight_tmp) + (pmout(j) + pfout(j,kh)) * weight_tmp
+          rhoin = pin / (R * Tin)
+          Qre(           k_offset+j) = rhoin / Jacobian_tmp
+          Qre(l_offset  +k_offset+j) = rhoin * uin / Jacobian_tmp
+          Qre(l_offset*2+k_offset+j) = rhoin * vin / Jacobian_tmp
+          Qre(l_offset*3+k_offset+j) = rhoin * win / Jacobian_tmp
+          Qre(l_offset*4+k_offset+j) = (pin / (gamma - 1.d0) + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) / Jacobian_tmp
       enddo;enddo
     else
       open(10, file=filename, position="append")
