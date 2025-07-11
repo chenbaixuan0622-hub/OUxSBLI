@@ -7,53 +7,51 @@ contains
     integer, intent(in)            :: step, flag_re, nx, ny, nz
     real(8), intent(in), device    :: Jacobian(ny), QJ(nx,ny,nz,5)
     real(8), intent(inout), device :: Qm(ny*5)
-    real(8) Q1, Q2, Q3, Q4, Q5
+    real(8) Q1, Q2, Q3, Q4, Q5, rhoinv, Jacobian_tmp, volinv, step1, step2
     integer i, k
+    volinv = 1.d0 / dble((nre2 - nre1 + 1) * (nz - 6))
     if (flag_re == 0) then
       !$cuf kernel do <<<*,*>>>
       do j = 1, ny
-        Q1 = 0.d0
-        Q2 = 0.d0
-        Q3 = 0.d0
-        Q4 = 0.d0
-        Q5 = 0.d0
+        Q1 = 0.d0; Q2 = 0.d0; Q3 = 0.d0; Q4 = 0.d0; Q5 = 0.d0
+        Jacobian_tmp = Jacobian(j)
         do k = 4, nz-3
           do i = nre1, nre2
-            Q1 = Q1 + QJ(i,j,k,1) * Jacobian(j)
-            Q2 = Q2 + QJ(i,j,k,2) / QJ(i,j,k,1)
-            Q3 = Q3 + QJ(i,j,k,3) / QJ(i,j,k,1)
-            Q4 = Q4 + QJ(i,j,k,4) / QJ(i,j,k,1)
-            Q5 = Q5 + (gamma - 1.d0) * Jacobian(j) * (QJ(i,j,k,5) &
-                    - 0.5d0 * (QJ(i,j,k,2)**2 + QJ(i,j,k,3)**2 + QJ(i,j,k,4)**2) / QJ(i,j,k,1))
+            rhoinv = 1.d0 / QJ(i,j,k,1)
+            Q1 = Q1 + QJ(i,j,k,1) * Jacobian_tmp
+            Q2 = Q2 + QJ(i,j,k,2) * rhoinv
+            Q3 = Q3 + QJ(i,j,k,3) * rhoinv
+            Q4 = Q4 + QJ(i,j,k,4) * rhoinv
+            Q5 = Q5 + (gamma - 1.d0) * Jacobian_tmp * (QJ(i,j,k,5) &
+                    - 0.5d0 * (QJ(i,j,k,2)**2 + QJ(i,j,k,3)**2 + QJ(i,j,k,4)**2) * rhoinv)
         enddo;enddo
-        Qm(ny*0+j) = Q1 / dble((nre2 - nre1 + 1) * (nz - 6))
-        Qm(ny*1+j) = Q2 / dble((nre2 - nre1 + 1) * (nz - 6))
-        Qm(ny*2+j) = Q3 / dble((nre2 - nre1 + 1) * (nz - 6))
-        Qm(ny*3+j) = Q4 / dble((nre2 - nre1 + 1) * (nz - 6))
-        Qm(ny*4+j) = Q5 / dble((nre2 - nre1 + 1) * (nz - 6))
+        Qm(ny*0+j) = Q1 * volinv
+        Qm(ny*1+j) = Q2 * volinv
+        Qm(ny*2+j) = Q3 * volinv
+        Qm(ny*3+j) = Q4 * volinv
+        Qm(ny*4+j) = Q5 * volinv
       enddo
     else
+      step1 = dble(step-1); step2 = 1.d0 / dble(step)
       !$cuf kernel do <<<*,*>>>
       do j = 1, ny
-        Q1 = 0.d0
-        Q2 = 0.d0
-        Q3 = 0.d0
-        Q4 = 0.d0
-        Q5 = 0.d0
+        Q1 = 0.d0; Q2 = 0.d0; Q3 = 0.d0; Q4 = 0.d0; Q5 = 0.d0
+        Jacobian_tmp = Jacobian(j)
         do k = 4, nz-3
           do i = nre1, nre2
-            Q1 = Q1 + QJ(i,j,k,1) * Jacobian(j)
-            Q2 = Q2 + QJ(i,j,k,2) / QJ(i,j,k,1)
-            Q3 = Q3 + QJ(i,j,k,3) / QJ(i,j,k,1)
-            Q4 = Q4 + QJ(i,j,k,4) / QJ(i,j,k,1)
-            Q5 = Q5 + (gamma - 1.d0) * Jacobian(j) * (QJ(i,j,k,5) &
-                    - 0.5d0 * (QJ(i,j,k,2)**2 + QJ(i,j,k,3)**2 + QJ(i,j,k,4)**2) / QJ(i,j,k,1))
+            rhoinv = 1.d0 / QJ(i,j,k,1)
+            Q1 = Q1 + QJ(i,j,k,1) * Jacobian_tmp
+            Q2 = Q2 + QJ(i,j,k,2) * rhoinv
+            Q3 = Q3 + QJ(i,j,k,3) * rhoinv
+            Q4 = Q4 + QJ(i,j,k,4) * rhoinv
+            Q5 = Q5 + (gamma - 1.d0) * Jacobian_tmp * (QJ(i,j,k,5) &
+                    - 0.5d0 * (QJ(i,j,k,2)**2 + QJ(i,j,k,3)**2 + QJ(i,j,k,4)**2) * rhoinv)
         enddo;enddo
-        Qm(ny*0+j) = (dble(step-1) * Qm(ny*0+j) + Q1 / dble((nre2 - nre1 + 1) * (nz - 6))) / dble(step)
-        Qm(ny*1+j) = (dble(step-1) * Qm(ny*1+j) + Q2 / dble((nre2 - nre1 + 1) * (nz - 6))) / dble(step)
-        Qm(ny*2+j) = (dble(step-1) * Qm(ny*2+j) + Q3 / dble((nre2 - nre1 + 1) * (nz - 6))) / dble(step)
-        Qm(ny*3+j) = (dble(step-1) * Qm(ny*3+j) + Q4 / dble((nre2 - nre1 + 1) * (nz - 6))) / dble(step)
-        Qm(ny*4+j) = (dble(step-1) * Qm(ny*4+j) + Q5 / dble((nre2 - nre1 + 1) * (nz - 6))) / dble(step)
+        Qm(ny*0+j) = (step1 * Qm(ny*0+j) + Q1 * volinv) * step2
+        Qm(ny*1+j) = (step1 * Qm(ny*1+j) + Q2 * volinv) * step2
+        Qm(ny*2+j) = (step1 * Qm(ny*2+j) + Q3 * volinv) * step2
+        Qm(ny*3+j) = (step1 * Qm(ny*3+j) + Q4 * volinv) * step2
+        Qm(ny*4+j) = (step1 * Qm(ny*4+j) + Q5 * volinv) * step2
       enddo
     endif
   end subroutine calc_mean
@@ -279,18 +277,18 @@ contains
         k_offset = ny * (k-1)
         do j = 1, ny
           weight_tmp   = weight(j)
-          Jacobian_tmp = Jacobian(j)
+          Jacobian_tmp = 1.d0 / Jacobian(j)
           uin = (Umin(j) + ufin(j,kh)) * (1.d0 - weight_tmp) + (Umout(j) + ufout(j,kh)) * weight_tmp
           vin = (Vmin(j) + vfin(j,kh)) * (1.d0 - weight_tmp) + (Vmout(j) + vfout(j,kh)) * weight_tmp
           win =            wfin(j,kh)  * (1.d0 - weight_tmp) +             wfout(j,kh)  * weight_tmp
           Tin = (Tmin(j) + Tfin(j,kh)) * (1.d0 - weight_tmp) + (Tmout(j) + Tfout(j,kh)) * weight_tmp
           pin = (pmin(j) + pfin(j,kh)) * (1.d0 - weight_tmp) + (pmout(j) + pfout(j,kh)) * weight_tmp
           rhoin = pin / (R * Tin)
-          Qre(           k_offset+j) = rhoin / Jacobian_tmp
-          Qre(l_offset  +k_offset+j) = rhoin * uin / Jacobian_tmp
-          Qre(l_offset*2+k_offset+j) = rhoin * vin / Jacobian_tmp
-          Qre(l_offset*3+k_offset+j) = rhoin * win / Jacobian_tmp
-          Qre(l_offset*4+k_offset+j) = (pin / (gamma - 1.d0) + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) / Jacobian_tmp
+          Qre(           k_offset+j) = rhoin * Jacobian_tmp
+          Qre(l_offset  +k_offset+j) = rhoin * uin * Jacobian_tmp
+          Qre(l_offset*2+k_offset+j) = rhoin * vin * Jacobian_tmp
+          Qre(l_offset*3+k_offset+j) = rhoin * win * Jacobian_tmp
+          Qre(l_offset*4+k_offset+j) = (pin / (gamma - 1.d0) + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) * Jacobian_tmp
       enddo;enddo
     else
       open(10, file=filename, position="append")
