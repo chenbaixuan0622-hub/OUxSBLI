@@ -139,7 +139,7 @@ contains
     ! rescaled properties at inlet
     real(8) uin, vin, win, rhoin, Tin, pin
     ! cache
-    real(8) u_tmp, v_tmp, p_tmp, T_tmp, weight_tmp, Jacobian_tmp
+    real(8) :: u_tmp, v_tmp, p_tmp, T_tmp, weight_tmp, Jacobian_tmp, over_rhore, over_gamma_1 = 1.d0 / (gamma - 1.d0)
     do l = 1, 5
       l_offset = ny * nz * (l-1)
       do k = 1, nz
@@ -200,9 +200,10 @@ contains
         k_offset = ny * (k-1)
         do j = 1, ny
           rhore = Qre(          +k_offset+j)
-          ure   = Qre(l_offset*1+k_offset+j) / rhore
-          vre   = Qre(l_offset*2+k_offset+j) / rhore
-          wre   = Qre(l_offset*3+k_offset+j) / rhore
+          over_rhore = 1.d0 / rhore
+          ure   = Qre(l_offset*1+k_offset+j) * over_rhore
+          vre   = Qre(l_offset*2+k_offset+j) * over_rhore
+          wre   = Qre(l_offset*3+k_offset+j) * over_rhore
           pre   = (gamma - 1.d0) * (Qre(l_offset*4+k_offset+j) - 0.5d0 * rhore * (ure**2 + vre**2 + wre**2)) 
           Tre   = pre / (rhore * R)
           ufre(j,k) = ure - Um(j)
@@ -288,7 +289,7 @@ contains
           Qre(l_offset  +k_offset+j) = rhoin * uin * Jacobian_tmp
           Qre(l_offset*2+k_offset+j) = rhoin * vin * Jacobian_tmp
           Qre(l_offset*3+k_offset+j) = rhoin * win * Jacobian_tmp
-          Qre(l_offset*4+k_offset+j) = (pin / (gamma - 1.d0) + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) * Jacobian_tmp
+          Qre(l_offset*4+k_offset+j) = (pin * over_gamma_1 + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) * Jacobian_tmp
       enddo;enddo
     else
       ! cyclic boundary condition !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
