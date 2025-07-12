@@ -25,8 +25,8 @@ contains
             Q5 = Q5 + (gamma - 1.d0) * Jacobian_tmp * (QJ(i,j,k,5) &
                     - 0.5d0 * (QJ(i,j,k,2)**2 + QJ(i,j,k,3)**2 + QJ(i,j,k,4)**2) * rhoinv)
         enddo;enddo
-        Qm(ny*0+j) = Q1 * volinv
-        Qm(ny*1+j) = Q2 * volinv
+        Qm(     j) = Q1 * volinv
+        Qm(ny  +j) = Q2 * volinv
         Qm(ny*2+j) = Q3 * volinv
         Qm(ny*3+j) = Q4 * volinv
         Qm(ny*4+j) = Q5 * volinv
@@ -47,8 +47,8 @@ contains
             Q5 = Q5 + (gamma - 1.d0) * Jacobian_tmp * (QJ(i,j,k,5) &
                     - 0.5d0 * (QJ(i,j,k,2)**2 + QJ(i,j,k,3)**2 + QJ(i,j,k,4)**2) * rhoinv)
         enddo;enddo
-        Qm(ny*0+j) = (step1 * Qm(ny*0+j) + Q1 * volinv) * step2
-        Qm(ny*1+j) = (step1 * Qm(ny*1+j) + Q2 * volinv) * step2
+        Qm(     j) = (step1 * Qm(     j) + Q1 * volinv) * step2
+        Qm(ny  +j) = (step1 * Qm(ny  +j) + Q2 * volinv) * step2
         Qm(ny*2+j) = (step1 * Qm(ny*2+j) + Q3 * volinv) * step2
         Qm(ny*3+j) = (step1 * Qm(ny*3+j) + Q4 * volinv) * step2
         Qm(ny*4+j) = (step1 * Qm(ny*4+j) + Q5 * volinv) * step2
@@ -60,12 +60,14 @@ contains
     integer, intent(in)          :: nx, ny, nz
     real(8), intent(in), device  :: QJ(nx,ny,nz,5)
     real(8), intent(out), device :: Qre(ny*(nz-6)*5)
-    integer j, k, l
+    integer j, k, l, k_offset, l_offset
     !$cuf kernel do <<<*,*>>>
     do l = 1, 5
+      l_offset = ny * (nz-6) * (l-1)
       do k = 1, nz-6
+        k_offset = ny * (k-1)
         do j = 1, ny
-          Qre(ny*(nz-6)*(l-1)+ny*(k-1)+j) = QJ(nre2,j,k+3,l)
+          Qre(l_offset+k_offset+j) = QJ(nre2,j,k+3,l)
     enddo;enddo;enddo
   end subroutine copy
 
@@ -73,9 +75,12 @@ contains
     integer, intent(inout) :: flag_re
     integer, intent(in)    :: nx, ny, nz, step
     real(8), intent(in)    :: y(ny), Jacobian(ny)
-    real(8)         :: Qre_cpu(ny*(nz-6)*5), Qm_cpu(ny*5)
+    real(8)         :: Qre_cpu(ny*(nz-6)*5), Qm_cpu(ny*5), bltre
     real(8), device ::     Qre(ny*(nz-6)*5),     Qm(ny*5)
-    integer stat, ierr, ireqs(2), istats(MPI_STATUS_SIZE,2)
+    integer stat, errorcode, ierr, ireq, ireqs(2), istat(MPI_STATUS_SIZE), istats(MPI_STATUS_SIZE,2)
+    real(8) t
+    character(len=40) filename
+    write(filename, "(a)") "data/rescaling.d"
 
     call MPI_IRECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank, 0, MPI_COMM_WORLD, ireqs(1), ierr)
     call MPI_IRECV(Qm,  5*ny,        MPI_REAL8, rerank, 1, MPI_COMM_WORLD, ireqs(2), ierr)
@@ -85,18 +90,36 @@ contains
     stat = cudaMemcpyAsync(Qm_cpu,  Qm,  5*ny,        cudaMemcpyDeviceToHost, 1)
     stat = cudaMemcpyAsync(Qre_cpu, Qre, 5*ny*(nz-6), cudaMemcpyDeviceToHost, 2)
     stat = cudaDeviceSynchronize()
-    call set_rescale(flag_re, step, nx, ny, nz-6, y, Jacobian, Qm_cpu, Qre_cpu)
+    call set_rescale(flag_re, step, nx, ny, nz-6, y, Jacobian, Qm_cpu, bltre, Qre_cpu)
     stat = cudaMemcpy(Qre, Qre_cpu, 5*ny*(nz-6), cudaMemcpyHostToDevice)
-    call MPI_SEND(Qre, 5*ny*(nz-6), MPI_REAL8, 0, 0, MPI_COMM_WORLD, ierr)
-    !call MPI_SEND(Qre_cpu, 5*ny*(nz-6), MPI_REAL8, 0, 0, MPI_COMM_WORLD, ierr)
+    call MPI_ISEND(Qre, 5*ny*(nz-6), MPI_REAL8, 0, 0, MPI_COMM_WORLD, ireq, ierr)
+    !call MPI_ISEND(Qre_cpu, 5*ny*(nz-6), MPI_REAL8, 0, 0, MPI_COMM_WORLD, ireq, ierr)
+    call MPI_WAIT(ireq, istat, ierr)
+    if (flag_re == 1) then
+      call MPI_BCAST(flag_re, 1, MPI_INTEGER, rerank+1, MPI_COMM_WORLD, ierr)
+    endif
+    if (bltre == 0.d0) then
+      print *, "Invalid boundary layer thickness was detected"
+      call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
+    endif
+    t = nt * step * dt
+    if (flag_re >= 1 .and. step >= start_rescale) then
+      open(10, file=filename, position="append")
+      write(10, "(2e12.4, a)") t*1d3, bltre, "rescale"
+      close(10)
+    else
+      open(10, file=filename, position="append")
+      write(10, "(2e12.4, a)") t*1d3, bltre, "cyclic"
+      close(10)
+    endif
   end subroutine rescale_recv_send
 
-  subroutine set_rescale(flag_re, step, nx, ny, nz, y, Jacobian, Qm, Qre)
+  subroutine set_rescale(flag_re, step, nx, ny, nz, y, Jacobian, Qm, bltre, Qre)
     integer, intent(inout) :: flag_re
     integer, intent(in)    :: step, nx, ny, nz! nz-6
     real(8), intent(in)    :: y(ny), Jacobian(ny), Qm(ny*5)
     real(8), intent(inout) :: Qre(ny*nz*5) ! Q / J
-    integer i, j, jj, k, kh, l, k_offset, l_offset, errorcode, ierr
+    integer i, j, jj, k, kh, l, k_offset, l_offset, ierr
     real(8) :: mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0, Cp = gamma * R / (gamma - 1.d0)
     real(8) t, dudy, bltre, taure, utre, utin, beta, mu, nu, ady, ade 
     ! mean properties at rescaling plane
@@ -105,7 +128,8 @@ contains
     real(8), dimension(ny,nz) :: ufre, vfre, wfre, Tfre, pfre
     real(8), dimension(ny)    :: ypre, ypin, etre, etin
     ! fluctuating properties at both inner and outer region
-    real(8), dimension(ny,nz) :: ufin, vfin, wfin, Tfin, pfin, ufout, vfout, wfout, Tfout, pfout
+    real(8), dimension(ny,nz) :: ufin, vfin, wfin, Tfin, pfin
+    real(8), dimension(ny,nz) :: ufout, vfout, wfout, Tfout, pfout
     ! mean properties at both inner and outer region
     real(8), dimension(ny)    :: Umin, Vmin, pmin, Tmin, Umout, Vmout, pmout, Tmout
     ! weighting function
@@ -116,11 +140,6 @@ contains
     real(8) uin, vin, win, rhoin, Tin, pin
     ! cache
     real(8) u_tmp, v_tmp, p_tmp, T_tmp, weight_tmp, Jacobian_tmp
-    character(len=40) filename
-    write(filename, "(a)") "data/rescaling.d"
-
-    t = nt * step * dt
-
     do l = 1, 5
       l_offset = ny * nz * (l-1)
       do k = 1, nz
@@ -131,12 +150,12 @@ contains
     enddo;enddo;enddo
 
     do j = 1, ny
-      rhom(j) = Qm(     j)
-      u_tmp   = Qm(ny  +j)
-      v_tmp   = Qm(ny*2+j)
-      Wm(j)   = Qm(ny*3+j)
-      p_tmp   = Qm(ny*4+j)
-      T_tmp   = p_tmp / (R * rhom(j))
+      rhom(j)  = Qm(     j)
+      u_tmp    = Qm(ny  +j)
+      v_tmp    = Qm(ny*2+j)
+      Wm(j)    = Qm(ny*3+j)
+      p_tmp    = Qm(ny*4+j)
+      T_tmp    = p_tmp / (R * rhom(j))
       Um(j)    = u_tmp
       Umin(j)  = u_tmp
       Umout(j) = u_tmp
@@ -161,25 +180,21 @@ contains
       endif
     enddo
 
-    if (bltre == 0.d0) then
-      print *, "Invalid boundary layer thickness was detected"
-      call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
-    endif
-
     if (bltre > blt) then
       flag_re = flag_re + 1
-      if (flag_re == 1) then
-        call MPI_BCAST(flag_re, 1, MPI_INTEGER, rerank+1, MPI_COMM_WORLD, ierr)
-        open(10, file=filename, position="append")
-        write(10, "(a)") "rescaling has started"
-        close(10)
-      endif
     endif
 
     if (flag_re >= 1 .and. step >= start_rescale) then
-      open(10, file=filename, position="append")
-      write(10, "(2e12.4, a)") t*1d3, bltre, "rescale"
-      close(10)
+      ufin(:,:)  = 0.d0
+      vfin(:,:)  = 0.d0
+      wfin(:,:)  = 0.d0
+      Tfin(:,:)  = 0.d0
+      pfin(:,:)  = 0.d0
+      ufout(:,:) = 0.d0
+      vfout(:,:) = 0.d0
+      wfout(:,:) = 0.d0
+      Tfout(:,:) = 0.d0
+      pfout(:,:) = 0.d0
       l_offset = ny * nz
       do k = 1, nz
         k_offset = ny * (k-1)
@@ -195,21 +210,6 @@ contains
           wfre(j,k) = wre - Wm(j)
           Tfre(j,k) = Tre - Tm(j)
           pfre(j,k) = pre - pm(j)
-          ! set initial values to avoid NaN
-          ! inner region
-          ! fluctuating
-          ufin(j,k) = 0.d0
-          vfin(j,k) = 0.d0
-          wfin(j,k) = 0.d0
-          Tfin(j,k) = 0.d0
-          pfin(j,k) = 0.d0
-          ! outer region
-          ! fluctuating
-          ufout(j,k) = 0.d0
-          vfout(j,k) = 0.d0
-          wfout(j,k) = 0.d0
-          Tfout(j,k) = 0.d0
-          pfout(j,k) = 0.d0
       enddo;enddo
 
       ! friction velocity
@@ -233,17 +233,17 @@ contains
           if (ypre(jj) > ypin(j)) then
             ady = (-ypre(jj-1) + ypin(j)) / (-ypre(jj-1) + ypre(jj))
             ! mean
-            Umin(j) = beta * (Um(jj-1) + ady * (-Um(jj-1) + Um(jj)))
-            Vmin(j) =         Vm(jj-1) + ady * (-Vm(jj-1) + Vm(jj))
-            Tmin(j) =         Tm(jj-1) + ady * (-Tm(jj-1) + Tm(jj))
-            pmin(j) =         pm(jj-1) + ady * (-pm(jj-1) + pm(jj))
+            Umin(j) = beta * ((1.d0 - ady) * Um(jj-1) + ady * Um(jj))!(Um(jj-1) + ady * (-Um(jj-1) + Um(jj)))
+            Vmin(j) =         (1.d0 - ady) * Vm(jj-1) + ady * Vm(jj) !Vm(jj-1) + ady * (-Vm(jj-1) + Vm(jj))
+            Tmin(j) =         (1.d0 - ady) * Tm(jj-1) + ady * Tm(jj) !Tm(jj-1) + ady * (-Tm(jj-1) + Tm(jj))
+            pmin(j) =         (1.d0 - ady) * pm(jj-1) + ady * pm(jj) !pm(jj-1) + ady * (-pm(jj-1) + pm(jj))
             do k = 1, nz
               ! fluctuating
-              ufin(j,k) = beta * (ufre(jj-1,k) + ady * (-ufre(jj-1,k) + ufre(jj,k)))
-              vfin(j,k) = beta * (vfre(jj-1,k) + ady * (-vfre(jj-1,k) + vfre(jj,k)))
-              wfin(j,k) = beta * (wfre(jj-1,k) + ady * (-wfre(jj-1,k) + wfre(jj,k)))
-              Tfin(j,k) =         Tfre(jj-1,k) + ady * (-Tfre(jj-1,k) + Tfre(jj,k))
-              pfin(j,k) =         pfre(jj-1,k) + ady * (-pfre(jj-1,k) + pfre(jj,k))
+              ufin(j,k) = beta * ((1.d0 - ady) * ufre(jj-1,k) + ady * ufre(jj,k))!(ufre(jj-1,k) + ady * (-ufre(jj-1,k) + ufre(jj,k)))
+              vfin(j,k) = beta * ((1.d0 - ady) * vfre(jj-1,k) + ady * vfre(jj,k))!(vfre(jj-1,k) + ady * (-vfre(jj-1,k) + vfre(jj,k)))
+              wfin(j,k) = beta * ((1.d0 - ady) * wfre(jj-1,k) + ady * wfre(jj,k))!(wfre(jj-1,k) + ady * (-wfre(jj-1,k) + wfre(jj,k)))
+              Tfin(j,k) =         (1.d0 - ady) * Tfre(jj-1,k) + ady * Tfre(jj,k) !Tfre(jj-1,k) + ady * (-Tfre(jj-1,k) + Tfre(jj,k))
+              pfin(j,k) =         (1.d0 - ady) * pfre(jj-1,k) + ady * pfre(jj,k) !pfre(jj-1,k) + ady * (-pfre(jj-1,k) + pfre(jj,k))
             enddo
             exit
           endif
@@ -254,17 +254,17 @@ contains
           if (etre(jj) > etin(j)) then
             ade = (-etre(jj-1) + etin(j)) / (-etre(jj-1) + etre(jj))
             ! mean
-            Umout(j) = beta * (Um(jj-1) + ade * (-Um(jj-1) + Um(jj))) + (1.d0 - beta) * u0
-            Vmout(j) =         Vm(jj-1) + ade * (-Vm(jj-1) + Vm(jj))
-            Tmout(j) =         Tm(jj-1) + ade * (-Tm(jj-1) + Tm(jj))
-            pmout(j) =         pm(jj-1) + ade * (-pm(jj-1) + pm(jj))
+            Umout(j) = beta * ((1.d0 - ade) * Um(jj-1) + ade * Um(jj)) + (1.d0 - beta) * u0
+            Vmout(j) =         (1.d0 - ade) * Vm(jj-1) + ade * Vm(jj) !Vm(jj-1) + ade * (-Vm(jj-1) + Vm(jj))
+            Tmout(j) =         (1.d0 - ade) * Tm(jj-1) + ade * Tm(jj) !Tm(jj-1) + ade * (-Tm(jj-1) + Tm(jj))
+            pmout(j) =         (1.d0 - ade) * pm(jj-1) + ade * pm(jj) !pm(jj-1) + ade * (-pm(jj-1) + pm(jj))
             do k = 1, nz
               ! fluctuating
-              ufout(j,k) = beta * (ufre(jj-1,k) + ade * (-ufre(jj-1,k) + ufre(jj,k)))
-              vfout(j,k) = beta * (vfre(jj-1,k) + ade * (-vfre(jj-1,k) + vfre(jj,k)))
-              wfout(j,k) = beta * (wfre(jj-1,k) + ade * (-wfre(jj-1,k) + wfre(jj,k)))
-              Tfout(j,k) =         Tfre(jj-1,k) + ade * (-Tfre(jj-1,k) + Tfre(jj,k))
-              pfout(j,k) =         pfre(jj-1,k) + ade * (-pfre(jj-1,k) + pfre(jj,k))
+              ufout(j,k) = beta * ((1.d0 - ade) * ufre(jj-1,k) + ade * ufre(jj,k))!(ufre(jj-1,k) + ade * (-ufre(jj-1,k) + ufre(jj,k)))
+              vfout(j,k) = beta * ((1.d0 - ade) * vfre(jj-1,k) + ade * vfre(jj,k))!(vfre(jj-1,k) + ade * (-vfre(jj-1,k) + vfre(jj,k)))
+              wfout(j,k) = beta * ((1.d0 - ade) * wfre(jj-1,k) + ade * wfre(jj,k))!(wfre(jj-1,k) + ade * (-wfre(jj-1,k) + wfre(jj,k)))
+              Tfout(j,k) =         (1.d0 - ade) * Tfre(jj-1,k) + ade * Tfre(jj,k) !Tfre(jj-1,k) + ade * (-Tfre(jj-1,k) + Tfre(jj,k))
+              pfout(j,k) =         (1.d0 - ade) * pfre(jj-1,k) + ade * pfre(jj,k) !pfre(jj-1,k) + ade * (-pfre(jj-1,k) + pfre(jj,k))
             enddo
             exit
           endif
@@ -291,14 +291,13 @@ contains
           Qre(l_offset*4+k_offset+j) = (pin / (gamma - 1.d0) + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) * Jacobian_tmp
       enddo;enddo
     else
-      open(10, file=filename, position="append")
-      write(10, "(2e12.4, a)") t*1d3, bltre, "cyclic"
-      close(10)
       ! cyclic boundary condition !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       do l = 1, 5
+        l_offset = ny * nz * (l-1)
         do k = 1, nz
+          k_offset = ny * (k-1)
           do j = 1, ny
-            Qre(ny*nz*(l-1)+ny*(k-1)+j) = Qre(ny*nz*(l-1)+ny*(k-1)+j) / Jacobian(j)
+            Qre(l_offset+k_offset+j) = Qre(l_offset+k_offset+j) / Jacobian(j)
       enddo;enddo;enddo
     endif
   end subroutine set_rescale
