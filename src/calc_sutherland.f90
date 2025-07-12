@@ -8,10 +8,9 @@ contains
   attributes(device) function mu(T) result(ans)
     real(8), intent(in), value :: T
     real(8) :: ans
-    real(8) :: mu0 = 1.716d-5
-    real(8) :: T0 = 273.2d0
-    real(8) :: S = 111.d0
-    ans = mu0 * ((T0 + S) / (T + S)) * (T / T0) ** 1.5d0
+    real(8) :: mu0  = 1.716d-5
+    real(8) :: T0 = 273.2d0, S = 111.d0, T0_S = 384.2d0 !T0 + S
+    ans = mu0 * ((T0_S) / (T + S)) * (T / T0) ** 1.5d0
   end function mu
 
   attributes(device) subroutine calc_mu2(T1,T2,mu_mean)
