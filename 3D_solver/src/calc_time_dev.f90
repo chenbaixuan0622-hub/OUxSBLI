@@ -200,6 +200,9 @@ contains
             call nvtxEndRange
             !print *, "myrank=", myrank, "send Qre"
           endif
+          if (myrank == 0 .and. kind(id_rescale) == 4) then
+            call MPI_IRECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr)
+          endif
           call nvtxStartRange("calc flux", 4)
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
           call nvtxEndRange
@@ -208,17 +211,16 @@ contains
           call calc_step(nx, ny, nz, 1.d0, 0.d0, xix, etay, zetaz, E, F, G, QJ, QJ2)
           call nvtxEndRange
           !print *, "myrank=", myrank, "calc step"
-          if (myrank == 0 .and. kind(id_rescale) == 4) then
-            call nvtxStartRange("recv Qre", 6)
-            call MPI_RECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
-            call nvtxEndRange
-            !print *, "myrank=", myrank, "recv Qre"
-          endif
           if (ndevices >= 2 .and. kind(id_exchange) == 4) then
-            call nvtxStartRange("exchange", 7)
+            call nvtxStartRange("exchange", 6)
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ2)
             call nvtxEndRange
             !print *, "myrank=", myrank, "exchange"
+          endif
+          if (myrank == 0 .and. kind(id_rescale) == 4) then
+            call nvtxStartRange("recv Qre", 7)
+            call MPI_WAIT(ireq, istat, ierr)
+            call nvtxEndRange
           endif
           call nvtxStartRange("set bc", 8)
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
@@ -238,13 +240,18 @@ contains
             call calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJ2, Qm)
             call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
           endif
+          if (myrank == 0 .and. kind(id_rescale) == 4) then
+            call MPI_IRECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr)
+          endif
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G)
           call calc_step2(nx, ny, nz, 0.75d0, 0.25d0, 0.25d0, 1.d0, xix, etay, zetaz, E, F, G, QJ, QJ2)
-          if (myrank == 0 .and. kind(id_rescale) == 4) then
-            call MPI_RECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
-          endif
           if (ndevices >= 2 .and. kind(id_exchange) == 4) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ2)
+          endif
+          if (myrank == 0 .and. kind(id_rescale) == 4) then
+            call nvtxStartRange("recv Qre", 7)
+            call MPI_WAIT(ireq, istat, ierr)
+            call nvtxEndRange
           endif
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
@@ -258,13 +265,18 @@ contains
             call calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJ2, Qm)
             call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
           endif
+          if (myrank == 0 .and. kind(id_rescale) == 4) then
+            call MPI_IRECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr)
+          endif
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G)
           call calc_step3(nx, ny, nz, xix, etay, zetaz, E, F, G, QJ2, QJ)
-          if (myrank == 0 .and. kind(id_rescale) == 4) then
-            call MPI_RECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, istat, ierr)
-          endif
           if (ndevices >= 2 .and. kind(id_exchange) == 4) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ)
+          endif
+          if (myrank == 0 .and. kind(id_rescale) == 4) then
+            call nvtxStartRange("recv Qre", 7)
+            call MPI_WAIT(ireq, istat, ierr)
+            call nvtxEndRange
           endif
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
