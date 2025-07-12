@@ -249,9 +249,7 @@ contains
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ2)
           endif
           if (myrank == 0 .and. kind(id_rescale) == 4) then
-            call nvtxStartRange("recv Qre", 7)
             call MPI_WAIT(ireq, istat, ierr)
-            call nvtxEndRange
           endif
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
@@ -274,9 +272,7 @@ contains
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ)
           endif
           if (myrank == 0 .and. kind(id_rescale) == 4) then
-            call nvtxStartRange("recv Qre", 7)
             call MPI_WAIT(ireq, istat, ierr)
-            call nvtxEndRange
           endif
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
