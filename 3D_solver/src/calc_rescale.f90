@@ -120,6 +120,7 @@ contains
     real(8), intent(in)    :: y(ny), Jacobian(ny), Qm(ny*5)
     real(8), intent(inout) :: Qre(ny*nz*5) ! Q / J
     integer i, j, jj, k, kh, l, k_offset, l_offset, ierr
+    integer, dimension(ny) :: jj_y, jj_e
     real(8) :: mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0, Cp = gamma * R / (gamma - 1.d0)
     real(8) t, dudy, bltre, taure, utre, utin, beta, mu, nu, ady, ade 
     ! mean properties at rescaling plane
@@ -229,6 +230,7 @@ contains
         weight(j) = min(1.d0, 0.5d0 * (1.d0 + tanh(4.d0 * (etin(j) - 0.2d0) / ((1.d0 - 0.4d0) * etin(j) + 0.2d0)) / tanh(4.d0)))
       enddo
 
+      jj_y(:) = -1
       do j = 1, ny
         do jj = 2, ny
           if (ypre(jj) > ypin(j)) then
@@ -238,18 +240,12 @@ contains
             Vmin(j) =         (1.d0 - ady) * Vm(jj-1) + ady * Vm(jj) !Vm(jj-1) + ady * (-Vm(jj-1) + Vm(jj))
             Tmin(j) =         (1.d0 - ady) * Tm(jj-1) + ady * Tm(jj) !Tm(jj-1) + ady * (-Tm(jj-1) + Tm(jj))
             pmin(j) =         (1.d0 - ady) * pm(jj-1) + ady * pm(jj) !pm(jj-1) + ady * (-pm(jj-1) + pm(jj))
-            do k = 1, nz
-              ! fluctuating
-              ufin(j,k) = beta * ((1.d0 - ady) * ufre(jj-1,k) + ady * ufre(jj,k))!(ufre(jj-1,k) + ady * (-ufre(jj-1,k) + ufre(jj,k)))
-              vfin(j,k) = beta * ((1.d0 - ady) * vfre(jj-1,k) + ady * vfre(jj,k))!(vfre(jj-1,k) + ady * (-vfre(jj-1,k) + vfre(jj,k)))
-              wfin(j,k) = beta * ((1.d0 - ady) * wfre(jj-1,k) + ady * wfre(jj,k))!(wfre(jj-1,k) + ady * (-wfre(jj-1,k) + wfre(jj,k)))
-              Tfin(j,k) =         (1.d0 - ady) * Tfre(jj-1,k) + ady * Tfre(jj,k) !Tfre(jj-1,k) + ady * (-Tfre(jj-1,k) + Tfre(jj,k))
-              pfin(j,k) =         (1.d0 - ady) * pfre(jj-1,k) + ady * pfre(jj,k) !pfre(jj-1,k) + ady * (-pfre(jj-1,k) + pfre(jj,k))
-            enddo
+            jj_y(j) = jj
             exit
           endif
       enddo;enddo
 
+      jj_e(:) = -1
       do j = 1, ny
         do jj = 2, ny
           if (etre(jj) > etin(j)) then
@@ -259,15 +255,30 @@ contains
             Vmout(j) =         (1.d0 - ade) * Vm(jj-1) + ade * Vm(jj) !Vm(jj-1) + ade * (-Vm(jj-1) + Vm(jj))
             Tmout(j) =         (1.d0 - ade) * Tm(jj-1) + ade * Tm(jj) !Tm(jj-1) + ade * (-Tm(jj-1) + Tm(jj))
             pmout(j) =         (1.d0 - ade) * pm(jj-1) + ade * pm(jj) !pm(jj-1) + ade * (-pm(jj-1) + pm(jj))
-            do k = 1, nz
-              ! fluctuating
-              ufout(j,k) = beta * ((1.d0 - ade) * ufre(jj-1,k) + ade * ufre(jj,k))!(ufre(jj-1,k) + ade * (-ufre(jj-1,k) + ufre(jj,k)))
-              vfout(j,k) = beta * ((1.d0 - ade) * vfre(jj-1,k) + ade * vfre(jj,k))!(vfre(jj-1,k) + ade * (-vfre(jj-1,k) + vfre(jj,k)))
-              wfout(j,k) = beta * ((1.d0 - ade) * wfre(jj-1,k) + ade * wfre(jj,k))!(wfre(jj-1,k) + ade * (-wfre(jj-1,k) + wfre(jj,k)))
-              Tfout(j,k) =         (1.d0 - ade) * Tfre(jj-1,k) + ade * Tfre(jj,k) !Tfre(jj-1,k) + ade * (-Tfre(jj-1,k) + Tfre(jj,k))
-              pfout(j,k) =         (1.d0 - ade) * pfre(jj-1,k) + ade * pfre(jj,k) !pfre(jj-1,k) + ade * (-pfre(jj-1,k) + pfre(jj,k))
-            enddo
+            jj_e(j)  = jj
             exit
+          endif
+      enddo;enddo
+      
+      do k = 1, nz
+        do j = 1, ny
+          jj = jj_y(j)
+          if (jj > 0) then
+            ady = (-ypre(jj-1) + ypin(j)) / (-ypre(jj-1) + ypre(jj))
+            ufin(j,k) = beta * ((1.d0 - ady) * ufre(jj-1,k) + ady * ufre(jj,k))!(ufre(jj-1,k) + ady * (-ufre(jj-1,k) + ufre(jj,k)))
+            vfin(j,k) = beta * ((1.d0 - ady) * vfre(jj-1,k) + ady * vfre(jj,k))!(vfre(jj-1,k) + ady * (-vfre(jj-1,k) + vfre(jj,k)))
+            wfin(j,k) = beta * ((1.d0 - ady) * wfre(jj-1,k) + ady * wfre(jj,k))!(wfre(jj-1,k) + ady * (-wfre(jj-1,k) + wfre(jj,k)))
+            Tfin(j,k) =         (1.d0 - ady) * Tfre(jj-1,k) + ady * Tfre(jj,k) !Tfre(jj-1,k) + ady * (-Tfre(jj-1,k) + Tfre(jj,k))
+            pfin(j,k) =         (1.d0 - ady) * pfre(jj-1,k) + ady * pfre(jj,k) !pfre(jj-1,k) + ady * (-pfre(jj-1,k) + pfre(jj,k))
+          endif
+          jj = jj_e(j)
+          if (jj > 0) then
+            ade = (-etre(jj-1) + etin(j)) / (-etre(jj-1) + etre(jj))
+            ufout(j,k) = beta * ((1.d0 - ade) * ufre(jj-1,k) + ade * ufre(jj,k))!(ufre(jj-1,k) + ade * (-ufre(jj-1,k) + ufre(jj,k)))
+            vfout(j,k) = beta * ((1.d0 - ade) * vfre(jj-1,k) + ade * vfre(jj,k))!(vfre(jj-1,k) + ade * (-vfre(jj-1,k) + vfre(jj,k)))
+            wfout(j,k) = beta * ((1.d0 - ade) * wfre(jj-1,k) + ade * wfre(jj,k))!(wfre(jj-1,k) + ade * (-wfre(jj-1,k) + wfre(jj,k)))
+            Tfout(j,k) =         (1.d0 - ade) * Tfre(jj-1,k) + ade * Tfre(jj,k) !Tfre(jj-1,k) + ade * (-Tfre(jj-1,k) + Tfre(jj,k))
+            pfout(j,k) =         (1.d0 - ade) * pfre(jj-1,k) + ade * pfre(jj,k) !pfre(jj-1,k) + ade * (-pfre(jj-1,k) + pfre(jj,k))
           endif
       enddo;enddo
   
