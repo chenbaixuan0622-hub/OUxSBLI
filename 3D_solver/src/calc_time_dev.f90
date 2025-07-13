@@ -119,6 +119,7 @@ contains
     ! rescale !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     integer :: step, flag_re = 0
     real(8), allocatable, device :: Qre(:), Qm(:)
+    real(8), allocatable, pinned :: Qm_cpu(:)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type(cudaDeviceProp)         :: prop
     real(8), allocatable, device :: QJ(:,:,:,:), QJ2(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
@@ -179,6 +180,8 @@ contains
       if (myrank == rerank+1) then
         stat = cudaSetDevice(rerank/2)
       endif
+    elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
+      allocate(Qm_cpu(ny*5))
     endif
 
     call MPI_BARRIER(MPI_COMM_WORLD, ierr)
@@ -228,7 +231,7 @@ contains
           !print *, "myrank=", myrank, "set bc"
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call nvtxStartRange("calc rescale", 9)
-          call rescale_recv_send(flag_re, nx, ny, nz, step, y, Jacobian_cpu)
+          call rescale_recv_send(1, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
           call nvtxEndRange
           !print *, "myrank=", myrank, "calc rescale"
         endif
@@ -238,6 +241,7 @@ contains
             call copy(nx, ny, nz, QJ2, Qre)
             call MPI_ISEND(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr)
             call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
+
           endif
           if (myrank == 0 .and. kind(id_rescale) == 4) then
             call MPI_IRECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr)
@@ -252,7 +256,7 @@ contains
           endif
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(flag_re, nx, ny, nz, step, y, Jacobian_cpu)
+          call rescale_recv_send(2, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
 
         if (mod(myrank,2) == 0) then
@@ -260,6 +264,7 @@ contains
             call copy(nx, ny, nz, QJ2, Qre)
             call MPI_ISEND(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr)
             call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
+
           endif
           if (myrank == 0 .and. kind(id_rescale) == 4) then
             call MPI_IRECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr)
@@ -274,7 +279,7 @@ contains
           endif
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(flag_re, nx, ny, nz, step, y, Jacobian_cpu)
+          call rescale_recv_send(3, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
       enddo
 
@@ -302,6 +307,9 @@ contains
     if (mod(myrank,2) == 0 .and. kind(id_rescale) == 4) then
       deallocate(Qre, Qm)
     endif
+    if (myrank == rerank+1 .and. kind(id_rescale) == 4) then
+      deallocate(Qm_cpu)
+    endif
     print *, "myrank is ", myrank, " deallocate GPU memory"
   end subroutine RungeKutta_3rd
 
@@ -320,6 +328,7 @@ contains
     ! rescale !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     integer :: step, flag_re = 0
     real(8), allocatable, device :: Qre(:), Qm(:)
+    real(8), allocatable, pinned :: Qm_cpu(:)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     type(cudaDeviceProp)         :: prop
     real(8), allocatable, device :: QJ(:,:,:,:), QJs(:,:,:,:), Rs(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
@@ -382,6 +391,8 @@ contains
       if (myrank == rerank+1) then
         stat = cudaSetDevice(rerank/2)
       endif
+    elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
+      allocate(Qm_cpu(ny*5))
     endif
     
     do t2 = 1, np
@@ -412,7 +423,7 @@ contains
           call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
           call nvtxEndRange
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(flag_re, nx, ny, nz, step, y, Jacobian_cpu)
+          call rescale_recv_send(1, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
 
         if (mod(myrank,2) == 0) then
@@ -420,6 +431,7 @@ contains
             call copy(nx, ny, nz, QJs, Qre)
             call MPI_ISEND(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr)
             call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
+
           endif
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
           call calc_step(nx, ny, nz, 0.5d0, 2.d0, xix, etay, zetaz, E, F, G, QJ, QJs, Rs) ! QJs = Q3
@@ -431,7 +443,7 @@ contains
           endif
           call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(flag_re, nx, ny, nz, step, y, Jacobian_cpu)
+          call rescale_recv_send(2, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
 
         if (mod(myrank,2) == 0) then
@@ -439,6 +451,7 @@ contains
             call copy(nx, ny, nz, QJs, Qre)
             call MPI_ISEND(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr)
             call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq, ierr)
+
           endif
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
           call calc_step(nx, ny, nz, 1.0d0, 2.d0, xix, etay, zetaz, E, F, G, QJ, QJs, Rs) ! QJs = Q4
@@ -450,7 +463,7 @@ contains
           endif
           call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(flag_re, nx, ny, nz, step, y, Jacobian_cpu)
+          call rescale_recv_send(3, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
 
         if (mod(myrank,2) == 0) then
@@ -469,7 +482,7 @@ contains
           endif
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(flag_re, nx, ny, nz, step, y, Jacobian_cpu)
+          call rescale_recv_send(4, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
       enddo
 
@@ -496,6 +509,9 @@ contains
     endif
     if (myrank == 0 .and. kind(id_rescale) == 4) then
       deallocate(Qre, Qm)
+    endif
+    if (myrank == rerank+1 .and. kind(id_rescale) == 4) then
+      deallocate(Qm_cpu)
     endif
   end subroutine RungeKutta_4th
 end module calc_time_dev

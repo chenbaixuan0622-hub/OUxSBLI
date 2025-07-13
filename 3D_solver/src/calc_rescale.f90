@@ -71,12 +71,14 @@ contains
     enddo;enddo;enddo
   end subroutine copy
 
-  subroutine rescale_recv_send(flag_re, nx, ny, nz, step, y, Jacobian)
+  subroutine rescale_recv_send(num, flag_re, nx, ny, nz, step, y, Jacobian, Qm_cpu)
+    integer, intent(in)    :: num
     integer, intent(inout) :: flag_re
     integer, intent(in)    :: nx, ny, nz, step
     real(8), intent(in)    :: y(ny), Jacobian(ny)
-    real(8)         :: Qre_cpu(ny*(nz-6)*5), Qm_cpu(ny*5), bltre
-    real(8), device ::     Qre(ny*(nz-6)*5),     Qm(ny*5)
+    real(8), intent(inout) :: Qm_cpu(ny*5)
+    real(8)         :: Qre_cpu(ny*(nz-6)*5), bltre
+    real(8), device ::     Qre(ny*(nz-6)*5), Qm(ny*5)
     integer stat, errorcode, ierr, ireq, ireqs(2), istat(MPI_STATUS_SIZE), istats(MPI_STATUS_SIZE,2)
     real(8) t
     character(len=40) filename
@@ -88,6 +90,7 @@ contains
     stat = cudaMemcpyAsync(Qm_cpu,  Qm,  5*ny,        cudaMemcpyDeviceToHost, 1)
     stat = cudaMemcpyAsync(Qre_cpu, Qre, 5*ny*(nz-6), cudaMemcpyDeviceToHost, 2)
     stat = cudaDeviceSynchronize()
+
     call set_rescale(flag_re, step, nx, ny, nz-6, y, Jacobian, Qm_cpu, bltre, Qre_cpu)
     stat = cudaMemcpy(Qre, Qre_cpu, 5*ny*(nz-6), cudaMemcpyHostToDevice)
     call MPI_ISEND(Qre, 5*ny*(nz-6), MPI_REAL8, 0, 0, MPI_COMM_WORLD, ireq, ierr)
@@ -95,19 +98,21 @@ contains
     if (flag_re == 1) then
       call MPI_BCAST(flag_re, 1, MPI_INTEGER, rerank+1, MPI_COMM_WORLD, ierr)
     endif
-    if (bltre == 0.d0) then
-      print *, "Invalid boundary layer thickness was detected"
-      call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
-    endif
-    t = nt * step * dt
-    if (flag_re >= 1 .and. step >= start_rescale) then
-      open(10, file=filename, position="append")
-      write(10, "(2e12.4, a)") t*1d3, bltre, "rescale"
-      close(10)
-    else
-      open(10, file=filename, position="append")
-      write(10, "(2e12.4, a)") t*1d3, bltre, "cyclic"
-      close(10)
+    if (num == 1) then
+      if (bltre == 0.d0) then
+        print *, "Invalid boundary layer thickness was detected"
+        call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
+      endif
+      t = nt * step * dt
+      if (flag_re >= 1 .and. step >= start_rescale) then
+        open(10, file=filename, position="append")
+        write(10, "(2e12.4, a)") t*1d3, bltre, "rescale"
+        close(10)
+      else
+        open(10, file=filename, position="append")
+        write(10, "(2e12.4, a)") t*1d3, bltre, "cyclic"
+        close(10)
+      endif
     endif
   end subroutine rescale_recv_send
 
