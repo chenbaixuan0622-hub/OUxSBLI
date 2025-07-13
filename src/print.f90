@@ -50,7 +50,6 @@ contains
           entropy = entropy + rho1d(l) * log(p1d(l) * (rho1d(l)**(-gamma)))
     enddo;enddo;enddo
     entropy = entropy / dble((nx-accuracy) * (ny-accuracy) * (nz-accuracy))
-
     if (step == 0) then
       entropy0 = entropy
     endif
@@ -92,7 +91,6 @@ contains
           ke = ke + 0.5d0 * rho1d(l) * (v1d(m)**2 + v1d(m+1)**2 + v1d(m+2)**2)
     enddo;enddo;enddo
     ke = ke / dble((nx-accuracy) * (ny-accuracy) * (nz-accuracy))
-
     if (step == 0) then
       ke0 = ke
     endif
@@ -160,7 +158,6 @@ contains
                                  int(byte_rho, kind=8)
     write(offset5(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8) + &
                                  int(byte_rho, kind=8) + int(byte_p, kind=8)
-
     write(10) '<?xml version="1.0"?>'//lf
     write(10) '<VTKFile type="RectilinearGrid" version="1.0" byte_order="LittleEndian">'//lf
     write(10) '  <RectilinearGrid WholeExtent="0 '//str1//' 0 '//str2//' 0 '//str3//'">'//lf
