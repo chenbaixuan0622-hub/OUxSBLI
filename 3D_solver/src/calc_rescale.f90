@@ -84,18 +84,13 @@ contains
     character(len=40) filename
     write(filename, "(a)") "data/rescaling.d"
 
-    if (num == 1) then
-      call MPI_IRECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank, 0, MPI_COMM_WORLD, ireqs(1), ierr)
-      call MPI_IRECV(Qm,  5*ny,        MPI_REAL8, rerank, 1, MPI_COMM_WORLD, ireqs(2), ierr)
-      call MPI_WAITALL(2, ireqs, istats, ierr)
-      stat = cudaMemcpyAsync(Qm_cpu,  Qm,  5*ny,        cudaMemcpyDeviceToHost, 1)
-      stat = cudaMemcpyAsync(Qre_cpu, Qre, 5*ny*(nz-6), cudaMemcpyDeviceToHost, 2)
-      stat = cudaDeviceSynchronize()
-    else
-      call MPI_IRECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank, 0, MPI_COMM_WORLD, ireqs(1), ierr)
-      call MPI_WAIT(ireq, istat, ierr)
-      stat = cudaMemcpy(Qre_cpu, Qre, 5*ny*(nz-6), cudaMemcpyDeviceToHost)
-    endif
+    call MPI_IRECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank, 0, MPI_COMM_WORLD, ireqs(1), ierr)
+    call MPI_IRECV(Qm,  5*ny,        MPI_REAL8, rerank, 1, MPI_COMM_WORLD, ireqs(2), ierr)
+    call MPI_WAITALL(2, ireqs, istats, ierr)
+    stat = cudaMemcpyAsync(Qm_cpu,  Qm,  5*ny,        cudaMemcpyDeviceToHost, 1)
+    stat = cudaMemcpyAsync(Qre_cpu, Qre, 5*ny*(nz-6), cudaMemcpyDeviceToHost, 2)
+    stat = cudaDeviceSynchronize()
+
     call set_rescale(flag_re, step, nx, ny, nz-6, y, Jacobian, Qm_cpu, bltre, Qre_cpu)
     stat = cudaMemcpy(Qre, Qre_cpu, 5*ny*(nz-6), cudaMemcpyHostToDevice)
     call MPI_ISEND(Qre, 5*ny*(nz-6), MPI_REAL8, 0, 0, MPI_COMM_WORLD, ireq, ierr)
