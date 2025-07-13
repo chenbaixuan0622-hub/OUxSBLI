@@ -103,19 +103,21 @@ contains
     if (flag_re == 1) then
       call MPI_BCAST(flag_re, 1, MPI_INTEGER, rerank+1, MPI_COMM_WORLD, ierr)
     endif
-    if (bltre == 0.d0) then
-      print *, "Invalid boundary layer thickness was detected"
-      call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
-    endif
-    t = nt * step * dt
-    if (flag_re >= 1 .and. step >= start_rescale) then
-      open(10, file=filename, position="append")
-      write(10, "(2e12.4, a)") t*1d3, bltre, "rescale"
-      close(10)
-    else
-      open(10, file=filename, position="append")
-      write(10, "(2e12.4, a)") t*1d3, bltre, "cyclic"
-      close(10)
+    if (num == 1) then
+      if (bltre == 0.d0) then
+        print *, "Invalid boundary layer thickness was detected"
+        call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
+      endif
+      t = nt * step * dt
+      if (flag_re >= 1 .and. step >= start_rescale) then
+        open(10, file=filename, position="append")
+        write(10, "(2e12.4, a)") t*1d3, bltre, "rescale"
+        close(10)
+      else
+        open(10, file=filename, position="append")
+        write(10, "(2e12.4, a)") t*1d3, bltre, "cyclic"
+        close(10)
+      endif
     endif
   end subroutine rescale_recv_send
 
