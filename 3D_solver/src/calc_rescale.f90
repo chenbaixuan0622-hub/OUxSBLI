@@ -71,23 +71,25 @@ contains
     enddo;enddo;enddo
   end subroutine copy
    
-  subroutine step_rescale(myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ, Qm, Qre)
-    integer, intent(in)         :: myrank, step, nx, ny, nz
-    integer, intent(inout)      :: flag_re, ireq, ireq2(2)
-    real(8), intent(in), device :: Jacobian(ny), QJ(nx,ny,nz,5)
+  subroutine step_rescale(num, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ, Qm, Qre)
+    integer, intent(in)            :: num, myrank, step, nx, ny, nz
+    integer, intent(inout)         :: flag_re, ireq, ireq2(2)
+    real(8), intent(in), device    :: Jacobian(ny), QJ(nx,ny,nz,5)
     real(8), intent(inout), device :: Qm(ny*5), Qre(ny*(nz-6)*5)
     real(8) Qm_cpu(ny*5)
     integer ierr, j
     if (myrank == rerank) then
       call copy(nx, ny, nz, QJ, Qre)
       call MPI_ISEND(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq2(1), ierr)
-      call calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJ, Qm)
-      Qm_cpu = Qm
-      do j = 1, ny
-        print *, "send j=", j, "Q", Qm_cpu(j), Qm_cpu(ny+j)
-      enddo
+      if (num == 1) then
+        call calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJ, Qm)
+        Qm_cpu = Qm
+        do j = 1, ny
+          print *, "send j=", j, "Q", Qm_cpu(j), Qm_cpu(ny+j)
+        enddo
+      endif
       call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq2(2), ierr)
-      print *, "myrank=", myrank, "send Qre"
+      !print *, "myrank=", myrank, "send Qre"
     endif
     if (myrank == 0) then
       call MPI_IRECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank+1, 0, MPI_COMM_WORLD, ireq, ierr)
@@ -100,11 +102,11 @@ contains
     integer ierr
     if (myrank == rerank) then
       call MPI_WAITALL(2, ireq2, istat2, ierr)
-      print *, "myrank=", myrank, "WAITALL send Qm, Qre"
+      !print *, "myrank=", myrank, "WAITALL send Qm, Qre"
     endif
     if (myrank == 0) then
       call MPI_WAIT(ireq, istat, ierr)
-      print *, "myrank=", myrank, "WAIT recv Qre"
+      !print *, "myrank=", myrank, "WAIT recv Qre"
     endif
   end subroutine wait_rescale
 
@@ -128,19 +130,12 @@ contains
     stat = cudaMemcpy(Qm_cpu,  Qm,  5*ny,        cudaMemcpyDeviceToHost)
     if (stat /= cudaSuccess) then
       print *, "Qm  cudaMemcpy failed:", trim(cudaGetErrorString(stat))
-    else
-      print *, "Qm  cudaMemcpy succeeded"
     endif
     stat = cudaMemcpy(Qre_cpu, Qre, 5*ny*(nz-6), cudaMemcpyDeviceToHost)
     if (stat /= cudaSuccess) then
       print *, "Qre cudaMemcpy failed:", trim(cudaGetErrorString(stat))
-    else
-      print *, "Qre cudaMemcpy succeeded"
     endif
     stat = cudaDeviceSynchronize()
-    do j = 1, ny
-      print *, "recv j=", j, "Q", Qm_cpu(j), Qm_cpu(ny+j)
-    enddo
     call set_rescale(flag_re, step, nx, ny, nz-6, y, Jacobian, Qm_cpu, bltre, Qre_cpu)
     stat = cudaMemcpy(Qre, Qre_cpu, 5*ny*(nz-6), cudaMemcpyHostToDevice)
     call MPI_ISEND(Qre, 5*ny*(nz-6), MPI_REAL8, 0, 0, MPI_COMM_WORLD, ireq, ierr)

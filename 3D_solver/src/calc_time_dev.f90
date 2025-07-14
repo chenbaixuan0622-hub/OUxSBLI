@@ -194,21 +194,21 @@ contains
         step = np * (t2-1) + t1
         if (mod(myrank,2) == 0) then
           if (kind(id_rescale) == 4) then
-            call step_rescale(myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ, Qm, Qre)
+            call step_rescale(1, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ, Qm, Qre)
           endif
           call nvtxStartRange("calc flux", 1)
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
           call nvtxEndRange
-          print *, "myrank=", myrank, "calc flux"
+          !print *, "myrank=", myrank, "calc flux"
           call nvtxStartRange("calc step", 2)
           call calc_step(nx, ny, nz, 1.d0, 0.d0, xix, etay, zetaz, E, F, G, QJ, QJ2)
           call nvtxEndRange
-          print *, "myrank=", myrank, "calc step"
+          !print *, "myrank=", myrank, "calc step"
           if (ndevices >= 2 .and. kind(id_exchange) == 4) then
             call nvtxStartRange("exchange", 3)
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ2)
             call nvtxEndRange
-            print *, "myrank=", myrank, "exchange"
+            !print *, "myrank=", myrank, "exchange"
           endif
           if (kind(id_rescale) == 4) then
             call wait_rescale(myrank, ireq, ireq2, istat, istat2)
@@ -216,17 +216,17 @@ contains
           call nvtxStartRange("set bc", 4)
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
           call nvtxEndRange
-          print *, "myrank=", myrank, "set bc"
+          !print *, "myrank=", myrank, "set bc"
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call nvtxStartRange("calc rescale", 5)
           call rescale_recv_send(1, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
           call nvtxEndRange
-          print *, "myrank=", myrank, "calc rescale"
+          !print *, "myrank=", myrank, "calc rescale"
         endif
 
         if (mod(myrank,2) == 0) then
           if (kind(id_rescale) == 4) then
-            call step_rescale(myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ2, Qm, Qre)
+            call step_rescale(2, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ2, Qm, Qre)
           endif
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G)
           call calc_step2(nx, ny, nz, 0.75d0, 0.25d0, 0.25d0, 1.d0, xix, etay, zetaz, E, F, G, QJ, QJ2)
@@ -243,7 +243,7 @@ contains
 
         if (mod(myrank,2) == 0) then
           if (kind(id_rescale) == 4) then
-            call step_rescale(myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ2, Qm, Qre)
+            call step_rescale(3, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ2, Qm, Qre)
           endif
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G)
           call calc_step3(nx, ny, nz, xix, etay, zetaz, E, F, G, QJ2, QJ)
@@ -380,7 +380,7 @@ contains
         step = np * (t2-1) + t1
         if (mod(myrank,2) == 0) then
           if (kind(id_rescale) == 4) then
-            call step_rescale(myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ, Qm, Qre)
+            call step_rescale(1, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ, Qm, Qre)
           endif
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
           call calc_step(nx, ny, nz, 0.5d0, 1.d0, xix, etay, zetaz, E, F, G, QJ, QJs, Rs) ! QJs = Q2
@@ -397,7 +397,7 @@ contains
 
         if (mod(myrank,2) == 0) then
           if (kind(id_rescale) == 4) then
-            call step_rescale(myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJs, Qm, Qre)
+            call step_rescale(2, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJs, Qm, Qre)
           endif
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
           call calc_step(nx, ny, nz, 0.5d0, 2.d0, xix, etay, zetaz, E, F, G, QJ, QJs, Rs) ! QJs = Q3
@@ -414,7 +414,7 @@ contains
 
         if (mod(myrank,2) == 0) then
           if (kind(id_rescale) == 4) then
-            call step_rescale(myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJs, Qm, Qre)
+            call step_rescale(3, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJs, Qm, Qre)
           endif
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
           call calc_step(nx, ny, nz, 1.0d0, 2.d0, xix, etay, zetaz, E, F, G, QJ, QJs, Rs) ! QJs = Q4
@@ -431,7 +431,7 @@ contains
 
         if (mod(myrank,2) == 0) then
           if (kind(id_rescale) == 4) then
-            call step_rescale(myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJs, Qm, Qre)
+            call step_rescale(4, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJs, Qm, Qre)
           endif
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
           call calc_step4(nx, ny, nz, xix, etay, zetaz, E, F, G, Rs, QJ)
