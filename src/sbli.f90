@@ -3,7 +3,7 @@ program main
   use cudafor
   use mpi
   use mod_globals,  only : id_RungeKutta, id_recal, nx1, nx2, ny1, ny2, nz1, nz2, Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, &
-  & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
+  & mygpu1, mygpu2, blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
   & blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv
   use set_coordinate
   use calc_time_dev
@@ -29,7 +29,7 @@ program main
     Lx = Lx1
     Ly = Ly1
     Lz = Lz1
-    mygpu = 0
+    mygpu = mygpu1
   elseif (2 <= myrank) then
     ! boundary layer + oblique shock
     nx = nx2
@@ -38,7 +38,7 @@ program main
     Lx = Lx2
     Ly = Ly2
     Lz = Lz2
-    mygpu = 0
+    mygpu = mygpu2
   endif
   call set_block_thread(myrank, accuracy, nx, ny, nz, blocks, threads, blocksE, blocksF, blocksG, &
                         & threadsE, threadsF, threadsG, blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv)
