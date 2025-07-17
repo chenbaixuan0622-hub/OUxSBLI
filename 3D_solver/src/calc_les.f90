@@ -69,9 +69,8 @@ contains
 
   attributes(device) function stride_filter(x) result(xh)
     real(8), intent(in), dimension(5,5,5), device   :: x
-    real(8), intent(out), dimension(3,3,3), device  :: xh
     integer i, j, k
-    real(8), dimension(3,3,3) :: xs
+    real(8), dimension(3,3,3) :: xh, xs
     do k = 1, 3
       do j = 1, 3
         do i = 1, 3
