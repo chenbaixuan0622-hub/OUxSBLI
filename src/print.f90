@@ -213,6 +213,30 @@ contains
     enddo;enddo;enddo
   end subroutine make_1d_for_print
 
+  subroutine send_recv_for_print(myrank, nranks, step, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
+    integer, intent(in)         :: myrank, nranks, step, nx, ny, nz
+    real(8), intent(in)         :: x(nx), y(ny), z(nz), Jacobian_cpu(ny)
+    real(8), intent(in), device :: QJ(nx,ny,nz,5)
+    real(8), intent(inout)      :: Q(nx,ny,nz,5)
+    real(4), intent(inout)      :: ke0, entropy0
+    integer ireq3(3), istat3(MPI_STATUS_SIZE,3), ierr
+    real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
+    if (mod(myrank,2) == 0) then
+      Q = QJ
+      call make_1d_for_print(nx, ny, nz, Jacobian_cpu, Q, rho1d, p1d, v1d)
+      call MPI_ISEND(rho1d, nx*ny*nz,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(1), ierr) 
+      call MPI_ISEND(p1d,   nx*ny*nz,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(2), ierr) 
+      call MPI_ISEND(v1d,   nx*ny*nz*3, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(3), ierr) 
+      call MPI_WAITALL(3, ireq3, istat3, ierr)
+    else
+      call MPI_IRECV(rho1d, nx*ny*nz,   MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(1), ierr)
+      call MPI_IRECV(p1d,   nx*ny*nz,   MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(2), ierr)
+      call MPI_IRECV(v1d,   nx*ny*nz*3, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(3), ierr)
+      call MPI_WAITALL(3, ireq3, istat3, ierr)
+      call print_vtk(step, nx, ny, nz, myrank, nranks, x, y, z, rho1d, p1d, v1d, ke0, entropy0)
+    endif
+  end subroutine send_recv_for_print
+
   subroutine print_vtk_2D(step, nx, ny, x, y, rho1d, p1d, v1d)
     integer, intent(in) :: step, nx, ny
     real(8), intent(in) :: x(nx), y(ny)
