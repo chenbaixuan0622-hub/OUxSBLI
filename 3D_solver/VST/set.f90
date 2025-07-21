@@ -2,9 +2,10 @@ module set
   use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, rhol => rho0, rhor => rho1, pl => p0, pr => p1
   implicit none
 contains
-  subroutine set_grid(nx,ny,nz,x,y,z,dx,dy,dz)
-    integer, intent(in)  :: nx, ny, nz
-    real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx), dy(ny), dz(nz)
+  subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
+    integer, intent(in)  :: myrank, nx, ny, nz
+    real(8), intent(in)  :: Lx, Ly, Lz
+    real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     integer i, j, k
     real(8) dx1, dy1, dz1
     dx1 = Lx / dble(nx-1)
@@ -27,8 +28,8 @@ contains
     enddo
   end subroutine set_grid
   
-  subroutine set_init(nx,ny,nz,x,y,z,Q)
-    integer, intent(in)  :: nx, ny, nz
+  subroutine set_init(myrank, nx, ny, nz, x, y, z, Q)
+    integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
     real(8), intent(out) :: Q(nx,ny,nz,5)
     integer i, j, k
@@ -49,8 +50,8 @@ contains
     enddo
   end subroutine set_init
   
-  subroutine set_bc(nx,ny,nz,Jacobian,Q,Qre)
-    integer, intent(in), value      :: nx, ny, nz
+  subroutine set_bc(myrank, nx, ny, nz, Jacobian, Q, Qre)
+    integer, intent(in), value      :: myrank, nx, ny, nz
     real(8), intent(in), device     :: Jacobian(nx,ny,nz)
     real(8), intent(inout), device  :: Q(nx,ny,nz,5) ! Q / J
     real(8), intent(in), device     :: Qre(2,ny,nz,5)

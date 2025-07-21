@@ -63,19 +63,19 @@ contains
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
     real(8), intent(out) :: Q(nx,ny,nz,5)
     integer i, j
-    real(8) :: Cp = R * gamma / (gamma - 1.d0), p = 1.d0 / (gamma * M0**2)
+    real(8) :: Cp = R * gamma / (gamma - 1.d0), p = rho0 * u0**2 / (gamma * M0**2)
     do j = 1, ny
       do i = 1, nx
         if (y(j) <= pi) then
           Q(i,j,:,1) = rho0
-          Q(i,j,:,2) = u0 * tanh((y(j) - 0.5d0 * pi) / d1)
-          Q(i,j,:,3) = d2 * sin(x(i))
+          Q(i,j,:,2) = rho0 * u0 * tanh((y(j) - 0.5d0 * pi) / d1)
+          Q(i,j,:,3) = rho0 * u0 * d2 * sin(x(i))
           Q(i,j,:,4) = 0.d0
           Q(i,j,:,5) = p / (gamma - 1.d0) + 0.5d0 * (Q(i,j,:,2)**2 + Q(i,j,:,3)**2) / Q(i,j,:,1)
         else
           Q(i,j,:,1) = rho0
-          Q(i,j,:,2) = u0 * tanh((1.5d0 * pi - y(j)) / d1)
-          Q(i,j,:,3) = d2 * sin(x(i))
+          Q(i,j,:,2) = rho0 * u0 * tanh((1.5d0 * pi - y(j)) / d1)
+          Q(i,j,:,3) = rho0 * u0 * d2 * sin(x(i))
           Q(i,j,:,4) = 0.d0
           Q(i,j,:,5) = p / (gamma - 1.d0) + 0.5d0 * (Q(i,j,:,2)**2 + Q(i,j,:,3)**2) / Q(i,j,:,1)
         endif

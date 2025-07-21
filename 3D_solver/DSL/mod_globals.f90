@@ -61,13 +61,20 @@ module mod_globals
   integer(kind=2), parameter :: id_rescale  = 0
   real(8), parameter         :: blt         = 2.d-3
 
+  ! exchange
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_exchange ! kind2 off !
+  !             ! kind4 on  !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!
+  integer(kind=2), parameter :: id_exchange = 0
+  integer(kind=2), parameter :: id_forcing  = 0
   ! mesh
   real(8), parameter :: pi = acos(-1.d0)
   real(8), parameter :: Lx = 2.d0 * pi
   real(8), parameter :: Ly = 2.d0 * pi
   real(8), parameter :: Lz = 0.1 * Lx
-  integer, parameter :: nx = 513!129!257!513
-  integer, parameter :: ny = 513!129!257!513
+  integer, parameter :: nx = 129!257!513
+  integer, parameter :: ny = 129!257!513
   integer, parameter :: nz = 7
 
   integer, parameter :: nre1 = int(1.d0 * dble(nx) / 7.d0)
