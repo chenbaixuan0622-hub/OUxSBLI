@@ -20,7 +20,6 @@ OBJ =	mod_globals.o \
       calc_physical_quantities.o \
       calc_sutherland.o \
       calc_visc.o \
-      calc_les.o \
       calc_common.o \
       calc_hybrid.o \
       calc_slau.o \
@@ -30,8 +29,6 @@ OBJ =	mod_globals.o \
       calc_flux.o \
       calc_flux_base.o \
       calc_steps.o \
-      calc_rescale.o \
-      calc_para.o \
       set.o \
       print.o \
       calc_time_dev.o \
@@ -51,14 +48,12 @@ calc_keep.o: mod_globals.mod calc_common_dim.mod calc_term.mod calc_mat.mod
 calc_visc.o: mod_globals.mod calc_sutherland.mod
 calc_mat.o: mod_globals.mod calc_common_dim.mod
 calc_slau.o: mod_globals.mod calc_common.mod calc_hybrid.mod
-calc_roe.o: mod_globals.mod calc_common.mod calc_common_dim.mod calc_physical_quantities.mod calc_mat.mod
 calc_muscl.o: mod_globals.mod
-calc_flux.o: mod_globals.mod calc_keep.mod calc_slau.mod calc_roe.mod calc_hybrid.mod calc_muscl.mod
-calc_flux_base.o: mod_globals.mod calc_physical_quantities.mod calc_hybrid.mod calc_flux.mod calc_visc.mod calc_les.mod set.mod
+calc_flux.o: mod_globals.mod calc_keep.mod calc_slau.mod calc_hybrid.mod calc_muscl.mod
+calc_flux_base.o: mod_globals.mod calc_physical_quantities.mod calc_hybrid.mod calc_flux.mod calc_visc.mod set.mod
 calc_hybrid.o: mod_globals.mod
 calc_steps.o: mod_globals.mod
-calc_rescale.o: mod_globals.mod
-calc_time_dev.o: mod_globals.mod set.mod calc_flux_base.mod calc_steps.mod calc_rescale.mod calc_para.mod print.mod
+calc_time_dev.o: mod_globals.mod set.mod calc_flux_base.mod calc_steps.mod print.mod
 print.o: mod_globals.mod
 main.o: main.f90 mod_globals.mod set_coordinate.mod set.mod calc_time_dev.mod
 

@@ -20,6 +20,14 @@ module print
     end subroutine print_KE
   end interface
 
+  interface make_1d_for_print
+    module procedure make_1d_for_print2, make_1d_for_print3
+  end interface
+  
+  interface send_recv_for_print
+    module procedure send_recv_for_print2, send_recv_for_print3
+  end interface
+
   interface print_vtk
     module procedure print_vtk_2D, print_vtk_3D
   end interface
@@ -186,7 +194,32 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine make_1d_for_print(nx, ny, nz, Jacobian, QJ, rho1d, p1d, v1d)
+  subroutine make_1d_for_print2(nx, ny, Jacobian, QJ, rho1d, p1d, v1d)
+    integer, intent(in)  :: nx, ny
+    real(8), intent(in)  :: Jacobian(ny), QJ(nx,ny,4) ! Q / Jacobian
+    real(4), intent(out), dimension(nx*ny)   :: rho1d, p1d
+    real(4), intent(out), dimension(nx*ny*3) :: v1d
+    real(8) rho, u, v, p
+    integer i, j, k, l, m
+    l = 1
+    m = 1
+    do j = 1, ny
+      do i = 1, nx
+        rho      = Jacobian(j) * QJ(i,j,1)
+        u        = QJ(i,j,2) / QJ(i,j,1)
+        v        = QJ(i,j,3) / QJ(i,j,1)
+        p        = (gamma - 1.d0) * (Jacobian(j) * QJ(i,j,4) - 0.5d0 * rho * (u**2 + v**2))
+        rho1d(l) = real(rho)
+        p1d(l)   = real(p)
+        v1d(m)   = real(u)
+        v1d(m+1) = real(v)
+        v1d(m+2) = 0.e0
+        l = l + 1
+        m = m + 3
+    enddo;enddo
+  end subroutine make_1d_for_print2
+
+  subroutine make_1d_for_print3(nx, ny, nz, Jacobian, QJ, rho1d, p1d, v1d)
     integer, intent(in)  :: nx, ny, nz
     real(8), intent(in)  :: Jacobian(ny), QJ(nx,ny,nz,5) ! Q / Jacobian
     real(4), intent(out), dimension(nx*ny*nz)   :: rho1d, p1d
@@ -211,9 +244,32 @@ contains
           l = l + 1
           m = m + 3
     enddo;enddo;enddo
-  end subroutine make_1d_for_print
+  end subroutine make_1d_for_print3
 
-  subroutine send_recv_for_print(myrank, nranks, step, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
+  subroutine send_recv_for_print2(myrank, nranks, step, nx, ny, x, y, Jacobian_cpu, QJ, Q)
+    integer, intent(in)         :: myrank, nranks, step, nx, ny
+    real(8), intent(in)         :: x(nx), y(ny), Jacobian_cpu(ny)
+    real(8), intent(in), device :: QJ(nx,ny,4)
+    real(8), intent(inout)      :: Q(nx,ny,4)
+    integer ireq3(3), istat3(MPI_STATUS_SIZE,3), ierr
+    real(4) rho1d(nx*ny), p1d(nx*ny), v1d(nx*ny*3)
+    if (mod(myrank,2) == 0) then
+      Q = QJ
+      call make_1d_for_print(nx, ny, Jacobian_cpu, Q, rho1d, p1d, v1d)
+      call MPI_ISEND(rho1d, nx*ny,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(1), ierr) 
+      call MPI_ISEND(p1d,   nx*ny,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(2), ierr) 
+      call MPI_ISEND(v1d,   nx*ny*3, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(3), ierr) 
+      call MPI_WAITALL(3, ireq3, istat3, ierr)
+    else
+      call MPI_IRECV(rho1d, nx*ny,   MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(1), ierr)
+      call MPI_IRECV(p1d,   nx*ny,   MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(2), ierr)
+      call MPI_IRECV(v1d,   nx*ny*3, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(3), ierr)
+      call MPI_WAITALL(3, ireq3, istat3, ierr)
+      call print_vtk(step, nx, ny, x, y, rho1d, p1d, v1d)
+    endif
+  end subroutine send_recv_for_print2
+
+  subroutine send_recv_for_print3(myrank, nranks, step, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
     integer, intent(in)         :: myrank, nranks, step, nx, ny, nz
     real(8), intent(in)         :: x(nx), y(ny), z(nz), Jacobian_cpu(ny)
     real(8), intent(in), device :: QJ(nx,ny,nz,5)
@@ -235,17 +291,17 @@ contains
       call MPI_WAITALL(3, ireq3, istat3, ierr)
       call print_vtk(step, nx, ny, nz, myrank, nranks, x, y, z, rho1d, p1d, v1d, ke0, entropy0)
     endif
-  end subroutine send_recv_for_print
+  end subroutine send_recv_for_print3
 
   subroutine print_vtk_2D(step, nx, ny, x, y, rho1d, p1d, v1d)
     integer, intent(in) :: step, nx, ny
     real(8), intent(in) :: x(nx), y(ny)
-    real(4), intent(in) :: rho1d(nx*ny), p1d(nx*ny), v1d(nx*ny*2)
+    real(4), intent(in) :: rho1d(nx*ny), p1d(nx*ny), v1d(nx*ny*3)
     real(8) :: z(1) = 0.d0
     character(len=40) filename
     write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtr"
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
-    call print_xml(nx, ny, 1, 2, real(x), real(y), real(z), rho1d, p1d, v1d)
+    call print_xml(nx, ny, 1, 3, real(x), real(y), real(z), rho1d, p1d, v1d)
   end subroutine print_vtk_2D
   
   subroutine print_vtk_3D(step, nx, ny, nz, myrank, nranks, x, y, z, rho1d, p1d, v1d, ke0, entropy0)
