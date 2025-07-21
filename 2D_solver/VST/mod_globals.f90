@@ -1,19 +1,15 @@
 module mod_globals
   use cudafor
   implicit none
-  integer, parameter :: dimension = 3
+  integer, parameter :: dimension = 2
   integer, parameter :: accuracy  = 2 
   integer, parameter :: offset    = accuracy / 2
-  integer, parameter :: id_visc   = 1
+  integer(4), parameter :: id_visc   = 1
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! kind2 Euler       !
   !               ! kind4 NS          !
-  !               ! kind8 LES         !
   !               ! 1 2nd             !
   !               ! 2 4th             !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_av         ! 0 no              !
-  !               ! 1 Neumann         !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_scheme   ! integer(2)  KEEP    !
   !             ! real(2)     SLAU    !
@@ -48,38 +44,22 @@ module mod_globals
   integer(kind=2), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
   integer(kind=2), parameter :: slau_wall   = 0
-  integer(kind=2), parameter :: id_rescale  = 0
-  real(8), parameter         :: blt = 0.d0
 
-  ! exchange
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_exchange ! kind2 off !
-  !             ! kind4 on  !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=2), parameter :: id_exchange = 0
   ! mesh
   integer, parameter :: nx = 1026
   integer, parameter :: ny = 7
-  integer, parameter :: nz = 7
-
-  integer, parameter :: nre1 = nx-4
-  integer, parameter :: nre2 = nx-4
-  integer, parameter :: rerank = 0
+  integer, parameter :: nz = 1
 
   ! GPU
-  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/205,(ny-accuracy)/1,(nz-accuracy)/1)
-  type(dim3) :: blocksF   = dim3((nx-accuracy)/128,(ny-accuracy+1)/1,(nz-accuracy)/1)
-  type(dim3) :: blocksG   = dim3((nx-accuracy)/128,(ny-accuracy)/1,(nz-accuracy+1)/1)
-  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/205,(ny-accuracy)/1,(nz-accuracy)/1)
-  type(dim3) :: blocksFv  = dim3((nx-accuracy)/128,(ny-accuracy+1)/1,(nz-accuracy)/1)
-  type(dim3) :: blocksGv  = dim3((nx-accuracy)/128,(ny-accuracy)/1,(nz-accuracy+1)/1)
-  type(dim3) :: blocks    = dim3((nx-accuracy)/128,(ny-accuracy)/1,(nz-accuracy)/1)
+  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/205,(ny-accuracy)/1,1)
+  type(dim3) :: blocksF   = dim3((nx-accuracy)/128,(ny-accuracy+1)/1,1)
+  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/205,(ny-accuracy)/1,1)
+  type(dim3) :: blocksFv  = dim3((nx-accuracy)/128,(ny-accuracy+1)/1,1)
+  type(dim3) :: blocks    = dim3((nx-accuracy)/128,(ny-accuracy)/1,1)
   type(dim3) :: threadsE  = dim3(205,1,1)
   type(dim3) :: threadsF  = dim3(128,1,1)
-  type(dim3) :: threadsG  = dim3(128,1,1)
   type(dim3) :: threadsEv = dim3(205,1,1)
   type(dim3) :: threadsFv = dim3(128,1,1)
-  type(dim3) :: threadsGv = dim3(128,1,1)
   type(dim3) :: threads   = dim3(128,1,1)
 
   ! time
@@ -94,7 +74,6 @@ module mod_globals
   integer(kind=2), parameter :: id_recal      = 0
   integer(kind=4), parameter :: id_RungeKutta = 0
   integer, parameter         :: step_offset   = 0
-  integer, parameter         :: start_rescale = 0
   integer, parameter         :: np            = 100
 
   ! physical properties

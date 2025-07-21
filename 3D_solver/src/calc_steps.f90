@@ -113,9 +113,9 @@ contains
         do j = 1, ny-2*offset
           do i = 1, nx-2*offset
             R(i,j,k,l) = &
-            &   dt / (dy(j) * dz(k)) * (-E(i,j,k,l) + E(i+1,j,k,l) + dx(i) * fx(i,j,k,l)) &
-            & + dt / (dz(k) * dx(i)) * (-F(i,j,k,l) + F(i,j+1,k,l) + dy(j) * fy(i,j,k,l)) &
-            & + dt / (dx(i) * dy(j)) * (-G(i,j,k,l) + G(i,j,k+1,l) + dz(k) * fz(i,j,k,l))
+            &   dt / (dy(j) * dz(k)) * (-E(i,j,k,l) + E(i+1,j,k,l) + fx(i,j,k,l) / dx(i)) &
+            & + dt / (dz(k) * dx(i)) * (-F(i,j,k,l) + F(i,j+1,k,l) + fy(i,j,k,l) / dy(j)) &
+            & + dt / (dx(i) * dy(j)) * (-G(i,j,k,l) + G(i,j,k+1,l) + fz(i,j,k,l) / dz(k))
     enddo;enddo;enddo;enddo
   end subroutine calc_R_forcing
 
@@ -170,9 +170,9 @@ contains
       do k = 1, nz-2*offset
         do j = 1, ny-2*offset
           do i = 1, nx-2*offset
-            R = dt / (dy(j) * dz(k)) * (-E(i,j,k,l) + E(i+1,j,k,l) + dx(i) * fx(i,j,k,l)) &
-            & + dt / (dz(k) * dx(i)) * (-F(i,j,k,l) + F(i,j+1,k,l) + dy(j) * fy(i,j,k,l)) &
-            & + dt / (dx(i) * dy(j)) * (-G(i,j,k,l) + G(i,j,k+1,l) + dz(k) * fz(i,j,k,l))
+            R = dt / (dy(j) * dz(k)) * (-E(i,j,k,l) + E(i+1,j,k,l) + fx(i,j,k,l) / dx(i)) &
+            & + dt / (dz(k) * dx(i)) * (-F(i,j,k,l) + F(i,j+1,k,l) + fy(i,j,k,l) / dy(j)) &
+            & + dt / (dx(i) * dy(j)) * (-G(i,j,k,l) + G(i,j,k+1,l) + fz(i,j,k,l) / dz(k))
             Q2(i+offset,j+offset,k+offset,l) = Q(i+offset,j+offset,k+offset,l) - coef1 * R
             if (present(Rs)) then
               Rs(i,j,k,l) = Rs(i,j,k,l) + coef2 * R
@@ -231,9 +231,9 @@ contains
       do k = 1, nz-2*offset
         do j = 1, ny-2*offset
           do i = 1, nx-2*offset
-            R = dt / (dy(j) * dz(k)) * (-E(i,j,k,l) + E(i+1,j,k,l) + dx(i) * fx(i,j,k,l)) &
-            & + dt / (dz(k) * dx(i)) * (-F(i,j,k,l) + F(i,j+1,k,l) + dy(j) * fy(i,j,k,l)) &
-            & + dt / (dx(i) * dy(j)) * (-G(i,j,k,l) + G(i,j,k+1,l) + dz(j) * fz(i,j,k,l))
+            R = dt / (dy(j) * dz(k)) * (-E(i,j,k,l) + E(i+1,j,k,l) + fx(i,j,k,l) / dx(i)) &
+            & + dt / (dz(k) * dx(i)) * (-F(i,j,k,l) + F(i,j+1,k,l) + fy(i,j,k,l) / dy(j)) &
+            & + dt / (dx(i) * dy(j)) * (-G(i,j,k,l) + G(i,j,k+1,l) + fz(i,j,k,l) / dz(k))
             Q2(i+offset,j+offset,k+offset,l) = (coef1 * Q(i+offset,j+offset,k+offset,l) + coef2 * Q2(i+offset,j+offset,k+offset,l) - coef3 * R) / coef4
             if (present(Rs)) then
               Rs(i,j,k,l) = R
@@ -285,9 +285,9 @@ contains
       do k = 1, nz-2*offset
         do j = 1, ny-2*offset
           do i = 1, nx-2*offset
-            R = dt / (dy(j) * dz(k)) * (-E(i,j,k,l) + E(i+1,j,k,l) + dx(i) * fx(i,j,k,l)) &
-            & + dt / (dz(k) * dx(i)) * (-F(i,j,k,l) + F(i,j+1,k,l) + dy(j) * fy(i,j,k,l)) &
-            & + dt / (dx(i) * dy(j)) * (-G(i,j,k,l) + G(i,j,k+1,l) + dz(k) * fz(i,j,k,l))
+            R = dt / (dy(j) * dz(k)) * (-E(i,j,k,l) + E(i+1,j,k,l) + fx(i,j,k,l) / dx(i)) &
+            & + dt / (dz(k) * dx(i)) * (-F(i,j,k,l) + F(i,j+1,k,l) + fy(i,j,k,l) / dy(j)) &
+            & + dt / (dx(i) * dy(j)) * (-G(i,j,k,l) + G(i,j,k+1,l) + fz(i,j,k,l) / dz(k))
             Q(i+offset,j+offset,k+offset,l) = (Q(i+offset,j+offset,k+offset,l) + 2.0d0 * Q3(i+offset,j+offset,k+offset,l) - 2.d0 * R) / 3.d0
     enddo;enddo;enddo;enddo
   end subroutine calc_step3_forcing
@@ -338,9 +338,9 @@ contains
       do k = 1, nz-2*offset
         do j = 1, ny-2*offset
           do i = 1, nx-2*offset
-            R = dt / (dy(j) * dz(k)) * (-E(i,j,k,l) + E(i+1,j,k,l) + dx(i) * fx(i,j,k,l)) &
-            & + dt / (dz(k) * dx(i)) * (-F(i,j,k,l) + F(i,j+1,k,l) + dy(j) * fy(i,j,k,l)) &
-            & + dt / (dx(i) * dy(j)) * (-G(i,j,k,l) + G(i,j,k+1,l) + dz(k) * fz(i,j,k,l))
+            R = dt / (dy(j) * dz(k)) * (-E(i,j,k,l) + E(i+1,j,k,l) + fx(i,j,k,l) / dx(i)) &
+            & + dt / (dz(k) * dx(i)) * (-F(i,j,k,l) + F(i,j+1,k,l) + fy(i,j,k,l) / dy(j)) &
+            & + dt / (dx(i) * dy(j)) * (-G(i,j,k,l) + G(i,j,k+1,l) + fz(i,j,k,l) / dz(k))
             Rs(i,j,k,l) = Rs(i,j,k,l) + R
             Q(i+offset,j+offset,k+offset,l) = Q(i+offset,j+offset,k+offset,l) - Rs(i,j,k,l) / 6.d0
             Rs(i,j,k,l) = 0.d0
