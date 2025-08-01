@@ -4,7 +4,7 @@ module mod_globals
   integer, parameter :: dimension = 2
   integer, parameter :: accuracy  = 2 
   integer, parameter :: offset    = accuracy / 2
-  integer(2), parameter :: id_visc   = 1
+  integer(4), parameter :: id_visc   = 1
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc     ! kind2 Euler         !
   !             ! kind4 NS            !
@@ -93,12 +93,16 @@ module mod_globals
 
   ! initial condition
   real(8), parameter :: M0   = 0.1d0
-  real(8), parameter :: rho0 = 1.d0
-  real(8), parameter :: u0   = 1.d0
+  real(8), parameter :: Re   = 1d3
+  real(8), parameter :: T    = 273.2d0 
+  real(8), parameter :: S    = 111.d0
+  real(8), parameter :: mu0  = 1.716d-5 * (273.2d0 + S) / (T + S) * (T / 273.2d0)**1.5d0
+  real(8), parameter :: u0   = M0 * sqrt(gamma * R * T)
+  real(8), parameter :: rho0 = mu0 * Re / (u0 * pi)
   real(8), parameter :: d1   = pi / 15.d0
   real(8), parameter :: d2   = 0.05d0
-  real(8), parameter :: dt   = 0.25d0 * 0.25d0 * 1.d-3
-  real(8), parameter :: endT = 8.d0
+  real(8), parameter :: dt   = 0.25d0 * 0.25d0 * 1.d-3 / u0
+  real(8), parameter :: endT = 8.d0 / u0
   integer, parameter :: np   = 10
   integer, parameter :: nt   = int(endT / (dble(np) * dt))
 end module mod_globals

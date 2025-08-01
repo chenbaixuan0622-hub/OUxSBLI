@@ -1,16 +1,15 @@
 module set
-  use mod_globals, only : nx, ny, nz, gamma, R, dtn
+  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, dtn, theta
   implicit none
 contains
   subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, xc, yc, zc, dx, dy, dz)
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: Lx, Ly, Lz
-    real(8), intent(out) :: xc(nx), yc(ny), zc(nz), dx(nx-1), dy(ny-1), dz(1)
+    real(8), intent(out) :: xc(nx), yc(ny), zc(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     real(8) x(nx+1), y(ny+1)
     integer i, j
     dx(:) = Lx / dble(nx-6)
     dy(:) = Ly / dble(ny-6)
-
     ! x direction
     do i = 4, nx-2
       x(i) = dx(1) * dble(i-4)
@@ -21,7 +20,6 @@ contains
     x(nx-1) = x(nx-2) + dx(1)
     x(nx)   = x(nx-2) + 2.d0 * dx(1)
     x(nx+1) = x(nx-2) + 3.d0 * dx(1)
-
     ! y direction
     do j = 4, ny-2
       y(j) = dy(1) * dble(j-4)
@@ -32,7 +30,6 @@ contains
     y(ny-1) = y(ny-2) + dy(1)
     y(ny)   = y(ny-2) + 2.d0 * dy(1)
     y(ny+1) = y(ny-2) + 3.d0 * dy(1)
-
     ! cell centered
     do i = 1, nx
       xc(i) = 0.5d0 * (x(i) + x(i+1))
@@ -41,27 +38,32 @@ contains
       yc(j) = 0.5d0 * (y(j) + y(j+1))
     enddo
   end subroutine set_grid
-  
+ 
   subroutine set_init(myrank, nx, ny, nz, x, y, z, Q)
-    use mod_globals, only : pi, M0, rho0, u0, d1, d2
+    use mod_globals, only : M0, rho0, p0, T0, u0, Rc, beta
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
     real(8), intent(out) :: Q(nx,ny,4)
     integer i, j
-    real(8) :: Cp = R * gamma / (gamma - 1.d0), p = rho0 * u0**2 / (gamma * M0**2)
+    real(8) xr, yr, xc, yc, ex, T, rho, u, v, du, dv, p
+    real(8) :: Cp = R * gamma / (gamma - 1.d0)
+    xc = x(int(nx/2))
+    yc = y(int(ny/2))
     do j = 1, ny
       do i = 1, nx
-        if (y(j) <= pi) then
-          Q(i,j,1) = rho0
-          Q(i,j,2) = rho0 * u0 * tanh((y(j) - 0.5d0 * pi) / d1)
-          Q(i,j,3) = rho0 * u0 * d2 * sin(x(i))
-          Q(i,j,4) = p / (gamma - 1.d0) + 0.5d0 * (Q(i,j,2)**2 + Q(i,j,3)**2) / Q(i,j,1)
-        else
-          Q(i,j,1) = rho0
-          Q(i,j,2) = rho0 * u0 * tanh((1.5d0 * pi - y(j)) / d1)
-          Q(i,j,3) = rho0 * u0 * d2 * sin(x(i))
-          Q(i,j,4) = p / (gamma - 1.d0) + 0.5d0 * (Q(i,j,2)**2 + Q(i,j,3)**2) / Q(i,j,1)
-        endif
+        ex  = exp(-0.5d0 * ((x(i) - xc)**2 + (y(j) - yc)**2) / (Rc**2))
+        T   = T0 - 0.5d0 * (u0 * beta)**2 / Cp * ex**2
+        rho = rho0 * (T / T0)**(1.d0  / (gamma - 1.d0))
+        du  = -u0 * beta * (y(j) - yc) / Rc * ex
+        dv  =  u0 * beta * (x(i) - xc) / Rc * ex
+        u   = u0 * cos(theta) + du * cos(theta) - dv * sin(theta)
+        v   = u0 * sin(theta) + du * sin(theta) + dv * cos(theta)
+        p   = rho * R * T
+        Q(i,j,1) = rho
+        Q(i,j,2) = rho * u
+        Q(i,j,3) = rho * v
+        ! p / (gamma - 1) + 0.5 * (rhou ** 2 + rhov ** 2 ) / rho
+        Q(i,j,4) = p / (gamma - 1.d0) + 0.5d0 * rho * (u**2 + v**2)
     enddo;enddo
   end subroutine set_init
   

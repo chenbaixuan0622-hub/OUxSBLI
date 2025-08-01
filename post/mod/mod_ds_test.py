@@ -3,41 +3,120 @@ from numba import njit
 import matplotlib.pyplot as plt
 
 
-def RK4(func, X0, sets):
-  """
-  Runge Kutta 4 solver.
-  """
-  n_x, dt, n_data, h, c, A, sigma = sets
-  func_sets = (n_x, h, c, A, sigma)
-  X  = np.zeros([n_data, len(X0)])
-  X[0] = X0
-  ti = 0
-  for i in range(n_data-1):
-    k1 = func(X[i], ti, func_sets)
-    k2 = func(X[i] + dt/2. * k1, ti + dt/2., func_sets)
-    k3 = func(X[i] + dt/2. * k2, ti + dt/2., func_sets)
-    k4 = func(X[i] + dt    * k3, ti + dt, func_sets)
-    X[i+1] = X[i] + dt / 6. * (k1 + 2. * k2 + 2. * k3 + k4)
-    ti += dt
-  return X
+class RK:
+  @staticmethod
+  @njit(cache=True, nogil=True)
+  def _RK44(RHS, params, nt, dt, x0):
+    x = np.zeros((nt+1,len(x0)))
+    x[0,:] = x0[:]
+    Dx = np.zeros(3)
+    for i in range(nt):
+      dx = RHS(params, x[i,:])
+      x[i+1,:] = x[i,:] + 0.5e0 * dt * dx[:]
+      Dx[:] = dx[:]
+      dx = RHS(params, x[i+1,:])
+      x[i+1,:] = x[i,:] + 0.5e0 * dt * dx[:]
+      Dx[:] += 2.e0 * dx[:]
+      dx = RHS(params, x[i+1,:])
+      x[i+1,:] = x[i,:] + dt * dx[:]
+      Dx[:] += 2.e0 * dx[:]
+      dx = RHS(params, x[i+1,:])
+      Dx[:] += dx[:]
+      x[i+1,:] = x[i,:] + dt * Dx[:] / 6.e0
+    return x
+
+  @staticmethod
+  @njit(cache=True, nogil=True)
+  def _error(RHS, params, dim, k1, k2, a11, a12, a21, a22, x, dt):
+    err = np.empty(2 * dim)
+    f1 = k1 - RHS(params, x + dt * (a11 * k1 + a12 * k2))
+    f2 = k2 - RHS(params, x + dt * (a21 * k1 + a22 * k2))
+    for i in range(dim):
+      err[i]     = f1[i]
+      err[dim+i] = f2[i]
+    return err
+
+  @staticmethod
+  @njit(cache=True, nogil=True)
+  def _GaussStep(RHS, Jacobian, error, params, dt, x, damping=1.e0, max_itr=100, tol=1e-12):
+    sqrt3 = np.sqrt(3.e0)
+    dim   = x.shape[0]
+    k  = RHS(params, x)
+    c1 = 0.5e0 - sqrt3 / 6.e0
+    c2 = 0.5e0 + sqrt3 / 6.e0
+    x1 = x + dt * c1 * k
+    x2 = x + dt * c2 * k
+    k1 = RHS(params, x1)
+    k2 = RHS(params, x2)
+    a11 = 0.25e0
+    a12 = 0.25e0 - sqrt3 / 6.e0
+    a21 = 0.25e0 + sqrt3 / 6.e0
+    a22 = 0.25e0
+    err = error(RHS, params, dim, k1, k2, a11, a12, a21, a22, x, dt)
+    itr = 0
+    while np.linalg.norm(err) > tol and itr < max_itr:
+      itr += 1
+      J1 = Jacobian(params, x + dt * (a11 * k1 + a12 * k2))
+      J2 = Jacobian(params, x + dt * (a21 * k1 + a22 * k2))
+      J = np.zeros((2*dim,2*dim))
+      I = np.eye(dim)
+      for i in range(dim):
+        for j in range(dim):
+          J[i,j]         = I[i,j] - dt * a11 * J1[i,j]
+          J[i,j+dim]     = -dt * a12 * J1[i,j]
+          J[i+dim,j]     = -dt * a21 * J2[i,j]
+          J[i+dim,j+dim] = I[i,j] - dt * a22 * J2[i,j]
+      delta = np.linalg.solve(J, err)
+      k1 -= damping * delta[:dim]
+      k2 -= damping * delta[dim:]
+      err = error(RHS, params, dim, k1, k2, a11, a12, a21, a22, x, dt)
+    return x + 0.5e0 * dt * (k1 + k2)
+
+  @staticmethod
+  @njit(cache=True, nogil=True)
+  def _GaussRK2(GaussStep, RHS, Jacobian, error, params, nt, dt, x0):
+    x = np.zeros((nt+1,len(x0)))
+    x[0,:] = x0[:]
+    for i in range(nt):
+      x[i+1,:] = GaussStep(RHS, Jacobian, error, params, dt, x[i,:])
+    return x
 
 
-@njit(cache=True, nogil=True)
-def lorenz(nt=1000, dt=0.01e0, x0=0.e0, y0=1.e0, z0=1.05e0, s=10.e0, r=28.e0, b=8.e0/3.e0):
-  x = np.zeros(nt+1)
-  y = np.zeros(nt+1)
-  z = np.zeros(nt+1)
-  x[0] = x0
-  y[0] = y0
-  z[0] = z0
-  for i in range(nt):
-    dot_x = s * (y[i] - x[i])
-    dot_y = r * x[i] - y[i] - x[i] * z[i]
-    dot_z = x[i] * y[i] - b * z[i]
-    x[i+1] = x[i] + dot_x * dt
-    y[i+1] = y[i] + dot_y * dt
-    z[i+1] = z[i] + dot_z * dt
-  return x, y, z
+
+class lorenz(RK):
+  def __init__(self, s=10.e0, r=28.e0, b=8.e0/3.e0):
+    self.s = s
+    self.r = r
+    self.b = b
+
+  @staticmethod
+  @njit(cache=True, nogil=True)
+  def _RHS(params, x):
+    s, r, b = params
+    dx = s * (x[1] - x[0])
+    dy = r * x[0] - x[1] - x[0] * x[2]
+    dz = x[0] * x[1] - b * x[2]
+    return np.array([dx, dy, dz])
+
+  @staticmethod
+  @njit(cache=True, nogil=True)
+  def _Jacobian(params, x):
+    s, r, b = params
+    J = np.array([[   -s,           s,  0.e0], 
+                  [r - x[2],    -1.e0, -x[0]], 
+                  [    x[1],     x[0],    -b]])
+    return J
+
+  def RK44(self, nt=10000, dt=0.001e0, x0=0.e0, y0=1.e0, z0=1.05e0):
+    params  = (self.s, self.r, self.b)
+    x = self._RK44(self._RHS, params, nt, dt, np.array([x0, y0, z0]))
+    return x[:,0], x[:,1], x[:,2]
+
+  def GaussRK2(self, nt=10000, dt=0.001e0, x0=0.e0, y0=1.e0, z0=1.05e0):
+    params  = (self.s, self.r, self.b)
+    x = self._GaussRK2(self._GaussStep, self._RHS, self._Jacobian, self._error, 
+                       params, nt, dt, np.array([x0, y0, z0]))
+    return x[:,0], x[:,1], x[:,2]
 
 
 @njit(cache=True, nogil=True)

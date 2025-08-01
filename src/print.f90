@@ -3,98 +3,43 @@ module print
   use mod_globals, only : id_accuracy, nt, np, dt, step_offset, gamma, R, Lx
   implicit none
   interface
-    subroutine print_entropy(step,nx,ny,nz,rho,p,entropy0,myrank)
-      integer, intent(in)                       :: step, nx, ny, nz
-      real(8), intent(in), dimension(nx,ny,nz)  :: rho, p
-      real(8), intent(inout)                    :: entropy0
-      integer, intent(in), optional             :: myrank
+    subroutine print_entropy(step, nx, ny, nz, rho1d, p1d, entropy0, myrank)
+      integer, intent(in)                      :: step, nx, ny, nz
+      real(4), intent(in), dimension(nx*ny*nz) :: rho1d, p1d
+      real(4), intent(inout)                   :: entropy0
+      integer, intent(in), optional            :: myrank
     end subroutine print_entropy
   end interface
   
   interface
-    subroutine print_KE(step,nx,ny,nz,Jacobian,QJ,ke0,myrank)
+    subroutine print_KE(step, nx, ny, nz, rho1d, v1d, ke0, myrank)
       integer, intent(in)           :: step, nx, ny, nz
-      real(8), intent(in)           :: Jacobian(ny), QJ(nx,ny,nz,5)
-      real(8), intent(inout)        :: ke0
+      real(4), intent(in)           :: rho1d(nx*ny*nz), v1d(nx*ny*nz*3)
+      real(4), intent(inout)        :: ke0
       integer, intent(in), optional :: myrank
     end subroutine print_KE
   end interface
 
-  interface
-    subroutine print_enstrophy(step,nx,ny,nz,x,y,z,rho,u,v,w,myrank)
-      integer, intent(in)                       :: step, nx, ny, nz
-      real(8), intent(in)                       :: x(nx), y(ny), z(nz)
-      real(8), intent(in), dimension(nx,ny,nz)  :: rho, u, v, w
-      integer, intent(in), optional             :: myrank
-    end subroutine print_enstrophy
+  interface make_1d_for_print
+    module procedure make_1d_for_print2, make_1d_for_print3
   end interface
-
-  interface
-    subroutine print_xml(ni,nj,nk,dimension,x,y,z,rho1d,p1d,T1d,M1d,v1d,Q1d)
-      integer, intent(in)                                 :: ni, nj, nk, dimension
-      real(4), intent(in)                                 :: x(ni), y(nj), z(nk)
-      real(4), intent(in), dimension(ni*nj*nk)            :: rho1d, p1d, T1d, M1d
-      real(4), intent(in), dimension(dimension*ni*nj*nk)  :: v1d
-      real(4), intent(in), dimension(ni*nj*nk), optional  :: Q1d
-    end subroutine print_xml
+  
+  interface send_recv_for_print
+    module procedure send_recv_for_print2, send_recv_for_print3
   end interface
 
   interface print_vtk
     module procedure print_vtk_2D, print_vtk_3D
   end interface
-
-  interface mean
-    module procedure mean1D, mean2D, mean3D
-  end interface
 contains
-  function mean1D(a) result(ans)
-    real(8), intent(in) :: a(:)
-    real(8) ans
-    ans = sum(a) / dble(size(a))
-  end function mean1D
-
-  function mean2D(a) result(ans)
-    real(8), intent(in) :: a(:,:)
-    real(8) ans
-    ans = sum(a) / dble(size(a))
-  end function mean2D
-
-  function mean3D(a) result(ans)
-    real(8), intent(in) :: a(:,:,:)
-    real(8) ans
-    ans = sum(a) / dble(size(a))
-  end function mean3D
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-  subroutine simple_bc(nx,ny,nz,A)
-    integer, intent(in)    :: nx, ny, nz
-    real(8), intent(inout) :: A(nx,ny,nz)
-    ! x direction
-    A(1,:,:)  = A(2,:,:)
-    A(nx,:,:) = A(nx-1,:,:)
-    ! y direction
-    A(:,1,:)  = A(:,2,:)
-    A(:,ny,:) = A(:,ny-1,:)
-    ! z direction
-    A(:,:,1)  = A(:,:,2)
-    A(:,:,nz) = A(:,:,nz-1)
-  end subroutine simple_bc
-
-  function vorticity(dudy,dudz,dvdx,dvdz,dwdx,dwdy) result(ans)
-    real(8), intent(in) :: dudy, dudz, dvdx, dvdz, dwdx, dwdy
-    real(8) ans(3)
-    ans(:) = (/dwdy - dvdz, dudz - dwdx, dvdx - dudy/)
-  end function vorticity
-  
-  subroutine print_entropy(step,nx,ny,nz,Jacobian,QJ,entropy0,myrank)
-    integer, intent(in)           :: step, nx, ny, nz
-    real(8), intent(in)           :: Jacobian(ny), QJ(nx,ny,nz,5)
-    real(8), intent(inout)        :: entropy0
-    integer, intent(in), optional :: myrank
-    real(8) rho, u, v, w, p, entropy, t
+  subroutine print_entropy(step, nx, ny, nz, rho1d, p1d, entropy0, myrank)
+    integer, intent(in)                      :: step, nx, ny, nz
+    real(4), intent(in), dimension(nx*ny*nz) :: rho1d, p1d
+    real(4), intent(inout)                   :: entropy0
+    integer, intent(in), optional            :: myrank
+    real(4) entropy, t
     character(len=40) filename
-    integer i, j, k, accuracy, offset
+    integer i, j, k, l, accuracy, offset
     if (kind(id_accuracy) == 8) then
       accuracy = 6
       offset   = accuracy / 2
@@ -105,19 +50,14 @@ contains
       accuracy = 2
       offset   = accuracy / 2
     endif
-    entropy = 0.d0
+    entropy = 0.e0
     do k = 1+offset, nz-offset
       do j = 1+offset, ny-offset
         do i = 1+offset, nx-offset
-          rho     = Jacobian(j) * QJ(i,j,k,1)
-          u       = QJ(i,j,k,2) / QJ(i,j,k,1)
-          v       = QJ(i,j,k,3) / QJ(i,j,k,1)
-          w       = QJ(i,j,k,4) / QJ(i,j,k,1)
-          p       = (gamma - 1.d0) * (Jacobian(j) * QJ(i,j,k,5) - 0.5d0 * rho * (u**2 + v**2 + w**2))
-          entropy = entropy + rho * log(p * (rho**(-gamma)))
+          l = i + (j-1) * nx + (k-1) * nx * ny
+          entropy = entropy + rho1d(l) * log(p1d(l) * (rho1d(l)**(-gamma)))
     enddo;enddo;enddo
     entropy = entropy / dble((nx-accuracy) * (ny-accuracy) * (nz-accuracy))
-
     if (step == 0) then
       entropy0 = entropy
     endif
@@ -132,14 +72,14 @@ contains
     close(10)
   end subroutine print_entropy
 
-  subroutine print_KE(step,nx,ny,nz,Jacobian,QJ,ke0,myrank)
+  subroutine print_KE(step, nx, ny, nz, rho1d, v1d, ke0, myrank)
     integer, intent(in)           :: step, nx, ny, nz
-    real(8), intent(in)           :: Jacobian(ny), QJ(nx,ny,nz,5)
-    real(8), intent(inout)        :: ke0
+    real(4), intent(in)           :: rho1d(nx*ny*nz), v1d(nx*ny*nz*3)
+    real(4), intent(inout)        :: ke0
     integer, intent(in), optional :: myrank
-    real(8) ke, t
+    real(4) ke, t
     character(len=40) filename
-    integer i, j, k, accuracy, offset
+    integer i, j, k, l, m, accuracy, offset
     if (kind(id_accuracy) == 8) then
       accuracy = 6
       offset   = accuracy / 2
@@ -150,14 +90,15 @@ contains
       accuracy = 2
       offset   = accuracy / 2
     endif
-    ke = 0.d0
+    ke = 0.e0
     do k = 1+offset, nz-offset
       do j = 1+offset, ny-offset
         do i = 1+offset, nx-offset
-          ke = ke + 0.5d0 * (QJ(i,j,k,2)**2 + QJ(i,j,k,3)**2 + QJ(i,j,k,4)**2) / QJ(i,j,k,1) * Jacobian(j)
+          l  = i + (j-1) * nx + (k-1) * nx * ny
+          m  = 1 + (i-1) * 3 + (j-1) * 3 * nx + (k-1) * 3 * nx * ny 
+          ke = ke + 0.5d0 * rho1d(l) * (v1d(m)**2 + v1d(m+1)**2 + v1d(m+2)**2)
     enddo;enddo;enddo
     ke = ke / dble((nx-accuracy) * (ny-accuracy) * (nz-accuracy))
-
     if (step == 0) then
       ke0 = ke
     endif
@@ -171,44 +112,6 @@ contains
     write(10,"(3e12.4)") t, ke, ke / ke0
     close(10)
   end subroutine print_KE
-
-  subroutine print_enstrophy(step,nx,ny,nz,x,y,z,rho,omega,myrank)
-    integer, intent(in)                        :: step, nx, ny, nz
-    real(8), intent(in)                        :: x(nx), y(ny), z(nz)
-    real(8), intent(in), dimension(nx,ny,nz)   :: rho
-    real(8), intent(in), dimension(nx,ny,nz,3) :: omega
-    integer, intent(in), optional              :: myrank
-    real(8) enstrophy, t
-    character(len=40) filename
-    integer i, j, k, accuracy, offset
-    if (kind(id_accuracy) == 8) then
-      accuracy = 6
-      offset   = accuracy / 2
-    elseif (kind(id_accuracy) == 4) then
-      accuracy = 4
-      offset   = accuracy / 2
-    else
-      accuracy = 2
-      offset   = accuracy / 2
-    endif
-    t = nt * step * dt
-    enstrophy = 0.d0
-    do k = 1+offset, nz-offset
-      do j = 1+offset, ny-offset
-        do i = 1+offset, nx-offset
-          enstrophy = enstrophy + 0.5d0 * rho(i,j,k) * (omega(i,j,k,1)**2 + omega(i,j,k,2)**2 + omega(i,j,k,3)**2)
-    enddo;enddo;enddo
-    enstrophy = enstrophy / dble((nx-accuracy) * (ny-accuracy) * (nz-accuracy))
-
-    if (present(myrank)) then
-      write(filename, "(a, i0, a)") "data/",int(myrank),"/enstrophy.d"
-      open(10,file=filename, position="append")
-    else
-      open(10,file="data/enstrophy.d", position="append")
-    endif
-    write(10,"(2e12.4)") t, enstrophy
-    close(10)
-  end subroutine print_enstrophy
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -237,15 +140,14 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine print_xml(ni,nj,nk,dimension,x,y,z,rho1d,p1d,T1d,M1d,v1d,Q1d)
-    integer, intent(in)                                 :: ni, nj, nk, dimension
-    real(4), intent(in)                                 :: x(ni), y(nj), z(nk)
-    real(4), intent(in), dimension(ni*nj*nk)            :: rho1d, p1d, T1d, M1d
-    real(4), intent(in), dimension(dimension*ni*nj*nk)  :: v1d
-    real(4), intent(in), dimension(ni*nj*nk), optional  :: Q1d
-    integer(4) byte_x, byte_y, byte_z, byte_rho, byte_p, byte_T, byte_M, byte_v, byte_Q
+  subroutine print_xml(ni, nj, nk, dimension, x, y, z, rho1d, p1d, v1d)
+    integer, intent(in)                                :: ni, nj, nk, dimension
+    real(4), intent(in)                                :: x(ni), y(nj), z(nk)
+    real(4), intent(in), dimension(ni*nj*nk)           :: rho1d, p1d
+    real(4), intent(in), dimension(dimension*ni*nj*nk) :: v1d
+    integer(4) byte_x, byte_y, byte_z, byte_rho, byte_p, byte_v
     character :: lf*1, str1*4, str2*4, str3*4, str4*1
-    character :: offset1*12, offset2*12, offset3*12, offset4*12, offset5*12, offset6*12, offset7*12, offset8*12
+    character :: offset1*12, offset2*12, offset3*12, offset4*12, offset5*12
     lf = char(10)
     write(str1(1:4),'(i4)') ni-1
     write(str2(1:4),'(i4)') nj-1
@@ -256,10 +158,7 @@ contains
     byte_z   = 4 + 4 * nk
     byte_rho = 4 + 4 * (ni * nj * nk)
     byte_p   = byte_rho
-    byte_T   = byte_rho
-    byte_M   = byte_rho
     byte_v   = 4 + 4 * (dimension * ni * nj * nk)
-    byte_Q   = byte_rho
     write(offset1(1:12),'(i12)') int(byte_x, kind=8)
     write(offset2(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8)
     write(offset3(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8)
@@ -267,13 +166,6 @@ contains
                                  int(byte_rho, kind=8)
     write(offset5(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8) + &
                                  int(byte_rho, kind=8) + int(byte_p, kind=8)
-    write(offset6(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8) + &
-                                 int(byte_rho, kind=8) + int(byte_p, kind=8) + int(byte_T, kind=8)
-    write(offset7(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8) + &
-                                 int(byte_rho, kind=8) + int(byte_P, kind=8) + int(byte_T, kind=8) + int(byte_M, kind=8)
-    write(offset8(1:12),'(i12)') int(byte_x, kind=8) + int(byte_y, kind=8) + int(byte_z, kind=8) + int(byte_rho, kind=8) + &
-                                 int(byte_P, kind=8) + int(byte_T, kind=8) + int(byte_M, kind=8) + int(byte_v, kind=8)
-
     write(10) '<?xml version="1.0"?>'//lf
     write(10) '<VTKFile type="RectilinearGrid" version="1.0" byte_order="LittleEndian">'//lf
     write(10) '  <RectilinearGrid WholeExtent="0 '//str1//' 0 '//str2//' 0 '//str3//'">'//lf
@@ -289,26 +181,12 @@ contains
     write(10) '        <DataArray type="Float32" format="appended" offset="'//offset4//'"&
     & Name="p" NumberOfComponents="1"/>'//lf
     write(10) '        <DataArray type="Float32" format="appended" offset="'//offset5//'"&
-    & Name="T" NumberOfComponents="1"/>'//lf
-    write(10) '        <DataArray type="Float32" format="appended" offset="'//offset6//'"&
-    & Name="M" NumberOfComponents="1"/>'//lf
-    write(10) '        <DataArray type="Float32" format="appended" offset="'//offset7//'"&
     & Name="velocity" NumberOfComponents="'//str4//'"/>'//lf
-    if (present(Q1d)) then
-    write(10) '        <DataArray type="Float32" format="appended" offset="'//offset8//'"&
-    & Name="Qcriterion" NumberOfComponents="1"/>'//lf
-    endif
     write(10) '      </PointData>'//lf
     write(10) '    </Piece>'//lf
     write(10) '  </RectilinearGrid>'//lf
     write(10) '  <AppendedData encoding="raw">'//lf
-    if (present(Q1d)) then
-      write(10) '  _', byte_x, x, byte_y, y, byte_z, z,&
-      & byte_rho, rho1d, byte_p, p1d, byte_T, T1d, byte_M, M1d, byte_v, v1d, byte_Q, Q1d, lf
-    else
-      write(10) '  _', byte_x, x, byte_y, y, byte_z, z,&
-      & byte_rho, rho1d, byte_p, p1d, byte_T, T1d, byte_M, M1d, byte_v, v1d, lf
-    endif
+    write(10) '  _', byte_x, x, byte_y, y, byte_z, z, byte_rho, rho1d, byte_p, p1d, byte_v, v1d, lf
     write(10) '  </AppendedData>'//lf
     write(10) '</VTKFile>'//lf
     close(10)
@@ -316,53 +194,38 @@ contains
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  subroutine print_vtk_2D(step,nx,ny,x,y,Jacobian,QJ)
-    integer, intent(in) :: step, nx, ny
-    real(8), intent(in) :: x(nx), y(ny), Jacobian(ny)
-    real(8), intent(in) :: QJ(nx,ny,4)
-    integer i, j, l, m
-    real(8) :: rho, u, v, p, z(1) = 0.d0
-    real(4), dimension(nx*ny)   :: rho1d, p1d, T1d, M1d
-    real(4), dimension(2*nx*ny) :: v1d
-    character(len=40) filename
-    character :: lf*1
-    lf = char(10)
+  subroutine make_1d_for_print2(nx, ny, Jacobian, QJ, rho1d, p1d, v1d)
+    integer, intent(in)  :: nx, ny
+    real(8), intent(in)  :: Jacobian(ny), QJ(nx,ny,4) ! Q / Jacobian
+    real(4), intent(out), dimension(nx*ny)   :: rho1d, p1d
+    real(4), intent(out), dimension(nx*ny*3) :: v1d
+    real(8) rho, u, v, p
+    integer i, j, k, l, m
     l = 1
     m = 1
     do j = 1, ny
       do i = 1, nx
-        rho = Jacobian(j) * QJ(i,j,1)
-        u   = QJ(i,j,2) / QJ(i,j,1)
-        v   = QJ(i,j,3) / QJ(i,j,1)
-        p   = (gamma - 1.d0) * (Jacobian(j) * QJ(i,j,4) - 0.5d0 * rho * (u**2 + v**2))
+        rho      = Jacobian(j) * QJ(i,j,1)
+        u        = QJ(i,j,2) / QJ(i,j,1)
+        v        = QJ(i,j,3) / QJ(i,j,1)
+        p        = (gamma - 1.d0) * (Jacobian(j) * QJ(i,j,4) - 0.5d0 * rho * (u**2 + v**2))
         rho1d(l) = real(rho)
         p1d(l)   = real(p)
-        T1d(l)   = real(p / (R * rho))
         v1d(m)   = real(u)
         v1d(m+1) = real(v)
-        M1d(l)   = real(sqrt(u**2 + v**2) / sqrt(gamma * p / rho))
+        v1d(m+2) = 0.e0
         l = l + 1
-        m = m + 2
+        m = m + 3
     enddo;enddo
+  end subroutine make_1d_for_print2
 
-    write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtr"
-    open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
-    call print_xml(nx,ny,1,2,real(x),real(y),real(z),rho1d,p1d,T1d,M1d,v1d)
-  end subroutine print_vtk_2D
-  
-  subroutine print_vtk_3D(step,nx,ny,nz,myrank,nranks,x,y,z,Jacobian,QJ,ke0,entropy0)
-    integer, intent(in)    :: step, nx, ny, nz, myrank, nranks
-    real(8), intent(in)    :: x(nx), y(ny), z(nz), Jacobian(ny)
-    real(8), intent(in)    :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(inout) :: ke0, entropy0
-    integer i, j, k, l, m, len, ierr
+  subroutine make_1d_for_print3(nx, ny, nz, Jacobian, QJ, rho1d, p1d, v1d)
+    integer, intent(in)  :: nx, ny, nz
+    real(8), intent(in)  :: Jacobian(ny), QJ(nx,ny,nz,5) ! Q / Jacobian
+    real(4), intent(out), dimension(nx*ny*nz)   :: rho1d, p1d
+    real(4), intent(out), dimension(nx*ny*nz*3) :: v1d
     real(8) rho, u, v, w, p
-    real(4), allocatable :: rho1d(:), p1d(:), T1d(:), M1d(:), v1d(:)
-    character(len=40) filename
-    character :: lf*1
-    lf = char(10)
-    len = nx * ny * nz
-    allocate(rho1d(len),p1d(len),T1d(len),M1d(len),v1d(3*len))
+    integer i, j, k, l, m
     l = 1
     m = 1
     do k = 1, nz
@@ -375,30 +238,89 @@ contains
           p        = (gamma - 1.d0) * (Jacobian(j) * QJ(i,j,k,5) - 0.5d0 * rho * (u**2 + v**2 + w**2))
           rho1d(l) = real(rho)
           p1d(l)   = real(p)
-          T1d(l)   = real(p / (R * rho))
           v1d(m)   = real(u)
           v1d(m+1) = real(v)
           v1d(m+2) = real(w)
-          M1d(l)   = real(sqrt(u**2 + v**2 + w**2) / sqrt(gamma * p / rho))
           l = l + 1
           m = m + 3
     enddo;enddo;enddo
+  end subroutine make_1d_for_print3
 
+  subroutine send_recv_for_print2(myrank, nranks, step, nx, ny, x, y, Jacobian_cpu, QJ, Q)
+    integer, intent(in)         :: myrank, nranks, step, nx, ny
+    real(8), intent(in)         :: x(nx), y(ny), Jacobian_cpu(ny)
+    real(8), intent(in), device :: QJ(nx,ny,4)
+    real(8), intent(inout)      :: Q(nx,ny,4)
+    integer ireq3(3), istat3(MPI_STATUS_SIZE,3), ierr
+    real(4) rho1d(nx*ny), p1d(nx*ny), v1d(nx*ny*3)
+    if (mod(myrank,2) == 0) then
+      Q = QJ
+      call make_1d_for_print(nx, ny, Jacobian_cpu, Q, rho1d, p1d, v1d)
+      call MPI_ISEND(rho1d, nx*ny,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(1), ierr) 
+      call MPI_ISEND(p1d,   nx*ny,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(2), ierr) 
+      call MPI_ISEND(v1d,   nx*ny*3, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(3), ierr) 
+      call MPI_WAITALL(3, ireq3, istat3, ierr)
+    else
+      call MPI_IRECV(rho1d, nx*ny,   MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(1), ierr)
+      call MPI_IRECV(p1d,   nx*ny,   MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(2), ierr)
+      call MPI_IRECV(v1d,   nx*ny*3, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(3), ierr)
+      call MPI_WAITALL(3, ireq3, istat3, ierr)
+      call print_vtk(step, nx, ny, x, y, rho1d, p1d, v1d)
+    endif
+  end subroutine send_recv_for_print2
+
+  subroutine send_recv_for_print3(myrank, nranks, step, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
+    integer, intent(in)         :: myrank, nranks, step, nx, ny, nz
+    real(8), intent(in)         :: x(nx), y(ny), z(nz), Jacobian_cpu(ny)
+    real(8), intent(in), device :: QJ(nx,ny,nz,5)
+    real(8), intent(inout)      :: Q(nx,ny,nz,5)
+    real(4), intent(inout)      :: ke0, entropy0
+    integer ireq3(3), istat3(MPI_STATUS_SIZE,3), ierr
+    real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
+    if (mod(myrank,2) == 0) then
+      Q = QJ
+      call make_1d_for_print(nx, ny, nz, Jacobian_cpu, Q, rho1d, p1d, v1d)
+      call MPI_ISEND(rho1d, nx*ny*nz,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(1), ierr) 
+      call MPI_ISEND(p1d,   nx*ny*nz,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(2), ierr) 
+      call MPI_ISEND(v1d,   nx*ny*nz*3, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(3), ierr) 
+      call MPI_WAITALL(3, ireq3, istat3, ierr)
+    else
+      call MPI_IRECV(rho1d, nx*ny*nz,   MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(1), ierr)
+      call MPI_IRECV(p1d,   nx*ny*nz,   MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(2), ierr)
+      call MPI_IRECV(v1d,   nx*ny*nz*3, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(3), ierr)
+      call MPI_WAITALL(3, ireq3, istat3, ierr)
+      call print_vtk(step, nx, ny, nz, myrank, nranks, x, y, z, rho1d, p1d, v1d, ke0, entropy0)
+    endif
+  end subroutine send_recv_for_print3
+
+  subroutine print_vtk_2D(step, nx, ny, x, y, rho1d, p1d, v1d)
+    integer, intent(in) :: step, nx, ny
+    real(8), intent(in) :: x(nx), y(ny)
+    real(4), intent(in) :: rho1d(nx*ny), p1d(nx*ny), v1d(nx*ny*3)
+    real(8) :: z(1) = 0.d0
+    character(len=40) filename
+    write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtr"
+    open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
+    call print_xml(nx, ny, 1, 3, real(x), real(y), real(z), rho1d, p1d, v1d)
+  end subroutine print_vtk_2D
+  
+  subroutine print_vtk_3D(step, nx, ny, nz, myrank, nranks, x, y, z, rho1d, p1d, v1d, ke0, entropy0)
+    integer, intent(in)    :: step, nx, ny, nz, myrank, nranks
+    real(8), intent(in)    :: x(nx), y(ny), z(nz)
+    real(4), intent(in)    :: rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
+    real(4), intent(inout) :: ke0, entropy0
+    character(len=40) filename
     if (nranks >= 4) then
-      call print_entropy(step,nx,ny,nz,Jacobian,QJ,entropy0,myrank)
-      call print_KE(step,nx,ny,nz,Jacobian,QJ,ke0,myrank)
-      !call print_enstrophy(step,nx,ny,nz,x,y,z,rho,omega,myrank)
+      call print_entropy(step, nx, ny, nz, rho1d, p1d, entropy0, myrank)
+      call print_KE(step, nx, ny, nz, rho1d, v1d, ke0, myrank)
       write(filename, "(a, i0, a, i5.5, a)") "data/",int(myrank),"/Q",int(step+step_offset),".vtr"
     else
-      call print_entropy(step,nx,ny,nz,Jacobian,QJ,entropy0)
-      call print_KE(step,nx,ny,nz,Jacobian,QJ,ke0)
-      !call print_enstrophy(step,nx,ny,nz,x,y,z,rho,omega)
+      call print_entropy(step, nx, ny, nz, rho1d, p1d, entropy0)
+      call print_KE(step, nx, ny, nz, rho1d, v1d, ke0)
       write(filename, "(a, i5.5, a)") "data/Q",int(step+step_offset),".vtr"
     endif
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
-    call print_xml(nx,ny,nz,3,real(x),real(y),real(z),rho1d,p1d,T1d,M1d,v1d)
-
-    deallocate(rho1d,p1d,T1d,M1d,v1d)
+    call print_xml(nx, ny, nz, 3, real(x), real(y), real(z), rho1d, p1d, v1d)
   end subroutine print_vtk_3D
 end module print
 

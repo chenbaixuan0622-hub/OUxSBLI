@@ -1,24 +1,33 @@
 module calc_hybrid
   use cudafor
-  use mod_globals, only : accuracy, offset, nx, ny, dxi, dyi
+  use mod_globals, only : accuracy, offset, gamma
   implicit none
 contains
-  attributes(global) subroutine calc_Ducros(u,v,fd)
-    real(8), intent(in), dimension(nx,ny), device :: u, v
+  attributes(global) subroutine calc_Ducros(nx, ny, dx, dy, u, v, fd)
+    integer, intent(in), value                     :: nx, ny
+    real(8), intent(in), dimension(nx-1), device   :: dx ! 1 / dx
+    real(8), intent(in), dimension(ny-1), device   :: dy ! 1 / dy
+    real(8), intent(in), dimension(nx,ny), device  :: u, v
     real(8), intent(out), dimension(nx,ny), device :: fd
-    real(8) dudx, dudy, dvdx, dvdy
-    real(8) div, rot
-    real(8) :: eps = 1.d-16
     integer i, j
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
+    real(8) dudx, dudy, dvdx, dvdy 
+    real(8) div, rot
+    real(8) dx_tmp, dy_tmp
+    real(8) :: eps = 1.d-16
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1 
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
-    dudx = 0.5d0 * (-u(i-1,j) + u(i+1,j)) * dxi
-    dvdx = 0.5d0 * (-v(i-1,j) + v(i+1,j)) * dxi
-    dudy = 0.5d0 * (-u(i,j-1) + u(i,j+1)) * dyi
-    dvdy = 0.5d0 * (-v(i,j-1) + v(i,j+1)) * dyi
-    div = dudx + dvdy
-    rot = dvdx - dudy
+    dx_tmp = 0.25d0 * (dx(i-1) + dx(i))
+    dy_tmp = 0.25d0 * (dy(j-1) + dy(j))
+    dudx = (-u(i-1,j) + u(i+1,j)) * dx_tmp
+    dvdx = (-v(i-1,j) + v(i+1,j)) * dx_tmp
+    dudy = (-u(i,j-1) + u(i,j+1)) * dy_tmp
+    dvdy = (-v(i,j-1) + v(i,j+1)) * dy_tmp
+    div  = dudx + dvdy
+    rot  = dvdx - dudy
     fd(i,j) = (div**2) / (div**2 + rot**2 + eps)
+
+    fd(i,j) = min(1.d0, fd(i,j))
+
     ! boundary
     ! x direction
     if (i == 2) then
@@ -33,6 +42,17 @@ contains
       fd(i,ny) = fd(i,ny-1)
     endif
   end subroutine calc_Ducros
+
+  attributes(device) function Albada(e, rho) result(phi)
+    real(8), intent(in), dimension(4), device :: e, rho
+    real(8) :: d1, d2, d3, phim, phip, phi, eps = 1.d-16
+    d1   = -e(1) / rho(1) + e(2) / rho(2)
+    d2   = -e(2) / rho(2) + e(3) / rho(3)
+    d3   = -e(3) / rho(3) + e(4) / rho(4)
+    phip = (d2 * d1 + d1**2) / (d2**2 + d1**2 + eps)
+    phim = (d2 * d3 + d3**2) / (d2**2 + d3**2 + eps)
+    phi  = max(min(1.d0 - min(phim, phip), 1.d0), 0.d0)
+  end function Albada
 
   attributes(device) function sigmoid(x) result(ans)
     real(8), intent(in), value :: x

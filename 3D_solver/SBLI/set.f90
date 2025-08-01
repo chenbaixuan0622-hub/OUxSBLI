@@ -12,34 +12,34 @@ contains
     type(dim3), intent(out) :: threadsE, threadsF, threadsG, threadsEv, threadsFv, threadsGv, threads
     if (myrank == 0) then
       blocksE   = dim3((nx-accuracy+1)/64,(ny-accuracy)/1,(nz-accuracy)/1)
-      blocksF   = dim3((nx-accuracy)/1,(ny-accuracy+1)/32,(nz-accuracy)/1)
-      blocksG   = dim3((nx-accuracy)/1,(ny-accuracy)/1,(nz-accuracy+1)/64)
+      blocksF   = dim3((nx-accuracy)/7,(ny-accuracy+1)/8,(nz-accuracy)/1)
+      blocksG   = dim3((nx-accuracy)/7,(ny-accuracy)/1,(nz-accuracy+1)/8)
       blocksEv  = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
-      blocksFv  = dim3((nx-accuracy)/1,(ny-accuracy+1)/32,(nz-accuracy)/1)
-      blocksGv  = dim3((nx-accuracy)/1,(ny-accuracy)/1,(nz-accuracy+1)/32)
-      blocks    = dim3((nx-accuracy)/1,(ny-accuracy)/159,(nz-accuracy)/1)
+      blocksFv  = dim3((nx-accuracy)/7,(ny-accuracy+1)/8,(nz-accuracy)/1)
+      blocksGv  = dim3((nx-accuracy)/7,(ny-accuracy)/1,(nz-accuracy+1)/8)
+      blocks    = dim3((nx-accuracy)/73,(ny-accuracy)/1,(nz-accuracy)/1)
       threadsE  = dim3(64,1,1)
-      threadsF  = dim3(1,32,1)
-      threadsG  = dim3(1,1,64)
+      threadsF  = dim3(7,8,1)
+      threadsG  = dim3(7,1,8)
       threadsEv = dim3(32,1,1)
-      threadsFv = dim3(1,32,1)
-      threadsGv = dim3(1,1,32)
-      threads   = dim3(1,159,1)
+      threadsFv = dim3(7,8,1)
+      threadsGv = dim3(7,1,8)
+      threads   = dim3(73,1,1)
     elseif (myrank == 2) then
       blocksE   = dim3((nx-accuracy+1)/64,(ny-accuracy)/1,(nz-accuracy)/1)
-      blocksF   = dim3((nx-accuracy)/1,(ny-accuracy+1)/32,(nz-accuracy)/1)
-      blocksG   = dim3((nx-accuracy)/1,(ny-accuracy)/1,(nz-accuracy+1)/64)
+      blocksF   = dim3((nx-accuracy)/179,(ny-accuracy+1)/1,(nz-accuracy)/1)
+      blocksG   = dim3((nx-accuracy)/179,(ny-accuracy)/1,(nz-accuracy+1)/1)
       blocksEv  = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
-      blocksFv  = dim3((nx-accuracy)/1,(ny-accuracy+1)/32,(nz-accuracy)/1)
-      blocksGv  = dim3((nx-accuracy)/1,(ny-accuracy)/1,(nz-accuracy+1)/32)
-      blocks    = dim3((nx-accuracy)/1,(ny-accuracy)/255,(nz-accuracy)/1)
+      blocksFv  = dim3((nx-accuracy)/179,(ny-accuracy+1)/1,(nz-accuracy)/1)
+      blocksGv  = dim3((nx-accuracy)/179,(ny-accuracy)/1,(nz-accuracy+1)/1)
+      blocks    = dim3((nx-accuracy)/179,(ny-accuracy)/1,(nz-accuracy)/1)
       threadsE  = dim3(64,1,1)
-      threadsF  = dim3(1,32,1)
-      threadsG  = dim3(1,1,64)
+      threadsF  = dim3(179,1,1)
+      threadsG  = dim3(179,1,1)
       threadsEv = dim3(32,1,1)
-      threadsFv = dim3(1,32,1)
-      threadsGv = dim3(1,1,32)
-      threads   = dim3(1,255,1)
+      threadsFv = dim3(179,1,1)
+      threadsGv = dim3(179,1,1)
+      threads   = dim3(179,1,1)
     endif
   end subroutine set_block_thread
 
@@ -64,9 +64,9 @@ contains
     enddo
 
     y(1) = 0.d0
-    do j = 1, ny
+    do j = 1, ny-1
       if (y(j) <= 3.d0 * blt) then
-        dy(j) = min(1.d0, max(0.05d0, dble(j)/dble(128))) * dy1
+        dy(j) = min(1.d0, max(0.07d0, dble(j)/dble(128))) * dy1
       elseif (3.d0 * blt <= y(j) .and. y(j) <= 8.d0 * blt) then
         dy(j) = 1.5d0 * dy1
       else
@@ -74,6 +74,7 @@ contains
       endif
       y(j+1) = y(j) + dy(j)
     enddo
+    print *, y(ny)
 
     z(1) = 0.d0
     do k = 1, nz-1
@@ -130,7 +131,7 @@ contains
             ustd = 0.2d0 * u0 * randum(ir,jr,kr,1)
             vstd = 0.1d0 * u0 * randum(ir,jr,kr,2)
             wstd = 0.1d0 * u0 * randum(ir,jr,kr,3)
-            Tstd = T0 * (gamma - 1.d0) * M0**2 * 0.2d0 * randum(ir,jr,kr,4)
+            Tstd = T0 * (gamma - 1.d0) * M0**2 * randum(ir,jr,kr,4) * 0.1d0!0.2d0
           else
             ustd = 0.d0
             vstd = 0.d0
@@ -165,8 +166,9 @@ contains
     real(8), intent(in), device    :: Jacobian(ny)
     real(8), intent(inout), device :: QJ(nx,ny,nz,5) ! Q / Jacobian
     real(8), intent(in), device    :: Qre(ny*(nz-6)*5)
-    integer i, j, k, l, No, ierr, istat(MPI_STATUS_SIZE)
+    integer i, j, k, l, No, ireq, ierr, istat(MPI_STATUS_SIZE)
     real(8) :: Cp = gamma * R / (gamma - 1.d0), rf = 0.89d0
+    real(8) :: over_gamma_1 = 1.d0 / (gamma - 1.d0)
     real(8) :: p_wall
     ! Riemann invariants
     real(8) :: rhoin, pin, cin, vin, Rp, Rm, rhob, ub, vb, cb, pb
@@ -174,9 +176,11 @@ contains
     ! parallel
     real(8), device :: Q1d(3*(ny1-2)*(nz-6)*5)
     real(8) Q_cpu(3*(ny1-2)*(nz-6)*5)
+    ! cache
+    real(8) Jacobian_tmp
     ! temperature and density at top
     Taw  = T0 * (1.d0 + rf * 0.5d0 * (gamma - 1.d0) * M0**2)
-    T    = Taw - rf * u0**2 / (2.d0 * (gamma * R / (gamma - 1.d0)))
+    T    = Taw - rf * u0**2 / (2.d0 * (gamma * R * over_gamma_1))
     rho0 = p0 / (R * T)
     c0   = sqrt(gamma * p0 / rho0)
 
@@ -207,22 +211,24 @@ contains
         enddo;enddo;enddo
       endif
       call flatten_rescale(nx, ny1, nz, nre2, 3, QJ, Q1d)
-      Q_cpu = Q1d
-      call MPI_SEND(Q_cpu, 5*3*(ny1-2)*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ierr)
+      !Q_cpu = Q1d ! This is safe but very slow
+      call MPI_ISEND(Q1d, 5*3*(ny1-2)*(nz-6), MPI_REAL8, myrank+2, 0, MPI_COMM_WORLD, ireq, ierr)
     else
-      call MPI_RECV(Q_cpu, 5*3*(ny1-2)*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, istat, ierr)
-      Q1d = Q_cpu
+      call MPI_IRECV(Q1d, 5*3*(ny1-2)*(nz-6), MPI_REAL8, myrank-2, 0, MPI_COMM_WORLD, ireq, ierr)
+      call MPI_WAIT(ireq, istat, ierr)
+      !Q1d = Q_cpu ! This is safe but very slow
       ! inlet boundary layer
       call reconstruct_sbli_inlet(nx, ny1, ny, nz, 3, Q1d, QJ)
       !$cuf kernel do(2)<<<*,*>>>
       do k = 4, nz-3
         do j = ny1-1, ny-1
-          ! inlet mean flow
-          QJ(1,j,k,1) = rho0 / Jacobian(j)
-          QJ(1,j,k,2) = rho0 * u0 / Jacobian(j)
+          ! inlet free stream flow
+          Jacobian_tmp = 1.d0 / Jacobian(j)
+          QJ(1,j,k,1) = rho0 * Jacobian_tmp
+          QJ(1,j,k,2) = rho0 * u0 * Jacobian_tmp
           QJ(1,j,k,3) = 0.d0
           QJ(1,j,k,4) = 0.d0
-          QJ(1,j,k,5) = (p0 / (gamma - 1.d0) + 0.5d0 * rho0 * u0**2) / Jacobian(j)
+          QJ(1,j,k,5) = (p0 * over_gamma_1 + 0.5d0 * rho0 * u0**2) * Jacobian_tmp
       enddo;enddo
       !$cuf kernel do(3)<<<*,*>>>
       do l = 1, 5
@@ -233,6 +239,7 @@ contains
       enddo;enddo;enddo
     endif
 
+    Jacobian_tmp = 1.d0 / Jacobian(ny)
     !$cuf kernel do(2)<<<*,*>>>
     do k = 4, nz-3
       do i = 1, nx
@@ -243,36 +250,36 @@ contains
         rhoin = QJ(i,ny-1,k,1) * Jacobian(ny-1)
         cin   = sqrt(gamma * pin / rhoin)
         vin   = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
-        Rp    = vin + 2.d0 * cin / (gamma - 1.d0)
-        Rm    = v0  - 2.d0 * c0  / (gamma - 1.d0)
+        Rp    = vin + 2.d0 * cin * over_gamma_1
+        Rm    = v0  - 2.d0 * c0  * over_gamma_1
         vb    = 0.5d0 * (Rp + Rm)
         cb    = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
-        rhob  = (cb / c0)**(2.d0 / (gamma - 1.d0)) * rho0
+        rhob  = (cb / c0)**(2.d0 * over_gamma_1) * rho0
         pb    = (rhob * cb**2) / gamma
-        QJ(i,ny,k,1) = rhob / Jacobian(ny)
-        QJ(i,ny,k,2) = rhob * u0 / Jacobian(ny)
-        QJ(i,ny,k,3) = rhob * vb / Jacobian(ny)
+        QJ(i,ny,k,1) = rhob * Jacobian_tmp
+        QJ(i,ny,k,2) = rhob * u0 * Jacobian_tmp
+        QJ(i,ny,k,3) = rhob * vb * Jacobian_tmp
         QJ(i,ny,k,4) = 0.d0
-        QJ(i,ny,k,5) = (pb / (gamma - 1.d0) + 0.5d0 * rhob * (u0**2 + vb**2)) / Jacobian(ny)
+        QJ(i,ny,k,5) = (pb * over_gamma_1 + 0.5d0 * rhob * (u0**2 + vb**2)) * Jacobian_tmp
         ! NoSlip
         QJ(i,1,k,1) = QJ(i,2,k,1)
         QJ(i,1,k,2) = 0.d0
         QJ(i,1,k,3) = 0.d0
         QJ(i,1,k,4) = 0.d0
         p_wall = (gamma - 1.d0) * (QJ(i,2,k,5) - 0.5d0 * (QJ(i,2,k,2)**2 + QJ(i,2,k,3)**2 + QJ(i,2,k,4)**2) / QJ(i,2,k,1))
-        QJ(i,1,k,5) = p_wall / (gamma - 1.d0)
+        QJ(i,1,k,5) = p_wall * over_gamma_1
     enddo;enddo
 
     if (myrank == 2) then
-      No = int(0.1 * nx)
+      No = int(dble(nx) * 0.33d0 / 35.d0)
       !$cuf kernel do(2)<<<*,*>>>
       do k = 1, nz
         do i = No, nx/2
-          QJ(i,ny,k,1) = rho2 / Jacobian(ny)
-          QJ(i,ny,k,2) = rho2 * ux / Jacobian(ny)
-          QJ(i,ny,k,3) = rho2 * uy / Jacobian(ny)
+          QJ(i,ny,k,1) = rho2 * Jacobian_tmp
+          QJ(i,ny,k,2) = rho2 * ux * Jacobian_tmp
+          QJ(i,ny,k,3) = rho2 * uy * Jacobian_tmp
           QJ(i,ny,k,4) = 0.d0
-          QJ(i,ny,k,5) = (p2 / (gamma - 1.d0) + 0.5d0 * rho2 * (ux**2 + uy**2)) / Jacobian(ny)
+          QJ(i,ny,k,5) = (p2 * over_gamma_1 + 0.5d0 * rho2 * (ux**2 + uy**2)) * Jacobian_tmp
       enddo;enddo
       !$cuf kernel do(2)<<<*,*>>>
       do k = 1, nz
@@ -283,18 +290,18 @@ contains
           cin   = sqrt(gamma * pin / rhoin)
           vin   = QJ(i,ny-1,k,3) / QJ(i,ny-1,k,1)
           c0    = sqrt(gamma * p2 / rho2)
-          Rp    = vin + 2.d0 * cin / (gamma - 1.d0)
-          Rm    = uy  - 2.d0 * c0  / (gamma - 1.d0)
+          Rp    = vin + 2.d0 * cin * over_gamma_1
+          Rm    = uy  - 2.d0 * c0  * over_gamma_1
           vb    = 0.5d0 * (Rp + Rm)
           cb    = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
           rhob  = cin * rhoin / cb
           pb    = (rhob * cb**2) / gamma
-          ub    = sqrt(2.d0 * gamma * (p2 / rho2 - pb / rhob) / (gamma - 1.d0) + ux**2 + uy**2 - vb**2)
-          QJ(i,ny,k,1) = rhob / Jacobian(ny)
-          QJ(i,ny,k,2) = rhob * ub / Jacobian(ny)
-          QJ(i,ny,k,3) = rhob * vb / Jacobian(ny)
+          ub    = sqrt(2.d0 * gamma * (p2 / rho2 - pb / rhob) * over_gamma_1 + ux**2 + uy**2 - vb**2)
+          QJ(i,ny,k,1) = rhob * Jacobian_tmp
+          QJ(i,ny,k,2) = rhob * ub * Jacobian_tmp
+          QJ(i,ny,k,3) = rhob * vb * Jacobian_tmp
           QJ(i,ny,k,4) = 0.d0
-          QJ(i,ny,k,5) = (pb / (gamma - 1.d0) + 0.5d0 * rhob * (ub**2 + vb**2)) / Jacobian(ny)
+          QJ(i,ny,k,5) = (pb * over_gamma_1 + 0.5d0 * rhob * (ub**2 + vb**2)) * Jacobian_tmp
       enddo;enddo
     endif
 
@@ -310,6 +317,10 @@ contains
           QJ(i,j,nz-1,l) = QJ(i,j,5,l)
           QJ(i,j,nz,l)   = QJ(i,j,6,l)
     enddo;enddo;enddo
+
+    if (myrank == 0) then
+      call MPI_WAIT(ireq, istat, ierr)
+    endif
   end subroutine set_bc
 
   subroutine set_bc_mut(nx,ny,nz,mut,qc2)
@@ -356,5 +367,14 @@ contains
         qc2(i,j,nz)   = qc2(i,j,6)
     enddo;enddo
   end subroutine set_bc_mut
+  
+  subroutine calc_forcing(nx, ny, nz, dx, dy, dz, rho, u, v, w, p, fx, fy, fz)
+    integer, intent(in), value   :: nx, ny, nz
+    real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
+    real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
+    real(8), intent(in), device  :: dz(nz-1) ! 1 / dz
+    real(8), intent(in), device  :: rho(nx,ny,nz), u(nx,ny,nz), v(nx,ny,nz), w(nx,ny,nz), p(nx,ny,nz)
+    real(8), intent(out), device :: fx(nx-2,ny-2,nz-2,5), fy(nx-2,ny-2,nz-2,5), fz(nx-2,ny-2,nz-2,5)
+  end subroutine calc_forcing
 end module set
 

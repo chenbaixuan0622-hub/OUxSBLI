@@ -38,7 +38,6 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_slau     ! kind2 SLAU          !
   !             ! kind4 HR-SLAU2      !
-  !             ! kind8 VHR-SLAU2     !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! slau_wall   ! kind2 off           !
   !             ! kind4 on            !
@@ -52,11 +51,18 @@ module mod_globals
   integer(kind=2), parameter :: id_accuracy = 0
   integer(kind=2), parameter :: id_tvd      = 0
   integer(kind=2), parameter :: id_keep     = 0
-  integer(kind=2), parameter :: id_slau     = 0
+  integer(kind=4), parameter :: id_slau     = 0
   integer(kind=2), parameter :: slau_wall   = 0
   integer(kind=2), parameter :: id_rescale  = 0
   real(8), parameter         :: blt         = 0.d0
 
+  ! exchange
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_exchange ! kind2 off !
+  !             ! kind4 on  !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!
+  integer(kind=2), parameter :: id_exchange = 0
+  integer(kind=2), parameter :: id_forcing  = 0
   ! mesh
   real(8), parameter :: pi = acos(-1.d0)
   real(8), parameter :: Lx = 2.d0 * pi
@@ -105,7 +111,7 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_RungeKutta ! kind=2 ! 3rd_TVD !
   !               ! kind=4 ! 4th     !
-  !               ! kind=8 ! 10step  !
+  !               ! kind=8 ! Gauss   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_recal      ! kind=2 ! set 0   !
   !               ! kind=4 ! recal   !
@@ -115,7 +121,7 @@ module mod_globals
   integer, parameter          :: step_offset = 0
   integer, parameter          :: start_rescale = 0
   integer, parameter          :: nt = 200!1
-  integer, parameter          :: np = 10!200
+  integer, parameter          :: np = 50!200
   real(8), parameter          :: dt = 0.01d0!0.02d0
 
   ! physical properties

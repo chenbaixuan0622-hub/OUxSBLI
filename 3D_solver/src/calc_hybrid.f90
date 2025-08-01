@@ -13,19 +13,23 @@ contains
     integer i, j, k
     real(8) dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz
     real(8) div, rot(3)
+    real(8) dx_tmp, dy_tmp, dz_tmp
     real(8) :: eps = 1.d-16
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1 
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
-    dudx = (-u(i-1,j,k) + u(i+1,j,k)) * 0.25d0 * (dx(i-1) + dx(i))
-    dvdx = (-v(i-1,j,k) + v(i+1,j,k)) * 0.25d0 * (dx(i-1) + dx(i))
-    dwdx = (-w(i-1,j,k) + w(i+1,j,k)) * 0.25d0 * (dx(i-1) + dx(i))
-    dudy = (-u(i,j-1,k) + u(i,j+1,k)) * 0.25d0 * (dy(j-1) + dy(j))
-    dvdy = (-v(i,j-1,k) + v(i,j+1,k)) * 0.25d0 * (dy(j-1) + dy(j))
-    dwdy = (-w(i,j-1,k) + w(i,j+1,k)) * 0.25d0 * (dy(j-1) + dy(j))
-    dudz = (-u(i,j,k-1) + u(i,j,k+1)) * 0.25d0 * (dz(k-1) + dz(k))
-    dvdz = (-v(i,j,k-1) + v(i,j,k+1)) * 0.25d0 * (dz(k-1) + dz(k))
-    dwdz = (-w(i,j,k-1) + w(i,j,k+1)) * 0.25d0 * (dz(k-1) + dz(k))
+    dx_tmp = 0.25d0 * (dx(i-1) + dx(i))
+    dy_tmp = 0.25d0 * (dy(j-1) + dy(j))
+    dz_tmp = 0.25d0 * (dz(k-1) + dz(k))
+    dudx = (-u(i-1,j,k) + u(i+1,j,k)) * dx_tmp
+    dvdx = (-v(i-1,j,k) + v(i+1,j,k)) * dx_tmp
+    dwdx = (-w(i-1,j,k) + w(i+1,j,k)) * dx_tmp
+    dudy = (-u(i,j-1,k) + u(i,j+1,k)) * dy_tmp
+    dvdy = (-v(i,j-1,k) + v(i,j+1,k)) * dy_tmp
+    dwdy = (-w(i,j-1,k) + w(i,j+1,k)) * dy_tmp
+    dudz = (-u(i,j,k-1) + u(i,j,k+1)) * dz_tmp
+    dvdz = (-v(i,j,k-1) + v(i,j,k+1)) * dz_tmp
+    dwdz = (-w(i,j,k-1) + w(i,j,k+1)) * dz_tmp
     div = dudx + dvdy + dwdz
     rot(1) = dwdy - dvdz
     rot(2) = dudz - dwdx

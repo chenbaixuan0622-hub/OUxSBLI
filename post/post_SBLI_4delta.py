@@ -18,19 +18,14 @@ from mod.mod_plot import print_scalar
 #set_Params()
 
 # parameter
-Q_dir = "../../SBLI/SBLI_4delta/2.2ms"
-Lx1   = 25.e-3
-Lx2   = 37.e-3
-Ly1   = 0.e-3
-Ly2   = 8.e-3
-Lz1   = 0.e-3 
-Lz2   = 8.e-3
-endT  = 1.e-3
+Q_dir = "../../SBLI_Re1400_5delta"
+blt   = 1.e-3
+endT  = 0.5e-3
 # wall unit
-rhow  = 0.1886e0
-ut    = 23.33e0
-mu    = 1.74e-5
-nu    = mu / rhow
+rhow = 0.1874e0
+ut   = 24.86e0
+mu   = 1.753e-5
+nu   = mu / rhow
 
 
 def set_range(dir, files, Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, ut=None, nu=None):
@@ -90,6 +85,7 @@ def make_data(Q_dir, Lx1, Lx2, Ly1, Ly2, Lz1, Lz2):
     file_path = os.path.join(Q_dir, file)
     if file_path == os.path.join(Q_dir, "TKE.vtr") \
     or file_path == os.path.join(Q_dir, "ReynoldsStress.vtr") \
+    or file_path == os.path.join(Q_dir, "Qrms.vtr") \
     or file_path == os.path.join(Q_dir, "Qmean.vtr"):
       continue
     U, _, _   = getVector(file_path, Nx, Ny, Nz, 'velocity')
@@ -113,7 +109,18 @@ def calc_POD(dir, name, endT, num_modes, Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, ut=None, 
   D  = np.zeros(((nx2-nx1)*(ny2-ny1)*(nz2-nz1), Nt), dtype=np.float32)
   for itr, file in tqdm(enumerate(files)):
     file_path = os.path.join(dir, file)
-    p = getScalar(file_path, Nx, Ny, Nz, name)
+    if file_path == os.path.join(Q_dir, "Qmean.vtr") \
+    or file_path == os.path.join(Q_dir, "Qrms.vtr") \
+    or file_path == os.path.join(Q_dir, "TKE.vtr") \
+    or file_path == os.path.join(Q_dir, "ReynoldsStress.vtr"):
+      continue
+    #p = getScalar(file_path, Nx, Ny, Nz, name)
+    #p, _, _ = getVector(file_path, Nx, Ny, Nz, name)
+    u, v, w = getVector(file_path, Nx, Ny, Nz, name)
+    uf = u - Um
+    vf = v - Vm
+    wf = w - Wm
+    p  = 0.5e0 * (uf**2 + vf**2 + wf**2)
     D[:,itr] = p[nz1:nz2,ny1:ny2,nx1:nx2].flatten()
   # separation
   #D = np.minimum(D, 0.e0)
@@ -130,56 +137,100 @@ def calc_POD(dir, name, endT, num_modes, Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, ut=None, 
 
 
 def calc_causality_POD(p_dir, u_dir, endT, num_modes):
-  path_p_down = os.path.join(p_dir, "POD_down",       "POD_time_coef.npy")
-  path_p_up   = os.path.join(p_dir, "POD_up",         "POD_time_coef.npy")
-  path_sepa   = os.path.join(u_dir, "POD_separation", "POD_time_coef.npy")
-  path_u_visc = os.path.join(u_dir, "POD_visc",       "POD_time_coef.npy")
-  path_u_buf  = os.path.join(u_dir, "POD_buf",        "POD_time_coef.npy")
-  path_u_log  = os.path.join(u_dir, "POD_log",        "POD_time_coef.npy")
-  time_coef1  = np.load(path_p_down)
-  time_coef2  = np.load(path_p_up)
-  time_coef3  = np.load(path_sepa)
-  time_coef4  = np.load(path_u_visc)
-  time_coef5  = np.load(path_u_buf)
-  time_coef6  = np.load(path_u_log)
+  path_p    = os.path.join(Q_dir, "POD_p",    "POD_time_coef.npy")
+  path_sepa = os.path.join(Q_dir, "POD_sepa", "POD_time_coef.npy")
+  path_visc = os.path.join(Q_dir, "POD_visc", "POD_time_coef.npy")
+  path_buf  = os.path.join(Q_dir, "POD_buf",  "POD_time_coef.npy")
+  path_log  = os.path.join(Q_dir, "POD_log",  "POD_time_coef.npy")
+  time_coef1 = np.load(path_p)
+  time_coef2 = np.load(path_sepa)
+  time_coef3 = np.load(path_visc)
+  time_coef4 = np.load(path_buf)
+  time_coef5 = np.load(path_log)
   data = np.concatenate((time_coef1[:,:num_modes], time_coef2[:,:num_modes], \
                          time_coef3[:,:num_modes], time_coef4[:,:num_modes], \
-                         time_coef5[:,:num_modes], time_coef6[:,:num_modes]), axis=-1)
+                         time_coef5[:,:num_modes]), axis=-1)
   # causal map
   n = data.shape[1]
   Map_te = np.zeros((n,n))
-  Map_gc = np.zeros((2,n,n)) # granger causality
+  #Map_ee = np.zeros((n,n))
+  #Map_gc = np.zeros((2,n,n)) # granger causality
   #Map_mi     = np.zeros((n,n))
   #Map_corr   = np.zeros((n,n))
-  dim = np.ones(n, dtype=np.int32)
+  #dim = np.ones(n, dtype=np.int32)
+  
   tau = np.ones(n, dtype=np.int32)
   for i in range(n):
-    tau[i] = int(search_tau(data[:,i]))
-    dim[i] = int(fnn(data[:,i], tau=tau[i]))
+    mean = np.mean(data[:,i])
+    std  = np.std(data[:,i])
+    data[:,i] = (data[:,i] - mean) / std
+    tau[i]  = int(search_tau(data[:,i]))
+    #dim[i] = int(fnn(data[:,i], tau=tau[i]))
+    print("tau = ", tau[i])
   save_path = os.path.join(p_dir, "tau.npy")
   np.save(save_path, tau)
-  save_path = os.path.join(p_dir, "dim.npy")
-  np.save(save_path, dim)
+  
+  #save_path = os.path.join(p_dir, "dim.npy")
+  #np.save(save_path, dim)
   for j in tqdm(range(n)):
     for i in range(n):
-      if i == j:
-        #Map_te[j,i] = np.inf
-        Map_gc[:,j,i] = np.inf
-      else:
-        #Map_te[j,i] = embedding_entropy(data[:,i], data[:,j], p=2*num_modes, k=5, Thei=1)
-        #Map_te[j,i] = transfer_entropy(data[:,i], data[:,j], \
-        #                               p=min(dim[i], dim[j]), tau=min(tau[i], tau[j]), k=5, Thei=1)
-        df = pd.DataFrame({'x': data[:,i], 'y': data[:,j]}) # causality y -> x
-        lag = min(tau[i], tau[j])
-        gc = grangercausalitytests(df, [lag], verbose=False)
-        Map_gc[0,j,i] = gc[lag][0]['ssr_ftest'][0] # f values
-        Map_gc[1,j,i] = gc[lag][0]['ssr_ftest'][1] # p values
-      #Map_mi[j,i]   = mutual_info(data[:,i].reshape(-1,1), data[:,j].reshape(-1,1), k=5, Thei=10)
       #Map_corr[j,i] = np.corrcoef(data[:,i], data[:,j])[0,1]
-  #save_path = os.path.join(p_dir, "Map_te.npy")
-  #np.save(save_path, Map_te)
-  save_path = os.path.join(p_dir, "Map_gc.npy")
-  np.save(save_path, Map_gc)
+      if i == j:
+        Map_te[j,i] = np.inf
+        #Map_ee[j,i] = np.inf
+        #Map_gc[:,j,i] = np.inf
+      else:
+        #Map_ee[j,i] = embedding_entropy(data[:,i], data[:,j], \
+        #                              p=2*dim[], k=5, Thei=1)
+        Map_te[j,i] = transfer_entropy(data[:,i], data[:,j], \
+                                       p=1, tau=tau[i], k=5, Thei=tau[i])
+        #df = pd.DataFrame({'x': data[:,i], 'y': data[:,j]}) # causality y -> x
+        #lag = min(tau[i], tau[j])
+        #gc = grangercausalitytests(df, [lag], verbose=False)
+        #Map_gc[0,j,i] = gc[lag][0]['ssr_ftest'][0] # f values
+        #Map_gc[1,j,i] = gc[lag][0]['ssr_ftest'][1] # p values
+      #Map_mi[j,i]   = mutual_info(data[:,i].reshape(-1,1), data[:,j].reshape(-1,1), k=5, Thei=10)
+  '''
+  Map_te[:50,:50] = np.inf
+  Map_te[50:,50:] = np.inf
+  plt.imshow(Map_te, cmap=plt.cm.viridis, vmin=0, vmax=0.7, extent=None, origin='lower')
+  plt.xlabel("Effect", fontsize=20)
+  plt.ylabel("Cause",  fontsize=20)
+  plt.xticks(ticks=[50,150,250,350,450], labels=ticks, fontsize=16)
+  plt.yticks(ticks=[50,150,250,350,450], labels=ticks, fontsize=16, rotation=90)
+  plt.colorbar()
+  plt.tight_layout()
+  plt.show()
+  '''
+  save_path = os.path.join(Q_dir, "Map_te_k5_correct.npy")
+  np.save(save_path, Map_te)
+  #save_path = os.path.join(Q_dir, "Map_gc.npy")
+  #np.save(save_path, Map_gc)
+  #save_path = os.path.join(Q_dir, "Map_corr.npy")
+  #np.save(save_path, Map_corr)
+
+
+def test_timedelay(num_modes=10):
+  path_p    = os.path.join(Q_dir, "POD_p",    "POD_time_coef.npy")
+  path_sepa = os.path.join(Q_dir, "POD_sepa", "POD_time_coef.npy")
+  time_coef1 = np.load(path_p)
+  time_coef2 = np.load(path_sepa)
+  data = np.concatenate((time_coef1[:,:num_modes], time_coef2[:,:num_modes]), axis=-1)
+  # causal map
+  n = data.shape[1]
+  Map_te = np.zeros((n,n))
+  for tau in tqdm(range(100)):
+    for j in range(n):
+      for i in range(n):
+        if i == j:
+          Map_te[j,i] = np.inf
+        else:
+          Map_te[j,i] = transfer_entropy(data[:,i], data[:,j], \
+                                         p=1, tau=tau, k=5, Thei=1)
+    name = "Map_te_k5_tau" + str(tau) + ".npy"
+    save_path = os.path.join(Q_dir, name)
+    np.save(save_path, Map_te)
+
 
 
 p_dir = os.path.join(Q_dir, "p")
@@ -187,24 +238,30 @@ os.makedirs(p_dir, exist_ok=True)
 u_dir = os.path.join(Q_dir, "u")
 os.makedirs(u_dir, exist_ok=True)
 
+'''
+file_path  = os.path.join(Q_dir, 'mean_rms', 'Qmean.vtr')
+Nx, Ny, Nz, _, _, _ = getGrid(file_path)
+Um, Vm, Wm = getVector(file_path, Nx, Ny, Nz, 'velocity')
+'''
 
 num_modes = 100
 #make_data(Q_dir, Lx1, Lx2, Ly1, Ly2, Lz1, Lz2)
 
 # separation
-#calc_POD(u_dir, "u",  endT, num_modes, Lx1=28.e-3, Lx2=37.e-3, Ly1=0.e0, Ly2=2e-3, Lz1=0.e0, Lz2=8.e-3)
+#calc_POD(Q_dir, "velocity", endT, num_modes, Lx1=28.e0*blt, Lx2=40.e0*blt, Ly1=0.e0, Ly2=blt, Lz1=0.e0, Lz2=5.e0*blt)
 
 # structures coming from upstream boundary layer (viscous sub-layer)
-#calc_POD(u_dir, "u",  endT, num_modes, Lx1=20.e-3, Lx2=28.e-3, Ly1=0.e0, Ly2=5.e0, Lz1=0.e0, Lz2=8.e-3, ut=ut, nu=nu)
+#calc_POD(Q_dir, "velocity", endT, num_modes, Lx1=26.e0*blt, Lx2=28.e0*blt, Ly1=0.e0, Ly2=5.e0, Lz1=0.e0, Lz2=5.e0*blt, ut=ut, nu=nu)
 # structures coming from upstream boundary layer (buffer layer)
-#calc_POD(u_dir, "u",  endT, num_modes, Lx1=20.e-3, Lx2=28.e-3, Ly1=5.e0, Ly2=30.e0, Lz1=0.e0, Lz2=8.e-3, ut=ut, nu=nu)
+#calc_POD(Q_dir, "velocity", endT, num_modes, Lx1=26.e0*blt, Lx2=28.e0*blt, Ly1=5.e0, Ly2=30.e0, Lz1=0.e0, Lz2=5.e0*blt, ut=ut, nu=nu)
 # structures coming from upstream boundary layer (log layer)
-#calc_POD(u_dir, "u",  endT, num_modes, Lx1=20.e-3, Lx2=28.e-3, Ly1=30.e0, Ly2=1000.e0, Lz1=0.e0, Lz2=8.e-3, ut=ut, nu=nu)
+#calc_POD(Q_dir, "velocity", endT, num_modes, Lx1=26.e0*blt, Lx2=28.e0*blt, Ly1=30.e0, Ly2=1000.e0, Lz1=0.e0, Lz2=5.e0*blt, ut=ut, nu=nu)
 
 # upstream pressure field
-#calc_POD(p_dir, "p",  endT, num_modes, Lx1=28.e-3, Lx2=32.e-3, Ly1=1.e-3, Ly2=8.e-3, Lz1=0.e0, Lz2=8.e-3)
+#calc_POD(Q_dir, "p",  endT, num_modes, Lx1=28.e0*blt, Lx2=35.e0*blt, Ly1=blt, Ly2=6.e0*blt, Lz1=0.e0, Lz2=5.e0*blt)
 # compression wave
-#calc_POD(p_dir, "p",  endT, num_modes, Lx1=32.e-3, Lx2=37.e-3, Ly1=1.e-3, Ly2=8.e-3, Lz1=0.e0, Lz2=8.e-3)
+#calc_POD(p_dir, "p",  endT, num_modes, Lx1=32.e-3*0.5e0, Lx2=37.e-3*0.5e0, Ly1=1.e-3*0.5e0, Ly2=8.e-3*0.5e0, Lz1=0.e0, Lz2=32.e-3*0.5e0)
 
 calc_causality_POD(p_dir, u_dir, endT, num_modes)
+#test_timedelay()
 
