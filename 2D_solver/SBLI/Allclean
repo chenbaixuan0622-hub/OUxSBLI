@@ -1,4 +1,0 @@
-rm *.mod *.o *.out
-rm -rf data
-mkdir data
-

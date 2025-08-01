@@ -1,32 +1,20 @@
 module mod_globals
   use cudafor
   implicit none
-  integer, parameter :: dimension = 3
+  integer, parameter :: dimension = 2
   integer, parameter :: accuracy  = 2 
   integer, parameter :: offset    = accuracy / 2
-  integer, parameter :: id_visc   = 1
-  integer, parameter :: id_turbulence = 0
-  integer, parameter :: id_av     = 0
+  integer(4), parameter :: id_visc   = 1
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_visc       ! 0 no-visc         !
-  !               ! 1 visc 2nd        !
-  !               ! 2 visc 4th        !
+  ! id_visc       ! kind2 Euler       !
+  !               ! kind4 NS          !
+  !               ! 1 2nd             !
+  !               ! 2 4th             !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_av         ! 0 no              !
-  !               ! 1 Neumann         !  
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_turbulence ! 0 laminar         !
-  !               ! 1 SMS             !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_scheme   ! 1  KEEP             !
-  !             ! 2  KEEP MUSCL       !
-  !             ! 3  SLAU             !
-  !             ! 4  KEEPUP           !
-  !             ! 5  Hybrid Weighted  !
-  !             ! 6  Hybrid threshold !
-  !             ! 7  Hybrid Sigmoid   !
-  !             ! 8  KEEP + Roe       !
-  !             ! 9  KEEP2nd          !
+  ! id_scheme   ! integer(2)  KEEP    !
+  !             ! real(2)     SLAU    !
+  !             ! real(4)   Weighted  !
+  !             ! real(8)   Threshold !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_sensor   ! 1 Ducros            !
   !             ! 2 Albada            !
@@ -38,7 +26,7 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_tvd      ! kind2 non TVD       !
   !             ! kind4 minmod        !
-  !             ! kind8 4thMUSCL      !
+  !             ! kind8 MUSCL4th      !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_keep     ! kind2 KEEP          !
   !             ! kind4 KEEPPE        !
@@ -48,36 +36,37 @@ module mod_globals
   !             ! kind4 HRSLAU2       !
   !             ! kind8 VHRSLAU2      !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer, parameter         :: id_scheme    = 1
-  integer, parameter         :: id_sensor    = 1
-  real(8), parameter         :: threshold    = 0.4d0
-  integer(kind=4), parameter :: id_accuracy  = 0
-  integer(kind=2), parameter :: id_tvd       = 0
-  integer(kind=2), parameter :: id_keep      = 0
-  integer(kind=4), parameter :: id_slau      = 0
+  integer(2), parameter      :: id_scheme   = 1
+  integer, parameter         :: id_sensor   = 1
+  real(8), parameter         :: threshold   = 0.4d0
+  integer(kind=2), parameter :: id_accuracy = 0
+  integer(kind=2), parameter :: id_tvd      = 0
+  integer(kind=2), parameter :: id_keep     = 0
+  integer(kind=4), parameter :: id_slau     = 0
+  integer(kind=2), parameter :: slau_wall   = 0
 
   ! mesh
   integer, parameter :: nx = 1026
   integer, parameter :: ny = 7
-  integer, parameter :: nz = 7
-
-  integer, parameter :: nre = nx-4
+  integer, parameter :: nz = 1
 
   ! GPU
-  type(dim3) :: blocksE = dim3((nx-accuracy+1)/205,(ny-accuracy)/1,(nz-accuracy)/1)
-  type(dim3) :: blocksF = dim3((nx-accuracy)/128,(ny-accuracy+1)/1,(nz-accuracy)/1)
-  type(dim3) :: blocksG = dim3((nx-accuracy)/128,(ny-accuracy)/1,(nz-accuracy+1)/1)
-  type(dim3) :: blocks  = dim3((nx-accuracy)/128,(ny-accuracy)/1,(nz-accuracy)/1)
-  type(dim3) :: threadsE = dim3(205,1,1)
-  type(dim3) :: threadsF = dim3(128,1,1)
-  type(dim3) :: threadsG = dim3(128,1,1)
-  type(dim3) :: threads  = dim3(128,1,1)
+  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/205,(ny-accuracy)/1,1)
+  type(dim3) :: blocksF   = dim3((nx-accuracy)/128,(ny-accuracy+1)/1,1)
+  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/205,(ny-accuracy)/1,1)
+  type(dim3) :: blocksFv  = dim3((nx-accuracy)/128,(ny-accuracy+1)/1,1)
+  type(dim3) :: blocks    = dim3((nx-accuracy)/128,(ny-accuracy)/1,1)
+  type(dim3) :: threadsE  = dim3(205,1,1)
+  type(dim3) :: threadsF  = dim3(128,1,1)
+  type(dim3) :: threadsEv = dim3(205,1,1)
+  type(dim3) :: threadsFv = dim3(128,1,1)
+  type(dim3) :: threads   = dim3(128,1,1)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_RungeKutta ! kind=2 ! 3rd_TVD !
   !               ! kind=4 ! 4th     !
-  !               ! kind=8 ! 10step  !
+  !               ! kind=8 ! Gauss   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_recal      ! kind=2 ! set 0   !
   !               ! kind=4 ! recal   !
