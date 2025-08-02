@@ -19,9 +19,9 @@ contains
     real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: Jacobian(ny)
-    real(8), intent(in), device  :: QJ(nx,ny,4) ! Q / Jacobian
-    real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,4)
-    real(8), intent(out), device :: F(nx-accuracy,ny-accuracy+1,4)
+    real(8), intent(in), device  :: QJ(4,nx,ny) ! Q / Jacobian
+    real(8), intent(out), device :: E(4,nx-accuracy+1,ny-accuracy)
+    real(8), intent(out), device :: F(4,nx-accuracy,ny-accuracy+1)
     real(8), dimension(nx,ny), device :: rho, u, v, p, sensor
     integer stat
     call calc_quantities_2D(nx, ny, Jacobian, QJ, rho, u, v, p)
@@ -38,10 +38,10 @@ contains
     real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: Jacobian(ny)
-    real(8), intent(in), device  :: QJ(nx,ny,4) ! Q / Jacobian
-    real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,4)
-    real(8), intent(out), device :: F(nx-accuracy,ny-accuracy+1,4)
-    real(8), intent(out), device :: fx(nx-2,ny-2,4), fy(nx-2,ny-2,4)
+    real(8), intent(in), device  :: QJ(4,nx,ny) ! Q / Jacobian
+    real(8), intent(out), device :: E(4,nx-accuracy+1,ny-accuracy)
+    real(8), intent(out), device :: F(4,nx-accuracy,ny-accuracy+1)
+    real(8), intent(out), device :: fx(nx-2,ny-2), fy(nx-2,ny-2)
     real(8), dimension(nx,ny), device :: rho, u, v, p, sensor
     integer stat
     call calc_quantities_2D(nx, ny, Jacobian, QJ, rho, u, v, p)
@@ -59,9 +59,9 @@ contains
     real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: Jacobian(ny)
-    real(8), intent(in), device  :: QJ(nx,ny,4) ! Q / Jacobian
-    real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,4)
-    real(8), intent(out), device :: F(nx-accuracy,ny-accuracy+1,4)
+    real(8), intent(in), device  :: QJ(4,nx,ny) ! Q / Jacobian
+    real(8), intent(out), device :: E(4,nx-accuracy+1,ny-accuracy)
+    real(8), intent(out), device :: F(4,nx-accuracy,ny-accuracy+1)
     real(8), dimension(nx,ny), device :: rho, u, v, p, sensor
     integer stat
     call calc_quantities_2D(nx, ny, Jacobian, QJ, rho, u, v, p)
@@ -81,10 +81,10 @@ contains
     real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: Jacobian(ny)
-    real(8), intent(in), device  :: QJ(nx,ny,4) ! Q / Jacobian
-    real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,4)
-    real(8), intent(out), device :: F(nx-accuracy,ny-accuracy+1,4)
-    real(8), intent(out), device :: fx(nx-2,ny-2,4), fy(nx-2,ny-2,4)
+    real(8), intent(in), device  :: QJ(4,nx,ny) ! Q / Jacobian
+    real(8), intent(out), device :: E(4,nx-accuracy+1,ny-accuracy)
+    real(8), intent(out), device :: F(4,nx-accuracy,ny-accuracy+1)
+    real(8), intent(out), device :: fx(nx-2,ny-2), fy(nx-2,ny-2)
     real(8), dimension(nx,ny), device :: rho, u, v, p, sensor
     integer stat
     call calc_quantities_2D(nx, ny, Jacobian, QJ, rho, u, v, p)

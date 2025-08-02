@@ -46,21 +46,21 @@ module mod_globals
   integer(kind=2), parameter :: slau_wall   = 0
 
   ! mesh
-  integer, parameter :: nx = 1026
+  integer, parameter :: nx = 4097
   integer, parameter :: ny = 7
   integer, parameter :: nz = 1
 
   ! GPU
-  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/205,(ny-accuracy)/1,1)
-  type(dim3) :: blocksF   = dim3((nx-accuracy)/128,(ny-accuracy+1)/1,1)
-  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/205,(ny-accuracy)/1,1)
-  type(dim3) :: blocksFv  = dim3((nx-accuracy)/128,(ny-accuracy+1)/1,1)
-  type(dim3) :: blocks    = dim3((nx-accuracy)/128,(ny-accuracy)/1,1)
-  type(dim3) :: threadsE  = dim3(205,1,1)
-  type(dim3) :: threadsF  = dim3(128,1,1)
-  type(dim3) :: threadsEv = dim3(205,1,1)
-  type(dim3) :: threadsFv = dim3(128,1,1)
-  type(dim3) :: threads   = dim3(128,1,1)
+  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/256,(ny-accuracy)/1,1)
+  type(dim3) :: blocksF   = dim3((nx-accuracy)/91,(ny-accuracy+1)/1,1)
+  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/256,(ny-accuracy)/1,1)
+  type(dim3) :: blocksFv  = dim3((nx-accuracy)/91,(ny-accuracy+1)/1,1)
+  type(dim3) :: blocks    = dim3((nx-accuracy)/91,(ny-accuracy)/1,1)
+  type(dim3) :: threadsE  = dim3(256,1,1)
+  type(dim3) :: threadsF  = dim3(91,1,1)
+  type(dim3) :: threadsEv = dim3(256,1,1)
+  type(dim3) :: threadsFv = dim3(91,1,1)
+  type(dim3) :: threads   = dim3(91,1,1)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -72,7 +72,7 @@ module mod_globals
   !               ! kind=4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_recal      = 0
-  integer(kind=4), parameter :: id_RungeKutta = 0
+  integer(kind=2), parameter :: id_RungeKutta = 0
   integer, parameter         :: step_offset   = 0
   integer, parameter         :: np            = 100
 
@@ -87,7 +87,7 @@ module mod_globals
   real(8), parameter :: C    = 1.456d-6
   real(8), parameter :: S    = 110.4d0
   real(8), parameter :: mu0  = C * T0**1.5 / (T0 + S)
-  real(8), parameter :: Re   = 25000.d0
+  real(8), parameter :: Re   = 250000.d0
   real(8), parameter :: rho0 = 1.293d0
   real(8), parameter :: p0   = rho0 * R * T0
   real(8), parameter :: rho1 = 0.125d0 * rho0
@@ -98,6 +98,6 @@ module mod_globals
   real(8), parameter :: CFL  = 0.1d0
   real(8), parameter :: dt   = CFL * Lx / (dble(Nx-1) * sqrt(p0 / rho0))
   real(8), parameter :: endT = 0.2136d0 * Lx / sqrt(p0 / rho0)
-  integer, parameter :: nt   = int(endT / (dble(np) * dt))
+  integer, parameter :: nt   = int(endT / (dble(np) * abs(dt)))
 end module mod_globals
 

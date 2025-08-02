@@ -101,7 +101,7 @@ contains
     real(8), intent(in), dimension(nx-1), device  :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device  :: dy ! 1 / dy
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
-    real(8), intent(inout), device                :: E(nx-accuracy+1,ny-accuracy,4)
+    real(8), intent(inout), device                :: E(4,nx-accuracy+1,ny-accuracy)
     integer i, j
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: txx, txy, utxx, vtxy, kTx
@@ -151,9 +151,9 @@ contains
       kTx      = Cp * mx * (-Tx(1) + Tx(2)) * dx(i) / Pr
     endif
 
-    E(i-offset+1,j-offset,2) = E(i-offset+1,j-offset,2) - txx
-    E(i-offset+1,j-offset,3) = E(i-offset+1,j-offset,3) - txy
-    E(i-offset+1,j-offset,4) = E(i-offset+1,j-offset,4) - (utxx + vtxy + kTx)
+    E(2,i-offset+1,j-offset) = E(2,i-offset+1,j-offset) - txx
+    E(3,i-offset+1,j-offset) = E(3,i-offset+1,j-offset) - txy
+    E(4,i-offset+1,j-offset) = E(4,i-offset+1,j-offset) - (utxx + vtxy + kTx)
   end subroutine calc_Ev
   
   attributes(global) subroutine calc_Fv(nx, ny, dy, dx, rho, u, v, p, F)
@@ -162,7 +162,7 @@ contains
     real(8), intent(in), dimension(ny-1), device  :: dy ! 1 / dy
     real(8), intent(in), dimension(nx-1), device  :: dx ! 1 / dx
     real(8), intent(in), dimension(nx,ny), device :: rho, u, v, p
-    real(8), intent(inout), device                :: F(nx-accuracy,ny-accuracy+1,4)
+    real(8), intent(inout), device                :: F(4,nx-accuracy,ny-accuracy+1)
     integer i, j
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: tyx, tyy, utyx, vtyy, kTy
@@ -212,9 +212,9 @@ contains
       kTy      = Cp * my * (-Ty(1) + Ty(2)) * dy(j) / Pr
     endif
 
-    F(i-offset,j-offset+1,2) = F(i-offset,j-offset+1,2) - tyx
-    F(i-offset,j-offset+1,3) = F(i-offset,j-offset+1,3) - tyy
-    F(i-offset,j-offset+1,4) = F(i-offset,j-offset+1,4) - (utyx + vtyy + kTy)
+    F(2,i-offset,j-offset+1) = F(2,i-offset,j-offset+1) - tyx
+    F(3,i-offset,j-offset+1) = F(3,i-offset,j-offset+1) - tyy
+    F(4,i-offset,j-offset+1) = F(4,i-offset,j-offset+1) - (utyx + vtyy + kTy)
   end subroutine calc_Fv
 end module calc_visc
 

@@ -121,7 +121,7 @@ contains
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
     real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
-    real(8), intent(inout), device                    :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
+    real(8), intent(inout), device                    :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx
@@ -190,10 +190,10 @@ contains
       kTx         = Cp * mx * (-Tx(1) + Tx(2)) * dx(i) / Pr
     endif
 
-    E(i-offset+1,j-offset,k-offset,2) = E(i-offset+1,j-offset,k-offset,2) - txx
-    E(i-offset+1,j-offset,k-offset,3) = E(i-offset+1,j-offset,k-offset,3) - txy
-    E(i-offset+1,j-offset,k-offset,4) = E(i-offset+1,j-offset,k-offset,4) - txz
-    E(i-offset+1,j-offset,k-offset,5) = E(i-offset+1,j-offset,k-offset,5) - (utxx + vtxy + wtxz + kTx)
+    E(2,i-offset+1,j-offset,k-offset) = E(2,i-offset+1,j-offset,k-offset) - txx
+    E(3,i-offset+1,j-offset,k-offset) = E(3,i-offset+1,j-offset,k-offset) - txy
+    E(4,i-offset+1,j-offset,k-offset) = E(4,i-offset+1,j-offset,k-offset) - txz
+    E(5,i-offset+1,j-offset,k-offset) = E(5,i-offset+1,j-offset,k-offset) - (utxx + vtxy + wtxz + kTx)
   end subroutine calc_Ev
   
   attributes(global) subroutine calc_Ev_LES(nx, ny, nz, dx, dy, dz, rho, u, v, w, p, mut, qc2, E)
@@ -203,7 +203,7 @@ contains
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
     real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, mut, qc2
-    real(8), intent(inout), device                    :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
+    real(8), intent(inout), device                    :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx, mutx, H(4), txxsgs = 0.d0, txysgs = 0.d0, txzsgs = 0.d0, Hsgs = 0.d0
@@ -297,10 +297,10 @@ contains
       Hsgs   = -mx * (-H(2) + H(3)) * dx(i) / Prt
     endif
 
-    E(i-offset+1,j-offset,k-offset,2) = E(i-offset+1,j-offset,k-offset,2) - (txx+txxsgs)
-    E(i-offset+1,j-offset,k-offset,3) = E(i-offset+1,j-offset,k-offset,3) - (txy+txysgs)
-    E(i-offset+1,j-offset,k-offset,4) = E(i-offset+1,j-offset,k-offset,4) - (txz+txzsgs)
-    E(i-offset+1,j-offset,k-offset,5) = E(i-offset+1,j-offset,k-offset,5) - (utxx + vtxy + wtxz + kTx + Hsgs)
+    E(2,i-offset+1,j-offset,k-offset) = E(2,i-offset+1,j-offset,k-offset) - (txx+txxsgs)
+    E(3,i-offset+1,j-offset,k-offset) = E(3,i-offset+1,j-offset,k-offset) - (txy+txysgs)
+    E(4,i-offset+1,j-offset,k-offset) = E(4,i-offset+1,j-offset,k-offset) - (txz+txzsgs)
+    E(5,i-offset+1,j-offset,k-offset) = E(5,i-offset+1,j-offset,k-offset) - (utxx + vtxy + wtxz + kTx + Hsgs)
   end subroutine calc_Ev_LES
   
   attributes(global) subroutine calc_Fv(nx, ny, nz, dy, dx, dz, rho, u, v, w, p, F)
@@ -310,7 +310,7 @@ contains
     real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
     real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
-    real(8), intent(inout), device                    :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
+    real(8), intent(inout), device                    :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy, muty
@@ -381,10 +381,10 @@ contains
       kTy         = Cp * my * (-Ty(1) + Ty(2)) * dy(j) / Pr
     endif
 
-    F(i-offset,j-offset+1,k-offset,2) = F(i-offset,j-offset+1,k-offset,2) - tyx
-    F(i-offset,j-offset+1,k-offset,3) = F(i-offset,j-offset+1,k-offset,3) - tyy
-    F(i-offset,j-offset+1,k-offset,4) = F(i-offset,j-offset+1,k-offset,4) - tyz
-    F(i-offset,j-offset+1,k-offset,5) = F(i-offset,j-offset+1,k-offset,5) - (utyx + vtyy + wtyz + kTy)
+    F(2,i-offset,j-offset+1,k-offset) = F(2,i-offset,j-offset+1,k-offset) - tyx
+    F(3,i-offset,j-offset+1,k-offset) = F(3,i-offset,j-offset+1,k-offset) - tyy
+    F(4,i-offset,j-offset+1,k-offset) = F(4,i-offset,j-offset+1,k-offset) - tyz
+    F(5,i-offset,j-offset+1,k-offset) = F(5,i-offset,j-offset+1,k-offset) - (utyx + vtyy + wtyz + kTy)
   end subroutine calc_Fv
   
   attributes(global) subroutine calc_Fv_LES(nx, ny, nz, dy, dx, dz, rho, u, v, w, p, mut, qc2, F)
@@ -394,7 +394,7 @@ contains
     real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
     real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, mut, qc2
-    real(8), intent(inout), device                    :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
+    real(8), intent(inout), device                    :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy, muty, H(4), tyxsgs = 0.d0, tyysgs = 0.d0, tyzsgs = 0.d0, Hsgs = 0.d0
@@ -490,10 +490,10 @@ contains
       Hsgs   = -my * (-H(2) + H(3)) * dy(j) / Prt
     endif
 
-    F(i-offset,j-offset+1,k-offset,2) = F(i-offset,j-offset+1,k-offset,2) - (tyx+tyxsgs)
-    F(i-offset,j-offset+1,k-offset,3) = F(i-offset,j-offset+1,k-offset,3) - (tyy+tyysgs)
-    F(i-offset,j-offset+1,k-offset,4) = F(i-offset,j-offset+1,k-offset,4) - (tyz+tyzsgs)
-    F(i-offset,j-offset+1,k-offset,5) = F(i-offset,j-offset+1,k-offset,5) - (utyx + vtyy + wtyz + kTy + Hsgs)
+    F(2,i-offset,j-offset+1,k-offset) = F(2,i-offset,j-offset+1,k-offset) - (tyx+tyxsgs)
+    F(3,i-offset,j-offset+1,k-offset) = F(3,i-offset,j-offset+1,k-offset) - (tyy+tyysgs)
+    F(4,i-offset,j-offset+1,k-offset) = F(4,i-offset,j-offset+1,k-offset) - (tyz+tyzsgs)
+    F(5,i-offset,j-offset+1,k-offset) = F(5,i-offset,j-offset+1,k-offset) - (utyx + vtyy + wtyz + kTy + Hsgs)
   end subroutine calc_Fv_LES
   
   attributes(global) subroutine calc_Gv(nx, ny, nz, dx, dy, dz, rho, u, v, w, p, G)
@@ -503,7 +503,7 @@ contains
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
     real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p
-    real(8), intent(inout), device                    :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    real(8), intent(inout), device                    :: G(5,nx-accuracy,ny-accuracy,nz-accuracy+1)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz
@@ -572,10 +572,10 @@ contains
       kTz         = Cp * mz * (-Tz(1) + Tz(2)) * dz(k) / Pr
     endif
 
-    G(i-offset,j-offset,k-offset+1,2) = G(i-offset,j-offset,k-offset+1,2) - tzx
-    G(i-offset,j-offset,k-offset+1,3) = G(i-offset,j-offset,k-offset+1,3) - tzy
-    G(i-offset,j-offset,k-offset+1,4) = G(i-offset,j-offset,k-offset+1,4) - tzz
-    G(i-offset,j-offset,k-offset+1,5) = G(i-offset,j-offset,k-offset+1,5) - (utzx + vtzy + wtzz + kTz)
+    G(2,i-offset,j-offset,k-offset+1) = G(2,i-offset,j-offset,k-offset+1) - tzx
+    G(3,i-offset,j-offset,k-offset+1) = G(3,i-offset,j-offset,k-offset+1) - tzy
+    G(4,i-offset,j-offset,k-offset+1) = G(4,i-offset,j-offset,k-offset+1) - tzz
+    G(5,i-offset,j-offset,k-offset+1) = G(5,i-offset,j-offset,k-offset+1) - (utzx + vtzy + wtzz + kTz)
   end subroutine calc_Gv
 
   attributes(global) subroutine calc_Gv_LES(nx, ny, nz, dx, dy, dz, rho, u, v, w, p, mut, qc2, G)
@@ -585,7 +585,7 @@ contains
     real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
     real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
     real(8), intent(in), dimension(nx,ny,nz), device  :: rho, u, v, w, p, mut, qc2
-    real(8), intent(inout), device                    :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    real(8), intent(inout), device                    :: G(5,nx-accuracy,ny-accuracy,nz-accuracy+1)
     integer i, j, k
     real(8) :: Cp = gamma * R / (gamma - 1.d0)
     real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz, mutz, H(4), tzxsgs = 0.d0, tzysgs = 0.d0, tzzsgs = 0.d0, Hsgs = 0.d0
@@ -679,10 +679,10 @@ contains
       Hsgs   = -mz * (-H(2) + H(3)) * dz(k) / Prt
     endif
 
-    G(i-offset,j-offset,k-offset+1,2) = G(i-offset,j-offset,k-offset+1,2) - (tzx+tzxsgs)
-    G(i-offset,j-offset,k-offset+1,3) = G(i-offset,j-offset,k-offset+1,3) - (tzy+tzysgs)
-    G(i-offset,j-offset,k-offset+1,4) = G(i-offset,j-offset,k-offset+1,4) - (tzz+tzzsgs)
-    G(i-offset,j-offset,k-offset+1,5) = G(i-offset,j-offset,k-offset+1,5) - (utzx + vtzy + wtzz + kTz + Hsgs)
+    G(2,i-offset,j-offset,k-offset+1) = G(2,i-offset,j-offset,k-offset+1) - (tzx+tzxsgs)
+    G(3,i-offset,j-offset,k-offset+1) = G(3,i-offset,j-offset,k-offset+1) - (tzy+tzysgs)
+    G(4,i-offset,j-offset,k-offset+1) = G(4,i-offset,j-offset,k-offset+1) - (tzz+tzzsgs)
+    G(5,i-offset,j-offset,k-offset+1) = G(5,i-offset,j-offset,k-offset+1) - (utzx + vtzy + wtzz + kTz + Hsgs)
   end subroutine calc_Gv_LES
 end module calc_visc
 

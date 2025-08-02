@@ -218,7 +218,7 @@ contains
     use mod_globals, only : id_accuracy, id_scheme
     integer, intent(in), value                       :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p, sensor
-    real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
+    real(8), intent(out), device :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
     integer i, j, k
     integer(kind=2) id_slau_wall
     real(8), dimension(2)   :: rho2, p2
@@ -239,21 +239,21 @@ contains
       V6(:,2) =   v(i-2:i+3,j,k)
       V6(:,3) =   w(i-2:i+3,j,k)
       p6(:)   =   p(i-2:i+3,j,k)
-      E(i,j-offset,k-offset,:) = flux6(id_scheme,1,rho6,p6,V6,Normal,fdx)
+      E(:,i,j-offset,k-offset) = flux6(id_scheme,1,rho6,p6,V6,Normal,fdx)
     elseif (2 <= i .and. i <= nx-2 .and. 4 <= kind(id_accuracy)) then
       rho4(:) = rho(i-1:i+2,j,k)
       V4(:,1) =   u(i-1:i+2,j,k)
       V4(:,2) =   v(i-1:i+2,j,k)
       V4(:,3) =   w(i-1:i+2,j,k)
       p4(:)   =   p(i-1:i+2,j,k)
-      E(i,j-offset,k-offset,:) = flux4(id_scheme,1,rho4,p4,V4,Normal,fdx)
+      E(:,i,j-offset,k-offset) = flux4(id_scheme,1,rho4,p4,V4,Normal,fdx)
     else
       rho2(:) = rho(i:i+1,j,k)
       V2(:,1) =   u(i:i+1,j,k)
       V2(:,2) =   v(i:i+1,j,k)
       V2(:,3) =   w(i:i+1,j,k)
       p2(:)   =   p(i:i+1,j,k)
-      E(i,j-offset,k-offset,:) = flux2(id_scheme,1,rho2,p2,V2,Normal,fdx)
+      E(:,i,j-offset,k-offset) = flux2(id_scheme,1,rho2,p2,V2,Normal,fdx)
     endif
   end subroutine calc_E
 
@@ -261,7 +261,7 @@ contains
     use mod_globals, only : id_accuracy, id_scheme, slau_wall
     integer, intent(in), value                       :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p, sensor
-    real(8), intent(out), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
+    real(8), intent(out), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
     integer i, j, k
     integer(kind=2) id_slau_wall
     real(8), dimension(2)   :: rho2, p2
@@ -282,14 +282,14 @@ contains
       V6(:,2) =   v(i,j-2:j+3,k)
       V6(:,3) =   w(i,j-2:j+3,k)
       p6(:)   =   p(i,j-2:j+3,k)
-      F(i-offset,j,k-offset,:) = flux6(id_scheme,2,rho6,p6,V6,Normal,fdy)
+      F(:,i-offset,j,k-offset) = flux6(id_scheme,2,rho6,p6,V6,Normal,fdy)
     elseif (2 <= j .and. j <= ny-2 .and. 4 <= kind(id_accuracy)) then
       rho4(:) = rho(i,j-1:j+2,k)
       V4(:,1) =   u(i,j-1:j+2,k)
       V4(:,2) =   v(i,j-1:j+2,k)
       V4(:,3) =   w(i,j-1:j+2,k)
       p4(:)   =   p(i,j-1:j+2,k)
-      F(i-offset,j,k-offset,:) = flux4(id_scheme,2,rho4,p4,V4,Normal,fdy)
+      F(:,i-offset,j,k-offset) = flux4(id_scheme,2,rho4,p4,V4,Normal,fdy)
     else
       rho2(:) = rho(i,j:j+1,k)
       V2(:,1) =   u(i,j:j+1,k)
@@ -297,9 +297,9 @@ contains
       V2(:,3) =   w(i,j:j+1,k)
       p2(:)   =   p(i,j:j+1,k)
       if (kind(slau_wall) /= 4) then
-        F(i-offset,j,k-offset,:) = flux2(id_scheme,2,rho2,p2,V2,Normal,fdy)
+        F(:,i-offset,j,k-offset) = flux2(id_scheme,2,rho2,p2,V2,Normal,fdy)
       else
-        F(i-offset,j,k-offset,:) = SLAU(id_slau_wall,2,rho2,p2,V2,Normal)
+        F(:,i-offset,j,k-offset) = SLAU(id_slau_wall,2,rho2,p2,V2,Normal)
       endif
     endif
   end subroutine calc_F
@@ -308,7 +308,7 @@ contains
     use mod_globals, only : id_accuracy, id_scheme
     integer, intent(in), value                       :: nx, ny, nz
     real(8), intent(in), dimension(nx,ny,nz), device :: rho, u, v, w, p, sensor
-    real(8), intent(out), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    real(8), intent(out), device :: G(5,nx-accuracy,ny-accuracy,nz-accuracy+1)
     integer i, j, k
     integer(kind=2) id_slau_wall
     real(8), dimension(2)   :: rho2, p2
@@ -329,21 +329,21 @@ contains
       V6(:,2) =   v(i,j,k-2:k+3)
       V6(:,3) =   w(i,j,k-2:k+3)
       p6(:)   =   p(i,j,k-2:k+3)
-      G(i-offset,j-offset,k,:) = flux6(id_scheme,3,rho6,p6,V6,Normal,fdz)
+      G(:,i-offset,j-offset,k) = flux6(id_scheme,3,rho6,p6,V6,Normal,fdz)
     elseif (2 <= k .and. k <= nz-2 .and. 4 <= kind(id_accuracy)) then
       rho4(:) = rho(i,j,k-1:k+2)
       V4(:,1) =   u(i,j,k-1:k+2)
       V4(:,2) =   v(i,j,k-1:k+2)
       V4(:,3) =   w(i,j,k-1:k+2)
       p4(:)   =   p(i,j,k-1:k+2)
-      G(i-offset,j-offset,k,:) = flux4(id_scheme,3,rho4,p4,V4,Normal,fdz)
+      G(:,i-offset,j-offset,k) = flux4(id_scheme,3,rho4,p4,V4,Normal,fdz)
     else
       rho2(:) = rho(i,j,k:k+1)
       V2(:,1) =   u(i,j,k:k+1)
       V2(:,2) =   v(i,j,k:k+1)
       V2(:,3) =   w(i,j,k:k+1)
       p2(:)   =   p(i,j,k:k+1)
-      G(i-offset,j-offset,k,:) = flux2(id_scheme,3,rho2,p2,V2,Normal,fdz)
+      G(:,i-offset,j-offset,k) = flux2(id_scheme,3,rho2,p2,V2,Normal,fdz)
     endif
   end subroutine calc_G
 end module calc_flux
