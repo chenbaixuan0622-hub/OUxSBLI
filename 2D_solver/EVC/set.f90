@@ -1,5 +1,6 @@
 module set
   use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, dtn, theta
+  use set_bc_common
   implicit none
 contains
   subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, xc, yc, zc, dx, dy, dz)
@@ -43,7 +44,7 @@ contains
     use mod_globals, only : M0, rho0, p0, T0, u0, Rc, beta
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
-    real(8), intent(out) :: Q(nx,ny,4)
+    real(8), intent(out) :: Q(4,nx,ny)
     integer i, j
     real(8) xr, yr, xc, yc, ex, T, rho, u, v, du, dv, p
     real(8) :: Cp = R * gamma / (gamma - 1.d0)
@@ -59,80 +60,20 @@ contains
         u   = u0 * cos(theta) + du * cos(theta) - dv * sin(theta)
         v   = u0 * sin(theta) + du * sin(theta) + dv * cos(theta)
         p   = rho * R * T
-        Q(i,j,1) = rho
-        Q(i,j,2) = rho * u
-        Q(i,j,3) = rho * v
+        Q(1,i,j) = rho
+        Q(2,i,j) = rho * u
+        Q(3,i,j) = rho * v
         ! p / (gamma - 1) + 0.5 * (rhou ** 2 + rhov ** 2 ) / rho
-        Q(i,j,4) = p / (gamma - 1.d0) + 0.5d0 * rho * (u**2 + v**2)
+        Q(4,i,j) = p / (gamma - 1.d0) + 0.5d0 * rho * (u**2 + v**2)
     enddo;enddo
   end subroutine set_init
   
   subroutine set_bc(myrank, nx, ny, Jacobian, Q)
+    use mod_globals, only : id_accuracy
     integer, intent(in), value     :: myrank, nx, ny
     real(8), intent(in), device    :: Jacobian(ny)
-    real(8), intent(inout), device :: Q(nx,ny,4)
-    integer i, j, k
-    !$cuf kernel do(2)<<<*,*>>>
-    do k = 1, 4
-      do j = 4, ny-3
-        Q(1,j,k) = Q(nx-5,j,k)
-        Q(2,j,k) = Q(nx-4,j,k)
-        Q(3,j,k) = Q(nx-3,j,k)
-        Q(nx-2,j,k) = Q(4,j,k)
-        Q(nx-1,j,k) = Q(5,j,k)
-        Q(nx,j,k)   = Q(6,j,k)
-    enddo;enddo
-
-    !$cuf kernel do(2)<<<*,*>>>
-    do k = 1, 4
-      do i = 4, nx-3
-        Q(i,1,k) = Q(i,ny-5,k)
-        Q(i,2,k) = Q(i,ny-4,k)
-        Q(i,3,k) = Q(i,ny-3,k)
-        Q(i,ny-2,k) = Q(i,4,k)
-        Q(i,ny-1,k) = Q(i,5,k)
-        Q(i,ny,k)   = Q(i,6,k)
-    enddo;enddo
-
-    !$cuf kernel do(1)<<<*,*>>>
-    do k = 1, 4
-      Q(1,1,k) = Q(nx-5,ny-5,k)
-      Q(1,2,k) = Q(nx-5,ny-4,k)
-      Q(1,3,k) = Q(nx-5,ny-3,k)
-      Q(2,1,k) = Q(nx-4,ny-5,k)
-      Q(2,2,k) = Q(nx-4,ny-4,k)
-      Q(2,3,k) = Q(nx-4,ny-3,k)
-      Q(3,1,k) = Q(nx-3,ny-5,k)
-      Q(3,2,k) = Q(nx-3,ny-4,k)
-      Q(3,3,k) = Q(nx-3,ny-3,k)
-      Q(nx-2,1,k) = Q(4,ny-5,k)
-      Q(nx-2,2,k) = Q(4,ny-4,k)
-      Q(nx-2,3,k) = Q(4,ny-3,k)
-      Q(nx-1,1,k) = Q(5,ny-5,k)
-      Q(nx-1,2,k) = Q(5,ny-4,k)
-      Q(nx-1,3,k) = Q(5,ny-3,k)
-      Q(nx,1,k)   = Q(6,ny-5,k)
-      Q(nx,2,k)   = Q(6,ny-4,k)
-      Q(nx,3,k)   = Q(6,ny-3,k)
-      Q(1,ny-2,k) = Q(nx-5,4,k)
-      Q(1,ny-1,k) = Q(nx-5,5,k)
-      Q(1,ny,k)   = Q(nx-5,6,k)
-      Q(2,ny-2,k) = Q(nx-4,4,k)
-      Q(2,ny-1,k) = Q(nx-4,5,k)
-      Q(2,ny,k)   = Q(nx-4,6,k)
-      Q(3,ny-2,k) = Q(nx-3,4,k)
-      Q(3,ny-1,k) = Q(nx-3,5,k)
-      Q(3,ny,k)   = Q(nx-3,6,k)
-      Q(nx-2,ny-2,k) = Q(4,4,k)
-      Q(nx-2,ny-1,k) = Q(4,5,k)
-      Q(nx-2,ny,k)   = Q(4,6,k)
-      Q(nx-1,ny-2,k) = Q(5,4,k)
-      Q(nx-1,ny-1,k) = Q(5,5,k)
-      Q(nx-1,ny,k)   = Q(5,6,k)
-      Q(nx,ny-2,k)   = Q(6,4,k)
-      Q(nx,ny-1,k)   = Q(6,5,k)
-      Q(nx,ny,k)     = Q(6,6,k)
-    enddo
+    real(8), intent(inout), device :: Q(4,nx,ny)
+    call set_bc_cyclic(id_accuracy, nx, ny, Q)
   end subroutine set_bc
 
   subroutine calc_forcing(nx, ny, dx, dy, rho, u, v, p, fx, fy)
@@ -140,7 +81,7 @@ contains
     real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: rho(nx,ny), u(nx,ny), v(nx,ny), p(nx,ny)
-    real(8), intent(out), device :: fx(nx-2,ny-2,4), fy(nx-2,ny-2,4)
+    real(8), intent(out), device :: fx(nx-2,ny-2), fy(nx-2,ny-2)
   end subroutine calc_forcing
 end module set
 

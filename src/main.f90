@@ -22,7 +22,7 @@ program main
 
   print *, "my rank is", myrank
 
-  allocate(Q(nx,ny,nz,dimension+2), x(nx), dx(nx-1), y(ny), dy(ny-1), z(nz), dz(nz-1), Jacobian(ny))
+  allocate(Q(dimension+2,nx,ny,nz), x(nx), dx(nx-1), y(ny), dy(ny-1), z(nz), dz(nz-1), Jacobian(ny))
 
   ! set grid information
   if (mod(myrank,2) == 0) then
@@ -75,11 +75,11 @@ program main
       print *, "calculation time:", m, " [min] ", s, " [sec]"
     endif
     ! save data
-    do m = 1, dimension+2
-      do l = 1, nz
-        do j = 1, ny
-          do i = 1, nx
-            Q(i,j,l,m) = Jacobian(j) * Q(i,j,l,m)
+    do l = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          do m = 1, dimension+2
+            Q(m,i,j,l) = Jacobian(j) * Q(m,i,j,l)
     enddo;enddo;enddo;enddo
     call cpu_time(t_start)
     write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"

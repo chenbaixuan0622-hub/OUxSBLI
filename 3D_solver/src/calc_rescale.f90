@@ -5,7 +5,7 @@ module calc_rescale
 contains
   subroutine calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJ, Qm)
     integer, intent(in)            :: step, flag_re, nx, ny, nz
-    real(8), intent(in), device    :: Jacobian(ny), QJ(nx,ny,nz,5)
+    real(8), intent(in), device    :: Jacobian(ny), QJ(5,nx,ny,nz)
     real(8), intent(inout), device :: Qm(ny*5)
     real(8) Q1, Q2, Q3, Q4, Q5, rhoinv, Jacobian_tmp, volinv, step1, step2
     integer i, k
@@ -17,19 +17,19 @@ contains
         Jacobian_tmp = Jacobian(j)
         do k = 4, nz-3
           do i = nre1, nre2
-            rhoinv = 1.d0 / QJ(i,j,k,1)
-            Q1 = Q1 + QJ(i,j,k,1) * Jacobian_tmp
-            Q2 = Q2 + QJ(i,j,k,2) * rhoinv
-            Q3 = Q3 + QJ(i,j,k,3) * rhoinv
-            Q4 = Q4 + QJ(i,j,k,4) * rhoinv
-            Q5 = Q5 + (gamma - 1.d0) * Jacobian_tmp * (QJ(i,j,k,5) &
-                    - 0.5d0 * (QJ(i,j,k,2)**2 + QJ(i,j,k,3)**2 + QJ(i,j,k,4)**2) * rhoinv)
+            rhoinv = 1.d0 / QJ(1,i,j,k)
+            Q1 = Q1 + QJ(1,i,j,k) * Jacobian_tmp
+            Q2 = Q2 + QJ(2,i,j,k) * rhoinv
+            Q3 = Q3 + QJ(3,i,j,k) * rhoinv
+            Q4 = Q4 + QJ(4,i,j,k) * rhoinv
+            Q5 = Q5 + (gamma - 1.d0) * Jacobian_tmp * (QJ(5,i,j,k) &
+                    - 0.5d0 * (QJ(2,i,j,k)**2 + QJ(3,i,j,k)**2 + QJ(4,i,j,k)**2) * rhoinv)
         enddo;enddo
-        Qm(     j) = Q1 * volinv
-        Qm(ny  +j) = Q2 * volinv
-        Qm(ny*2+j) = Q3 * volinv
-        Qm(ny*3+j) = Q4 * volinv
-        Qm(ny*4+j) = Q5 * volinv
+        Qm(ny*(j-1)+1) = Q1 * volinv
+        Qm(ny*(j-1)+2) = Q2 * volinv
+        Qm(ny*(j-1)+3) = Q3 * volinv
+        Qm(ny*(j-1)+4) = Q4 * volinv
+        Qm(ny*(j-1)+5) = Q5 * volinv
       enddo
     else
       step1 = dble(step-1); step2 = 1.d0 / dble(step)
@@ -39,42 +39,42 @@ contains
         Jacobian_tmp = Jacobian(j)
         do k = 4, nz-3
           do i = nre1, nre2
-            rhoinv = 1.d0 / QJ(i,j,k,1)
-            Q1 = Q1 + QJ(i,j,k,1) * Jacobian_tmp
-            Q2 = Q2 + QJ(i,j,k,2) * rhoinv
-            Q3 = Q3 + QJ(i,j,k,3) * rhoinv
-            Q4 = Q4 + QJ(i,j,k,4) * rhoinv
-            Q5 = Q5 + (gamma - 1.d0) * Jacobian_tmp * (QJ(i,j,k,5) &
-                    - 0.5d0 * (QJ(i,j,k,2)**2 + QJ(i,j,k,3)**2 + QJ(i,j,k,4)**2) * rhoinv)
+            rhoinv = 1.d0 / QJ(1,i,j,k)
+            Q1 = Q1 + QJ(1,i,j,k) * Jacobian_tmp
+            Q2 = Q2 + QJ(2,i,j,k) * rhoinv
+            Q3 = Q3 + QJ(3,i,j,k) * rhoinv
+            Q4 = Q4 + QJ(4,i,j,k) * rhoinv
+            Q5 = Q5 + (gamma - 1.d0) * Jacobian_tmp * (QJ(5,i,j,k) &
+                    - 0.5d0 * (QJ(2,i,j,k)**2 + QJ(3,i,j,k)**2 + QJ(4,i,j,k)**2) * rhoinv)
         enddo;enddo
-        Qm(     j) = (step1 * Qm(     j) + Q1 * volinv) * step2
-        Qm(ny  +j) = (step1 * Qm(ny  +j) + Q2 * volinv) * step2
-        Qm(ny*2+j) = (step1 * Qm(ny*2+j) + Q3 * volinv) * step2
-        Qm(ny*3+j) = (step1 * Qm(ny*3+j) + Q4 * volinv) * step2
-        Qm(ny*4+j) = (step1 * Qm(ny*4+j) + Q5 * volinv) * step2
+        Qm(ny*(j-1)+1) = (step1 * Qm(ny*(j-1)+1) + Q1 * volinv) * step2
+        Qm(ny*(j-1)+2) = (step1 * Qm(ny*(j-1)+2) + Q2 * volinv) * step2
+        Qm(ny*(j-1)+3) = (step1 * Qm(ny*(j-1)+3) + Q3 * volinv) * step2
+        Qm(ny*(j-1)+4) = (step1 * Qm(ny*(j-1)+4) + Q4 * volinv) * step2
+        Qm(ny*(j-1)+5) = (step1 * Qm(ny*(j-1)+5) + Q5 * volinv) * step2
       enddo
     endif
   end subroutine calc_mean
 
   subroutine copy(nx, ny, nz, QJ, Qre)
     integer, intent(in)          :: nx, ny, nz
-    real(8), intent(in), device  :: QJ(nx,ny,nz,5)
+    real(8), intent(in), device  :: QJ(5,nx,ny,nz)
     real(8), intent(out), device :: Qre(ny*(nz-6)*5)
-    integer j, k, l, k_offset, l_offset
+    integer j, k, l, j_offset, k_offset
     !$cuf kernel do <<<*,*>>>
-    do l = 1, 5
-      l_offset = ny * (nz-6) * (l-1)
-      do k = 1, nz-6
-        k_offset = ny * (k-1)
-        do j = 1, ny
-          Qre(l_offset+k_offset+j) = QJ(nre2,j,k+3,l)
+    do k = 1, nz-6
+      k_offset = ny * (k-1)
+      do j = 1, ny
+        j_offset = 5 * (j-1)
+        do l = 1, 5
+          Qre(k_offset+j_offset+l) = QJ(l,nre2,j,k+3)
     enddo;enddo;enddo
   end subroutine copy
    
   subroutine step_rescale(num, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ, Qm, Qre)
     integer, intent(in)            :: num, myrank, step, nx, ny, nz
     integer, intent(inout)         :: flag_re, ireq, ireq2(2)
-    real(8), intent(in), device    :: Jacobian(ny), QJ(nx,ny,nz,5)
+    real(8), intent(in), device    :: Jacobian(ny), QJ(5,nx,ny,nz)
     real(8), intent(inout), device :: Qm(ny*5), Qre(ny*(nz-6)*5)
     real(8) Qm_cpu(ny*5)
     integer ierr, j
@@ -167,7 +167,7 @@ contains
     real(8), intent(in)    :: y(ny), Jacobian(ny), Qm(ny*5)
     real(8), intent(out)   :: bltre
     real(8), intent(inout) :: Qre(ny*nz*5) ! Q / J
-    integer i, j, jj, k, kh, l, k_offset, l_offset, ierr
+    integer i, j, jj, k, kh, l, j_offset, k_offset, ierr
     integer, dimension(ny) :: jj_y, jj_e
     real(8) :: mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0, Cp = gamma * R / (gamma - 1.d0)
     real(8) t, dudy, taure, utre, utin, beta, mu, nu, ady, ade 
@@ -189,21 +189,21 @@ contains
     real(8) uin, vin, win, rhoin, Tin, pin
     ! cache
     real(8) :: u_tmp, v_tmp, p_tmp, T_tmp, weight_tmp, Jacobian_tmp, over_rhore, over_gamma_1 = 1.d0 / (gamma - 1.d0)
-    do l = 1, 5
-      l_offset = ny * nz * (l-1)
-      do k = 1, nz
-        k_offset = ny * (k-1)
-        do j = 1, ny
-          i = l_offset + k_offset + j
+    do k = 1, nz
+      k_offset = ny * (k-1)
+      do j = 1, ny
+        j_offset = 5 * (j-1)
+        do l = 1, 5
+          i = k_offset + j_offset + l
           Qre(i) = Qre(i) * Jacobian(j)
     enddo;enddo;enddo
 
     do j = 1, ny
-      rhom(j)  = Qm(     j)
-      u_tmp    = Qm(ny  +j)
-      v_tmp    = Qm(ny*2+j)
-      Wm(j)    = Qm(ny*3+j)
-      p_tmp    = Qm(ny*4+j)
+      rhom(j)  = Qm(ny*(j-1)+1)
+      u_tmp    = Qm(ny*(j-1)+2)
+      v_tmp    = Qm(ny*(j-1)+3)
+      Wm(j)    = Qm(ny*(j-1)+4)
+      p_tmp    = Qm(ny*(j-1)+5)
       T_tmp    = p_tmp / (R * rhom(j))
       Um(j)    = u_tmp
       Umin(j)  = u_tmp
@@ -244,16 +244,16 @@ contains
       wfout(:,:) = 0.d0
       Tfout(:,:) = 0.d0
       pfout(:,:) = 0.d0
-      l_offset = ny * nz
       do k = 1, nz
         k_offset = ny * (k-1)
         do j = 1, ny
-          rhore = Qre(          +k_offset+j)
+          j_offset = 5 * (j-1)
+          rhore = Qre(k_offset+j_offset+1)
           over_rhore = 1.d0 / rhore
-          ure   = Qre(l_offset*1+k_offset+j) * over_rhore
-          vre   = Qre(l_offset*2+k_offset+j) * over_rhore
-          wre   = Qre(l_offset*3+k_offset+j) * over_rhore
-          pre   = (gamma - 1.d0) * (Qre(l_offset*4+k_offset+j) - 0.5d0 * rhore * (ure**2 + vre**2 + wre**2)) 
+          ure   = Qre(k_offset+j_offset+2) * over_rhore
+          vre   = Qre(k_offset+j_offset+3) * over_rhore
+          wre   = Qre(k_offset+j_offset+4) * over_rhore
+          pre   = (gamma - 1.d0) * (Qre(k_offset+j_offset+5) - 0.5d0 * rhore * (ure**2 + vre**2 + wre**2)) 
           Tre   = pre / (rhore * R)
           ufre(j,k) = ure - Um(j)
           vfre(j,k) = vre - Vm(j)
@@ -331,11 +331,11 @@ contains
       enddo;enddo
   
       ! re-introducing
-      l_offset = ny * nz
       do k = 1, nz
         kh = mod(k+nz/2,nz) + 1
         k_offset = ny * (k-1)
         do j = 1, ny
+          j_offset = 5 * (j-1)
           weight_tmp   = weight(j)
           Jacobian_tmp = 1.d0 / Jacobian(j)
           uin = (Umin(j) + ufin(j,kh)) * (1.d0 - weight_tmp) + (Umout(j) + ufout(j,kh)) * weight_tmp
@@ -344,20 +344,20 @@ contains
           Tin = (Tmin(j) + Tfin(j,kh)) * (1.d0 - weight_tmp) + (Tmout(j) + Tfout(j,kh)) * weight_tmp
           pin = (pmin(j) + pfin(j,kh)) * (1.d0 - weight_tmp) + (pmout(j) + pfout(j,kh)) * weight_tmp
           rhoin = pin / (R * Tin)
-          Qre(           k_offset+j) = rhoin * Jacobian_tmp
-          Qre(l_offset  +k_offset+j) = rhoin * uin * Jacobian_tmp
-          Qre(l_offset*2+k_offset+j) = rhoin * vin * Jacobian_tmp
-          Qre(l_offset*3+k_offset+j) = rhoin * win * Jacobian_tmp
-          Qre(l_offset*4+k_offset+j) = (pin * over_gamma_1 + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) * Jacobian_tmp
+          Qre(k_offset+j_offset+1) = rhoin * Jacobian_tmp
+          Qre(k_offset+j_offset+2) = rhoin * uin * Jacobian_tmp
+          Qre(k_offset+j_offset+3) = rhoin * vin * Jacobian_tmp
+          Qre(k_offset+j_offset+4) = rhoin * win * Jacobian_tmp
+          Qre(k_offset+j_offset+5) = (pin * over_gamma_1 + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) * Jacobian_tmp
       enddo;enddo
     else
       ! cyclic boundary condition !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      do l = 1, 5
-        l_offset = ny * nz * (l-1)
-        do k = 1, nz
-          k_offset = ny * (k-1)
-          do j = 1, ny
-            Qre(l_offset+k_offset+j) = Qre(l_offset+k_offset+j) / Jacobian(j)
+      do k = 1, nz
+        k_offset = ny * (k-1)
+        do j = 1, ny
+          j_offset = 5 * (j-1)
+          do l = 1, 5
+            Qre(k_offset+j_offset+l) = Qre(k_offset+j_offset+l) / Jacobian(j)
       enddo;enddo;enddo
     endif
   end subroutine set_rescale

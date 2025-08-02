@@ -58,37 +58,37 @@ module mod_globals
   integer(kind=2), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
   integer(kind=2), parameter :: slau_wall   = 0
-  integer(kind=4), parameter :: id_rescale  = 0
-  real(8), parameter         :: blt         = 2.d-3
+  integer(kind=2), parameter :: id_rescale  = 0
+  real(8), parameter         :: blt         = 0.8d-3
 
   ! mesh
-  real(8), parameter :: Lx = 50d-3  ! 20  delta
-  real(8), parameter :: Ly = 10d-3  !  5  delta
-  real(8), parameter :: Lz = 2d-3   ! 1/4 delta
+  real(8), parameter :: Lx = 10.d0 * blt
+  real(8), parameter :: Ly = 5.d0 * blt
+  real(8), parameter :: Lz = 2.5d0 * blt
   ! DNS
-  integer, parameter :: nx = 1281 ! xp = 10   0.04   mm
-  integer, parameter :: ny = 321  ! yp = 0.5, 0.002  mm
-  integer, parameter :: nz = 129  ! zp = 5    0.0156 mm
+  integer, parameter :: nx = 257
+  integer, parameter :: ny = 129
+  integer, parameter :: nz = 129
 
-  integer, parameter :: nre1 = int(0.24 * nx) ! 6 delta for Lz = 1/4 delta, 4 delta for Lz = delta
-  integer, parameter :: nre2 = int(0.32 * nx)
+  integer, parameter :: nre1 = int(0.8 * nx)
+  integer, parameter :: nre2 = int(0.9 * nx)
   integer, parameter :: rerank = 0
 
   ! RTX 4090
-  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
-  type(dim3) :: blocksF   = dim3((nx-accuracy)/1,(ny-accuracy+1)/64,(nz-accuracy)/1)
-  type(dim3) :: blocksG   = dim3((nx-accuracy)/1,(ny-accuracy)/1,(nz-accuracy+1)/32)
+  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/64,(ny-accuracy)/1,(nz-accuracy)/1)
+  type(dim3) :: blocksF   = dim3((nx-accuracy)/1,(ny-accuracy+1)/32,(nz-accuracy)/1)
+  type(dim3) :: blocksG   = dim3((nx-accuracy)/1,(ny-accuracy)/1,(nz-accuracy+1)/64)
   type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
   type(dim3) :: blocksFv  = dim3((nx-accuracy)/1,(ny-accuracy+1)/32,(nz-accuracy)/1)
   type(dim3) :: blocksGv  = dim3((nx-accuracy)/1,(ny-accuracy)/1,(nz-accuracy+1)/32)
-  type(dim3) :: blocks    = dim3((nx-accuracy)/1,(ny-accuracy)/319,(nz-accuracy)/1)
-  type(dim3) :: threadsE  = dim3(32,1,1)
-  type(dim3) :: threadsF  = dim3(1,64,1)
-  type(dim3) :: threadsG  = dim3(1,1,32)
+  type(dim3) :: blocks    = dim3((nx-accuracy)/1,(ny-accuracy)/127,(nz-accuracy)/1)
+  type(dim3) :: threadsE  = dim3(64,1,1)
+  type(dim3) :: threadsF  = dim3(1,32,1)
+  type(dim3) :: threadsG  = dim3(1,1,64)
   type(dim3) :: threadsEv = dim3(32,1,1)
   type(dim3) :: threadsFv = dim3(1,32,1)
   type(dim3) :: threadsGv = dim3(1,1,32)
-  type(dim3) :: threads   = dim3(1,319,1)
+  type(dim3) :: threads   = dim3(1,127,1)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -99,28 +99,26 @@ module mod_globals
   !               ! kind4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_RungeKutta = 0
-  integer(kind=4), parameter :: id_recal      = 0
-  integer, parameter         :: step_offset   = 200
-  integer, parameter         :: start_rescale = 0
-  real(8), parameter :: endT  = 0.4d-3
-  integer, parameter :: np    = 200
+  integer(kind=2), parameter :: id_recal      = 0
+  integer, parameter         :: step_offset   = 0
+  integer, parameter         :: start_rescale = 3
+  real(8), parameter :: endT  = 0.05d-3
+  integer, parameter :: np    = 5
   real(8), parameter :: R     = 287.03d0
   real(8), parameter :: gamma = 1.4d0
+  real(8), parameter :: M0    = 2.5d0
   real(8), parameter :: T0    = 171.31d0
-  real(8), parameter :: u0    = 506.8d0
-  real(8), parameter :: CFL   = 0.1d0
-  real(8), parameter :: dt    = 8.d-9!CFL * Lx / (dble(nx-1) * u0)
-  integer, parameter :: nt    = int(endT / (dble(np) * dt))
+  real(8), parameter :: p0    = 14924.d0
+  real(8), parameter :: u0    = M0 * sqrt(gamma * R * T0)
+  real(8), parameter :: dt    = 2.d-9
+  integer, parameter :: nt    = 100!int(endT / (dble(np) * dt))
 
   ! physical properties
   real(8), parameter :: Pr    = 0.72d0
   real(8), parameter :: Prt   = 0.9d0
 
-  ! initial condition
-  real(8), parameter :: M0   = 1.9d0
-  real(8), parameter :: p0   = 14924.d0
   ! oblique shock
-  real(8), parameter :: beta  = dacos(-1.d0) * 39.27d0 / 180.d0
+  real(8), parameter :: beta  = dacos(-1.d0) * 40.03d0 / 180.d0
   real(8), parameter :: Ms    = M0 * dsin(beta)
   real(8), parameter :: Ms2   = Ms**2
   real(8), parameter :: theta = datan(2.d0 * (1.d0 / dtan(beta)) * (Ms2 - 1.d0) / (M0**2 * (gamma + dcos(2.d0 * beta)) + 2.d0))
