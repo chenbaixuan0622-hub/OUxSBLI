@@ -2,6 +2,7 @@ module calc_rescale
   use cudafor
   use mpi
   use mod_globals, only : nre1, nre2, rerank, nt, dt, gamma , R, Pr, u0, rho0, p0, M0, blt, start_rescale
+  use mod_constant, only : Cp, gamma_1, over_gamma_1
 contains
   subroutine calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJ, Qm)
     integer, intent(in)            :: step, flag_re, nx, ny, nz
@@ -22,7 +23,7 @@ contains
             Q2 = Q2 + QJ(2,i,j,k) * rhoinv
             Q3 = Q3 + QJ(3,i,j,k) * rhoinv
             Q4 = Q4 + QJ(4,i,j,k) * rhoinv
-            Q5 = Q5 + (gamma - 1.d0) * Jacobian_tmp * (QJ(5,i,j,k) &
+            Q5 = Q5 + gamma_1 * Jacobian_tmp * (QJ(5,i,j,k) &
                     - 0.5d0 * (QJ(2,i,j,k)**2 + QJ(3,i,j,k)**2 + QJ(4,i,j,k)**2) * rhoinv)
         enddo;enddo
         Qm(5*(j-1)+1) = Q1 * volinv
@@ -44,7 +45,7 @@ contains
             Q2 = Q2 + QJ(2,i,j,k) * rhoinv
             Q3 = Q3 + QJ(3,i,j,k) * rhoinv
             Q4 = Q4 + QJ(4,i,j,k) * rhoinv
-            Q5 = Q5 + (gamma - 1.d0) * Jacobian_tmp * (QJ(5,i,j,k) &
+            Q5 = Q5 + gamma_1 * Jacobian_tmp * (QJ(5,i,j,k) &
                     - 0.5d0 * (QJ(2,i,j,k)**2 + QJ(3,i,j,k)**2 + QJ(4,i,j,k)**2) * rhoinv)
         enddo;enddo
         Qm(5*(j-1)+1) = (step1 * Qm(5*(j-1)+1) + Q1 * volinv) * step2
@@ -169,7 +170,7 @@ contains
     real(8), intent(inout) :: Qre(ny*nz*5) ! Q / J
     integer i, j, jj, k, kh, l, j_offset, k_offset, ierr
     integer, dimension(ny) :: jj_y, jj_e
-    real(8) :: mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0, Cp = gamma * R / (gamma - 1.d0)
+    real(8) :: mu0 = 1.716d-5, T0 = 273.2d0, S = 111.d0
     real(8) t, dudy, taure, utre, utin, beta, mu, nu, ady, ade 
     ! mean properties at rescaling plane
     real(8), dimension(ny)    :: Um, Vm, Wm, rhom, Tm, pm
@@ -188,7 +189,7 @@ contains
     ! rescaled properties at inlet
     real(8) uin, vin, win, rhoin, Tin, pin
     ! cache
-    real(8) :: u_tmp, v_tmp, p_tmp, T_tmp, weight_tmp, Jacobian_tmp, over_rhore, over_gamma_1 = 1.d0 / (gamma - 1.d0)
+    real(8) :: u_tmp, v_tmp, p_tmp, T_tmp, weight_tmp, Jacobian_tmp, over_rhore
     do k = 1, nz
       k_offset = ny * 5 * (k-1)
       do j = 1, ny
@@ -253,7 +254,7 @@ contains
           ure   = Qre(k_offset+j_offset+2) * over_rhore
           vre   = Qre(k_offset+j_offset+3) * over_rhore
           wre   = Qre(k_offset+j_offset+4) * over_rhore
-          pre   = (gamma - 1.d0) * (Qre(k_offset+j_offset+5) - 0.5d0 * rhore * (ure**2 + vre**2 + wre**2)) 
+          pre   = gamma_1 * (Qre(k_offset+j_offset+5) - 0.5d0 * rhore * (ure**2 + vre**2 + wre**2)) 
           Tre   = pre / (rhore * R)
           ufre(j,k) = ure - Um(j)
           vfre(j,k) = vre - Vm(j)

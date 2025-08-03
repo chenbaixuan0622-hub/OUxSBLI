@@ -260,32 +260,6 @@ contains
     enddo;enddo;enddo
   end subroutine set_bc_cyclic6
 
-  attributes(host, device) subroutine riemann_inv_entropy(c0, cin, v0, vin, rho0, rhob, vb, pb)
-    use mod_globals, only : gamma
-    real(8), intent(in), value :: c0, cin, v0, vin, rho0
-    real(8), intent(out)       :: rhob, vb, pb
-    real(8) :: Rp, Rm, cb, gamma_1 = 1.d0 / (gamma - 1.d0)
-    Rp   = vin + 2.d0 * cin * gamma_1
-    Rm   = v0  - 2.d0 * c0  * gamma_1
-    vb   = 0.5d0 * (Rp + Rm)
-    cb   = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
-    rhob = (cb / c0)**(2.d0 * gamma_1) * rho0
-    pb   = (rhob * cb**2) / gamma
-  end subroutine riemann_inv_entropy
-
-  attributes(host, device) subroutine riemann_inv_impedance(c0, cin, v0, vin, rhoin, rhob, vb, pb)
-    use mod_globals, only : gamma
-    real(8), intent(in), value :: c0, cin, v0, vin, rhoin
-    real(8), intent(out)       :: rhob, vb, pb
-    real(8) :: Rp, Rm, cb, gamma_1 = 1.d0 / (gamma - 1.d0)
-    Rp    = vin + 2.d0 * cin / (gamma - 1.d0)
-    Rm    = v0  - 2.d0 * c0  / (gamma - 1.d0)
-    vb    = 0.5d0 * (Rp + Rm)
-    cb    = 0.25d0 * (gamma - 1.d0) * (Rp - Rm)
-    rhob  = cin * rhoin / cb
-    pb    = (rhob * cb**2) / gamma
-  end subroutine riemann_inv_impedance
-
   subroutine set_bc_mut_common(nx, ny, nz, mut, qc2)
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(inout), device :: mut(nx,ny,nz), qc2(nx,ny,nz)
