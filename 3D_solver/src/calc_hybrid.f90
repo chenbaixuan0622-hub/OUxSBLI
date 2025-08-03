@@ -3,13 +3,13 @@ module calc_hybrid
   use mod_globals, only : accuracy, offset, gamma
   implicit none
 contains
-  attributes(global) subroutine calc_Ducros(nx,ny,nz,dx,dy,dz,u,v,w,fd)
-    integer, intent(in), value                        :: nx, ny, nz
-    real(8), intent(in), dimension(nx-1), device      :: dx ! 1 / dx
-    real(8), intent(in), dimension(ny-1), device      :: dy ! 1 / dy
-    real(8), intent(in), dimension(nz-1), device      :: dz ! 1 / dz
-    real(8), intent(in), dimension(nx,ny,nz), device  :: u, v, w
-    real(8), intent(out), dimension(nx,ny,nz), device :: fd
+  attributes(global) subroutine calc_Ducros(nx, ny, nz, dx, dy, dz, Q, fd)
+    integer, intent(in), value                         :: nx, ny, nz
+    real(8), intent(in), dimension(nx-1), device       :: dx ! 1 / dx
+    real(8), intent(in), dimension(ny-1), device       :: dy ! 1 / dy
+    real(8), intent(in), dimension(nz-1), device       :: dz ! 1 / dz
+    real(8), intent(in), dimension(5,nx,ny,nz), device :: Q
+    real(8), intent(out), dimension(nx,ny,nz), device  :: fd
     integer i, j, k
     real(8) dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz
     real(8) div, rot(3)
@@ -21,15 +21,15 @@ contains
     dx_tmp = 0.25d0 * (dx(i-1) + dx(i))
     dy_tmp = 0.25d0 * (dy(j-1) + dy(j))
     dz_tmp = 0.25d0 * (dz(k-1) + dz(k))
-    dudx = (-u(i-1,j,k) + u(i+1,j,k)) * dx_tmp
-    dvdx = (-v(i-1,j,k) + v(i+1,j,k)) * dx_tmp
-    dwdx = (-w(i-1,j,k) + w(i+1,j,k)) * dx_tmp
-    dudy = (-u(i,j-1,k) + u(i,j+1,k)) * dy_tmp
-    dvdy = (-v(i,j-1,k) + v(i,j+1,k)) * dy_tmp
-    dwdy = (-w(i,j-1,k) + w(i,j+1,k)) * dy_tmp
-    dudz = (-u(i,j,k-1) + u(i,j,k+1)) * dz_tmp
-    dvdz = (-v(i,j,k-1) + v(i,j,k+1)) * dz_tmp
-    dwdz = (-w(i,j,k-1) + w(i,j,k+1)) * dz_tmp
+    dudx = (-Q(2,i-1,j,k) + Q(2,i+1,j,k)) * dx_tmp
+    dvdx = (-Q(3,i-1,j,k) + Q(3,i+1,j,k)) * dx_tmp
+    dwdx = (-Q(4,i-1,j,k) + Q(4,i+1,j,k)) * dx_tmp
+    dudy = (-Q(2,i,j-1,k) + Q(2,i,j+1,k)) * dy_tmp
+    dvdy = (-Q(3,i,j-1,k) + Q(3,i,j+1,k)) * dy_tmp
+    dwdy = (-Q(4,i,j-1,k) + Q(4,i,j+1,k)) * dy_tmp
+    dudz = (-Q(2,i,j,k-1) + Q(2,i,j,k+1)) * dz_tmp
+    dvdz = (-Q(3,i,j,k-1) + Q(3,i,j,k+1)) * dz_tmp
+    dwdz = (-Q(4,i,j,k-1) + Q(4,i,j,k+1)) * dz_tmp
     div = dudx + dvdy + dwdz
     rot(1) = dwdy - dvdz
     rot(2) = dudz - dwdx
