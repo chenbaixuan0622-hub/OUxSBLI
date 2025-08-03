@@ -148,7 +148,7 @@ contains
             !print *, "myrank is ", myrank, " calc EFG"
             call nvtxEndRange
             call nvtxStartRange("calc step", 2)
-            call calc_step(nx, ny, nz, 1.d0, 0.d0, xix, etay, zetaz, E, F, G, QJ, QJ2)
+            call calc_step1(nx, ny, nz, xix, etay, zetaz, E, F, G, QJ, QJ2)
             !print *, "myrank is ", myrank, " calc step"
             call nvtxEndRange
           else
@@ -156,7 +156,7 @@ contains
             call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G, fx, fy, fz)
             call nvtxEndRange
             call nvtxStartRange("calc step", 2)
-            call calc_step_forcing(nx, ny, nz, 1.d0, 0.d0, xix, etay, zetaz, E, F, G, fx, fy, fz, QJ, QJ2)
+            call calc_step1_forcing(nx, ny, nz, xix, etay, zetaz, E, F, G, fx, fy, fz, QJ, QJ2)
             call nvtxEndRange
           endif
           if (ndevices >= 2 .and. kind(id_exchange) == 4) then
