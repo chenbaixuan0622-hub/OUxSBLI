@@ -1,5 +1,6 @@
 module calc_keep
   use mod_globals, only : dimension, gamma
+  use mod_constant, only : over_gamma_1
   use calc_common_dim
   use calc_term
   use calc_mat
@@ -26,7 +27,7 @@ contains
     real(8), intent(in), dimension(2), device         :: rho, p
     real(8), intent(in), dimension(dimension), device :: V1, V2
     real(8) :: IE, PV, KE, Et
-    IE = C * 0.5d0 * (p(1) / rho(1) + p(2) / rho(2)) / (gamma - 1.d0)
+    IE = C * 0.5d0 * (p(1) / rho(1) + p(2) / rho(2)) * over_gamma_1
     PV = 0.5d0 * (V1(id) * p(2) + V2(id) * p(1))
     KE = 0.5d0 * C * vecsum(V1, V2)
     Et = IE + PV + KE
@@ -39,7 +40,7 @@ contains
     real(8), intent(in), dimension(2), device         :: rho, p
     real(8), intent(in), dimension(dimension), device :: V1, V2
     real(8) :: IE, PV, KE, Et
-    IE = 0.25d0 * (V1(id) + V2(id)) * (p(1) + p(2)) / (gamma - 1.d0)
+    IE = 0.25d0 * (V1(id) + V2(id)) * (p(1) + p(2)) * over_gamma_1
     PV = 0.5d0 * (V1(id) * p(2) + V2(id) * p(1))
     KE = 0.5d0 * C * vecsum(V1, V2)
     Et = IE + PV + KE
@@ -52,7 +53,7 @@ contains
     real(8), intent(in), dimension(2), device         :: rho, p
     real(8), intent(in), dimension(dimension), device :: V1, V2
     real(8) :: H, KE, Et
-    H  = C * 0.5d0 * gamma / (gamma - 1.d0) * (p(1) / rho(1) + p(2) / rho(2))
+    H  = C * 0.5d0 * gamma * over_gamma_1 * (p(1) / rho(1) + p(2) / rho(2))
     KE = 0.5d0 * C * vecsum(V1, V2)
     Et = H + KE
   end function EtKEP2
@@ -68,7 +69,7 @@ contains
     real(8), dimension(4) :: P_over_Rho
     real(8), dimension(3) :: RhoVIE, RhoVKE, VP, Et
     P_over_Rho(:) = p(:) / rho(:)
-    RhoVIE(:)     = RhoPhiU4(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
+    RhoVIE(:)     = RhoPhiU4(RhoV(:), P_over_Rho(:)) * over_gamma_1
     RhoVKE(:)     = RhoUPhiPhi4(RhoV(:), V(:,:))
     VP(:)         = PhiPsi4(V(:,id), p(:))
     Et(:)         = RhoVIE(:) + RhoVKE(:) + VP(:)
@@ -82,7 +83,7 @@ contains
     real(8), intent(in), dimension(3), device           :: RhoV
     real(8), dimension(3) :: Vm, RhoVIE, RhoVKE, VP, Et
     Vm(:)     = Phi4(V(:,id))
-    RhoVIE(:) = RhoPhiU4(Vm(:), p(:)) / (gamma - 1.d0)    
+    RhoVIE(:) = RhoPhiU4(Vm(:), p(:)) * over_gamma_1    
     RhoVKE(:) = RhoUPhiPhi4(RhoV(:), V(:,:))
     VP(:)     = PhiPsi4(V(:,id), p(:))
     Et(:)     = RhoVIE(:) + RhoVKE(:) + VP(:)
@@ -98,7 +99,7 @@ contains
     real(8), dimension(4) :: P_over_Rho
     integer i
     P_over_Rho(:) = p(:) / rho(:)
-    RhoVH(:)      = RhoPhiU4(RhoV(:), P_over_Rho(:)) * gamma / (gamma - 1.d0)
+    RhoVH(:)      = RhoPhiU4(RhoV(:), P_over_Rho(:)) * gamma * over_gamma_1
     RhoVKE(:)     = RhoUPhiPhi4(RhoV(:), V(:,:))
     Et(:)         = RhoVH(:) + RhoVKE(:)
   end function EtKEP4
@@ -114,7 +115,7 @@ contains
     real(8), dimension(6) :: P_over_Rho
     real(8), dimension(6) :: RhoVIE, RhoVKE, VP, Et
     P_over_Rho(:) = p(:) / rho(:)
-    RhoVIE(:)     = RhoPhiU6(RhoV(:), P_over_Rho(:)) / (gamma - 1.d0)
+    RhoVIE(:)     = RhoPhiU6(RhoV(:), P_over_Rho(:)) * over_gamma_1
     RhoVKE(:)     = RhoUPhiPhi6(RhoV(:), V(:,:))
     VP(:)         = PhiPsi6(V(:,id), p(:))
     Et(:)         = RhoVIE(:) + RhoVKE(:) + VP(:)
@@ -128,7 +129,7 @@ contains
     real(8), intent(in), dimension(6), device           :: RhoV
     real(8), dimension(6) :: Vm, RhoVIE, RhoVKE, VP, Et
     Vm(:)     = Phi6(V(:,id))
-    RhoVIE(:) = RhoPhiU6(Vm(:), p(:)) / (gamma - 1.d0)    
+    RhoVIE(:) = RhoPhiU6(Vm(:), p(:)) * over_gamma_1    
     RhoVKE(:) = RhoUPhiPhi6(RhoV(:), V(:,:))
     VP(:)     = PhiPsi6(V(:,id), p(:))
     Et(:)     = RhoVIE(:) + RhoVKE(:) + VP(:)
@@ -144,7 +145,7 @@ contains
     real(8), dimension(6) :: P_over_Rho
     integer i
     P_over_Rho(:) = p(:) / rho(:)
-    RhoVH(:)      = RhoPhiU6(RhoV(:), P_over_Rho(:)) * gamma / (gamma - 1.d0)
+    RhoVH(:)      = RhoPhiU6(RhoV(:), P_over_Rho(:)) * gamma * over_gamma_1
     RhoVKE(:)     = RhoUPhiPhi6(RhoV(:), V(:,:))
     Et(:)         = RhoVH(:) + RhoVKE(:)
   end function EtKEP6
