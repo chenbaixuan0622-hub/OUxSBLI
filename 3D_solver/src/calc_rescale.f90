@@ -25,11 +25,11 @@ contains
             Q5 = Q5 + (gamma - 1.d0) * Jacobian_tmp * (QJ(5,i,j,k) &
                     - 0.5d0 * (QJ(2,i,j,k)**2 + QJ(3,i,j,k)**2 + QJ(4,i,j,k)**2) * rhoinv)
         enddo;enddo
-        Qm(ny*(j-1)+1) = Q1 * volinv
-        Qm(ny*(j-1)+2) = Q2 * volinv
-        Qm(ny*(j-1)+3) = Q3 * volinv
-        Qm(ny*(j-1)+4) = Q4 * volinv
-        Qm(ny*(j-1)+5) = Q5 * volinv
+        Qm(5*(j-1)+1) = Q1 * volinv
+        Qm(5*(j-1)+2) = Q2 * volinv
+        Qm(5*(j-1)+3) = Q3 * volinv
+        Qm(5*(j-1)+4) = Q4 * volinv
+        Qm(5*(j-1)+5) = Q5 * volinv
       enddo
     else
       step1 = dble(step-1); step2 = 1.d0 / dble(step)
@@ -47,11 +47,11 @@ contains
             Q5 = Q5 + (gamma - 1.d0) * Jacobian_tmp * (QJ(5,i,j,k) &
                     - 0.5d0 * (QJ(2,i,j,k)**2 + QJ(3,i,j,k)**2 + QJ(4,i,j,k)**2) * rhoinv)
         enddo;enddo
-        Qm(ny*(j-1)+1) = (step1 * Qm(ny*(j-1)+1) + Q1 * volinv) * step2
-        Qm(ny*(j-1)+2) = (step1 * Qm(ny*(j-1)+2) + Q2 * volinv) * step2
-        Qm(ny*(j-1)+3) = (step1 * Qm(ny*(j-1)+3) + Q3 * volinv) * step2
-        Qm(ny*(j-1)+4) = (step1 * Qm(ny*(j-1)+4) + Q4 * volinv) * step2
-        Qm(ny*(j-1)+5) = (step1 * Qm(ny*(j-1)+5) + Q5 * volinv) * step2
+        Qm(5*(j-1)+1) = (step1 * Qm(5*(j-1)+1) + Q1 * volinv) * step2
+        Qm(5*(j-1)+2) = (step1 * Qm(5*(j-1)+2) + Q2 * volinv) * step2
+        Qm(5*(j-1)+3) = (step1 * Qm(5*(j-1)+3) + Q3 * volinv) * step2
+        Qm(5*(j-1)+4) = (step1 * Qm(5*(j-1)+4) + Q4 * volinv) * step2
+        Qm(5*(j-1)+5) = (step1 * Qm(5*(j-1)+5) + Q5 * volinv) * step2
       enddo
     endif
   end subroutine calc_mean
@@ -63,7 +63,7 @@ contains
     integer j, k, l, j_offset, k_offset
     !$cuf kernel do <<<*,*>>>
     do k = 1, nz-6
-      k_offset = ny * (k-1)
+      k_offset = ny * 5 * (k-1)
       do j = 1, ny
         j_offset = 5 * (j-1)
         do l = 1, 5
@@ -84,9 +84,9 @@ contains
       if (num == 1) then
         call calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJ, Qm)
         Qm_cpu = Qm
-        do j = 1, ny
-          print *, "send j=", j, "Q", Qm_cpu(j), Qm_cpu(ny+j)
-        enddo
+        !do j = 1, ny
+        !  print *, "send j=", j, "Q", Qm_cpu(5*(j-1)+1), Qm_cpu(5*(j-1)+2)
+        !enddo
       endif
       call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq2(2), ierr)
       !print *, "myrank=", myrank, "send Qre"
@@ -190,7 +190,7 @@ contains
     ! cache
     real(8) :: u_tmp, v_tmp, p_tmp, T_tmp, weight_tmp, Jacobian_tmp, over_rhore, over_gamma_1 = 1.d0 / (gamma - 1.d0)
     do k = 1, nz
-      k_offset = ny * (k-1)
+      k_offset = ny * 5 * (k-1)
       do j = 1, ny
         j_offset = 5 * (j-1)
         do l = 1, 5
@@ -199,11 +199,11 @@ contains
     enddo;enddo;enddo
 
     do j = 1, ny
-      rhom(j)  = Qm(ny*(j-1)+1)
-      u_tmp    = Qm(ny*(j-1)+2)
-      v_tmp    = Qm(ny*(j-1)+3)
-      Wm(j)    = Qm(ny*(j-1)+4)
-      p_tmp    = Qm(ny*(j-1)+5)
+      rhom(j)  = Qm(5*(j-1)+1)
+      u_tmp    = Qm(5*(j-1)+2)
+      v_tmp    = Qm(5*(j-1)+3)
+      Wm(j)    = Qm(5*(j-1)+4)
+      p_tmp    = Qm(5*(j-1)+5)
       T_tmp    = p_tmp / (R * rhom(j))
       Um(j)    = u_tmp
       Umin(j)  = u_tmp
@@ -245,7 +245,7 @@ contains
       Tfout(:,:) = 0.d0
       pfout(:,:) = 0.d0
       do k = 1, nz
-        k_offset = ny * (k-1)
+        k_offset = ny * 5 * (k-1)
         do j = 1, ny
           j_offset = 5 * (j-1)
           rhore = Qre(k_offset+j_offset+1)
@@ -333,7 +333,7 @@ contains
       ! re-introducing
       do k = 1, nz
         kh = mod(k+nz/2,nz) + 1
-        k_offset = ny * (k-1)
+        k_offset = ny * 5 * (k-1)
         do j = 1, ny
           j_offset = 5 * (j-1)
           weight_tmp   = weight(j)
@@ -353,7 +353,7 @@ contains
     else
       ! cyclic boundary condition !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       do k = 1, nz
-        k_offset = ny * (k-1)
+        k_offset = ny * 5 * (k-1)
         do j = 1, ny
           j_offset = 5 * (j-1)
           do l = 1, 5
