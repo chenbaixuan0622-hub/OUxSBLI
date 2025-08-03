@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.spatial import KDTree
+from scipy.spatial.distance import squareform, pdist
 from sklearn.feature_selection import mutual_info_regression
 from nolitsa import dimension
 from nolitsa import delay
@@ -90,27 +91,17 @@ def local_constant_pred(t, x, m, dim, k):
   return xp, xa
 
 
-def recurrence_plot(x):
-  n = len(x)
-  D = np.zeros((n,n), dtype=np.float32)
-  d = np.zeros((n,n), dtype=bool)
-  # calc distance
-  for j in range(n):
-    for i in range(n):
-      if i != j:
-        D[i,j] = np.linalg.norm(-x[i] + x[j])
-        D[j,i] = D[i,j]
-      else:
-        D[i,j] = 0.e0
-  eps = np.median(D.flatten())
-  # 0 or 1
-  for j in range(n):
-    for i in range(n):
-      if D[i,j] < eps:
-        d[i,j] = 1
-        d[j,i] = 1
-      else:
-        d[i,j] = 0
-        d[j,i] = 0
-  return D, d
+def recurrence_plot(x, tau=None, dim=None):
+  if tau is not None and dim is not None:
+    X = embedding(x, dim=dim, tau=tau)
+    n = X.shape[0]
+  else:
+    n = len(x)
+  dist_matrix = squareform(pdist(X))
+  eps = np.median(dist_matrix)
+  adjacency = (dist_matrix < eps).astype(np.uint8)
+  np.fill_diagonal(adjacency, 0)
+  src, dst   = np.nonzero(adjacency)
+  edge_index = np.stack([src, dst], axis=0)
+  return dist_matrix, adjacency, edge_index
 

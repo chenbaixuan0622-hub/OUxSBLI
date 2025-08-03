@@ -1,9 +1,11 @@
 module set
-  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, rhol => rho0, rhor => rho1, pl => p0, pr => p1
+  use mod_globals, only : nx, ny, nz, gamma, R, rhol => rho0, rhor => rho1, pl => p0, pr => p1
+  use set_bc_common
   implicit none
 contains
-  subroutine set_grid(nx,ny,nz,x,y,z,dx,dy,dz)
-    integer, intent(in)  :: nx, ny, nz
+  subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
+    integer, intent(in)  :: myrank, nx, ny, nz
+    real(8), intent(in)  :: Lx, Ly, Lz
     real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx), dy(ny), dz(nz)
     integer i, j, k
     real(8) dx1, dy1, dz1
@@ -27,129 +29,100 @@ contains
     enddo
   end subroutine set_grid
   
-  subroutine set_init(nx,ny,nz,x,y,z,Q)
-    integer, intent(in)  :: nx, ny, nz
+  subroutine set_init(myrank, nx, ny, nz, x, y, z, Q)
+    integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
-    real(8), intent(out) :: Q(nx,ny,nz,5)
+    real(8), intent(out) :: Q(5,nx,ny,nz)
     integer i, j, k
     do i = 1, nx
       if (i < int(0.5*nx)) then
-        Q(i,:,:,1) = rhol
-        Q(i,:,:,2) = 0.d0
-        Q(i,:,:,3) = 0.d0
-        Q(i,:,:,4) = 0.d0
-        Q(i,:,:,5) = pl / (gamma  - 1.d0)
+        Q(1,i,:,:) = rhol
+        Q(2,i,:,:) = 0.d0
+        Q(3,i,:,:) = 0.d0
+        Q(4,i,:,:) = 0.d0
+        Q(5,i,:,:) = pl / (gamma  - 1.d0)
       else
-        Q(i,:,:,1) = rhor
-        Q(i,:,:,2) = 0.d0
-        Q(i,:,:,3) = 0.d0
-        Q(i,:,:,4) = 0.d0
-        Q(i,:,:,5) = pr / (gamma - 1.d0)
+        Q(1,i,:,:) = rhor
+        Q(2,i,:,:) = 0.d0
+        Q(3,i,:,:) = 0.d0
+        Q(4,i,:,:) = 0.d0
+        Q(5,i,:,:) = pr / (gamma - 1.d0)
       endif
     enddo
   end subroutine set_init
   
-  subroutine set_bc(nx,ny,nz,Jacobian,Q,Qre)
-    integer, intent(in), value     :: nx, ny, nz
+  subroutine set_bc(myrank, nx, ny, nz, Jacobian, Q, Qre)
+    integer, intent(in), value     :: myrank, nx, ny, nz
     real(8), intent(in), device    :: Jacobian(ny)
-    real(8), intent(inout), device :: Q(nx,ny,nz,5) ! Q / J
-    real(8), intent(in), device    :: Qre(2,ny,nz,5)
+    real(8), intent(inout), device :: Q(5,nx,ny,nz) ! Q / J
+    real(8), intent(in), device    :: Qre(ny*(nz-6)*5)
     integer :: i, j, k, l, jc = 4, kc = 4
-    real(8), device :: Qc(nx,5)
+    real(8), device :: Qc(5,nx)
   
     ! inlet and outlet
     !$cuf kernel do(2) <<<*,*>>>
     do k = 4, 4
       do j = 4, 4
-        Q(1,j,k,1)    = rhol / Jacobian(j)
-        Q(1,j,k,2)    = 0.d0
-        Q(1,j,k,3)    = 0.d0
-        Q(1,j,k,4)    = 0.d0
-        Q(1,j,k,5)    = pl / (gamma - 1.d0) / Jacobian(j)
-        Q(2,j,k,1)    = rhol / Jacobian(j)
-        Q(2,j,k,2)    = 0.d0
-        Q(2,j,k,3)    = 0.d0
-        Q(2,j,k,4)    = 0.d0
-        Q(2,j,k,5)    = pl / (gamma - 1.d0) / Jacobian(j)
-        Q(3,j,k,1)    = rhol / Jacobian(j)
-        Q(3,j,k,2)    = 0.d0
-        Q(3,j,k,3)    = 0.d0
-        Q(3,j,k,4)    = 0.d0
-        Q(3,j,k,5)    = pl / (gamma - 1.d0) / Jacobian(j)
-        Q(nx-2,j,k,1) = rhor / Jacobian(j)
-        Q(nx-2,j,k,2) = 0.d0
-        Q(nx-2,j,k,3) = 0.d0
-        Q(nx-2,j,k,4) = 0.d0
-        Q(nx-2,j,k,5) = pr / (gamma - 1.d0) / Jacobian(j)
-        Q(nx-1,j,k,1) = rhor / Jacobian(j)
-        Q(nx-1,j,k,2) = 0.d0
-        Q(nx-1,j,k,3) = 0.d0
-        Q(nx-1,j,k,4) = 0.d0
-        Q(nx-1,j,k,5) = pr / (gamma - 1.d0) / Jacobian(j)
-        Q(nx,j,k,1)   = rhor / Jacobian(j)
-        Q(nx,j,k,2)   = 0.d0
-        Q(nx,j,k,3)   = 0.d0
-        Q(nx,j,k,4)   = 0.d0
-        Q(nx,j,k,5)   = pr / (gamma - 1.d0) / Jacobian(j)
+        Q(1,1,j,k)    = rhol / Jacobian(j)
+        Q(2,1,j,k)    = 0.d0
+        Q(3,1,j,k)    = 0.d0
+        Q(4,1,j,k)    = 0.d0
+        Q(5,1,j,k)    = pl / (gamma - 1.d0) / Jacobian(j)
+        Q(1,2,j,k)    = rhol / Jacobian(j)
+        Q(2,2,j,k)    = 0.d0
+        Q(3,2,j,k)    = 0.d0
+        Q(4,2,j,k)    = 0.d0
+        Q(5,2,j,k)    = pl / (gamma - 1.d0) / Jacobian(j)
+        Q(1,3,j,k)    = rhol / Jacobian(j)
+        Q(2,3,j,k)    = 0.d0
+        Q(3,3,j,k)    = 0.d0
+        Q(4,3,j,k)    = 0.d0
+        Q(5,3,j,k)    = pl / (gamma - 1.d0) / Jacobian(j)
+        Q(1,nx-2,j,k) = rhor / Jacobian(j)
+        Q(2,nx-2,j,k) = 0.d0
+        Q(3,nx-2,j,k) = 0.d0
+        Q(4,nx-2,j,k) = 0.d0
+        Q(5,nx-2,j,k) = pr / (gamma - 1.d0) / Jacobian(j)
+        Q(1,nx-1,j,k) = rhor / Jacobian(j)
+        Q(2,nx-1,j,k) = 0.d0
+        Q(3,nx-1,j,k) = 0.d0
+        Q(4,nx-1,j,k) = 0.d0
+        Q(5,nx-1,j,k) = pr / (gamma - 1.d0) / Jacobian(j)
+        Q(1,nx,j,k)   = rhor / Jacobian(j)
+        Q(2,nx,j,k)   = 0.d0
+        Q(3,nx,j,k)   = 0.d0
+        Q(4,nx,j,k)   = 0.d0
+        Q(5,nx,j,k)   = pr / (gamma - 1.d0) / Jacobian(j)
     enddo;enddo
 
     !$cuf kernel do(2)<<<*,*>>>
-    do l = 1, 5
-      do i = 1, nx
-        Qc(i,l) = Q(i,jc,kc,l)
+    do i = 1, nx
+      do l = 1, 5
+        Qc(l,i) = Q(l,i,jc,kc)
     enddo;enddo
 
     !$cuf kernel do(4)<<<*,*>>>
-    do l = 1, 5
-      do k = 1, nz
-        do j = 1, ny
-          do i = 1, nx
-            Q(i,j,k,l) = Qc(i,l)
+    do k = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          do l = 1, 5
+            Q(l,i,j,k) = Qc(l,i)
     enddo;enddo;enddo;enddo
   end subroutine set_bc
 
   subroutine set_bc_mut(nx,ny,nz,mut,qc2)
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(inout), device :: mut(nx,ny,nz), qc2(nx,ny,nz)
-    integer i, j, k
-    !$cuf kernel do(2) <<<*,*>>>
-    do k = 2, nz-1
-      do j = 2, ny-1
-        mut(1,j,k) = mut(nx-1,j,k)
-        mut(nx,j,k) = mut(2,j,k)
-        qc2(1,j,k) = qc2(nx-1,j,k)
-        qc2(nx,j,k) = qc2(2,j,k)
-    enddo;enddo
-
-    !$cuf kernel do(2) <<<*,*>>>
-    do k = 2, nz-1
-      do i = 2, nx-1
-        mut(i,1,k) = mut(i,ny-1,k)
-        mut(i,ny,k) = mut(i,2,k)
-        qc2(i,1,k) = qc2(i,ny-1,k)
-        qc2(i,ny,k) = qc2(i,2,k)
-    enddo;enddo
-
-    !$cuf kernel do(1) <<<*,*>>>
-    do k = 2, nz-1
-      mut(1,1,k) = mut(nx-1,ny-1,k)
-      mut(nx,1,k) = mut(2,ny-1,k)
-      mut(1,ny,k) = mut(nx-1,2,k)
-      mut(nx,ny,k) = mut(2,2,k)
-      qc2(1,1,k) = qc2(nx-1,ny-1,k)
-      qc2(nx,1,k) = qc2(2,ny-1,k)
-      qc2(1,ny,k) = qc2(nx-1,2,k)
-      qc2(nx,ny,k) = qc2(2,2,k)
-    enddo
-
-    !$cuf kernel do(2) <<<*,*>>>
-    do j = 1, ny
-      do i = 1, nx
-        mut(i,j,1) = mut(i,j,nz-1)
-        mut(i,j,nz) = mut(i,j,2)
-        qc2(i,j,1) = qc2(i,j,nz-1)
-        qc2(i,j,nz) = qc2(i,j,2)
-    enddo;enddo
+    call set_bc_mut_common(nx, ny, nz, mut, qc2)
   end subroutine set_bc_mut
+
+  subroutine calc_forcing(nx, ny, nz, dx, dy, dz, rho, u, v, w, p, fx, fy, fz)
+    integer, intent(in), value   :: nx, ny, nz
+    real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
+    real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
+    real(8), intent(in), device  :: dz(nz-1) ! 1 / dz
+    real(8), intent(in), device  :: rho(nx,ny,nz), u(nx,ny,nz), v(nx,ny,nz), w(nx,ny,nz), p(nx,ny,nz)
+    real(8), intent(out), device :: fx(nx-2,ny-2,nz-2), fy(nx-2,ny-2,nz-2), fz(nx-2,ny-2,nz-2)
+  end subroutine calc_forcing
 end module set
 
