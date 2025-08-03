@@ -13,7 +13,7 @@ contains
     real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy+1), device :: G
     real(8), intent(out), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy),device   :: R
     integer i, j, k, l
-    !$cuf kernel do(4) <<<*,*>>>
+    !$cuf kernel do(3) <<<*,*>>>
     do k = 1, nz-2*offset
       do j = 1, ny-2*offset
         do i = 1, nx-2*offset
@@ -38,7 +38,7 @@ contains
     real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy), device     :: fz
     real(8), intent(out), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy),device   :: R
     integer i, j, k, l
-    !$cuf kernel do(4) <<<*,*>>>
+    !$cuf kernel do(3) <<<*,*>>>
     do k = 1, nz-2*offset
       do j = 1, ny-2*offset
         do i = 1, nx-2*offset
@@ -50,8 +50,9 @@ contains
     enddo;enddo;enddo;enddo
   end subroutine calc_R_forcing
 
-  subroutine calc_step1(nx, ny, nz, dx, dy, dz, E, F, G, Q, Q2)
+  subroutine calc_step1(nx, ny, nz, coef, dx, dy, dz, E, F, G, Q, Q2)
     integer, intent(in), value                                                      :: nx, ny, nz
+    real(8), intent(in), value                                                      :: coef
     real(8), intent(in), dimension(nx-1), device                                    :: dx
     real(8), intent(in), dimension(ny-1), device                                    :: dy
     real(8), intent(in), dimension(nz-1), device                                    :: dz
@@ -62,7 +63,7 @@ contains
     real(8), intent(out), dimension(5,nx,ny,nz), device                             :: Q2
     integer i, j, k, l
     real(8) R
-    !$cuf kernel do(4) <<<*,*>>>
+    !$cuf kernel do(3) <<<*,*>>>
     do k = 1, nz-2*offset
       do j = 1, ny-2*offset
         do i = 1, nx-2*offset
@@ -70,12 +71,13 @@ contains
             R = dt / (dy(j) * dz(k)) * (-E(l,i,j,k) + E(l,i+1,j,k)) &
             & + dt / (dz(k) * dx(i)) * (-F(l,i,j,k) + F(l,i,j+1,k)) &
             & + dt / (dx(i) * dy(j)) * (-G(l,i,j,k) + G(l,i,j,k+1))
-            Q2(l,i+offset,j+offset,k+offset) = Q(l,i+offset,j+offset,k+offset) - R
+            Q2(l,i+offset,j+offset,k+offset) = Q(l,i+offset,j+offset,k+offset) - coef * R
     enddo;enddo;enddo;enddo
   end subroutine calc_step1
   
-  subroutine calc_step1_forcing(nx, ny, nz, dx, dy, dz, E, F, G, fx, fy, fz, Q, Q2)
+  subroutine calc_step1_forcing(nx, ny, nz, coef, dx, dy, dz, E, F, G, fx, fy, fz, Q, Q2)
     integer, intent(in), value                                                      :: nx, ny, nz
+    real(8), intent(in), value                                                      :: coef
     real(8), intent(in), dimension(nx-1), device                                    :: dx
     real(8), intent(in), dimension(ny-1), device                                    :: dy
     real(8), intent(in), dimension(nz-1), device                                    :: dz
@@ -89,7 +91,7 @@ contains
     real(8), intent(out), dimension(5,nx,ny,nz), device                             :: Q2
     integer i, j, k, l
     real(8) R
-    !$cuf kernel do(4) <<<*,*>>>
+    !$cuf kernel do(3) <<<*,*>>>
     do k = 1, nz-2*offset
       do j = 1, ny-2*offset
         do i = 1, nx-2*offset
@@ -97,7 +99,7 @@ contains
             R = dt / (dy(j) * dz(k)) * (-E(l,i,j,k) + E(l,i+1,j,k) + fx(i,j,k) / dx(i)) &
             & + dt / (dz(k) * dx(i)) * (-F(l,i,j,k) + F(l,i,j+1,k) + fy(i,j,k) / dy(j)) &
             & + dt / (dx(i) * dy(j)) * (-G(l,i,j,k) + G(l,i,j,k+1) + fz(i,j,k) / dz(k))
-            Q2(l,i+offset,j+offset,k+offset) = Q(l,i+offset,j+offset,k+offset) - R
+            Q2(l,i+offset,j+offset,k+offset) = Q(l,i+offset,j+offset,k+offset) - coef * R
     enddo;enddo;enddo;enddo
   end subroutine calc_step1_forcing
   
@@ -115,7 +117,7 @@ contains
     real(8), intent(inout), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy), device :: Rs
     integer i, j, k, l
     real(8) R
-    !$cuf kernel do(4) <<<*,*>>>
+    !$cuf kernel do(3) <<<*,*>>>
     do k = 1, nz-2*offset
       do j = 1, ny-2*offset
         do i = 1, nx-2*offset
@@ -145,7 +147,7 @@ contains
     real(8), intent(inout), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy), device :: Rs
     integer i, j, k, l
     real(8) R
-    !$cuf kernel do(4) <<<*,*>>>
+    !$cuf kernel do(3) <<<*,*>>>
     do k = 1, nz-2*offset
       do j = 1, ny-2*offset
         do i = 1, nx-2*offset
@@ -171,7 +173,7 @@ contains
     real(8), intent(inout), dimension(5,nx,ny,nz), device                           :: Qout
     integer i, j, k, l
     real(8) R
-    !$cuf kernel do(4) <<<*,*>>>
+    !$cuf kernel do(3) <<<*,*>>>
     do k = 1, nz-2*offset
       do j = 1, ny-2*offset
         do i = 1, nx-2*offset
@@ -199,7 +201,7 @@ contains
     real(8), intent(inout), dimension(5,nx,ny,nz), device                           :: Qout
     integer i, j, k, l
     real(8) R
-    !$cuf kernel do(4) <<<*,*>>>
+    !$cuf kernel do(3) <<<*,*>>>
     do k = 1, nz-2*offset
       do j = 1, ny-2*offset
         do i = 1, nx-2*offset
@@ -223,7 +225,7 @@ contains
     real(8), intent(inout), dimension(5,nx,ny,nz), device                            :: Q
     integer i, j, k, l
     real(8) R
-    !$cuf kernel do(4) <<<*,*>>>
+    !$cuf kernel do(3) <<<*,*>>>
     do k = 1, nz-2*offset
       do j = 1, ny-2*offset
         do i = 1, nx-2*offset
@@ -252,7 +254,7 @@ contains
     real(8), intent(inout), dimension(5,nx,ny,nz), device                            :: Q
     integer i, j, k, l
     real(8) R
-    !$cuf kernel do(4) <<<*,*>>>
+    !$cuf kernel do(3) <<<*,*>>>
     do k = 1, nz-2*offset
       do j = 1, ny-2*offset
         do i = 1, nx-2*offset
@@ -272,7 +274,7 @@ contains
     real(8), intent(out)                                                          :: err
     integer i, j, k, l
     err = 0.d0
-    !$cuf kernel do(4) <<<*,*>>>
+    !$cuf kernel do(3) <<<*,*>>>
     do k = 1, nz-2*offset
       do j = 1, ny-2*offset
         do i = 1, nx-2*offset
@@ -293,7 +295,7 @@ contains
     real(8), intent(in), dimension(5,nx,ny,nz), device                            :: Q
     real(8), intent(out), dimension(5,nx,ny,nz), device                           :: Q2
     integer i, j, k, l
-    !$cuf kernel do(4) <<<*,*>>>
+    !$cuf kernel do(3) <<<*,*>>>
     do k = 1+offset, nz-offset
       do j = 1+offset, ny-offset
         do i = 1+offset, nx-offset
@@ -312,7 +314,7 @@ contains
     real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy), device :: R2
     real(8), intent(inout), dimension(5,nx,ny,nz), device                         :: Q
     integer i, j, k, l
-    !$cuf kernel do(4) <<<*,*>>>
+    !$cuf kernel do(3) <<<*,*>>>
     do k = 1+offset, nz-offset
       do j = 1+offset, ny-offset
         do i = 1+offset, nx-offset
