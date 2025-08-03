@@ -58,9 +58,16 @@ module mod_globals
   integer(kind=2), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
   integer(kind=2), parameter :: slau_wall   = 0
-  integer(kind=2), parameter :: id_rescale  = 0
+  integer(kind=4), parameter :: id_rescale  = 0
   real(8), parameter         :: blt         = 0.8d-3
 
+  ! exchange
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_exchange ! kind2 off !
+  !             ! kind4 on  !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!
+  integer(kind=2), parameter :: id_exchange = 0
+  integer(kind=2), parameter :: id_forcing  = 0
   ! mesh
   real(8), parameter :: Lx = 10.d0 * blt
   real(8), parameter :: Ly = 5.d0 * blt
@@ -75,20 +82,20 @@ module mod_globals
   integer, parameter :: rerank = 0
 
   ! RTX 4090
-  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/64,(ny-accuracy)/1,(nz-accuracy)/1)
+  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/128,(ny-accuracy)/1,(nz-accuracy)/1)
   type(dim3) :: blocksF   = dim3((nx-accuracy)/1,(ny-accuracy+1)/32,(nz-accuracy)/1)
-  type(dim3) :: blocksG   = dim3((nx-accuracy)/1,(ny-accuracy)/1,(nz-accuracy+1)/64)
-  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
+  type(dim3) :: blocksG   = dim3((nx-accuracy)/255,(ny-accuracy)/1,(nz-accuracy+1)/1)
+  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/64,(ny-accuracy)/1,(nz-accuracy)/1)
   type(dim3) :: blocksFv  = dim3((nx-accuracy)/1,(ny-accuracy+1)/32,(nz-accuracy)/1)
-  type(dim3) :: blocksGv  = dim3((nx-accuracy)/1,(ny-accuracy)/1,(nz-accuracy+1)/32)
-  type(dim3) :: blocks    = dim3((nx-accuracy)/1,(ny-accuracy)/127,(nz-accuracy)/1)
-  type(dim3) :: threadsE  = dim3(64,1,1)
+  type(dim3) :: blocksGv  = dim3((nx-accuracy)/255,(ny-accuracy)/1,(nz-accuracy+1)/1)
+  type(dim3) :: blocks    = dim3((nx-accuracy)/255,(ny-accuracy)/1,(nz-accuracy)/1)
+  type(dim3) :: threadsE  = dim3(128,1,1)
   type(dim3) :: threadsF  = dim3(1,32,1)
-  type(dim3) :: threadsG  = dim3(1,1,64)
-  type(dim3) :: threadsEv = dim3(32,1,1)
+  type(dim3) :: threadsG  = dim3(255,1,1)
+  type(dim3) :: threadsEv = dim3(64,1,1)
   type(dim3) :: threadsFv = dim3(1,32,1)
-  type(dim3) :: threadsGv = dim3(1,1,32)
-  type(dim3) :: threads   = dim3(1,127,1)
+  type(dim3) :: threadsGv = dim3(255,1,1)
+  type(dim3) :: threads   = dim3(255,1,1)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -99,18 +106,18 @@ module mod_globals
   !               ! kind4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_RungeKutta = 0
-  integer(kind=2), parameter :: id_recal      = 0
-  integer, parameter         :: step_offset   = 0
+  integer(kind=4), parameter :: id_recal      = 0
+  integer, parameter         :: step_offset   = 20
   integer, parameter         :: start_rescale = 3
   real(8), parameter :: endT  = 0.05d-3
-  integer, parameter :: np    = 5
+  integer, parameter :: np    = 80
   real(8), parameter :: R     = 287.03d0
   real(8), parameter :: gamma = 1.4d0
   real(8), parameter :: M0    = 2.5d0
   real(8), parameter :: T0    = 171.31d0
   real(8), parameter :: p0    = 14924.d0
   real(8), parameter :: u0    = M0 * sqrt(gamma * R * T0)
-  real(8), parameter :: dt    = 2.d-9
+  real(8), parameter :: dt    = 3.d-9
   integer, parameter :: nt    = 100!int(endT / (dble(np) * dt))
 
   ! physical properties

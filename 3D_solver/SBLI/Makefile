@@ -32,6 +32,8 @@ OBJ =	mod_globals.o \
       calc_steps.o \
       calc_rescale.o \
       calc_para.o \
+      set_bc_common.o \
+      set_init_common.o \
       set.o \
       print.o \
       calc_time_dev.o \
@@ -43,7 +45,9 @@ a.out: $(OBJ)
 $(TARGET): $(OBJ)
 		$(LINK.f) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
-set.o: mod_globals.mod
+set_init_common.o: mod_globals.mod
+set_bc_common.o: mod_globals.mod
+set.o: mod_globals.mod set_bc_common.mod set_init_common.mod set_coordinate.mod
 calc_physical_quantities.o: mod_globals.mod
 calc_common.o: mod_globals.mod
 calc_term.o: calc_common_dim.mod
@@ -60,5 +64,5 @@ calc_steps.o: mod_globals.mod
 calc_rescale.o: mod_globals.mod
 calc_time_dev.o: mod_globals.mod set.mod calc_flux_base.mod calc_steps.mod calc_rescale.mod calc_para.mod print.mod
 print.o: mod_globals.mod
-sbli.o: main.f90 mod_globals.mod set_coordinate.mod set.mod calc_time_dev.mod
+sbli.o: sbli.f90 mod_globals.mod set_coordinate.mod set.mod calc_time_dev.mod
 

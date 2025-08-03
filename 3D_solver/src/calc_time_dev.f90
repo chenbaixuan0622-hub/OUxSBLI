@@ -145,9 +145,11 @@ contains
           if (kind(id_forcing) == 2) then
             call nvtxStartRange("calc flux", 1)
             call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
+            !print *, "myrank is ", myrank, " calc EFG"
             call nvtxEndRange
             call nvtxStartRange("calc step", 2)
             call calc_step(nx, ny, nz, 1.d0, 0.d0, xix, etay, zetaz, E, F, G, QJ, QJ2)
+            !print *, "myrank is ", myrank, " calc step"
             call nvtxEndRange
           else
             call nvtxStartRange("calc flux", 1)
@@ -167,6 +169,7 @@ contains
           endif
           call nvtxStartRange("set bc", 4)
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
+          !print *, "myrank is ", myrank, " set bc"
           call nvtxEndRange
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call nvtxStartRange("calc rescale", 5)

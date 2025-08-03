@@ -33,6 +33,7 @@ OBJ =	mod_globals.o \
       calc_rescale.o \
       calc_para.o \
       set_bc_common.o \
+      set_init_common.o \
       set.o \
       print.o \
       calc_time_dev.o \
@@ -44,8 +45,9 @@ a.out: $(OBJ)
 $(TARGET): $(OBJ)
 		$(LINK.f) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
+set_init_common.o: mod_globals.mod
 set_bc_common.o: mod_globals.mod
-set.o: mod_globals.mod set_bc_common.mod set_coordinate.mod
+set.o: mod_globals.mod set_bc_common.mod set_init_common.mod set_coordinate.mod
 calc_physical_quantities.o: mod_globals.mod
 calc_common.o: mod_globals.mod
 calc_term.o: calc_common_dim.mod

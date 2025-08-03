@@ -43,7 +43,7 @@ program main
   call set_block_thread(myrank, accuracy, nx, ny, nz, blocks, threads, blocksE, blocksF, blocksG, &
                         & threadsE, threadsF, threadsG, blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv)
 
-  allocate(Q(nx,ny,nz,5), x(nx), dx(nx), y(ny), dy(ny), z(nz), dz(nz), Jacobian(ny))
+  allocate(Q(5,nx,ny,nz), x(nx), dx(nx), y(ny), dy(ny), z(nz), dz(nz), Jacobian(ny))
 
   ! set grid information
   if (mod(myrank,2) == 0) then
@@ -96,11 +96,11 @@ program main
       print *, "calculation time:", m, " [min] ", s, " [sec]"
     endif
     ! save data
-    do m = 1, 5
-      do l = 1, nz
-        do j = 1, ny
-          do i = 1, nx
-            Q(i,j,l,m) = Jacobian(j) * Q(i,j,l,m)
+    do l = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          do m = 1, 5
+            Q(m,i,j,l) = Jacobian(j) * Q(m,i,j,l)
     enddo;enddo;enddo;enddo
     call cpu_time(t_start)
     write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"

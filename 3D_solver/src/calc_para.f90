@@ -8,7 +8,7 @@ module calc_para
 contains
   subroutine flatten(nx, ny, nz, overlap, Q, Q1d_left, Q1d_right)
     integer, intent(in), value   :: nx, ny, nz, overlap
-    real(8), intent(in), device  :: Q(nx,ny,nz,5)
+    real(8), intent(in), device  :: Q(5,nx,ny,nz)
     real(8), intent(out), device :: Q1d_left(overlap*(ny-2)*(nz-6)*5)
     real(8), intent(out), device :: Q1d_right(overlap*(ny-2)*(nz-6)*5)
     integer i, j, k, l, ni, nj, nk
@@ -16,63 +16,63 @@ contains
     nj = ny-2
     nk = nz-6
     !$cuf kernel do(4)<<<*,*>>>
-    do l = 1, 5
-      do k = 1, nk
-        do j = 1, nj
-          do i = 1, ni
-            Q1d_left(ni*nj*nk*(l-1)+ni*nj*(k-1)+ni*(j-1)+i)  = Q(overlap+i,j+1,k+3,l)
-            Q1d_right(ni*nj*nk*(l-1)+ni*nj*(k-1)+ni*(j-1)+i) = Q(nx-2*overlap+i,j+1,k+3,l)
+    do k = 1, nk
+      do j = 1, nj
+        do i = 1, ni
+          do l = 1, 5
+            Q1d_left(ni*nj*5*(k-1)+ni*5*(j-1)+5*(i-1)+l)  = Q(l,overlap+i,j+1,k+3)
+            Q1d_right(ni*nj*5*(k-1)+ni*5*(j-1)+5*(i-1)+l) = Q(l,nx-2*overlap+i,j+1,k+3)
     enddo;enddo;enddo;enddo
   end subroutine flatten
 
   subroutine flatten_left(nx, ny, nz, overlap, Q, Q1d_left)
     integer, intent(in), value   :: nx, ny, nz, overlap
-    real(8), intent(in), device  :: Q(nx,ny,nz,5)
+    real(8), intent(in), device  :: Q(5,nx,ny,nz)
     real(8), intent(out), device :: Q1d_left(overlap*(ny-2)*(nz-6)*5)
     integer i, j, k, l, ni, nj, nk
     ni = overlap
     nj = ny-2
     nk = nz-6
     !$cuf kernel do(4)<<<*,*>>>
-    do l = 1, 5
-      do k = 1, nk
-        do j = 1, nj
-          do i = 1, ni
-            Q1d_left(ni*nj*nk*(l-1)+ni*nj*(k-1)+ni*(j-1)+i)  = Q(overlap+i,j+1,k+3,l)
+    do k = 1, nk
+      do j = 1, nj
+        do i = 1, ni
+          do l = 1, 5
+            Q1d_left(ni*nj*5*(k-1)+ni*5*(j-1)+5*(i-1)+l)  = Q(l,overlap+i,j+1,k+3)
     enddo;enddo;enddo;enddo
   end subroutine flatten_left
 
   subroutine flatten_right(nx, ny, nz, overlap, Q, Q1d_right)
     integer, intent(in), value   :: nx, ny, nz, overlap
-    real(8), intent(in), device  :: Q(nx,ny,nz,5)
+    real(8), intent(in), device  :: Q(5,nx,ny,nz)
     real(8), intent(out), device :: Q1d_right(overlap*(ny-2)*(nz-6)*5)
     integer i, j, k, l, ni, nj, nk
     ni = overlap
     nj = ny-2
     nk = nz-6
     !$cuf kernel do(4)<<<*,*>>>
-    do l = 1, 5
-      do k = 1, nk
-        do j = 1, nj
-          do i = 1, ni
-            Q1d_right(ni*nj*nk*(l-1)+ni*nj*(k-1)+ni*(j-1)+i) = Q(nx-2*overlap+i,j+1,k+3,l)
+    do k = 1, nk
+      do j = 1, nj
+        do i = 1, ni
+          do l = 1, 5
+            Q1d_right(ni*nj*5*(k-1)+ni*5*(j-1)+5*(i-1)+l) = Q(l,nx-2*overlap+i,j+1,k+3)
     enddo;enddo;enddo;enddo
   end subroutine flatten_right
   
   subroutine flatten_rescale(nx, ny, nz, nre, overlap, Q, Q1d_right)
     integer, intent(in), value   :: nx, ny, nz, nre, overlap
-    real(8), intent(in), device  :: Q(nx,ny,nz,5)
+    real(8), intent(in), device  :: Q(5,nx,ny,nz)
     real(8), intent(out), device :: Q1d_right(overlap*(ny-2)*(nz-6)*5)
     integer i, j, k, l, ni, nj, nk
     ni = overlap
     nj = ny-2
     nk = nz-6
     !$cuf kernel do(4)<<<*,*>>>
-    do l = 1, 5
-      do k = 1, nk
-        do j = 1, nj
-          do i = 1, ni
-            Q1d_right(ni*nj*nk*(l-1)+ni*nj*(k-1)+ni*(j-1)+i) = Q(nre-2*overlap+i,j+1,k+3,l)
+    do k = 1, nk
+      do j = 1, nj
+        do i = 1, ni
+          do l = 1, 5
+            Q1d_right(ni*nj*5*(k-1)+ni*5*(j-1)+5*(i-1)+l) = Q(l,nre-2*overlap+i,j+1,k+3)
     enddo;enddo;enddo;enddo
   end subroutine flatten_rescale
   
@@ -80,76 +80,76 @@ contains
     integer, intent(in), value   :: nx, ny, nz, overlap
     real(8), intent(in), device  :: Q1d_left(overlap*(ny-2)*(nz-6)*5)
     real(8), intent(in), device  :: Q1d_right(overlap*(ny-2)*(nz-6)*5)
-    real(8), intent(out), device :: Q(nx,ny,nz,5)
+    real(8), intent(out), device :: Q(5,nx,ny,nz)
     integer i, j, k, l, ni, nj, nk
     ni = overlap
     nj = ny-2
     nk = nz-6
     !$cuf kernel do(4)<<<*,*>>>
-    do l = 1, 5
-      do k = 1, nk
-        do j = 1, nj
-          do i = 1, ni
-            Q(i,j+1,k+3,l)            = Q1d_left(ni*nj*nk*(l-1)+ni*nj*(k-1)+ni*(j-1)+i)
-            Q(nx-overlap+i,j+1,k+3,l) = Q1d_right(ni*nj*nk*(l-1)+ni*nj*(k-1)+ni*(j-1)+i)
+    do k = 1, nk
+      do j = 1, nj
+        do i = 1, ni
+          do l = 1, 5
+            Q(l,i,j+1,k+3)            =  Q1d_left(ni*nj*5*(k-1)+ni*5*(j-1)+5*(i-1)+l)
+            Q(l,nx-overlap+i,j+1,k+3) = Q1d_right(ni*nj*5*(k-1)+ni*5*(j-1)+5*(i-1)+l)
     enddo;enddo;enddo;enddo
   end subroutine reconstruct
 
   subroutine reconstruct_left(nx, ny, nz, overlap, Q1d_left, Q)
     integer, intent(in), value   :: nx, ny, nz, overlap
     real(8), intent(in), device  :: Q1d_left(overlap*(ny-2)*(nz-6)*5)
-    real(8), intent(out), device :: Q(nx,ny,nz,5)
+    real(8), intent(out), device :: Q(5,nx,ny,nz)
     integer i, j, k, l, ni, nj, nk
     ni = overlap
     nj = ny-2
     nk = nz-6
     !$cuf kernel do(4)<<<*,*>>>
-    do l = 1, 5
-      do k = 1, nk
-        do j = 1, nj
-          do i = 1, ni
-            Q(i,j+1,k+3,l) = Q1d_left(ni*nj*nk*(l-1)+ni*nj*(k-1)+ni*(j-1)+i)
+    do k = 1, nk
+      do j = 1, nj
+        do i = 1, ni
+          do l = 1, 5
+            Q(l,i,j+1,k+3) = Q1d_left(ni*nj*5*(k-1)+ni*5*(j-1)+5*(i-1)+l)
     enddo;enddo;enddo;enddo
   end subroutine reconstruct_left
   
   subroutine reconstruct_right(nx, ny, nz, overlap, Q1d_right, Q)
     integer, intent(in), value   :: nx, ny, nz, overlap
     real(8), intent(in), device  :: Q1d_right(overlap*(ny-2)*(nz-6)*5)
-    real(8), intent(out), device :: Q(nx,ny,nz,5)
+    real(8), intent(out), device :: Q(5,nx,ny,nz)
     integer i, j, k, l, ni, nj, nk
     ni = overlap
     nj = ny-2
     nk = nz-6
     !$cuf kernel do(4)<<<*,*>>>
-    do l = 1, 5
-      do k = 1, nk
-        do j = 1, nj
-          do i = 1, ni
-            Q(nx-overlap+i,j+1,k+3,l) = Q1d_right(ni*nj*nk*(l-1)+ni*nj*(k-1)+ni*(j-1)+i)
+    do k = 1, nk
+      do j = 1, nj
+        do i = 1, ni
+          do l = 1, 5
+            Q(l,nx-overlap+i,j+1,k+3) = Q1d_right(ni*nj*5*(k-1)+ni*5*(j-1)+5*(i-1)+l)
     enddo;enddo;enddo;enddo
   end subroutine reconstruct_right
 
   subroutine reconstruct_sbli_inlet(nx, ny1, ny2, nz, overlap, Q1d, Q)
     integer, intent(in), value     :: nx, ny1, ny2, nz, overlap
     real(8), intent(in), device    :: Q1d(overlap*(ny1-2)*(nz-6)*5)
-    real(8), intent(inout), device :: Q(nx,ny2,nz,5)
+    real(8), intent(inout), device :: Q(5,nx,ny2,nz)
     integer i, j, k, l, ni, nj, nk
     ni = overlap
     nj = ny1-2
     nk = nz-6
     !$cuf kernel do(4)<<<*,*>>>
-    do l = 1, 5
-      do k = 1, nk
-        do j = 1, nj
-          do i = 1, overlap
-            Q(i,j+1,k+3,l) = Q1d(ni*nj*nk*(l-1)+ni*nj*(k-1)+ni*(j-1)+i)
+    do k = 1, nk
+      do j = 1, nj
+        do i = 1, overlap
+          do l = 1, 5
+            Q(l,i,j+1,k+3) = Q1d(ni*nj*5*(k-1)+ni*5*(j-1)+5*(i-1)+l)
     enddo;enddo;enddo;enddo
   end subroutine reconstruct_sbli_inlet
 
   subroutine exchange_cyclic(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ)
     integer(kind=2), intent(in), value :: id_rescale
     integer, intent(in), value         :: myrank, nranks, overlap, nx, ny, nz
-    real(8), intent(inout), device     :: QJ(nx,ny,nz,5) ! Q / Jacobian
+    real(8), intent(inout), device     :: QJ(5,nx,ny,nz) ! Q / Jacobian
     integer rank1, rank2, ierr, ireq4(4), istat(MPI_STATUS_SIZE), istat4(MPI_STATUS_SIZE,4)
     real(8), dimension(overlap*(ny-2)*(nz-6)*5)         :: Qs_left,   Qs_right,   Qr_left,   Qr_right
     real(8), dimension(overlap*(ny-2)*(nz-6)*5), device :: Qs1d_left, Qs1d_right, Qr1d_left, Qr1d_right
@@ -184,7 +184,7 @@ contains
   subroutine exchange_rescale(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ)
     integer(kind=4), intent(in), value :: id_rescale
     integer, intent(in), value         :: myrank, nranks, overlap, nx, ny, nz
-    real(8), intent(inout), device     :: QJ(nx,ny,nz,5) ! Q / Jacobian
+    real(8), intent(inout), device     :: QJ(5,nx,ny,nz) ! Q / Jacobian
     integer rank1, rank2, stat, ierr, ireq4(4), istat(MPI_STATUS_SIZE), istat4(MPI_STATUS_SIZE,4)
     real(8), dimension(overlap*(ny-2)*(nz-6)*5)         :: Qs_left,   Qs_right,   Qr_left,   Qr_right
     real(8), dimension(overlap*(ny-2)*(nz-6)*5), device :: Qs1d_left, Qs1d_right, Qr1d_left, Qr1d_right
