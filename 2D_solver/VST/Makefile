@@ -29,6 +29,7 @@ OBJ =	mod_globals.o \
       calc_flux.o \
       calc_flux_base.o \
       calc_steps.o \
+      set_bc_common.o \
       set.o \
       print.o \
       calc_time_dev.o \
@@ -40,7 +41,8 @@ a.out: $(OBJ)
 $(TARGET): $(OBJ)
 		$(LINK.f) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
-set.o: mod_globals.mod
+set_bc_common.o: mod_globals.mod
+set.o: mod_globals.mod set_bc_common.mod
 calc_physical_quantities.o: mod_globals.mod
 calc_common.o: mod_globals.mod
 calc_term.o: calc_common_dim.mod

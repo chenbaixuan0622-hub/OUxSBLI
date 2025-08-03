@@ -21,10 +21,10 @@ contains
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device  :: Jacobian(ny)
-    real(8), intent(in), device  :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
-    real(8), intent(out), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
-    real(8), intent(out), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    real(8), intent(in), device  :: QJ(5,nx,ny,nz) ! Q / Jacobian
+    real(8), intent(out), device :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
+    real(8), intent(out), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
+    real(8), intent(out), device :: G(5,nx-accuracy,ny-accuracy,nz-accuracy+1)
     real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, sensor
     integer stat
     call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, rho, u, v, w, p)
@@ -43,11 +43,11 @@ contains
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device  :: Jacobian(ny)
-    real(8), intent(in), device  :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
-    real(8), intent(out), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
-    real(8), intent(out), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
-    real(8), intent(out), device :: fx(nx-2,ny-2,nz-2,5), fy(nx-2,ny-2,nz-2,5), fz(nx-2,ny-2,nz-2,5)
+    real(8), intent(in), device  :: QJ(5,nx,ny,nz) ! Q / Jacobian
+    real(8), intent(out), device :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
+    real(8), intent(out), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
+    real(8), intent(out), device :: G(5,nx-accuracy,ny-accuracy,nz-accuracy+1)
+    real(8), intent(out), device :: fx(nx-2,ny-2,nz-2), fy(nx-2,ny-2,nz-2), fz(nx-2,ny-2,nz-2)
     real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, sensor
     integer stat
     call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, rho, u, v, w, p)
@@ -67,10 +67,10 @@ contains
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device  :: Jacobian(ny)
-    real(8), intent(in), device  :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
-    real(8), intent(out), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
-    real(8), intent(out), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    real(8), intent(in), device  :: QJ(5,nx,ny,nz) ! Q / Jacobian
+    real(8), intent(out), device :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
+    real(8), intent(out), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
+    real(8), intent(out), device :: G(5,nx-accuracy,ny-accuracy,nz-accuracy+1)
     real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, sensor
     integer stat
     call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, rho, u, v, w, p)
@@ -93,11 +93,11 @@ contains
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device  :: Jacobian(ny)
-    real(8), intent(in), device  :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
-    real(8), intent(out), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
-    real(8), intent(out), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
-    real(8), intent(out), device :: fx(nx-2,ny-2,nz-2,5), fy(nx-2,ny-2,nz-2,5), fz(nx-2,ny-2,nz-2,5)
+    real(8), intent(in), device  :: QJ(5,nx,ny,nz) ! Q / Jacobian
+    real(8), intent(out), device :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
+    real(8), intent(out), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
+    real(8), intent(out), device :: G(5,nx-accuracy,ny-accuracy,nz-accuracy+1)
+    real(8), intent(out), device :: fx(nx-2,ny-2,nz-2), fy(nx-2,ny-2,nz-2), fz(nx-2,ny-2,nz-2)
     real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, sensor
     integer stat
     call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, rho, u, v, w, p)
@@ -121,10 +121,10 @@ contains
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device  :: Jacobian(ny)
-    real(8), intent(in), device  :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
-    real(8), intent(out), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
-    real(8), intent(out), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
+    real(8), intent(in), device  :: QJ(5,nx,ny,nz) ! Q / Jacobian
+    real(8), intent(out), device :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
+    real(8), intent(out), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
+    real(8), intent(out), device :: G(5,nx-accuracy,ny-accuracy,nz-accuracy+1)
     real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, sensor, mut, qc2
     integer stat
     mut = 0.d0
@@ -151,11 +151,11 @@ contains
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device  :: Jacobian(ny)
-    real(8), intent(in), device  :: QJ(nx,ny,nz,5) ! Q / Jacobian
-    real(8), intent(out), device :: E(nx-accuracy+1,ny-accuracy,nz-accuracy,5)
-    real(8), intent(out), device :: F(nx-accuracy,ny-accuracy+1,nz-accuracy,5)
-    real(8), intent(out), device :: G(nx-accuracy,ny-accuracy,nz-accuracy+1,5)
-    real(8), intent(out), device :: fx(nx-2,ny-2,nz-2,5), fy(nx-2,ny-2,nz-2,5), fz(nx-2,ny-2,nz-2,5)
+    real(8), intent(in), device  :: QJ(5,nx,ny,nz) ! Q / Jacobian
+    real(8), intent(out), device :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
+    real(8), intent(out), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
+    real(8), intent(out), device :: G(5,nx-accuracy,ny-accuracy,nz-accuracy+1)
+    real(8), intent(out), device :: fx(nx-2,ny-2,nz-2), fy(nx-2,ny-2,nz-2), fz(nx-2,ny-2,nz-2)
     real(8), dimension(nx,ny,nz), device :: rho, u, v, w, p, sensor, mut, qc2
     integer stat
     mut = 0.d0

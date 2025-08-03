@@ -44,7 +44,7 @@ module mod_globals
   real(8), parameter         :: threshold   = 0.4d0
   integer(kind=8), parameter :: id_accuracy = 0
   integer(kind=2), parameter :: id_tvd      = 0
-  integer(kind=2), parameter :: id_keep     = 0
+  integer(kind=4), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
   integer(kind=2), parameter :: slau_wall   = 0
 
@@ -95,9 +95,9 @@ module mod_globals
   real(8), parameter :: u0    = M0 * sqrt(gamma * R * T0)
   real(8), parameter :: rho0  = p0 / (R * T0)
   real(8), parameter :: CFL   = 0.05d0
-  real(8), parameter :: dt    = CFL * Lx / (dble(nx-1) * u0)
+  real(8), parameter :: dt    = -CFL * Lx / (dble(nx-1) * u0)
   real(8), parameter :: T     = 1.d0 * Lx / u0
   integer, parameter :: np    = 1
-  integer, parameter :: nt    = int(T / (dble(np) * dt))
+  integer, parameter :: nt    = int(T / (dble(np) * abs(dt)))
 end module mod_globals
 

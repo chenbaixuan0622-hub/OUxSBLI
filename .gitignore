@@ -5,6 +5,7 @@
 *.o
 *.out
 *.png
+*.so
 *.err
 post/__pycache__/
 post/mod/__pycache__/
