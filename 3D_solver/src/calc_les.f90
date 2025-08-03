@@ -79,10 +79,10 @@ contains
     enddo;enddo;enddo
   end function stride_filter
 
-  attributes(global) subroutine calc_mut(nx,ny,nz,dx,dy,dz,rho,u,v,w,mut,qc2)
+  attributes(global) subroutine calc_mut(nx, ny, nz, dx, dy, dz, Q, mut, qc2)
     integer, intent(in), value   :: nx, ny, nz
     real(8), intent(in), device  :: dx(nx-1), dy(ny-1), dz(nz-1)
-    real(8), intent(in), device  :: rho(nx,ny,nz), u(nx,ny,nz), v(nx,ny,nz), w(nx,ny,nz)
+    real(8), intent(in), device  :: Q(5,nx,ny,nz)
     real(8), intent(out), device :: mut(nx,ny,nz), qc2(nx,ny,nz)
     integer i, j, k
     real(8), dimension(3,3,3), device :: u3, v3, w3, uh, vh, wh
@@ -90,23 +90,23 @@ contains
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
-    !u3 = u(i-1:i+1,j-1:j+1,k-1:k+1)
-    !v3 = v(i-1:i+1,j-1:j+1,k-1:k+1)
-    !w3 = w(i-1:i+1,j-1:j+1,k-1:k+1)
-    !if (3<=i .and. i<=nx-2 .and. 3<=j .and. j<=ny-2 .and. 3<=k .and. k <=nz-2) then
-      !u5 = u(i-2:i+2,j-2:j+2,k-2:k+2)
-      !v5 = v(i-2:i+2,j-2:j+2,k-2:k+2)
-      !w5 = w(i-2:i+2,j-2:j+2,k-2:k+2)
-      !uh = stride_filter(u5)
-      !vh = stride_filter(v5)
-      !wh = stride_filter(w5)
-    !else
-      !uh = u3
-      !vh = v3
-      !wh = w3
-    !endif
-    !qc2(i,j,k) = 0.5d0! * ((u3(2,2,2) - uh(2,2,2))**2 + (v3(2,2,2) - vh(2,2,2))**2 + (w3(2,2,2) - wh(2,2,2))**2)
-    !mut(i,j,k) = 0.5d0!rho(i,j,k)! * SMS(u3,v3,w3,uh,vh,wh,dx(i),dy(j),dz(k),qc2(i,j,k))
+    u3 = Q(2,i-1:i+1,j-1:j+1,k-1:k+1)
+    v3 = Q(3,i-1:i+1,j-1:j+1,k-1:k+1)
+    w3 = Q(4,i-1:i+1,j-1:j+1,k-1:k+1)
+    if (3<=i .and. i<=nx-2 .and. 3<=j .and. j<=ny-2 .and. 3<=k .and. k <=nz-2) then
+      u5 = Q(2,i-2:i+2,j-2:j+2,k-2:k+2)
+      v5 = Q(3,i-2:i+2,j-2:j+2,k-2:k+2)
+      w5 = Q(4,i-2:i+2,j-2:j+2,k-2:k+2)
+      uh = stride_filter(u5)
+      vh = stride_filter(v5)
+      wh = stride_filter(w5)
+    else
+      uh = u3
+      vh = v3
+      wh = w3
+    endif
+    qc2(i,j,k) = 0.5d0 * ((u3(2,2,2) - uh(2,2,2))**2 + (v3(2,2,2) - vh(2,2,2))**2 + (w3(2,2,2) - wh(2,2,2))**2)
+    mut(i,j,k) = Q(1,i,j,k) * SMS(u3,v3,w3,uh,vh,wh,dx(i),dy(j),dz(k),qc2(i,j,k))
   end subroutine calc_mut
 end module calc_les
 
