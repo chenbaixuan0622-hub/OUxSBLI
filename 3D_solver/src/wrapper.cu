@@ -115,7 +115,7 @@ extern "C" void calc_R_wrapper(int nx, int ny, int nz, py::object dx_obj, py::ob
 }
 
 
-extern "C" void calc_step1_wrapper(int nx, int ny, int nz, py::object dx_obj, py::object dy_obj, py::object dz_obj, \
+extern "C" void calc_step1_wrapper(int nx, int ny, int nz, double coef, py::object dx_obj, py::object dy_obj, py::object dz_obj, \
                                     py::object E_obj, py::object F_obj, py::object G_obj, \
                                     py::object Q_obj, py::object Q2_obj, \
                                     py::object fx_obj = py::none(), \
@@ -133,9 +133,9 @@ extern "C" void calc_step1_wrapper(int nx, int ny, int nz, py::object dx_obj, py
     double *fx = get_cuda_pointer<double>(fx_obj);
     double *fy = get_cuda_pointer<double>(fy_obj);
     double *fz = get_cuda_pointer<double>(fz_obj);
-    calc_step1_forcing_c(nx, ny, nz, dx, dy, dz, E, F, G, fx, fy, fz, Q, Q2);
+    calc_step1_forcing_c(nx, ny, nz, coef, dx, dy, dz, E, F, G, fx, fy, fz, Q, Q2);
   } else {
-    calc_step1_c(nx, ny, nz, dx, dy, dz, E, F, G, Q, Q2);
+    calc_step1_c(nx, ny, nz, coef, dx, dy, dz, E, F, G, Q, Q2);
   }
 }
 
@@ -293,7 +293,7 @@ PYBIND11_MODULE(cufd, m) {
         py::arg("fy") = py::none(),
         py::arg("fz") = py::none());
   m.def("calc_step1", &calc_step1_wrapper,
-        py::arg("nx"), py::arg("ny"), py::arg("nz"),
+        py::arg("nx"), py::arg("ny"), py::arg("nz"), py::arg("coef")
         py::arg("dx"), py::arg("dy"), py::arg("dz"),
         py::arg("E"),  py::arg("F"),  py::arg("G"), py::arg("Q"), py::arg("Q2"),
         py::arg("fx") = py::none(),
