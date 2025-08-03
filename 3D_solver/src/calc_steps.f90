@@ -2,40 +2,6 @@ module calc_steps
   use cudafor
   use mod_globals, only : accuracy, offset, dt
   implicit none
-  interface
-    subroutine calc_step(nx, ny, nz, coef1, coef2, dx, dy, dz, E, F, G, Q, Q2, Rs)
-      integer, intent(in), value                                                                 :: nx, ny, nz
-      real(8), intent(in), value                                                                 :: coef1, coef2
-      real(8), intent(in), dimension(nx-1), device                                               :: dx
-      real(8), intent(in), dimension(ny-1), device                                               :: dy
-      real(8), intent(in), dimension(nz-1), device                                               :: dz
-      real(8), intent(in), dimension(5,nx-accuracy+1,ny-accuracy,nz-accuracy), device            :: E
-      real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy+1,nz-accuracy), device            :: F
-      real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy+1), device            :: G
-      real(8), intent(in), dimension(5,nx,ny,nz), device                                         :: Q
-      real(8), intent(out), dimension(5,nx,ny,nz), device                                        :: Q2
-      real(8), intent(inout), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy), optional, device :: Rs
-    end subroutine
-  end interface
-  
-  interface
-    subroutine calc_step_forcing(nx, ny, nz, coef1, coef2, dx, dy, dz, E, F, G, fx, fy, fz, Q, Q2, Rs)
-      integer, intent(in), value                                                                 :: nx, ny, nz
-      real(8), intent(in), value                                                                 :: coef1, coef2
-      real(8), intent(in), dimension(nx-1), device                                               :: dx
-      real(8), intent(in), dimension(ny-1), device                                               :: dy
-      real(8), intent(in), dimension(nz-1), device                                               :: dz
-      real(8), intent(in), dimension(5,nx-accuracy+1,ny-accuracy,nz-accuracy), device            :: E
-      real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy+1,nz-accuracy), device            :: F
-      real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy+1), device            :: G
-      real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy), device                :: fx
-      real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy), device                :: fy
-      real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy), device                :: fz
-      real(8), intent(in), dimension(5,nx,ny,nz), device                                         :: Q
-      real(8), intent(out), dimension(5,nx,ny,nz), device                                        :: Q2
-      real(8), intent(inout), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy), optional, device :: Rs
-    end subroutine
-  end interface
 contains
   subroutine calc_R(nx, ny, nz, dx, dy, dz, E, F, G, R)
     integer, intent(in), value                                                      :: nx, ny, nz
@@ -84,18 +50,69 @@ contains
     enddo;enddo;enddo;enddo
   end subroutine calc_R_forcing
 
+  subroutine calc_step1(nx, ny, nz, dx, dy, dz, E, F, G, Q, Q2)
+    integer, intent(in), value                                                      :: nx, ny, nz
+    real(8), intent(in), dimension(nx-1), device                                    :: dx
+    real(8), intent(in), dimension(ny-1), device                                    :: dy
+    real(8), intent(in), dimension(nz-1), device                                    :: dz
+    real(8), intent(in), dimension(5,nx-accuracy+1,ny-accuracy,nz-accuracy), device :: E
+    real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy+1,nz-accuracy), device :: F
+    real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy+1), device :: G
+    real(8), intent(in), dimension(5,nx,ny,nz), device                              :: Q
+    real(8), intent(out), dimension(5,nx,ny,nz), device                             :: Q2
+    integer i, j, k, l
+    real(8) R
+    !$cuf kernel do(4) <<<*,*>>>
+    do k = 1, nz-2*offset
+      do j = 1, ny-2*offset
+        do i = 1, nx-2*offset
+          do l = 1, 5
+            R = dt / (dy(j) * dz(k)) * (-E(l,i,j,k) + E(l,i+1,j,k)) &
+            & + dt / (dz(k) * dx(i)) * (-F(l,i,j,k) + F(l,i,j+1,k)) &
+            & + dt / (dx(i) * dy(j)) * (-G(l,i,j,k) + G(l,i,j,k+1))
+            Q2(l,i+offset,j+offset,k+offset) = Q(l,i+offset,j+offset,k+offset) - R
+    enddo;enddo;enddo;enddo
+  end subroutine calc_step1
+  
+  subroutine calc_step1_forcing(nx, ny, nz, dx, dy, dz, E, F, G, fx, fy, fz, Q, Q2)
+    integer, intent(in), value                                                      :: nx, ny, nz
+    real(8), intent(in), dimension(nx-1), device                                    :: dx
+    real(8), intent(in), dimension(ny-1), device                                    :: dy
+    real(8), intent(in), dimension(nz-1), device                                    :: dz
+    real(8), intent(in), dimension(5,nx-accuracy+1,ny-accuracy,nz-accuracy), device :: E
+    real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy+1,nz-accuracy), device :: F
+    real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy+1), device :: G
+    real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy), device     :: fx
+    real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy), device     :: fy
+    real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy), device     :: fz
+    real(8), intent(in), dimension(5,nx,ny,nz), device                              :: Q
+    real(8), intent(out), dimension(5,nx,ny,nz), device                             :: Q2
+    integer i, j, k, l
+    real(8) R
+    !$cuf kernel do(4) <<<*,*>>>
+    do k = 1, nz-2*offset
+      do j = 1, ny-2*offset
+        do i = 1, nx-2*offset
+          do l = 1, 5
+            R = dt / (dy(j) * dz(k)) * (-E(l,i,j,k) + E(l,i+1,j,k) + fx(i,j,k) / dx(i)) &
+            & + dt / (dz(k) * dx(i)) * (-F(l,i,j,k) + F(l,i,j+1,k) + fy(i,j,k) / dy(j)) &
+            & + dt / (dx(i) * dy(j)) * (-G(l,i,j,k) + G(l,i,j,k+1) + fz(i,j,k) / dz(k))
+            Q2(l,i+offset,j+offset,k+offset) = Q(l,i+offset,j+offset,k+offset) - R
+    enddo;enddo;enddo;enddo
+  end subroutine calc_step1_forcing
+  
   subroutine calc_step(nx, ny, nz, coef1, coef2, dx, dy, dz, E, F, G, Q, Q2, Rs)
-    integer, intent(in), value                                                                 :: nx, ny, nz
-    real(8), intent(in), value                                                                 :: coef1, coef2
-    real(8), intent(in), dimension(nx-1), device                                               :: dx
-    real(8), intent(in), dimension(ny-1), device                                               :: dy
-    real(8), intent(in), dimension(nz-1), device                                               :: dz
-    real(8), intent(in), dimension(5,nx-accuracy+1,ny-accuracy,nz-accuracy), device            :: E
-    real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy+1,nz-accuracy), device            :: F
-    real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy+1), device            :: G
-    real(8), intent(in), dimension(5,nx,ny,nz), device                                         :: Q
-    real(8), intent(out), dimension(5,nx,ny,nz), device                                        :: Q2
-    real(8), intent(inout), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy), optional, device :: Rs
+    integer, intent(in), value                                                       :: nx, ny, nz
+    real(8), intent(in), value                                                       :: coef1, coef2
+    real(8), intent(in), dimension(nx-1), device                                     :: dx
+    real(8), intent(in), dimension(ny-1), device                                     :: dy
+    real(8), intent(in), dimension(nz-1), device                                     :: dz
+    real(8), intent(in), dimension(5,nx-accuracy+1,ny-accuracy,nz-accuracy), device  :: E
+    real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy+1,nz-accuracy), device  :: F
+    real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy+1), device  :: G
+    real(8), intent(in), dimension(5,nx,ny,nz), device                               :: Q
+    real(8), intent(out), dimension(5,nx,ny,nz), device                              :: Q2
+    real(8), intent(inout), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy), device :: Rs
     integer i, j, k, l
     real(8) R
     !$cuf kernel do(4) <<<*,*>>>
@@ -107,27 +124,25 @@ contains
             & + dt / (dz(k) * dx(i)) * (-F(l,i,j,k) + F(l,i,j+1,k)) &
             & + dt / (dx(i) * dy(j)) * (-G(l,i,j,k) + G(l,i,j,k+1))
             Q2(l,i+offset,j+offset,k+offset) = Q(l,i+offset,j+offset,k+offset) - coef1 * R
-            if (present(Rs)) then
-              Rs(l,i,j,k) = Rs(l,i,j,k) + coef2 * R
-            endif
+            Rs(l,i,j,k) = Rs(l,i,j,k) + coef2 * R
     enddo;enddo;enddo;enddo
   end subroutine calc_step
   
   subroutine calc_step_forcing(nx, ny, nz, coef1, coef2, dx, dy, dz, E, F, G, fx, fy, fz, Q, Q2, Rs)
-    integer, intent(in), value                                                                 :: nx, ny, nz
-    real(8), intent(in), value                                                                 :: coef1, coef2
-    real(8), intent(in), dimension(nx-1), device                                               :: dx
-    real(8), intent(in), dimension(ny-1), device                                               :: dy
-    real(8), intent(in), dimension(nz-1), device                                               :: dz
-    real(8), intent(in), dimension(5,nx-accuracy+1,ny-accuracy,nz-accuracy), device            :: E
-    real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy+1,nz-accuracy), device            :: F
-    real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy+1), device            :: G
-    real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy), device                :: fx
-    real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy), device                :: fy
-    real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy), device                :: fz
-    real(8), intent(in), dimension(5,nx,ny,nz), device                                         :: Q
-    real(8), intent(out), dimension(5,nx,ny,nz), device                                        :: Q2
-    real(8), intent(inout), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy), optional, device :: Rs
+    integer, intent(in), value                                                       :: nx, ny, nz
+    real(8), intent(in), value                                                       :: coef1, coef2
+    real(8), intent(in), dimension(nx-1), device                                     :: dx
+    real(8), intent(in), dimension(ny-1), device                                     :: dy
+    real(8), intent(in), dimension(nz-1), device                                     :: dz
+    real(8), intent(in), dimension(5,nx-accuracy+1,ny-accuracy,nz-accuracy), device  :: E
+    real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy+1,nz-accuracy), device  :: F
+    real(8), intent(in), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy+1), device  :: G
+    real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy), device      :: fx
+    real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy), device      :: fy
+    real(8), intent(in), dimension(nx-accuracy,ny-accuracy,nz-accuracy), device      :: fz
+    real(8), intent(in), dimension(5,nx,ny,nz), device                               :: Q
+    real(8), intent(out), dimension(5,nx,ny,nz), device                              :: Q2
+    real(8), intent(inout), dimension(5,nx-accuracy,ny-accuracy,nz-accuracy), device :: Rs
     integer i, j, k, l
     real(8) R
     !$cuf kernel do(4) <<<*,*>>>
@@ -139,9 +154,7 @@ contains
             & + dt / (dz(k) * dx(i)) * (-F(l,i,j,k) + F(l,i,j+1,k) + fy(i,j,k) / dy(j)) &
             & + dt / (dx(i) * dy(j)) * (-G(l,i,j,k) + G(l,i,j,k+1) + fz(i,j,k) / dz(k))
             Q2(l,i+offset,j+offset,k+offset) = Q(l,i+offset,j+offset,k+offset) - coef1 * R
-            if (present(Rs)) then
-              Rs(l,i,j,k) = Rs(l,i,j,k) + coef2 * R
-            endif
+            Rs(l,i,j,k) = Rs(l,i,j,k) + coef2 * R
     enddo;enddo;enddo;enddo
   end subroutine calc_step_forcing
   
