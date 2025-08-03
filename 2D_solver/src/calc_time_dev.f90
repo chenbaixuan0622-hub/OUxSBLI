@@ -26,26 +26,26 @@ contains
   subroutine pre_calc(nx, ny, myrank, nranks, x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q, overlap, xix, etay, Jacobian, QJ)
     integer, intent(in)    :: nx, ny, myrank, nranks
     real(8), intent(in)    :: x(nx), dx_cpu(nx-1), y(ny), dy_cpu(ny-1), Jacobian_cpu(ny)
-    real(8), intent(inout) :: Q(nx,ny,1,4)
+    real(8), intent(inout) :: Q(4,nx,ny,1)
     integer, intent(out)   :: overlap
     real(8), intent(out), device :: xix(nx-1), etay(ny-1), Jacobian(ny)
-    real(8), intent(out), device :: QJ(nx,ny,4)
+    real(8), intent(out), device :: QJ(4,nx,ny)
     real(8) xix_cpu(nx-1), etay_cpu(ny-1)
     real(4) rho1d(nx*ny), p1d(nx*ny), v1d(nx*ny*3)
     integer i, j, k, ierr
     ! set Q / Jacobian
-    do k = 1, 4
-      do j = 1, ny
-        do i = 1, nx
-          Q(i,j,1,k) = Q(i,j,1,k) / Jacobian_cpu(j)
+    do j = 1, ny
+      do i = 1, nx
+        do k = 1, 4
+          Q(k,i,j,1) = Q(k,i,j,1) / Jacobian_cpu(j)
     enddo;enddo;enddo
     ! copy on GPU
-    xix_cpu   = 1.d0 / dx_cpu
-    etay_cpu  = 1.d0 / dy_cpu
+    xix_cpu  = 1.d0 / dx_cpu
+    etay_cpu = 1.d0 / dy_cpu
     xix      = xix_cpu
     etay     = etay_cpu
     Jacobian = Jacobian_cpu
-    QJ = Q(:,:,1,:)
+    QJ = Q(:,:,:,1)
     ! for multi GPU
     if (kind(id_accuracy) == 8) then
       overlap = 3
@@ -54,7 +54,7 @@ contains
     else
       overlap = 1
     endif
-    call make_1d_for_print(nx, ny, Jacobian_cpu, Q(:,:,1,:), rho1d, p1d, v1d)
+    call make_1d_for_print(nx, ny, Jacobian_cpu, Q(:,:,:,1), rho1d, p1d, v1d)
     call print_vtk(0, nx, ny, x, y, rho1d, p1d, v1d)
   end subroutine pre_calc
 
@@ -66,14 +66,14 @@ contains
     real(8), intent(in)         :: x(nx), dx_cpu(nx-1)
     real(8), intent(in)         :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)         :: z(nz), dz_cpu(nz-1), Jacobian_cpu(ny)
-    real(8), intent(inout)      :: Q(nx,ny,nz,4)
+    real(8), intent(inout)      :: Q(4,nx,ny,nz)
     integer i, j, k, l, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireq2(2)
     integer istat(MPI_STATUS_SIZE), istat2(MPI_STATUS_SIZE,2)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     real(8), allocatable, device :: QJ(:,:,:), QJ2(:,:,:), E(:,:,:), F(:,:,:)
     real(8), allocatable, device :: xix(:), etay(:), Jacobian(:)
     ! forcing !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: fx(:,:,:), fy(:,:,:)
+    real(8), allocatable, device :: fx(:,:), fy(:,:)
 
     call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
     ! count GPU
@@ -81,14 +81,14 @@ contains
     print *, "rank", myrank, " has found ", ndevices, " GPU devices"
     if (mod(myrank,2) == 0) then
       call check_gpu(mygpu)
-      allocate(QJ(nx,ny,4), QJ2(nx,ny,4), E(nx-1,ny-2,4), F(nx-2,ny-1,4))
+      allocate(QJ(4,nx,ny), QJ2(4,nx,ny), E(4,nx-1,ny-2), F(4,nx-2,ny-1))
       allocate(xix(nx-1), etay(ny-1), Jacobian(ny))
       print *, "myrank is ", myrank, " memory allocation has completed"
       call pre_calc(nx, ny, myrank, nranks, x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q, overlap, xix, etay, Jacobian, QJ)
       if (kind(id_forcing) == 4) then
-        allocate(fx(nx-2,ny-2,4), fy(nx-2,ny-2,4))
-        fx(:,:,:) = 0.d0
-        fy(:,:,:) = 0.d0
+        allocate(fx(nx-2,ny-2), fy(nx-2,ny-2))
+        fx(:,:) = 0.d0
+        fy(:,:) = 0.d0
       endif
     endif
 
@@ -110,10 +110,10 @@ contains
         if (mod(myrank,2) == 0) then
           if (kind(id_forcing) == 2) then
             call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJ2, E, F)
-            call calc_step2(nx, ny, 0.75d0, 0.25d0, 0.25d0, 1.d0, xix, etay, E, F, QJ, QJ2)
+            call calc_step2_3(nx, ny, 0.75d0, 0.25d0, 0.25d0, 1.d0, xix, etay, E, F, QJ, QJ2)
           else
             call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJ2, E, F, fx, fy)
-            call calc_step2_forcing(nx, ny, 0.75d0, 0.25d0, 0.25d0, 1.d0, xix, etay, E, F, fx, fy, QJ, QJ2)
+            call calc_step2_3_forcing(nx, ny, 0.75d0, 0.25d0, 0.25d0, 1.d0, xix, etay, E, F, fx, fy, QJ, QJ2)
           endif
           call set_bc(myrank, nx, ny, Jacobian, QJ2)
         endif
@@ -121,15 +121,15 @@ contains
         if (mod(myrank,2) == 0) then
           if (kind(id_forcing) == 2) then
             call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJ2, E, F)
-            call calc_step3(nx, ny, xix, etay, E, F, QJ2, QJ)
+            call calc_step2_3(nx, ny, 2.d0, 1.d0, 2.d0, 3.d0, xix, etay, E, F, QJ2, QJ)
           else
             call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJ2, E, F, fx, fy)
-            call calc_step3_forcing(nx, ny, xix, etay, E, F, fx, fy, QJ2, QJ)
+            call calc_step2_3_forcing(nx, ny, 2.d0, 1.d0, 2.d0, 3.d0, xix, etay, E, F, fx, fy, QJ2, QJ)
           endif
           call set_bc(myrank, nx, ny, Jacobian, QJ)
         endif
       enddo
-      call send_recv_for_print(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, QJ, Q(:,:,1,:))
+      call send_recv_for_print(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, QJ, Q(:,:,:,1))
     enddo
 
     if (mod(myrank,2) == 0) then
@@ -149,14 +149,14 @@ contains
     real(8), intent(in)         :: x(nx), dx_cpu(nx-1)
     real(8), intent(in)         :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)         :: z(nz), dz_cpu(nz-1), Jacobian_cpu(ny)
-    real(8), intent(inout)      :: Q(nx,ny,nz,4)
+    real(8), intent(inout)      :: Q(4,nx,ny,nz)
     integer i, j, k, l, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireq2(2)
     integer istat(MPI_STATUS_SIZE), istat2(MPI_STATUS_SIZE,2)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     real(8), allocatable, device :: QJ(:,:,:), QJs(:,:,:), Rs(:,:,:), E(:,:,:), F(:,:,:)
     real(8), allocatable, device :: xix(:), etay(:), Jacobian(:)
     ! forcing !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: fx(:,:,:), fy(:,:,:)
+    real(8), allocatable, device :: fx(:,:), fy(:,:)
 
     call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
     ! count GPU
@@ -166,15 +166,15 @@ contains
     endif
     if (mod(myrank,2) == 0) then
       call check_gpu(mygpu)
-      allocate(QJ(nx,ny,4), QJs(nx,ny,4), Rs(nx-2,ny-2,4), E(nx-1,ny-2,4), F(nx-2,ny-1,4))
+      allocate(QJ(4,nx,ny), QJs(4,nx,ny), Rs(4,nx-2,ny-2), E(4,nx-1,ny-2), F(4,nx-2,ny-1))
       allocate(xix(nx-1), etay(ny-1), Jacobian(ny))
       print *, "myrank is ", myrank, " memory allocation has completed"
       call pre_calc(nx, ny, myrank, nranks, x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q, overlap, xix, etay, Jacobian, QJ)
       Rs = 0.d0
       if (kind(id_forcing) == 4) then
-        allocate(fx(nx-2,ny-2,4), fy(nx-2,ny-2,4))
-        fx(:,:,:) = 0.d0
-        fy(:,:,:) = 0.d0
+        allocate(fx(nx-2,ny-2), fy(nx-2,ny-2))
+        fx(:,:) = 0.d0
+        fy(:,:) = 0.d0
       endif
     endif
     
@@ -224,7 +224,7 @@ contains
           call set_bc(myrank, nx, ny, Jacobian, QJ)
         endif
       enddo
-      call send_recv_for_print(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, QJ, Q(:,:,1,:))
+      call send_recv_for_print(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, QJ, Q(:,:,:,1))
     enddo
 
     if (mod(myrank,2) == 0) then
@@ -243,7 +243,7 @@ contains
     real(8), intent(in)         :: x(nx), dx_cpu(nx-1)
     real(8), intent(in)         :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)         :: z(nz), dz_cpu(nz-1), Jacobian_cpu(ny)
-    real(8), intent(inout)      :: Q(nx,ny,nz,4)
+    real(8), intent(inout)      :: Q(4,nx,ny,nz)
     integer i, j, k, itr, max_itr, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireqs(2)
     integer istat(MPI_STATUS_SIZE), istats(MPI_STATUS_SIZE,2)
     real(8) :: c1, c2, a11, a12, a21, a22, b1, b2, err, tol = 1.d-16
@@ -252,7 +252,7 @@ contains
     real(8), allocatable, device :: R1(:,:,:), R2(:,:,:), R1_new(:,:,:), R2_new(:,:,:)
     real(8), allocatable, device :: xix(:), etay(:), Jacobian(:)
     ! forcing !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: fx(:,:,:), fy(:,:,:)
+    real(8), allocatable, device :: fx(:,:), fy(:,:)
 
     stat = cudaGetDeviceCount(ndevices)
     if (myrank == 0) then
@@ -260,16 +260,16 @@ contains
     endif
     if (mod(myrank,2) == 0) then
       call check_gpu(mygpu)
-      allocate(QJ(nx,ny,4), QJs(nx,ny,4), R1(nx-2,ny-2,4), R2(nx-2,ny-2,4))
-      allocate(R1_new(nx-2,ny-2,4), R2_new(nx-2,ny-2,4))
-      allocate(E(nx-1,ny-2,4), F(nx-2,ny-1,4))
+      allocate(QJ(4,nx,ny), QJs(4,nx,ny), R1(4,nx-2,ny-2), R2(4,nx-2,ny-2))
+      allocate(R1_new(4,nx-2,ny-2), R2_new(4,nx-2,ny-2))
+      allocate(E(4,nx-1,ny-2), F(4,nx-2,ny-1))
       allocate(xix(nx-1), etay(ny-1), Jacobian(ny))
       print *, "myrank is ", myrank, " memory allocation has completed"
       call pre_calc(nx, ny, myrank, nranks, x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q, overlap, xix, etay, Jacobian, QJ)
       if (kind(id_forcing) == 4) then
-        allocate(fx(nx-2,ny-2,4), fy(nx-2,ny-2,4))
-        fx(:,:,:) = 0.d0
-        fy(:,:,:) = 0.d0
+        allocate(fx(nx-2,ny-2), fy(nx-2,ny-2))
+        fx(:,:) = 0.d0
+        fy(:,:) = 0.d0
       endif
     endif
 
@@ -324,7 +324,7 @@ contains
           call set_bc(myrank, nx, ny, Jacobian, QJ)
         endif
       enddo
-      call send_recv_for_print(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, QJ, Q(:,:,1,:))
+      call send_recv_for_print(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, QJ, Q(:,:,:,1))
     enddo
 
     if (mod(myrank,2) == 0) then

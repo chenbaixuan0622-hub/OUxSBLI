@@ -30,20 +30,20 @@ contains
   subroutine pre_calc(nx, ny, nz, myrank, nranks, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q, overlap, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0)
     integer, intent(in)    :: nx, ny, nz, myrank, nranks
     real(8), intent(in)    :: x(nx), dx_cpu(nx-1), y(ny), dy_cpu(ny-1), z(nz), dz_cpu(nz-1), Jacobian_cpu(ny)
-    real(8), intent(inout) :: Q(nx,ny,nz,5)
+    real(8), intent(inout) :: Q(5,nx,ny,nz)
     integer, intent(out)   :: overlap
     real(8), intent(out), device :: xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(ny)
-    real(8), intent(out), device :: QJ(nx,ny,nz,5)
+    real(8), intent(out), device :: QJ(5,nx,ny,nz)
     real(4), intent(inout)       :: ke0, entropy0
     real(8) xix_cpu(nx-1), etay_cpu(ny-1), zetaz_cpu(nz-1)
     real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
     integer i, j, k, l, ierr
     ! set Q / Jacobian
-    do l = 1, 5
-      do k = 1, nz
-        do j = 1, ny
-          do i = 1, nx
-            Q(i,j,k,l) = Q(i,j,k,l) / Jacobian_cpu(j)
+    do k = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          do l = 1, 5
+            Q(l,i,j,k) = Q(l,i,j,k) / Jacobian_cpu(j)
     enddo;enddo;enddo;enddo
     ! copy on GPU
     xix_cpu   = 1.d0 / dx_cpu
@@ -94,7 +94,7 @@ contains
     real(8), intent(in)         :: x(nx), dx_cpu(nx-1)
     real(8), intent(in)         :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)         :: z(nz), dz_cpu(nz-1), Jacobian_cpu(ny)
-    real(8), intent(inout)      :: Q(nx,ny,nz,5)
+    real(8), intent(inout)      :: Q(5,nx,ny,nz)
     integer i, j, k, l, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireq2(2)
     integer istat(MPI_STATUS_SIZE), istat2(MPI_STATUS_SIZE,2)
     ! rescal_cpu!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -105,7 +105,7 @@ contains
     real(8), allocatable, device :: QJ(:,:,:,:), QJ2(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
     real(8), allocatable, device :: xix(:), etay(:), zetaz(:), Jacobian(:)
     ! forcing !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: fx(:,:,:,:), fy(:,:,:,:), fz(:,:,:,:)
+    real(8), allocatable, device :: fx(:,:,:), fy(:,:,:), fz(:,:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
 
@@ -115,15 +115,15 @@ contains
     print *, "rank", myrank, " has found ", ndevices, " GPU devices"
     if (mod(myrank,2) == 0) then
       call check_gpu(mygpu)
-      allocate(QJ(nx,ny,nz,5), QJ2(nx,ny,nz,5), E(nx-1,ny-2,nz-2,5), F(nx-2,ny-1,nz-2,5), G(nx-2,ny-2,nz-1,5))
+      allocate(QJ(5,nx,ny,nz), QJ2(5,nx,ny,nz), E(5,nx-1,ny-2,nz-2), F(5,nx-2,ny-1,nz-2), G(5,nx-2,ny-2,nz-1))
       allocate(xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(ny))
       print *, "myrank is ", myrank, " memory allocation has completed"
       call pre_calc(nx, ny, nz, myrank, nranks, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q, overlap, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0)
       if (kind(id_forcing) == 4) then
-        allocate(fx(nx-2,ny-2,nz-2,5), fy(nx-2,ny-2,nz-2,5), fz(nx-2,ny-2,nz-2,5))
-        fx(:,:,:,:) = 0.d0
-        fy(:,:,:,:) = 0.d0
-        fz(:,:,:,:) = 0.d0
+        allocate(fx(nx-2,ny-2,nz-2), fy(nx-2,ny-2,nz-2), fz(nx-2,ny-2,nz-2))
+        fx(:,:,:) = 0.d0
+        fy(:,:,:) = 0.d0
+        fz(:,:,:) = 0.d0
       endif
     else
       call MPI_RECV(ke0,      1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
@@ -145,9 +145,11 @@ contains
           if (kind(id_forcing) == 2) then
             call nvtxStartRange("calc flux", 1)
             call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
+            !print *, "myrank is ", myrank, " calc EFG"
             call nvtxEndRange
             call nvtxStartRange("calc step", 2)
             call calc_step(nx, ny, nz, 1.d0, 0.d0, xix, etay, zetaz, E, F, G, QJ, QJ2)
+            !print *, "myrank is ", myrank, " calc step"
             call nvtxEndRange
           else
             call nvtxStartRange("calc flux", 1)
@@ -167,6 +169,7 @@ contains
           endif
           call nvtxStartRange("set bc", 4)
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
+          !print *, "myrank is ", myrank, " set bc"
           call nvtxEndRange
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call nvtxStartRange("calc rescale", 5)
@@ -180,10 +183,10 @@ contains
           endif
           if (kind(id_forcing) == 2) then
             call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G)
-            call calc_step2(nx, ny, nz, 0.75d0, 0.25d0, 0.25d0, 1.d0, xix, etay, zetaz, E, F, G, QJ, QJ2)
+            call calc_step2_3(nx, ny, nz, 0.75d0, 0.25d0, 0.25d0, 1.d0, xix, etay, zetaz, E, F, G, QJ, QJ2)
           else
             call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G, fx, fy, fz)
-            call calc_step2_forcing(nx, ny, nz, 0.75d0, 0.25d0, 0.25d0, 1.d0, xix, etay, zetaz, E, F, G, fx, fy, fz, QJ, QJ2)
+            call calc_step2_3_forcing(nx, ny, nz, 0.75d0, 0.25d0, 0.25d0, 1.d0, xix, etay, zetaz, E, F, G, fx, fy, fz, QJ, QJ2)
           endif
           if (ndevices >= 2 .and. kind(id_exchange) == 4) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ2)
@@ -202,10 +205,10 @@ contains
           endif
           if (kind(id_forcing) == 2) then
             call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G)
-            call calc_step3(nx, ny, nz, xix, etay, zetaz, E, F, G, QJ2, QJ)
+            call calc_step2_3(nx, ny, nz, 2.d0, 1.d0, 2.d0, 3.d0, xix, etay, zetaz, E, F, G, QJ2, QJ)
           else
             call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G, fx, fy, fz)
-            call calc_step3_forcing(nx, ny, nz, xix, etay, zetaz, E, F, G, fx, fy, fz, QJ2, QJ)
+            call calc_step2_3_forcing(nx, ny, nz, 2.d0, 1.d0, 2.d0, 3.d0, xix, etay, zetaz, E, F, G, fx, fy, fz, QJ2, QJ)
           endif
           if (ndevices >= 2 .and. kind(id_exchange) == 4) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ)
@@ -245,7 +248,7 @@ contains
     real(8), intent(in)         :: x(nx), dx_cpu(nx-1)
     real(8), intent(in)         :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)         :: z(nz), dz_cpu(nz-1), Jacobian_cpu(ny)
-    real(8), intent(inout)      :: Q(nx,ny,nz,5)
+    real(8), intent(inout)      :: Q(5,nx,ny,nz)
     integer i, j, k, l, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireq2(2)
     integer istat(MPI_STATUS_SIZE), istat2(MPI_STATUS_SIZE,2)
     ! rescale !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -256,7 +259,7 @@ contains
     real(8), allocatable, device :: QJ(:,:,:,:), QJs(:,:,:,:), Rs(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
     real(8), allocatable, device :: xix(:), etay(:), zetaz(:), Jacobian(:)
     ! forcing !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: fx(:,:,:,:), fy(:,:,:,:), fz(:,:,:,:)
+    real(8), allocatable, device :: fx(:,:,:), fy(:,:,:), fz(:,:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
 
@@ -268,16 +271,16 @@ contains
     endif
     if (mod(myrank,2) == 0) then
       call check_gpu(mygpu)
-      allocate(QJ(nx,ny,nz,5), QJs(nx,ny,nz,5), Rs(nx-2,ny-2,nz-2,5), E(nx-1,ny-2,nz-2,5), F(nx-2,ny-1,nz-2,5), G(nx-2,ny-2,nz-1,5))
+      allocate(QJ(5,nx,ny,nz), QJs(5,nx,ny,nz), Rs(5,nx-2,ny-2,nz-2), E(5,nx-1,ny-2,nz-2), F(5,nx-2,ny-1,nz-2), G(5,nx-2,ny-2,nz-1))
       allocate(xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(ny))
       print *, "myrank is ", myrank, " memory allocation has completed"
       call pre_calc(nx, ny, nz, myrank, nranks, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q, overlap, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0)
       Rs = 0.d0
       if (kind(id_forcing) == 4) then
-        allocate(fx(nx-2,ny-2,nz-2,5), fy(nx-2,ny-2,nz-2,5), fz(nx-2,ny-2,nz-2,5))
-        fx(:,:,:,:) = 0.d0
-        fy(:,:,:,:) = 0.d0
-        fz(:,:,:,:) = 0.d0
+        allocate(fx(nx-2,ny-2,nz-2), fy(nx-2,ny-2,nz-2), fz(nx-2,ny-2,nz-2))
+        fx(:,:,:) = 0.d0
+        fy(:,:,:) = 0.d0
+        fz(:,:,:) = 0.d0
       endif
     else
       call MPI_RECV(ke0,      1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
@@ -404,7 +407,7 @@ contains
     real(8), intent(in)         :: x(nx), dx_cpu(nx-1)
     real(8), intent(in)         :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)         :: z(nz), dz_cpu(nz-1), Jacobian_cpu(ny)
-    real(8), intent(inout)      :: Q(nx,ny,nz,5)
+    real(8), intent(inout)      :: Q(5,nx,ny,nz)
     integer i, j, k, itr, max_itr, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireqs(2)
     integer istat(MPI_STATUS_SIZE), istats(MPI_STATUS_SIZE,2)
     ! rescale !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -417,7 +420,7 @@ contains
     real(8), allocatable, device :: R1(:,:,:,:), R2(:,:,:,:), R1_new(:,:,:,:), R2_new(:,:,:,:)
     real(8), allocatable, device :: xix(:), etay(:), zetaz(:), Jacobian(:)
     ! forcing !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: fx(:,:,:,:), fy(:,:,:,:), fz(:,:,:,:)
+    real(8), allocatable, device :: fx(:,:,:), fy(:,:,:), fz(:,:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
 
@@ -429,17 +432,17 @@ contains
     endif
     if (mod(myrank,2) == 0) then
       call check_gpu(mygpu)
-      allocate(QJ(nx,ny,nz,5), QJs(nx,ny,nz,5), R1(nx-2,ny-2,nz-2,5), R2(nx-2,ny-2,nz-2,5))
-      allocate(R1_new(nx-2,ny-2,nz-2,5), R2_new(nx-2,ny-2,nz-2,5))
-      allocate(E(nx-1,ny-2,nz-2,5), F(nx-2,ny-1,nz-2,5), G(nx-2,ny-2,nz-1,5))
+      allocate(QJ(5,nx,ny,nz), QJs(5,nx,ny,nz), R1(5,nx-2,ny-2,nz-2), R2(5,nx-2,ny-2,nz-2))
+      allocate(R1_new(5,nx-2,ny-2,nz-2), R2_new(5,nx-2,ny-2,nz-2))
+      allocate(E(5,nx-1,ny-2,nz-2), F(5,nx-2,ny-1,nz-2), G(5,nx-2,ny-2,nz-1))
       allocate(xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(ny))
       print *, "myrank is ", myrank, " memory allocation has completed"
       call pre_calc(nx, ny, nz, myrank, nranks, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q, overlap, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0)
       if (kind(id_forcing) == 4) then
-        allocate(fx(nx-2,ny-2,nz-2,5), fy(nx-2,ny-2,nz-2,5), fz(nx-2,ny-2,nz-2,5))
-        fx(:,:,:,:) = 0.d0
-        fy(:,:,:,:) = 0.d0
-        fz(:,:,:,:) = 0.d0
+        allocate(fx(nx-2,ny-2,nz-2), fy(nx-2,ny-2,nz-2), fz(nx-2,ny-2,nz-2))
+        fx(:,:,:) = 0.d0
+        fy(:,:,:) = 0.d0
+        fz(:,:,:) = 0.d0
       endif
     else
       call MPI_RECV(ke0,      1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)

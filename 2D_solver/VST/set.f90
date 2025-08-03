@@ -1,5 +1,6 @@
 module set
   use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, rhol => rho0, rhor => rho1, pl => p0, pr => p1
+  use set_bc_common
   implicit none
 contains
   subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
@@ -25,19 +26,19 @@ contains
   subroutine set_init(myrank, nx, ny, nz, x, y, z, Q)
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
-    real(8), intent(out) :: Q(nx,ny,4)
+    real(8), intent(out) :: Q(4,nx,ny)
     integer i, j
     do i = 1, nx
       if (i < int(0.5*nx)) then
-        Q(i,:,1) = rhol
-        Q(i,:,2) = 0.d0
-        Q(i,:,3) = 0.d0
-        Q(i,:,4) = pl / (gamma  - 1.d0)
+        Q(1,i,:) = rhol
+        Q(2,i,:) = 0.d0
+        Q(3,i,:) = 0.d0
+        Q(4,i,:) = pl / (gamma  - 1.d0)
       else
-        Q(i,:,1) = rhor
-        Q(i,:,2) = 0.d0
-        Q(i,:,3) = 0.d0
-        Q(i,:,4) = pr / (gamma - 1.d0)
+        Q(1,i,:) = rhor
+        Q(2,i,:) = 0.d0
+        Q(3,i,:) = 0.d0
+        Q(4,i,:) = pr / (gamma - 1.d0)
       endif
     enddo
   end subroutine set_init
@@ -45,47 +46,45 @@ contains
   subroutine set_bc(myrank, nx, ny, Jacobian, Q)
     integer, intent(in), value     :: myrank, nx, ny
     real(8), intent(in), device    :: Jacobian(ny)
-    real(8), intent(inout), device :: Q(nx,ny,4) ! Q / J
+    real(8), intent(inout), device :: Q(4,nx,ny) ! Q / J
     integer i, j, k
-  
     ! inlet and outlet
     !$cuf kernel do(1) <<<*,*>>>
     do j = 1, ny
-      Q(1,j,1)    = rhol / Jacobian(j)
-      Q(1,j,2)    = 0.d0
-      Q(1,j,3)    = 0.d0
-      Q(1,j,4)    = pl / (gamma - 1.d0) / Jacobian(j)
-      Q(2,j,1)    = rhol / Jacobian(j)
-      Q(2,j,2)    = 0.d0
-      Q(2,j,3)    = 0.d0
-      Q(2,j,4)    = pl / (gamma - 1.d0) / Jacobian(j)
-      Q(3,j,1)    = rhol / Jacobian(j)
-      Q(3,j,2)    = 0.d0
-      Q(3,j,3)    = 0.d0
-      Q(3,j,4)    = pl / (gamma - 1.d0) / Jacobian(j)
-      Q(nx-2,j,1) = rhor / Jacobian(j)
-      Q(nx-2,j,2) = 0.d0
-      Q(nx-2,j,3) = 0.d0
-      Q(nx-2,j,4) = pr / (gamma - 1.d0) / Jacobian(j)
-      Q(nx-1,j,1) = rhor / Jacobian(j)
-      Q(nx-1,j,2) = 0.d0
-      Q(nx-1,j,3) = 0.d0
-      Q(nx-1,j,4) = pr / (gamma - 1.d0) / Jacobian(j)
-      Q(nx,j,1)   = rhor / Jacobian(j)
-      Q(nx,j,2)   = 0.d0
-      Q(nx,j,3)   = 0.d0
-      Q(nx,j,4)   = pr / (gamma - 1.d0) / Jacobian(j)
+      Q(1,1,j)    = rhol / Jacobian(j)
+      Q(2,1,j)    = 0.d0
+      Q(3,1,j)    = 0.d0
+      Q(4,1,j)    = pl / (gamma - 1.d0) / Jacobian(j)
+      Q(1,2,j)    = rhol / Jacobian(j)
+      Q(2,2,j)    = 0.d0
+      Q(3,2,j)    = 0.d0
+      Q(4,2,j)    = pl / (gamma - 1.d0) / Jacobian(j)
+      Q(1,3,j)    = rhol / Jacobian(j)
+      Q(2,3,j)    = 0.d0
+      Q(3,3,j)    = 0.d0
+      Q(4,3,j)    = pl / (gamma - 1.d0) / Jacobian(j)
+      Q(1,nx-2,j) = rhor / Jacobian(j)
+      Q(2,nx-2,j) = 0.d0
+      Q(3,nx-2,j) = 0.d0
+      Q(4,nx-2,j) = pr / (gamma - 1.d0) / Jacobian(j)
+      Q(1,nx-1,j) = rhor / Jacobian(j)
+      Q(2,nx-1,j) = 0.d0
+      Q(3,nx-1,j) = 0.d0
+      Q(4,nx-1,j) = pr / (gamma - 1.d0) / Jacobian(j)
+      Q(1,nx,j)   = rhor / Jacobian(j)
+      Q(2,nx,j)   = 0.d0
+      Q(3,nx,j)   = 0.d0
+      Q(4,nx,j)   = pr / (gamma - 1.d0) / Jacobian(j)
     enddo
-    
     !$cuf kernel do(2)<<<*,*>>>
-    do k = 1, 4
-      do i = 4, nx-3
-        Q(i,1,k)    = Q(i,4,k)
-        Q(i,2,k)    = Q(i,4,k)
-        Q(i,3,k)    = Q(i,4,k)
-        Q(i,ny-2,k) = Q(i,4,k)
-        Q(i,ny-1,k) = Q(i,4,k)
-        Q(i,ny,k)   = Q(i,4,k)
+    do i = 4, nx-3
+      do k = 1, 4
+        Q(k,i,1)    = Q(k,i,4)
+        Q(k,i,2)    = Q(k,i,4)
+        Q(k,i,3)    = Q(k,i,4)
+        Q(k,i,ny-2) = Q(k,i,4)
+        Q(k,i,ny-1) = Q(k,i,4)
+        Q(k,i,ny)   = Q(k,i,4)
     enddo;enddo
   end subroutine set_bc
 
@@ -94,7 +93,7 @@ contains
     real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: rho(nx,ny), u(nx,ny), v(nx,ny), p(nx,ny)
-    real(8), intent(out), device :: fx(nx-2,ny-2,4), fy(nx-2,ny-2,4)
+    real(8), intent(out), device :: fx(nx-2,ny-2), fy(nx-2,ny-2)
   end subroutine calc_forcing
 end module set
 
