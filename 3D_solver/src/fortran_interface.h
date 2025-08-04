@@ -23,9 +23,9 @@ extern "C" void calc_R_c(int nx, int ny, int nz, double* dx, double* dy, double*
 extern "C" void calc_R_forcing_c(int nx, int ny, int nz, double* dx, double* dy, double* dz, \
                                  double* E, double* F, double* G, \
                                  double* fx, double* fy, double* fz, double* R);
-extern "C" void calc_step1_c(int nx, int ny, int nz, double* dx, double* dy, double* dz, \
+extern "C" void calc_step1_c(int nx, int ny, int nz, double coef, double* dx, double* dy, double* dz, \
                              double* E, double* F, double* G, double* Q, double* Q2);
-extern "C" void calc_step1_forcing_c(int nx, int ny, int nz, double* dx, double* dy, double* dz, \
+extern "C" void calc_step1_forcing_c(int nx, int ny, int nz, double coef, double* dx, double* dy, double* dz, \
                                      double* E, double* F, double* G, \
                                      double* fx, double* fy, double* fz, double* Q, double* Q2);
 extern "C" void calc_step_c(int nx, int ny, int nz, double coef1, double coef2, double* dx, double* dy, double* dz, \

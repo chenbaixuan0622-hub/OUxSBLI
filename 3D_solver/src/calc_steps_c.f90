@@ -41,9 +41,10 @@ contains
     call calc_R_forcing(nx, ny, nz, dx, dy, dz, E, F, G, fx, fy, fz, R)
   end subroutine calc_R_forcing_c
 
-  subroutine calc_step1_c(nx, ny, nz, dx_ptr, dy_ptr, dz_ptr, E_ptr, F_ptr, G_ptr, &
+  subroutine calc_step1_c(nx, ny, nz, coef, dx_ptr, dy_ptr, dz_ptr, E_ptr, F_ptr, G_ptr, &
                          Q_ptr, Q2_ptr) bind(c, name="calc_step1_c")
     integer, intent(in), value     :: nx, ny, nz
+    real(8), intent(in), value     :: coef
     real(8), intent(inout), target :: dx_ptr, dy_ptr, dz_ptr
     real(8), intent(inout), target :: E_ptr, F_ptr, G_ptr, Q_ptr, Q2_ptr
     real(8), dimension(:), device, pointer       :: dx, dy, dz
@@ -56,12 +57,13 @@ contains
     call c_f_pointer(c_loc(G_ptr), G, [5,nx-2,ny-2,nz-1])
     call c_f_pointer(c_loc(Q_ptr), Q, [5,nx,ny,nz])
     call c_f_pointer(c_loc(Q2_ptr), Q2, [5,nx,ny,nz])
-    call calc_step1(nx, ny, nz, dx, dy, dz, E, F, G, Q, Q2)
+    call calc_step1(nx, ny, nz, coef, dx, dy, dz, E, F, G, Q, Q2)
   end subroutine calc_step1_c
   
-  subroutine calc_step1_forcing_c(nx, ny, nz, dx_ptr, dy_ptr, dz_ptr, E_ptr, F_ptr, G_ptr, &
+  subroutine calc_step1_forcing_c(nx, ny, nz, coef, dx_ptr, dy_ptr, dz_ptr, E_ptr, F_ptr, G_ptr, &
                          fx_ptr, fy_ptr, fz_ptr, Q_ptr, Q2_ptr) bind(c, name="calc_step1_forcing_c")
     integer, intent(in), value     :: nx, ny, nz
+    real(8), intent(in), value     :: coef
     real(8), intent(inout), target :: dx_ptr, dy_ptr, dz_ptr
     real(8), intent(inout), target :: E_ptr, F_ptr, G_ptr, fx_ptr, fy_ptr, fz_ptr, Q_ptr, Q2_ptr
     real(8), dimension(:), device, pointer       :: dx, dy, dz
@@ -78,7 +80,7 @@ contains
     call c_f_pointer(c_loc(fz_ptr), fz, [nx-2,ny-2,nz-2])
     call c_f_pointer(c_loc(Q_ptr), Q, [5,nx,ny,nz])
     call c_f_pointer(c_loc(Q2_ptr), Q2, [5,nx,ny,nz])
-    call calc_step1_forcing(nx, ny, nz, dx, dy, dz, E, F, G, fx, fy, fz, Q, Q2)
+    call calc_step1_forcing(nx, ny, nz, coef, dx, dy, dz, E, F, G, fx, fy, fz, Q, Q2)
   end subroutine calc_step1_forcing_c
  
   subroutine calc_step_c(nx, ny, nz, coef1, coef2, dx_ptr, dy_ptr, dz_ptr, E_ptr, F_ptr, G_ptr, &
