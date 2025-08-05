@@ -20,7 +20,7 @@ contains
     real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device  :: Jacobian(ny)
+    real(8), intent(in), device  :: Jacobian(nx,ny)
     real(8), intent(in), device  :: QJ(5,nx,ny,nz) ! Q / Jacobian
     real(8), intent(out), device :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
     real(8), intent(out), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
@@ -43,7 +43,7 @@ contains
     real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device  :: Jacobian(ny)
+    real(8), intent(in), device  :: Jacobian(nx,ny)
     real(8), intent(in), device  :: QJ(5,nx,ny,nz) ! Q / Jacobian
     real(8), intent(out), device :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
     real(8), intent(out), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
@@ -68,7 +68,7 @@ contains
     real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device  :: Jacobian(ny)
+    real(8), intent(in), device  :: Jacobian(nx,ny)
     real(8), intent(in), device  :: QJ(5,nx,ny,nz) ! Q / Jacobian
     real(8), intent(out), device :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
     real(8), intent(out), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
@@ -95,7 +95,7 @@ contains
     real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device  :: Jacobian(ny)
+    real(8), intent(in), device  :: Jacobian(nx,ny)
     real(8), intent(in), device  :: QJ(5,nx,ny,nz) ! Q / Jacobian
     real(8), intent(out), device :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
     real(8), intent(out), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
@@ -124,7 +124,7 @@ contains
     real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device  :: Jacobian(ny)
+    real(8), intent(in), device  :: Jacobian(nx,ny)
     real(8), intent(in), device  :: QJ(5,nx,ny,nz) ! Q / Jacobian
     real(8), intent(out), device :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
     real(8), intent(out), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
@@ -155,7 +155,7 @@ contains
     real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device  :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device  :: Jacobian(ny)
+    real(8), intent(in), device  :: Jacobian(nx,ny)
     real(8), intent(in), device  :: QJ(5,nx,ny,nz) ! Q / Jacobian
     real(8), intent(out), device :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
     real(8), intent(out), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)

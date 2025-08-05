@@ -293,7 +293,7 @@ PYBIND11_MODULE(cufd, m) {
         py::arg("fy") = py::none(),
         py::arg("fz") = py::none());
   m.def("calc_step1", &calc_step1_wrapper,
-        py::arg("nx"), py::arg("ny"), py::arg("nz"), py::arg("coef")
+        py::arg("nx"), py::arg("ny"), py::arg("nz"), py::arg("coef"),
         py::arg("dx"), py::arg("dy"), py::arg("dz"),
         py::arg("E"),  py::arg("F"),  py::arg("G"), py::arg("Q"), py::arg("Q2"),
         py::arg("fx") = py::none(),
