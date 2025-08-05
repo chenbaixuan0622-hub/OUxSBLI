@@ -7,13 +7,14 @@ contains
     integer, intent(in), value         :: nx, ny, nz
     real(8), intent(inout), target     :: dx_ptr, dy_ptr, dz_ptr, Jacobian_ptr
     real(8), intent(inout), target     :: QJ_ptr, E_ptr, F_ptr, G_ptr
-    real(8), dimension(:), device, pointer       :: dx, dy, dz, Jacobian
+    real(8), dimension(:), device, pointer       :: dx, dy, dz
+    real(8), dimension(:,:), device, pointer     :: Jacobian
     real(8), dimension(:,:,:,:), device, pointer :: QJ, E, F, G
     integer(kind=2) id_visc
     call c_f_pointer(c_loc(dx_ptr), dx, [nx-1])
     call c_f_pointer(c_loc(dy_ptr), dy, [ny-1])
     call c_f_pointer(c_loc(dz_ptr), dz, [nz-1])
-    call c_f_pointer(c_loc(Jacobian_ptr), Jacobian, [ny])
+    call c_f_pointer(c_loc(Jacobian_ptr), Jacobian, [nx,ny])
     call c_f_pointer(c_loc(QJ_ptr), QJ, [5,nx,ny,nz])
     call c_f_pointer(c_loc(E_ptr), E, [5,nx-1,ny-2,nz-2])
     call c_f_pointer(c_loc(F_ptr), F, [5,nx-2,ny-1,nz-2])
@@ -27,14 +28,15 @@ contains
     integer, intent(in), value         :: nx, ny, nz
     real(8), intent(inout), target     :: dx_ptr, dy_ptr, dz_ptr, Jacobian_ptr
     real(8), intent(inout), target     :: QJ_ptr, E_ptr, F_ptr, G_ptr, fx_ptr, fy_ptr, fz_ptr
-    real(8), dimension(:), device, pointer       :: dx, dy, dz, Jacobian
+    real(8), dimension(:), device, pointer       :: dx, dy, dz
+    real(8), dimension(:,:), device, pointer     :: Jacobian
     real(8), dimension(:,:,:,:), device, pointer :: QJ, E, F, G
     real(8), dimension(:,:,:), device, pointer   :: fx, fy, fz
     integer(kind=2) id_visc
     call c_f_pointer(c_loc(dx_ptr), dx, [nx-1])
     call c_f_pointer(c_loc(dy_ptr), dy, [ny-1])
     call c_f_pointer(c_loc(dz_ptr), dz, [nz-1])
-    call c_f_pointer(c_loc(Jacobian_ptr), Jacobian, [ny])
+    call c_f_pointer(c_loc(Jacobian_ptr), Jacobian, [nx,ny])
     call c_f_pointer(c_loc(QJ_ptr), QJ, [5,nx,ny,nz])
     call c_f_pointer(c_loc(E_ptr), E, [5,nx-1,ny-2,nz-2])
     call c_f_pointer(c_loc(F_ptr), F, [5,nx-2,ny-1,nz-2])
@@ -50,13 +52,14 @@ contains
     integer, intent(in), value         :: nx, ny, nz
     real(8), intent(inout), target     :: dx_ptr, dy_ptr, dz_ptr, Jacobian_ptr
     real(8), intent(inout), target     :: QJ_ptr, E_ptr, F_ptr, G_ptr
-    real(8), dimension(:), device, pointer       :: dx, dy, dz, Jacobian
+    real(8), dimension(:), device, pointer       :: dx, dy, dz
+    real(8), dimension(:,:), device, pointer     :: Jacobian
     real(8), dimension(:,:,:,:), device, pointer :: QJ, E, F, G
     integer(kind=4) id_visc
     call c_f_pointer(c_loc(dx_ptr), dx, [nx-1])
     call c_f_pointer(c_loc(dy_ptr), dy, [ny-1])
     call c_f_pointer(c_loc(dz_ptr), dz, [nz-1])
-    call c_f_pointer(c_loc(Jacobian_ptr), Jacobian, [ny])
+    call c_f_pointer(c_loc(Jacobian_ptr), Jacobian, [nx,ny])
     call c_f_pointer(c_loc(QJ_ptr), QJ, [5,nx,ny,nz])
     call c_f_pointer(c_loc(E_ptr), E, [5,nx-1,ny-2,nz-2])
     call c_f_pointer(c_loc(F_ptr), F, [5,nx-2,ny-1,nz-2])
@@ -70,14 +73,15 @@ contains
     integer, intent(in), value         :: nx, ny, nz
     real(8), intent(inout), target     :: dx_ptr, dy_ptr, dz_ptr, Jacobian_ptr
     real(8), intent(inout), target     :: QJ_ptr, E_ptr, F_ptr, G_ptr, fx_ptr, fy_ptr, fz_ptr
-    real(8), dimension(:), device, pointer       :: dx, dy, dz, Jacobian
+    real(8), dimension(:), device, pointer       :: dx, dy, dz
+    real(8), dimension(:,:), device, pointer     :: Jacobian
     real(8), dimension(:,:,:,:), device, pointer :: QJ, E, F, G
     real(8), dimension(:,:,:), device, pointer   :: fx, fy, fz
     integer(kind=4) id_visc
     call c_f_pointer(c_loc(dx_ptr), dx, [nx-1])
     call c_f_pointer(c_loc(dy_ptr), dy, [ny-1])
     call c_f_pointer(c_loc(dz_ptr), dz, [nz-1])
-    call c_f_pointer(c_loc(Jacobian_ptr), Jacobian, [ny])
+    call c_f_pointer(c_loc(Jacobian_ptr), Jacobian, [nx,ny])
     call c_f_pointer(c_loc(QJ_ptr), QJ, [5,nx,ny,nz])
     call c_f_pointer(c_loc(E_ptr), E, [5,nx-1,ny-2,nz-2])
     call c_f_pointer(c_loc(F_ptr), F, [5,nx-2,ny-1,nz-2])
@@ -93,13 +97,14 @@ contains
     integer, intent(in), value         :: nx, ny, nz
     real(8), intent(inout), target     :: dx_ptr, dy_ptr, dz_ptr, Jacobian_ptr
     real(8), intent(inout), target     :: QJ_ptr, E_ptr, F_ptr, G_ptr
-    real(8), dimension(:), device, pointer       :: dx, dy, dz, Jacobian
+    real(8), dimension(:), device, pointer       :: dx, dy, dz
+    real(8), dimension(:,:), device, pointer     :: Jacobian
     real(8), dimension(:,:,:,:), device, pointer :: QJ, E, F, G
     integer(kind=8) id_visc
     call c_f_pointer(c_loc(dx_ptr), dx, [nx-1])
     call c_f_pointer(c_loc(dy_ptr), dy, [ny-1])
     call c_f_pointer(c_loc(dz_ptr), dz, [nz-1])
-    call c_f_pointer(c_loc(Jacobian_ptr), Jacobian, [ny])
+    call c_f_pointer(c_loc(Jacobian_ptr), Jacobian, [nx,ny])
     call c_f_pointer(c_loc(QJ_ptr), QJ, [5,nx,ny,nz])
     call c_f_pointer(c_loc(E_ptr), E, [5,nx-1,ny-2,nz-2])
     call c_f_pointer(c_loc(F_ptr), F, [5,nx-2,ny-1,nz-2])
@@ -113,14 +118,15 @@ contains
     integer, intent(in), value         :: nx, ny, nz
     real(8), intent(inout), target     :: dx_ptr, dy_ptr, dz_ptr, Jacobian_ptr
     real(8), intent(inout), target     :: QJ_ptr, E_ptr, F_ptr, G_ptr, fx_ptr, fy_ptr, fz_ptr
-    real(8), dimension(:), device, pointer       :: dx, dy, dz, Jacobian
+    real(8), dimension(:), device, pointer       :: dx, dy, dz
+    real(8), dimension(:,:), device, pointer     :: Jacobian
     real(8), dimension(:,:,:,:), device, pointer :: QJ, E, F, G
     real(8), dimension(:,:,:), device, pointer   :: fx, fy, fz
     integer(kind=8) id_visc
     call c_f_pointer(c_loc(dx_ptr), dx, [nx-1])
     call c_f_pointer(c_loc(dy_ptr), dy, [ny-1])
     call c_f_pointer(c_loc(dz_ptr), dz, [nz-1])
-    call c_f_pointer(c_loc(Jacobian_ptr), Jacobian, [ny])
+    call c_f_pointer(c_loc(Jacobian_ptr), Jacobian, [nx,ny])
     call c_f_pointer(c_loc(QJ_ptr), QJ, [5,nx,ny,nz])
     call c_f_pointer(c_loc(E_ptr), E, [5,nx-1,ny-2,nz-2])
     call c_f_pointer(c_loc(F_ptr), F, [5,nx-2,ny-1,nz-2])

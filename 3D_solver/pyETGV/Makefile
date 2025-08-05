@@ -20,6 +20,7 @@ vpath %h 	 ../src
 
 # Source files
 FSRC =mod_globals.o \
+      mod_constant.o \
       set_coordinate.o \
       calc_common_dim.o \
       calc_mat.o \
@@ -34,6 +35,7 @@ FSRC =mod_globals.o \
       calc_keep.o \
 			calc_roe.o \
       calc_muscl.o \
+			set_bc_common.o \
 			set.o \
       calc_flux.o \
       calc_flux_base.o \
@@ -61,6 +63,23 @@ $(TARGET): $(OBJ)
 
 wrapper.o: $(FSRC:.f90=.o)
 cufd.so: wrapper.o
+
+mod_constant.o: mod_globals.mod
+set_bc_common.o: mod_globals.mod mod_constant.mod
+set.o: mod_globals.mod mod_constant.mod set_bc_common.mod set_coordinate.mod
+calc_physical_quantities.o: mod_globals.mod mod_constant.mod
+calc_common.o: mod_globals.mod
+calc_term.o: calc_common_dim.mod
+calc_keep.o: mod_globals.mod mod_constant.mod calc_common_dim.mod calc_term.mod calc_mat.mod
+calc_sutherland.o: mod_globals.mod mod_constant.mod
+calc_visc.o: mod_globals.mod mod_constant.mod calc_sutherland.mod
+calc_mat.o: mod_globals.mod calc_common_dim.mod
+calc_slau.o: mod_globals.mod mod_constant.mod calc_common.mod calc_hybrid.mod
+calc_roe.o: mod_globals.mod calc_common.mod calc_common_dim.mod calc_physical_quantities.mod calc_mat.mod
+calc_flux.o: mod_globals.mod calc_keep.mod calc_slau.mod calc_roe.mod calc_hybrid.mod calc_muscl.mod
+calc_flux_base.o: mod_globals.mod calc_physical_quantities.mod calc_hybrid.mod calc_flux.mod calc_visc.mod calc_les.mod set.mod
+calc_hybrid.o: mod_globals.mod
+calc_steps.o: mod_globals.mod
 
 clean:
 	rm -f *.o *.so

@@ -57,6 +57,35 @@ contains
     Jacobian(ny) = Jacobian(ny-1)
   end subroutine set_Jacobian_y
 
+  subroutine set_Jacobian_xy(nx, ny, nz, dx, dy, dz, Jacobian)
+    integer, intent(in)  :: nx, ny, nz
+    real(8), intent(in)  :: dx(nx-1), dy(ny-1), dz(nz-1)
+    real(8), intent(out) :: Jacobian(nx,ny)
+    integer i, j, k
+    if (2 < nz) then
+      do k = 2, nz-1
+        do j = 2, ny-1
+          do i = 2, nx-1
+            Jacobian(i,j) = 8.d0 / &
+            & ((dx(i-1) + dx(i)) * (dy(j-1) + dy(j)) * (dz(k-1) + dz(k)))
+      enddo;enddo;enddo
+    else
+      do j = 2, ny-1
+        do i = 2, nx-1
+          Jacobian(i,j) = 4.d0 / &
+          & ((dx(i-1) + dx(i)) * (dy(j-1) + dy(j)))
+      enddo;enddo
+    endif
+    do i = 1, nx
+      Jacobian(i,1)  = Jacobian(i,2)
+      Jacobian(i,ny) = Jacobian(i,ny-1)
+    enddo
+    do j = 1, ny
+      Jacobian(1,j)  = Jacobian(2,j)
+      Jacobian(nx,j) = Jacobian(nx-1,j)
+    enddo
+  end subroutine set_Jacobian_xy
+
   subroutine set_grid_cyclic2(id_accuracy, nx, ny, nz, Lx, Ly, Lz, xc, yc, zc, dx, dy, dz)
     integer(kind=2), intent(in) :: id_accuracy
     integer, intent(in)         :: nx, ny, nz
