@@ -6,7 +6,7 @@ module calc_rescale
 contains
   subroutine calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJ, Qm)
     integer, intent(in)            :: step, flag_re, nx, ny, nz
-    real(8), intent(in), device    :: Jacobian(ny), QJ(5,nx,ny,nz)
+    real(8), intent(in), device    :: Jacobian(nx,ny), QJ(5,nx,ny,nz)
     real(8), intent(inout), device :: Qm(ny*5)
     real(8) Q1, Q2, Q3, Q4, Q5, rhoinv, Jacobian_tmp, volinv, step1, step2
     integer i, k
@@ -15,9 +15,9 @@ contains
       !$cuf kernel do <<<*,*>>>
       do j = 1, ny
         Q1 = 0.d0; Q2 = 0.d0; Q3 = 0.d0; Q4 = 0.d0; Q5 = 0.d0
-        Jacobian_tmp = Jacobian(j)
         do k = 4, nz-3
           do i = nre1, nre2
+            Jacobian_tmp = Jacobian(i,j)
             rhoinv = 1.d0 / QJ(1,i,j,k)
             Q1 = Q1 + QJ(1,i,j,k) * Jacobian_tmp
             Q2 = Q2 + QJ(2,i,j,k) * rhoinv
@@ -37,9 +37,9 @@ contains
       !$cuf kernel do <<<*,*>>>
       do j = 1, ny
         Q1 = 0.d0; Q2 = 0.d0; Q3 = 0.d0; Q4 = 0.d0; Q5 = 0.d0
-        Jacobian_tmp = Jacobian(j)
         do k = 4, nz-3
           do i = nre1, nre2
+            Jacobian_tmp = Jacobian(i,j)
             rhoinv = 1.d0 / QJ(1,i,j,k)
             Q1 = Q1 + QJ(1,i,j,k) * Jacobian_tmp
             Q2 = Q2 + QJ(2,i,j,k) * rhoinv
@@ -75,7 +75,7 @@ contains
   subroutine step_rescale(num, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ, Qm, Qre)
     integer, intent(in)            :: num, myrank, step, nx, ny, nz
     integer, intent(inout)         :: flag_re, ireq, ireq2(2)
-    real(8), intent(in), device    :: Jacobian(ny), QJ(5,nx,ny,nz)
+    real(8), intent(in), device    :: Jacobian(nx,ny), QJ(5,nx,ny,nz)
     real(8), intent(inout), device :: Qm(ny*5), Qre(ny*(nz-6)*5)
     real(8) Qm_cpu(ny*5)
     integer ierr, j
@@ -115,7 +115,7 @@ contains
     integer, intent(in)    :: num
     integer, intent(inout) :: flag_re
     integer, intent(in)    :: nx, ny, nz, step
-    real(8), intent(in)    :: y(ny), Jacobian(ny)
+    real(8), intent(in)    :: y(ny), Jacobian(nx,ny)
     real(8), intent(inout) :: Qm_cpu(ny*5)
     real(8)         :: Qre_cpu(ny*(nz-6)*5), bltre
     real(8), device ::     Qre(ny*(nz-6)*5), Qm(ny*5)
@@ -165,7 +165,7 @@ contains
   subroutine set_rescale(flag_re, step, nx, ny, nz, y, Jacobian, Qm, bltre, Qre)
     integer, intent(inout) :: flag_re
     integer, intent(in)    :: step, nx, ny, nz! nz-6
-    real(8), intent(in)    :: y(ny), Jacobian(ny), Qm(ny*5)
+    real(8), intent(in)    :: y(ny), Jacobian(nx,ny), Qm(ny*5)
     real(8), intent(out)   :: bltre
     real(8), intent(inout) :: Qre(ny*nz*5) ! Q / J
     integer i, j, jj, k, kh, l, j_offset, k_offset, ierr
@@ -196,7 +196,7 @@ contains
         j_offset = 5 * (j-1)
         do l = 1, 5
           i = k_offset + j_offset + l
-          Qre(i) = Qre(i) * Jacobian(j)
+          Qre(i) = Qre(i) * Jacobian(nre2,j)
     enddo;enddo;enddo
 
     do j = 1, ny
@@ -338,7 +338,7 @@ contains
         do j = 1, ny
           j_offset = 5 * (j-1)
           weight_tmp   = weight(j)
-          Jacobian_tmp = 1.d0 / Jacobian(j)
+          Jacobian_tmp = 1.d0 / Jacobian(nre2,j)
           uin = (Umin(j) + ufin(j,kh)) * (1.d0 - weight_tmp) + (Umout(j) + ufout(j,kh)) * weight_tmp
           vin = (Vmin(j) + vfin(j,kh)) * (1.d0 - weight_tmp) + (Vmout(j) + vfout(j,kh)) * weight_tmp
           win =            wfin(j,kh)  * (1.d0 - weight_tmp) +             wfout(j,kh)  * weight_tmp
@@ -358,7 +358,7 @@ contains
         do j = 1, ny
           j_offset = 5 * (j-1)
           do l = 1, 5
-            Qre(k_offset+j_offset+l) = Qre(k_offset+j_offset+l) / Jacobian(j)
+            Qre(k_offset+j_offset+l) = Qre(k_offset+j_offset+l) / Jacobian(nre2,j)
       enddo;enddo;enddo
     endif
   end subroutine set_rescale
