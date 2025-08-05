@@ -21,7 +21,7 @@ contains
 
   subroutine calc_quantities_2D(nx,ny,Jacobian,QJ,rho,u,v,p)
     integer, intent(in), value                      :: nx, ny
-    real(8), intent(in), dimension(ny), device      :: Jacobian
+    real(8), intent(in), dimension(nx,ny), device   :: Jacobian
     real(8), intent(in), dimension(4,nx,ny), device :: QJ ! Q / Jacobian
     real(8), intent(out), dimension(nx,ny), device  :: rho, u, v, p
     integer i, j
@@ -30,16 +30,16 @@ contains
     do j = 1, ny
       do i = 1, nx
         over_Q1  = 1.d0 / QJ(1,i,j)
-        rho(i,j) = Jacobian(j) * QJ(1,i,j)
+        rho(i,j) = Jacobian(i,j) * QJ(1,i,j)
         u(i,j)   = QJ(2,i,j) * over_Q1
         v(i,j)   = QJ(3,i,j) * over_Q1
-        p(i,j)   = gamma_1 * (Jacobian(j) * QJ(4,i,j)- 0.5d0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
+        p(i,j)   = gamma_1 * (Jacobian(i,j) * QJ(4,i,j)- 0.5d0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
     enddo;enddo
   end subroutine calc_quantities_2D
 
   subroutine calc_quantities_3D(nx, ny, nz, Jacobian, QJ, Q)
     integer, intent(in), value                          :: nx, ny, nz
-    real(8), intent(in), dimension(ny), device          :: Jacobian
+    real(8), intent(in), dimension(nx,ny), device       :: Jacobian
     real(8), intent(in), dimension(5,nx,ny,nz), device  :: QJ ! Q / Jacobian
     real(8), intent(out), dimension(5,nx,ny,nz), device :: Q
     integer i, j, k
@@ -49,11 +49,11 @@ contains
       do j = 1, ny
         do i = 1, nx
           over_Q1    = 1.d0 / QJ(1,i,j,k)
-          Q(1,i,j,k) = Jacobian(j) * QJ(1,i,j,k)
+          Q(1,i,j,k) = Jacobian(i,j) * QJ(1,i,j,k)
           Q(2,i,j,k) = QJ(2,i,j,k) * over_Q1
           Q(3,i,j,k) = QJ(3,i,j,k) * over_Q1
           Q(4,i,j,k) = QJ(4,i,j,k) * over_Q1
-          Q(5,i,j,k) = gamma_1 * (Jacobian(j) * QJ(5,i,j,k) - 0.5d0 * Q(1,i,j,k) * (Q(2,i,j,k)**2 + Q(3,i,j,k)**2 + Q(4,i,j,k)**2))
+          Q(5,i,j,k) = gamma_1 * (Jacobian(i,j) * QJ(5,i,j,k) - 0.5d0 * Q(1,i,j,k) * (Q(2,i,j,k)**2 + Q(3,i,j,k)**2 + Q(4,i,j,k)**2))
     enddo;enddo;enddo
   end subroutine calc_quantities_3D
 end module calc_physical_quantities
