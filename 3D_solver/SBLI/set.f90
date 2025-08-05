@@ -8,43 +8,27 @@ module set
   use calc_para
   implicit none
 contains
-  subroutine set_block_thread(myrank, accuracy, nx, ny, nz, blocks, threads, blocksE, blocksF, blocksG, &
-                              & threadsE, threadsF, threadsG, blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv)
-    integer, intent(in) :: myrank, accuracy, nx, ny, nz
-    type(dim3), intent(out) :: blocksE,  blocksF,  blocksG,  blocksEv,  blocksFv,  blocksGv,  blocks
+  subroutine set_thread(myrank, threadsE, threadsF, threadsG, threadsEv, threadsFv, threadsGv, threads)
+    integer, intent(in)     :: myrank
     type(dim3), intent(out) :: threadsE, threadsF, threadsG, threadsEv, threadsFv, threadsGv, threads
     if (myrank == 0) then
-      blocksE   = dim3((nx-accuracy+1)/64,(ny-accuracy)/1,(nz-accuracy)/1)
-      blocksF   = dim3((nx-accuracy)/7,(ny-accuracy+1)/8,(nz-accuracy)/1)
-      blocksG   = dim3((nx-accuracy)/7,(ny-accuracy)/1,(nz-accuracy+1)/8)
-      blocksEv  = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
-      blocksFv  = dim3((nx-accuracy)/7,(ny-accuracy+1)/8,(nz-accuracy)/1)
-      blocksGv  = dim3((nx-accuracy)/7,(ny-accuracy)/1,(nz-accuracy+1)/8)
-      blocks    = dim3((nx-accuracy)/73,(ny-accuracy)/1,(nz-accuracy)/1)
-      threadsE  = dim3(64,1,1)
-      threadsF  = dim3(7,8,1)
-      threadsG  = dim3(7,1,8)
-      threadsEv = dim3(32,1,1)
-      threadsFv = dim3(7,8,1)
-      threadsGv = dim3(7,1,8)
-      threads   = dim3(73,1,1)
+      threadsE  = dim3(128,1,1)
+      threadsF  = dim3(32,8,1)
+      threadsG  = dim3(32,1,8)
+      threadsEv = dim3(128,1,1)
+      threadsFv = dim3(32,8,1)
+      threadsGv = dim3(32,1,8)
+      threads   = dim3(32,1,1)
     elseif (myrank == 2) then
-      blocksE   = dim3((nx-accuracy+1)/64,(ny-accuracy)/1,(nz-accuracy)/1)
-      blocksF   = dim3((nx-accuracy)/179,(ny-accuracy+1)/1,(nz-accuracy)/1)
-      blocksG   = dim3((nx-accuracy)/179,(ny-accuracy)/1,(nz-accuracy+1)/1)
-      blocksEv  = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
-      blocksFv  = dim3((nx-accuracy)/179,(ny-accuracy+1)/1,(nz-accuracy)/1)
-      blocksGv  = dim3((nx-accuracy)/179,(ny-accuracy)/1,(nz-accuracy+1)/1)
-      blocks    = dim3((nx-accuracy)/179,(ny-accuracy)/1,(nz-accuracy)/1)
-      threadsE  = dim3(64,1,1)
-      threadsF  = dim3(179,1,1)
-      threadsG  = dim3(179,1,1)
-      threadsEv = dim3(32,1,1)
-      threadsFv = dim3(179,1,1)
-      threadsGv = dim3(179,1,1)
-      threads   = dim3(179,1,1)
+      threadsE  = dim3(128,1,1)
+      threadsF  = dim3(32,8,1)
+      threadsG  = dim3(32,1,8)
+      threadsEv = dim3(128,1,1)
+      threadsFv = dim3(32,8,1)
+      threadsGv = dim3(32,1,8)
+      threads   = dim3(32,1,1)
     endif
-  end subroutine set_block_thread
+  end subroutine set_thread
 
   subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, Lx1, x, y, z, dx, dy, dz)
     integer, intent(in)  :: myrank, nx, ny, nz
