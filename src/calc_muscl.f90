@@ -13,6 +13,7 @@ module calc_muscl
   end interface
 
 contains
+  !dir$ inline
   attributes(device) function minmod2(x,y) result(ans)
     real(8), intent(in), value :: x, y
     real(8) :: ans, sgn
@@ -20,6 +21,7 @@ contains
     ans = sgn * max(min(abs(x), sgn * y), 0.d0)
   end function minmod2
 
+  !dir$ inline
   attributes(device) function minmod3(x,y,z) result(ans)
     real(8), intent(in), value :: x, y, z
     real(8) :: ans, sgn
@@ -27,6 +29,7 @@ contains
     ans = sgn * max(min(abs(x), sgn * y, sgn * z), 0.d0)
   end function minmod3
 
+  !dir$ inline
   attributes(device) function d33(d1,d2,d3) result(ans)
     real(8), intent(in), value :: d1, d2, d3 
     real(8) :: ans, da, db, dc
@@ -36,6 +39,7 @@ contains
     ans = da - 2.d0 * db + dc
   end function d33
 
+  !dir$ inline
   attributes(device) function MUSCL3rdnonTVD(id_tvd,eps1,eps2,k,sensor,a2,a3,d) result(alr)
     integer(kind=2), intent(in), value :: id_tvd
     real(8), intent(in), value         :: eps1, eps2, k, sensor, a2, a3
@@ -75,6 +79,7 @@ contains
     endif
   end function MUSCL3rdThreshold
 
+  !dir$ inline
   attributes(device) function MUSCL4thnonTVD(id_tvd,sensor,a2,a3,d) result(alr)
     integer(kind=2), intent(in), value :: id_tvd
     real(8), intent(in), value         :: sensor, a2, a3
@@ -119,6 +124,7 @@ contains
     endif
   end function MUSCL4thThreshold
 
+  !dir$ inline
   attributes(device) function delta4(eps1,eps2,k,sensor,a) result(alr)
     use mod_globals, only : id_tvd
     real(8), intent(in), value  :: eps1, eps2, k, sensor
@@ -128,6 +134,7 @@ contains
     alr  = MUSCL3rd(id_tvd,eps1,eps2,k,sensor,a(2),a(3),d)
   end function delta4
 
+  !dir$ inline
   attributes(device) function delta6(sensor,a) result(alr)
     use mod_globals, only : id_tvd
     real(8), intent(in), value  :: sensor

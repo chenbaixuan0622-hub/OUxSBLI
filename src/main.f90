@@ -1,14 +1,16 @@
 program main
   use, intrinsic :: iso_fortran_env
   use mpi
-  use mod_globals, only : id_RungeKutta, id_recal, dimension, nx, ny, nz, Lx, Ly, Lz
+  use mod_globals, only : id_RungeKutta, id_recal, dimension, nx, ny, nz, Lx, Ly, Lz, %
+  & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
+  & blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv
   use set
   use set_coordinate
   use calc_time_dev
   implicit none
   integer i, j, l, m, s, mygpu, ios
   real(8) t_start, t_end
-  real(8), allocatable :: x(:), dx(:), y(:), dy(:), z(:), dz(:), Jacobian(:), Q(:,:,:,:)
+  real(8), allocatable :: x(:), dx(:), y(:), dy(:), z(:), dz(:), Jacobian(:,:), Q(:,:,:,:)
   character(len=8) header
   character(len=40) filename
   logical is_sequential
@@ -21,8 +23,11 @@ program main
   mygpu = myrank / 2
 
   print *, "my rank is", myrank
-
-  allocate(Q(dimension+2,nx,ny,nz), x(nx), dx(nx-1), y(ny), dy(ny-1), z(nz), dz(nz-1), Jacobian(ny))
+  if (mod(myrank,2) == 0) then
+    call set_block(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, threadsG, threadsGv, &
+                   blocks, blocksE, blocksEv, blocksF, blocksFv, blocksG, blocksGv)
+  endif
+  allocate(Q(dimension+2,nx,ny,nz), x(nx), dx(nx-1), y(ny), dy(ny-1), z(nz), dz(nz-1), Jacobian(nx,ny))
 
   ! set grid information
   if (mod(myrank,2) == 0) then
@@ -79,7 +84,7 @@ program main
       do j = 1, ny
         do i = 1, nx
           do m = 1, dimension+2
-            Q(m,i,j,l) = Jacobian(j) * Q(m,i,j,l)
+            Q(m,i,j,l) = Jacobian(i,j) * Q(m,i,j,l)
     enddo;enddo;enddo;enddo
     call cpu_time(t_start)
     write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"

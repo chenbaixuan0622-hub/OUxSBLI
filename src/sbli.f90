@@ -10,7 +10,7 @@ program main
   implicit none
   integer i, j, l, mygpu, m, s, nx, ny, nz, ios
   real(8) Lx, Ly, Lz, t_start, t_end
-  real(8), allocatable :: x(:), dx(:), y(:), dy(:), z(:), dz(:), Jacobian(:), Q(:,:,:,:)
+  real(8), allocatable :: x(:), dx(:), y(:), dy(:), z(:), dz(:), Jacobian(:,:), Q(:,:,:,:)
   character(len=8) header
   character(len=40) filename
   logical is_sequential
@@ -40,10 +40,12 @@ program main
     Lz = Lz2
     mygpu = mygpu2
   endif
-  call set_block_thread(myrank, accuracy, nx, ny, nz, blocks, threads, blocksE, blocksF, blocksG, &
-                        & threadsE, threadsF, threadsG, blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv)
-
-  allocate(Q(5,nx,ny,nz), x(nx), dx(nx), y(ny), dy(ny), z(nz), dz(nz), Jacobian(ny))
+  if (mod(myrank,2) == 0) then
+    call set_thread(myrank, threadsE, threadsF, threadsG, threadsEv, threadsFv, threadsGv, threads)
+    call set_block(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, threadsG, threadsGv, &
+                   blocks, blocksE, blocksEv, blocksF, blocksFv, blocksG, blocksGv)
+  endif
+  allocate(Q(5,nx,ny,nz), x(nx), dx(nx), y(ny), dy(ny), z(nz), dz(nz), Jacobian(nx,ny))
 
   ! set grid information
   if (mod(myrank,2) == 0) then
@@ -78,7 +80,7 @@ program main
   else
     call set_grid(myrank-1, nx, ny, nz, Lx, Ly, Lz, 0.9d0 * Lx1, x, y, z, dx, dy, dz)
   endif
-  call set_Jacobian_y(nx, ny, nz, dx, dy, dz, Jacobian)
+  call set_Jacobian_xy(nx, ny, nz, dx, dy, dz, Jacobian)
 
   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   call cpu_time(t_start)
@@ -100,7 +102,7 @@ program main
       do j = 1, ny
         do i = 1, nx
           do m = 1, 5
-            Q(m,i,j,l) = Jacobian(j) * Q(m,i,j,l)
+            Q(m,i,j,l) = Jacobian(i,j) * Q(m,i,j,l)
     enddo;enddo;enddo;enddo
     call cpu_time(t_start)
     write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"
