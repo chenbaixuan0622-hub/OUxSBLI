@@ -1,5 +1,5 @@
 module calc_visc
-  use mod_globals, only : accuracy, offset, id_visc, id_turbulence, id_av, gamma, R, Pr, Prt
+  use mod_globals, only : id_visc, id_turbulence, id_av, gamma, R, Pr, Prt
   use mod_constant, only : Cp, gamma_1
   implicit none
 contains
@@ -133,21 +133,22 @@ contains
     real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device    :: Q(5,nx,ny,nz)
-    real(8), intent(inout), device :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
+    real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k
     real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx
-    ! 4th-order accuracy
+    ! 4th-order 2
     real(8), dimension(6,5), device :: u651, v651, u615, w615
     real(8), dimension(6), device   :: T6, u6, v6, w6
     real(8), dimension(3), device   :: ux3, vx3, wx3, uy3, vy3, uz3, wz3, mu
-    ! 2nd-order accuracy
+    ! 2nd-order 2
     real(8), dimension(2,3,3) , device :: T233
     real(8), dimension(2,3), device    :: u231, v231, u213, w213, Ty, Tz
     real(8), dimension(2), device      :: Tx, u2, v2, w2, my, mz
     real(8) mx, mux, mvx, mwx, muy, mvy, muz, mwz
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset - 1
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
+    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (id_visc ==2 .and. 3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
       u651(:,:) = Q(2,i-2:i+3,j-2:j+2,k)
       u615(:,:) = Q(2,i-2:i+3,j,k-2:k+2)
@@ -199,10 +200,10 @@ contains
       wtxz        = 0.5d0 * (w2(1) + w2(2)) * txz
       kTx         = Cp * mx * (-Tx(1) + Tx(2)) * dx(i) / Pr
     endif
-    E(2,i-offset+1,j-offset,k-offset) = E(2,i-offset+1,j-offset,k-offset) - txx
-    E(3,i-offset+1,j-offset,k-offset) = E(3,i-offset+1,j-offset,k-offset) - txy
-    E(4,i-offset+1,j-offset,k-offset) = E(4,i-offset+1,j-offset,k-offset) - txz
-    E(5,i-offset+1,j-offset,k-offset) = E(5,i-offset+1,j-offset,k-offset) - (utxx + vtxy + wtxz + kTx)
+    E(2,i,j-1,k-1) = E(2,i,j-1,k-1) - txx
+    E(3,i,j-1,k-1) = E(3,i,j-1,k-1) - txy
+    E(4,i,j-1,k-1) = E(4,i,j-1,k-1) - txz
+    E(5,i,j-1,k-1) = E(5,i,j-1,k-1) - (utxx + vtxy + wtxz + kTx)
   end subroutine calc_Ev
   
   attributes(global) subroutine calc_Ev_LES(nx, ny, nz, dx, dy, dz, Q, mut, qc2, E)
@@ -213,21 +214,22 @@ contains
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device    :: Q(5,nx,ny,nz)
     real(8), intent(in), device    :: mut(nx,ny,nz), qc2(nx,ny,nz)
-    real(8), intent(inout), device :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
+    real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k
     real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx, mutx, H(4), txxsgs = 0.d0, txysgs = 0.d0, txzsgs = 0.d0, Hsgs = 0.d0
-    ! 4th-order accuracy
+    ! 4th-order 2
     real(8), dimension(6,5), device :: u651, v651, u615, w615
     real(8), dimension(6), device   :: T6, u6, v6, w6
     real(8), dimension(3), device   :: ux3, vx3, wx3, uy3, vy3, uz3, wz3, mu
-    ! 2nd-order accuracy
+    ! 2nd-order 2
     real(8), dimension(2,3,3) , device :: T233
     real(8), dimension(2,3), device    :: u231, v231, u213, w213, Ty, Tz
     real(8), dimension(2), device      :: Tx, u2, v2, w2, my, mz
     real(8) mx, mux, mvx, mwx, muy, mvy, muz, mwz
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset - 1
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1 - 1
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
+    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (id_visc ==2 .and. 3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
       u651(:,:) = Q(2,i-2:i+3,j-2:j+2,k)
       u615(:,:) = Q(2,i-2:i+3,j,k-2:k+2)
@@ -304,10 +306,10 @@ contains
                + 0.5d0 * (u2(:)**2 + v2(:)**2 + w2(:)**2) + qc2(i:i+1,j,k)
       Hsgs   = -mx * (-H(2) + H(3)) * dx(i) / Prt
     endif
-    E(2,i-offset+1,j-offset,k-offset) = E(2,i-offset+1,j-offset,k-offset) - (txx+txxsgs)
-    E(3,i-offset+1,j-offset,k-offset) = E(3,i-offset+1,j-offset,k-offset) - (txy+txysgs)
-    E(4,i-offset+1,j-offset,k-offset) = E(4,i-offset+1,j-offset,k-offset) - (txz+txzsgs)
-    E(5,i-offset+1,j-offset,k-offset) = E(5,i-offset+1,j-offset,k-offset) - (utxx + vtxy + wtxz + kTx + Hsgs)
+    E(2,i,j-1,k-1) = E(2,i,j-1,k-1) - (txx+txxsgs)
+    E(3,i,j-1,k-1) = E(3,i,j-1,k-1) - (txy+txysgs)
+    E(4,i,j-1,k-1) = E(4,i,j-1,k-1) - (txz+txzsgs)
+    E(5,i,j-1,k-1) = E(5,i,j-1,k-1) - (utxx + vtxy + wtxz + kTx + Hsgs)
   end subroutine calc_Ev_LES
   
   attributes(global) subroutine calc_Fv(nx, ny, nz, dy, dx, dz, Q, F)
@@ -317,23 +319,24 @@ contains
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device    :: Q(5,nx,ny,nz)
-    real(8), intent(inout), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
+    real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k
     real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy, muty
-    ! 4th-order accuracy
+    ! 4th-order 2
     real(8), dimension(5,6), device :: u561, v561
     real(8), dimension(6,5), device :: v165, w165
     real(8), dimension(6), device   :: T6, u6, v6, w6
     real(8), dimension(3), device   :: uy3, vy3, wy3, vz3, wz3, ux3, vx3, mu
-    ! 2nd-order accuracy
+    ! 2nd-order 2
     real(8), dimension(3,2,3), device :: T323
     real(8), dimension(3,2), device   :: u321, v321, Tx
     real(8), dimension(2,3), device   :: v123, w123, Tz
     real(8), dimension(2), device     :: Ty, u2, v2, w2, mz, mx
     real(8) my, muy, mvy, mwy, mvz, mwz, mux, mvx
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset - 1
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1 - 1
+    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (id_visc == 2 .and. 3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-2) then
       u561(:,:) = Q(2,i-2:i+2,j-2:j+3,k)
       v561(:,:) = Q(3,i-2:i+2,j-2:j+3,k)
@@ -385,10 +388,10 @@ contains
       wtyz        = 0.5d0 * (w2(1) + w2(2)) * tyz
       kTy         = Cp * my * (-Ty(1) + Ty(2)) * dy(j) / Pr
     endif
-    F(2,i-offset,j-offset+1,k-offset) = F(2,i-offset,j-offset+1,k-offset) - tyx
-    F(3,i-offset,j-offset+1,k-offset) = F(3,i-offset,j-offset+1,k-offset) - tyy
-    F(4,i-offset,j-offset+1,k-offset) = F(4,i-offset,j-offset+1,k-offset) - tyz
-    F(5,i-offset,j-offset+1,k-offset) = F(5,i-offset,j-offset+1,k-offset) - (utyx + vtyy + wtyz + kTy)
+    F(2,i-1,j,k-1) = F(2,i-1,j,k-1) - tyx
+    F(3,i-1,j,k-1) = F(3,i-1,j,k-1) - tyy
+    F(4,i-1,j,k-1) = F(4,i-1,j,k-1) - tyz
+    F(5,i-1,j,k-1) = F(5,i-1,j,k-1) - (utyx + vtyy + wtyz + kTy)
   end subroutine calc_Fv
   
   attributes(global) subroutine calc_Fv_LES(nx, ny, nz, dy, dx, dz, Q, mut, qc2, F)
@@ -399,23 +402,24 @@ contains
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device    :: Q(5,nx,ny,nz)
     real(8), intent(in), device    :: mut(nx,ny,nz), qc2(nx,ny,nz)
-    real(8), intent(inout), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
+    real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k
     real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy, muty, H(4), tyxsgs = 0.d0, tyysgs = 0.d0, tyzsgs = 0.d0, Hsgs = 0.d0
-    ! 4th-order accuracy
+    ! 4th-order 2
     real(8), dimension(5,6), device :: u561, v561
     real(8), dimension(6,5), device :: v165, w165
     real(8), dimension(6), device   :: T6, u6, v6, w6
     real(8), dimension(3), device   :: uy3, vy3, wy3, vz3, wz3, ux3, vx3, mu
-    ! 2nd-order accuracy
+    ! 2nd-order 2
     real(8), dimension(3,2,3), device :: T323
     real(8), dimension(3,2), device   :: u321, v321, Tx
     real(8), dimension(2,3), device   :: v123, w123, Tz
     real(8), dimension(2), device     :: Ty, u2, v2, w2, mz, mx
     real(8) my, muy, mvy, mwy, mvz, mwz, mux, mvx
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset - 1
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y
+    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (id_visc == 2 .and. 3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-2) then
       u561(:,:) = Q(2,i-2:i+2,j-2:j+3,k)
       v561(:,:) = Q(3,i-2:i+2,j-2:j+3,k)
@@ -492,10 +496,10 @@ contains
                + 0.5d0 * (u2(:)**2 + v2(:)**2 + w2(:)**2) + qc2(i,j:j+1,k)
       Hsgs   = -my * (-H(2) + H(3)) * dy(j) / Prt
     endif
-    F(2,i-offset,j-offset+1,k-offset) = F(2,i-offset,j-offset+1,k-offset) - (tyx+tyxsgs)
-    F(3,i-offset,j-offset+1,k-offset) = F(3,i-offset,j-offset+1,k-offset) - (tyy+tyysgs)
-    F(4,i-offset,j-offset+1,k-offset) = F(4,i-offset,j-offset+1,k-offset) - (tyz+tyzsgs)
-    F(5,i-offset,j-offset+1,k-offset) = F(5,i-offset,j-offset+1,k-offset) - (utyx + vtyy + wtyz + kTy + Hsgs)
+    F(2,i-1,j,k-1) = F(2,i-1,j,k-1) - (tyx+tyxsgs)
+    F(3,i-1,j,k-1) = F(3,i-1,j,k-1) - (tyy+tyysgs)
+    F(4,i-1,j,k-1) = F(4,i-1,j,k-1) - (tyz+tyzsgs)
+    F(5,i-1,j,k-1) = F(5,i-1,j,k-1) - (utyx + vtyy + wtyz + kTy + Hsgs)
   end subroutine calc_Fv_LES
   
   attributes(global) subroutine calc_Gv(nx, ny, nz, dx, dy, dz, Q, G)
@@ -505,21 +509,22 @@ contains
     real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device    :: Q(5,nx,ny,nz)
-    real(8), intent(inout), device :: G(5,nx-accuracy,ny-accuracy,nz-accuracy+1)
+    real(8), intent(inout), device :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k
     real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz
-    ! 4th-order accuracy
+    ! 4th-order 2
     real(8), dimension(5,6), device :: u516, w516, v156, w156
     real(8), dimension(6), device   :: T6, u6, v6, w6
     real(8), dimension(3), device   :: uz3, vz3, wz3, wx3, ux3, vy3, wy3, mu
-    ! 2nd-order accuracy
+    ! 2nd-order 2
     real(8), dimension(3,3,2), device :: T332
     real(8), dimension(3,2), device   :: u312, w312, v132, w132, Tx, Ty
     real(8), dimension(2), device     :: Tz, u2, v2, w2, mx, my
     real(8) mz, muz, mvz, mwz, mwx, mux, mvy, mwy
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset - 1
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
+    k = (blockIdx%z-1)*blockDim%z + threadIdx%z
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (id_visc == 2 .and. 3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-3) then
       u516(:,:) = Q(2,i-2:i+2,j,k-2:k+3)
       v156(:,:) = Q(3,i,j-2:j+2,k-2:k+3)
@@ -571,10 +576,10 @@ contains
       wtzz        = 0.5d0 * (w2(1) + w2(2)) * tzz
       kTz         = Cp * mz * (-Tz(1) + Tz(2)) * dz(k) / Pr
     endif
-    G(2,i-offset,j-offset,k-offset+1) = G(2,i-offset,j-offset,k-offset+1) - tzx
-    G(3,i-offset,j-offset,k-offset+1) = G(3,i-offset,j-offset,k-offset+1) - tzy
-    G(4,i-offset,j-offset,k-offset+1) = G(4,i-offset,j-offset,k-offset+1) - tzz
-    G(5,i-offset,j-offset,k-offset+1) = G(5,i-offset,j-offset,k-offset+1) - (utzx + vtzy + wtzz + kTz)
+    G(2,i-1,j-1,k) = G(2,i-1,j-1,k) - tzx
+    G(3,i-1,j-1,k) = G(3,i-1,j-1,k) - tzy
+    G(4,i-1,j-1,k) = G(4,i-1,j-1,k) - tzz
+    G(5,i-1,j-1,k) = G(5,i-1,j-1,k) - (utzx + vtzy + wtzz + kTz)
   end subroutine calc_Gv
 
   attributes(global) subroutine calc_Gv_LES(nx, ny, nz, dx, dy, dz, Q, mut, qc2, G)
@@ -585,21 +590,22 @@ contains
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device    :: Q(5,nx,ny,nz)
     real(8), intent(in), device    :: mut(nx,ny,nz), qc2(nx,ny,nz)
-    real(8), intent(inout), device :: G(5,nx-accuracy,ny-accuracy,nz-accuracy+1)
+    real(8), intent(inout), device :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k
     real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz, mutz, H(4), tzxsgs = 0.d0, tzysgs = 0.d0, tzzsgs = 0.d0, Hsgs = 0.d0
-    ! 4th-order accuracy
+    ! 4th-order 2
     real(8), dimension(5,6), device :: u516, w516, v156, w156
     real(8), dimension(6), device   :: T6, u6, v6, w6
     real(8), dimension(3), device   :: uz3, vz3, wz3, wx3, ux3, vy3, wy3, mu
-    ! 2nd-order accuracy
+    ! 2nd-order 2
     real(8), dimension(3,3,2), device :: T332
     real(8), dimension(3,2), device   :: u312, w312, v132, w132, Tx, Ty
     real(8), dimension(2), device     :: Tz, u2, v2, w2, mx, my
     real(8) mz, muz, mvz, mwz, mwx, mux, mvy, mwy
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + offset
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + offset
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + offset - 1
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
+    k = (blockIdx%z-1)*blockDim%z + threadIdx%z
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (id_visc == 2 .and. 3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-3) then
       u516(:,:) = Q(2,i-2:i+2,j,k-2:k+3)
       v156(:,:) = Q(3,i,j-2:j+2,k-2:k+3)
@@ -676,10 +682,10 @@ contains
                + 0.5d0 * (u2(:)**2 + v2(:)**2 + w2(:)**2) + qc2(i,j,k:k+1)
       Hsgs   = -mz * (-H(2) + H(3)) * dz(k) / Prt
     endif
-    G(2,i-offset,j-offset,k-offset+1) = G(2,i-offset,j-offset,k-offset+1) - (tzx+tzxsgs)
-    G(3,i-offset,j-offset,k-offset+1) = G(3,i-offset,j-offset,k-offset+1) - (tzy+tzysgs)
-    G(4,i-offset,j-offset,k-offset+1) = G(4,i-offset,j-offset,k-offset+1) - (tzz+tzzsgs)
-    G(5,i-offset,j-offset,k-offset+1) = G(5,i-offset,j-offset,k-offset+1) - (utzx + vtzy + wtzz + kTz + Hsgs)
+    G(2,i-1,j-1,k) = G(2,i-1,j-1,k) - (tzx+tzxsgs)
+    G(3,i-1,j-1,k) = G(3,i-1,j-1,k) - (tzy+tzysgs)
+    G(4,i-1,j-1,k) = G(4,i-1,j-1,k) - (tzz+tzzsgs)
+    G(5,i-1,j-1,k) = G(5,i-1,j-1,k) - (utzx + vtzy + wtzz + kTz + Hsgs)
   end subroutine calc_Gv_LES
 end module calc_visc
 

@@ -1,7 +1,9 @@
 program main
   use, intrinsic :: iso_fortran_env
   use mpi
-  use mod_globals, only : id_RungeKutta, id_recal, dimension, nx, ny, nz, Lx, Ly, Lz
+  use mod_globals, only : id_RungeKutta, id_recal, dimension, nx, ny, nz, Lx, Ly, Lz, %
+  & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
+  & blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv
   use set
   use set_coordinate
   use calc_time_dev
@@ -21,7 +23,10 @@ program main
   mygpu = myrank / 2
 
   print *, "my rank is", myrank
-
+  if (mod(myrank,2) == 0) then
+    call set_block(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, threadsG, threadsGv, &
+                   blocks, blocksE, blocksEv, blocksF, blocksFv, blocksG, blocksGv)
+  endif
   allocate(Q(dimension+2,nx,ny,nz), x(nx), dx(nx-1), y(ny), dy(ny-1), z(nz), dz(nz-1), Jacobian(nx,ny))
 
   ! set grid information
