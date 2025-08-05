@@ -8,7 +8,7 @@ program main
   implicit none
   integer i, j, l, m, s, mygpu, ios
   real(8) t_start, t_end
-  real(8), allocatable :: x(:), dx(:), y(:), dy(:), z(:), dz(:), Jacobian(:), Q(:,:,:,:)
+  real(8), allocatable :: x(:), dx(:), y(:), dy(:), z(:), dz(:), Jacobian(:,:), Q(:,:,:,:)
   character(len=8) header
   character(len=40) filename
   logical is_sequential
@@ -22,7 +22,7 @@ program main
 
   print *, "my rank is", myrank
 
-  allocate(Q(dimension+2,nx,ny,nz), x(nx), dx(nx-1), y(ny), dy(ny-1), z(nz), dz(nz-1), Jacobian(ny))
+  allocate(Q(dimension+2,nx,ny,nz), x(nx), dx(nx-1), y(ny), dy(ny-1), z(nz), dz(nz-1), Jacobian(nx,ny))
 
   ! set grid information
   if (mod(myrank,2) == 0) then
@@ -79,7 +79,7 @@ program main
       do j = 1, ny
         do i = 1, nx
           do m = 1, dimension+2
-            Q(m,i,j,l) = Jacobian(j) * Q(m,i,j,l)
+            Q(m,i,j,l) = Jacobian(i,j) * Q(m,i,j,l)
     enddo;enddo;enddo;enddo
     call cpu_time(t_start)
     write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"
