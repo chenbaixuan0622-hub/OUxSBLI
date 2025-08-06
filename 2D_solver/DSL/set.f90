@@ -1,15 +1,15 @@
 module set
-  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, dtn
+  use mod_globals, only : nx, ny, nz, gamma, R, dtn
   implicit none
 contains
-  subroutine set_grid(nx,ny,nz,xc,yc,zc,dx,dy,dz)
-    integer, intent(in)  :: nx, ny, nz
-    real(8), intent(out) :: xc(nx), yc(ny), zc(nz), dx(nx-1), dy(ny-1), dz(nz-1)
-    real(8) x(nx+1), y(ny+1), z(nz+1)
-    integer i, j, k
+  subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, xc, yc, zc, dx, dy, dz)
+    integer, intent(in)  :: myrank, nx, ny, nz
+    real(8), intent(in)  :: Lx, Ly, Lz
+    real(8), intent(out) :: xc(nx), yc(ny), zc(nz), dx(nx-1), dy(ny-1), dz(1)
+    real(8) x(nx+1), y(ny+1)
+    integer i, j
     dx(:) = Lx / dble(nx-6)
     dy(:) = Ly / dble(ny-6)
-    dz(:) = Lz / dble(nz-6)
 
     ! x direction
     do i = 4, nx-2
@@ -33,17 +33,6 @@ contains
     y(ny)   = y(ny-2) + 2.d0 * dy(1)
     y(ny+1) = y(ny-2) + 3.d0 * dy(1)
 
-    ! z direction
-    do k = 4, nz-2
-      z(k) = dz(1) * dble(k-4)
-    enddo
-    z(1)    = z(4)    - 3.d0 * dz(1)
-    z(2)    = z(4)    - 2.d0 * dz(1)
-    z(3)    = z(4)    - dz(1)
-    z(nz-1) = z(nz-2) + dz(1)
-    z(nz)   = z(nz-2) + 2.d0 * dz(1)
-    z(nz+1) = z(nz-2) + 3.d0 * dz(1)
-
     ! cell centered
     do i = 1, nx
       xc(i) = 0.5d0 * (x(i) + x(i+1))
@@ -51,38 +40,33 @@ contains
     do j = 1, ny
       yc(j) = 0.5d0 * (y(j) + y(j+1))
     enddo
-    do k = 1, nz
-      zc(k) = 0.5d0 * (z(k) + z(k+1))
-    enddo
   end subroutine set_grid
   
-  subroutine set_init(nx,ny,nz,x,y,z,Q)
+  subroutine set_init(myrank, nx, ny, nz, x, y, z, Q)
     use mod_globals, only : pi, M0, rho0, u0, d1, d2
-    integer, intent(in)  :: nx, ny, nz
+    integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
-    real(8), intent(out) :: Q(nx,ny,nz,5)
+    real(8), intent(out) :: Q(nx,ny,4)
     integer i, j
-    real(8) :: Cp = R * gamma / (gamma - 1.d0), p = 1.d0 / (gamma * M0**2)
+    real(8) :: Cp = R * gamma / (gamma - 1.d0), p = rho0 * u0**2 / (gamma * M0**2)
     do j = 1, ny
       do i = 1, nx
         if (y(j) <= pi) then
-          Q(i,j,:,1) = rho0
-          Q(i,j,:,2) = u0 * tanh((y(j) - 0.5d0 * pi) / d1)
-          Q(i,j,:,3) = d2 * sin(x(i))
-          Q(i,j,:,4) = 0.d0
-          Q(i,j,:,5) = p / (gamma - 1.d0) + 0.5d0 * (Q(i,j,:,2)**2 + Q(i,j,:,3)**2) / Q(i,j,:,1)
+          Q(i,j,1) = rho0
+          Q(i,j,2) = rho0 * u0 * tanh((y(j) - 0.5d0 * pi) / d1)
+          Q(i,j,3) = rho0 * u0 * d2 * sin(x(i))
+          Q(i,j,4) = p / (gamma - 1.d0) + 0.5d0 * (Q(i,j,2)**2 + Q(i,j,3)**2) / Q(i,j,1)
         else
-          Q(i,j,:,1) = rho0
-          Q(i,j,:,2) = u0 * tanh((1.5d0 * pi - y(j)) / d1)
-          Q(i,j,:,3) = d2 * sin(x(i))
-          Q(i,j,:,4) = 0.d0
-          Q(i,j,:,5) = p / (gamma - 1.d0) + 0.5d0 * (Q(i,j,:,2)**2 + Q(i,j,:,3)**2) / Q(i,j,:,1)
+          Q(i,j,1) = rho0
+          Q(i,j,2) = rho0 * u0 * tanh((1.5d0 * pi - y(j)) / d1)
+          Q(i,j,3) = rho0 * u0 * d2 * sin(x(i))
+          Q(i,j,4) = p / (gamma - 1.d0) + 0.5d0 * (Q(i,j,2)**2 + Q(i,j,3)**2) / Q(i,j,1)
         endif
     enddo;enddo
   end subroutine set_init
   
-  subroutine set_bc(nx,ny,Jacobian,Q)
-    integer, intent(in), value     :: nx, ny
+  subroutine set_bc(myrank, nx, ny, Jacobian, Q)
+    integer, intent(in), value     :: myrank, nx, ny
     real(8), intent(in), device    :: Jacobian(ny)
     real(8), intent(inout), device :: Q(nx,ny,4)
     integer i, j, k
@@ -148,5 +132,13 @@ contains
       Q(nx,ny,k)     = Q(6,6,k)
     enddo
   end subroutine set_bc
+
+  subroutine calc_forcing(nx, ny, dx, dy, rho, u, v, p, fx, fy)
+    integer, intent(in), value   :: nx, ny
+    real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
+    real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
+    real(8), intent(in), device  :: rho(nx,ny), u(nx,ny), v(nx,ny), p(nx,ny)
+    real(8), intent(out), device :: fx(nx-2,ny-2,4), fy(nx-2,ny-2,4)
+  end subroutine calc_forcing
 end module set
 

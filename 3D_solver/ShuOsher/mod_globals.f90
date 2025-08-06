@@ -56,11 +56,17 @@ module mod_globals
   integer(kind=2), parameter :: id_rescale  = 0
   real(8), parameter         :: blt         = 2.d-3
 
+  ! exchange
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_exchange ! kind2 off !
+  !             ! kind4 on  !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!
+  integer(kind=2), parameter :: id_exchange = 0
+  integer(kind=2), parameter :: id_forcing  = 0
+  ! mesh
   real(8), parameter :: Lx   = 1.d0
   real(8), parameter :: Ly   = 0.1d0 * Lx
   real(8), parameter :: Lz   = 0.1d0 * Lx
-
-  ! mesh
   integer, parameter :: nx = 257
   ! 6th-order accuracy
   integer, parameter :: ny = 7

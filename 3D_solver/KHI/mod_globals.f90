@@ -1,28 +1,24 @@
 module mod_globals
   use cudafor
   implicit none
-  integer, parameter :: dimension = 3
-  integer, parameter :: accuracy  = 2 
-  integer, parameter :: offset    = accuracy / 2
-  integer, parameter :: id_visc   = 0
-  integer, parameter :: id_av     = 0
-  integer, parameter :: id_turbulence = 0
+  integer, parameter    :: dimension = 3
+  integer, parameter    :: accuracy  = 2 
+  integer, parameter    :: offset    = accuracy / 2
+  integer(2), parameter :: id_visc   = 0
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_visc       ! 0 no-visc         !
-  !               ! 1 visc            !
+  ! id_visc       ! kind2 Euler       !
+  !               ! kind4 NS          !
+  !               ! kind8 LES         !
+  !               ! 1 2nd             !
+  !               ! 2 4th             !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_turbulence ! 0 laminar         !
-  !               ! 1 SMSky           !
+  ! id_av         ! 0 no              !
+  !               ! 1 Neumann         !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_scheme   ! 1  KEEP4th          !
-  !             ! 2  KEEP MUSCL       !
-  !             ! 3  SLAU             !
-  !             ! 4  KEEPUP           !
-  !             ! 5  Hybrid Weighted  !
-  !             ! 6  Hybrid threshold !
-  !             ! 7  Hybrid Sigmoid   !
-  !             ! 8  KEEP + Rho       !
-  !             ! 9  KEEP2nd          !
+  ! id_scheme   ! integer(2)  KEEP    !
+  !             ! real(2)     SLAU    !
+  !             ! real(4)   Weighted  !
+  !             ! real(8)   Threshold !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_sensor   ! 1 Ducros            !
   !             ! 2 Albada            !
@@ -42,20 +38,30 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_slau     ! kind2 SLAU          !
   !             ! kind4 HR-SLAU2      !
-  !             ! kind8 VHR-SLAU2     !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! slau_wall   ! kind2 off           !
+  !             ! kind4 on            !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_rescale  ! kind2 off           !
   !             ! kind4 on            !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer, parameter         :: id_scheme   = 3
+  integer(2), parameter      :: id_scheme   = 0
   integer, parameter         :: id_sensor   = 1
-  real(8), parameter         :: threshold   = 0.4d0
+  real(8), parameter         :: threshold   = 0.9d0
   integer(kind=8), parameter :: id_accuracy = 0
   integer(kind=2), parameter :: id_tvd      = 0
   integer(kind=2), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
+  integer(kind=2), parameter :: slau_wall   = 0
   integer(kind=2), parameter :: id_rescale  = 0
-
+  
+  ! exchange
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_exchange ! kind2 off !
+  !             ! kind4 on  !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!
+  integer(kind=2), parameter :: id_exchange = 0
+  integer(kind=2), parameter :: id_forcing  = 0
   ! mesh
   real(8), parameter :: Lx = 1.d0
   real(8), parameter :: Ly = 1.d0
@@ -63,16 +69,24 @@ module mod_globals
   integer, parameter :: nx = 258!130
   integer, parameter :: ny = 258!130
   integer, parameter :: nz = 258!130
-  integer, parameter :: nre = nx-4
+  integer, parameter :: nre1 = 1
+  integer, parameter :: nre2 = nx
+  integer, parameter :: rerank = 0
 
-  type(dim3) :: blocksE = dim3((nx-accuracy+1)/1,(ny-accuracy)/32,(nz-accuracy)/8)
-  type(dim3) :: blocksF = dim3((nx-accuracy)/32,(ny-accuracy+1)/1,(nz-accuracy)/8)
-  type(dim3) :: blocksG = dim3((nx-accuracy)/32,(ny-accuracy)/8,(nz-accuracy+1)/1)
-  type(dim3) :: blocks  = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy)/4)
-  type(dim3) :: threadsE = dim3(1,32,8)
-  type(dim3) :: threadsF = dim3(32,1,8)
-  type(dim3) :: threadsG = dim3(32,8,1)
-  type(dim3) :: threads  = dim3(8,8,4)
+  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/1,(ny-accuracy)/32,(nz-accuracy)/8)
+  type(dim3) :: blocksF   = dim3((nx-accuracy)/32,(ny-accuracy+1)/1,(nz-accuracy)/8)
+  type(dim3) :: blocksG   = dim3((nx-accuracy)/32,(ny-accuracy)/8,(nz-accuracy+1)/1)
+  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/1,(ny-accuracy)/32,(nz-accuracy)/8)
+  type(dim3) :: blocksFv  = dim3((nx-accuracy)/32,(ny-accuracy+1)/1,(nz-accuracy)/8)
+  type(dim3) :: blocksGv  = dim3((nx-accuracy)/32,(ny-accuracy)/8,(nz-accuracy+1)/1)
+  type(dim3) :: blocks    = dim3((nx-accuracy)/8,(ny-accuracy)/8,(nz-accuracy)/4)
+  type(dim3) :: threadsE  = dim3(1,32,8)
+  type(dim3) :: threadsF  = dim3(32,1,8)
+  type(dim3) :: threadsG  = dim3(32,8,1)
+  type(dim3) :: threadsEv = dim3(1,32,8)
+  type(dim3) :: threadsFv = dim3(32,1,8)
+  type(dim3) :: threadsGv = dim3(32,8,1)
+  type(dim3) :: threads   = dim3(8,8,4)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
