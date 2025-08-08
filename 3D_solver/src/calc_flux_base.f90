@@ -30,9 +30,9 @@ contains
     integer stat
     call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, Q)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, dx, dy, dz, Q, sensor)
-    call calc_E<<<blocksE,threadsE,1>>>(nx, ny, nz, Q, sensor, E)
-    call calc_F<<<blocksF,threadsF,2>>>(nx, ny, nz, Q, sensor, F)
-    call calc_G<<<blocksG,threadsG,3>>>(nx, ny, nz, Q, sensor, G)
+    call calc_E<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
+    call calc_F<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, Q, sensor, F)
+    call calc_G<<<blocksG,threadsG,3>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_Euler
 
@@ -54,9 +54,9 @@ contains
     integer stat
     call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, Q)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, dx, dy, dz, Q, sensor)
-    call calc_E<<<blocksE,threadsE,1>>>(nx, ny, nz, Q, sensor, E)
-    call calc_F<<<blocksF,threadsF,2>>>(nx, ny, nz, Q, sensor, F)
-    call calc_G<<<blocksG,threadsG,3>>>(nx, ny, nz, Q, sensor, G)
+    call calc_E<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
+    call calc_F<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, Q, sensor, F)
+    call calc_G<<<blocksG,threadsG,3>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
     stat = cudaDeviceSynchronize()
     call calc_forcing(nx, ny, nz, dx, dy, dz, Q, fx, fy, fz)
   end subroutine calc_EFG_Euler_forcing
@@ -78,9 +78,9 @@ contains
     integer stat
     call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, Q)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, dx, dy, dz, Q, sensor)
-    call calc_E<<<blocksE,threadsE,1>>>(nx, ny, nz, Q, sensor, E)
-    call calc_F<<<blocksF,threadsF,2>>>(nx, ny, nz, Q, sensor, F)
-    call calc_G<<<blocksG,threadsG,3>>>(nx, ny, nz, Q, sensor, G)
+    call calc_E<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
+    call calc_F<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, Q, sensor, F)
+    call calc_G<<<blocksG,threadsG,3>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
     stat = cudaDeviceSynchronize()
     call calc_Ev<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, Q, E)
     call calc_Fv<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, Q, F)
@@ -106,9 +106,9 @@ contains
     integer stat
     call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, Q)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, dx, dy, dz, Q, sensor)
-    call calc_E<<<blocksE,threadsE,1>>>(nx, ny, nz, Q, sensor, E)
-    call calc_F<<<blocksF,threadsF,2>>>(nx, ny, nz, Q, sensor, F)
-    call calc_G<<<blocksG,threadsG,3>>>(nx, ny, nz, Q, sensor, G)
+    call calc_E<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
+    call calc_F<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, Q, sensor, F)
+    call calc_G<<<blocksG,threadsG,3>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
     stat = cudaDeviceSynchronize()
     call calc_Ev<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, Q, E)
     call calc_Fv<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, Q, F)
@@ -136,9 +136,9 @@ contains
     qc2 = 0.d0
     call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, Q)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, dx, dy, dz, Q, sensor)
-    call calc_E<<<blocksE,threadsE,1>>>(nx, ny, nz, Q, sensor, E)
-    call calc_F<<<blocksF,threadsF,2>>>(nx, ny, nz, Q, sensor, F)
-    call calc_G<<<blocksG,threadsG,3>>>(nx, ny, nz, Q, sensor, G)
+    call calc_E<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
+    call calc_F<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, Q, sensor, F)
+    call calc_G<<<blocksG,threadsG,3>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
     call calc_mut<<<blocks,threads>>>(nx, ny, nz, dx, dy, dz, Q, mut, qc2)
     stat = cudaDeviceSynchronize()
     call set_bc_mut(nx, ny, nz, mut, qc2)
@@ -168,9 +168,9 @@ contains
     qc2 = 0.d0
     call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, Q)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, dx, dy, dz, Q, sensor)
-    call calc_E<<<blocksE,threadsE,1>>>(nx, ny, nz, Q, sensor, E)
-    call calc_F<<<blocksF,threadsF,2>>>(nx, ny, nz, Q, sensor, F)
-    call calc_G<<<blocksG,threadsG,3>>>(nx, ny, nz, Q, sensor, G)
+    call calc_E<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
+    call calc_F<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, Q, sensor, F)
+    call calc_G<<<blocksG,threadsG,3>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
     call calc_mut<<<blocks,threads>>>(nx, ny, nz, dx, dy, dz, Q, mut, qc2)
     stat = cudaDeviceSynchronize()
     call set_bc_mut(nx, ny, nz, mut, qc2)
