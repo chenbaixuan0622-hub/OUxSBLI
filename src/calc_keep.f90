@@ -1,5 +1,5 @@
 module calc_keep
-  use mod_globals, only : dimension, gamma
+  use mod_globals, only : dim => dimension, gamma
   use mod_constant, only : over_gamma_1
   use calc_common_dim
   use calc_term
@@ -20,12 +20,12 @@ contains
   !KEEP energy!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! 2nd-order accuracy !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  attributes(device) function EtKEEP2(id_keep,id,C,rho,p,V1,V2) result(Et)
-    integer(kind=2), intent(in), value                :: id_keep
-    integer, intent(in), value                        :: id
-    real(8), intent(in), value                        :: C
-    real(8), intent(in), dimension(2), device         :: rho, p
-    real(8), intent(in), dimension(dimension), device :: V1, V2
+  attributes(device) function EtKEEP2(id_keep, id, C, rho, p, V1, V2) result(Et)
+    integer(kind=2), intent(in), value  :: id_keep
+    integer, intent(in), value          :: id
+    real(8), intent(in), value          :: C
+    real(8), intent(in), dimension(2)   :: rho, p
+    real(8), intent(in), dimension(dim) :: V1, V2
     real(8) :: IE, PV, KE, Et
     IE = C * 0.5d0 * (p(1) / rho(1) + p(2) / rho(2)) * over_gamma_1
     PV = 0.5d0 * (V1(id) * p(2) + V2(id) * p(1))
@@ -33,12 +33,12 @@ contains
     Et = IE + PV + KE
   end function EtKEEP2
 
-  attributes(device) function EtKEEPPE2(id_keep,id,C,rho,p,V1,V2) result(Et)
-    integer(kind=4), intent(in), value                :: id_keep
-    integer, intent(in), value                        :: id
-    real(8), intent(in), value                        :: C
-    real(8), intent(in), dimension(2), device         :: rho, p
-    real(8), intent(in), dimension(dimension), device :: V1, V2
+  attributes(device) function EtKEEPPE2(id_keep, id, C, rho, p, V1, V2) result(Et)
+    integer(kind=4), intent(in), value  :: id_keep
+    integer, intent(in), value          :: id
+    real(8), intent(in), value          :: C
+    real(8), intent(in), dimension(2)   :: rho, p
+    real(8), intent(in), dimension(dim) :: V1, V2
     real(8) :: IE, PV, KE, Et
     IE = 0.25d0 * (V1(id) + V2(id)) * (p(1) + p(2)) * over_gamma_1
     PV = 0.5d0 * (V1(id) * p(2) + V2(id) * p(1))
@@ -46,12 +46,12 @@ contains
     Et = IE + PV + KE
   end function EtKEEPPE2
 
-  attributes(device) function EtKEP2(id_keep,id,C,rho,p,V1,V2) result(Et)
-    integer(kind=8), intent(in), value                :: id_keep
-    integer, intent(in), value                        :: id
-    real(8), intent(in), value                        :: C
-    real(8), intent(in), dimension(2), device         :: rho, p
-    real(8), intent(in), dimension(dimension), device :: V1, V2
+  attributes(device) function EtKEP2(id_keep, id, C, rho, p, V1, V2) result(Et)
+    integer(kind=8), intent(in), value  :: id_keep
+    integer, intent(in), value          :: id
+    real(8), intent(in), value          :: C
+    real(8), intent(in), dimension(2)   :: rho, p
+    real(8), intent(in), dimension(dim) :: V1, V2
     real(8) :: H, KE, Et
     H  = C * 0.5d0 * gamma * over_gamma_1 * (p(1) / rho(1) + p(2) / rho(2))
     KE = 0.5d0 * C * vecsum(V1, V2)
@@ -60,12 +60,12 @@ contains
 
   ! 4th-order accuracy !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  attributes(device) function  EtKEEP4(id_keep,id,rho,p,V,RhoV) result(Et)
-    integer(kind=2), intent(in), value                  :: id_keep
-    integer, intent(in), value                          :: id
-    real(8), intent(in), dimension(4), device           :: rho, p
-    real(8), intent(in), dimension(4,dimension), device :: V
-    real(8), intent(in), dimension(3), device           :: RhoV
+  attributes(device) function  EtKEEP4(id_keep, id, rho, p, V, RhoV) result(Et)
+    integer(kind=2), intent(in), value    :: id_keep
+    integer, intent(in), value            :: id
+    real(8), intent(in), dimension(4)     :: rho, p
+    real(8), intent(in), dimension(4,dim) :: V
+    real(8), intent(in), dimension(3)     :: RhoV
     real(8), dimension(4) :: P_over_Rho
     real(8), dimension(3) :: RhoVIE, RhoVKE, VP, Et
     P_over_Rho(:) = p(:) / rho(:)
@@ -75,12 +75,12 @@ contains
     Et(:)         = RhoVIE(:) + RhoVKE(:) + VP(:)
   end function EtKEEP4
 
-  attributes(device) function EtKEEPPE4(id_keep,id,rho,p,V,RhoV) result(Et)
-    integer(kind=4), intent(in), value                  :: id_keep
-    integer, intent(in), value                          :: id
-    real(8), intent(in), dimension(4), device           :: rho, p
-    real(8), intent(in), dimension(4,dimension), device :: V
-    real(8), intent(in), dimension(3), device           :: RhoV
+  attributes(device) function EtKEEPPE4(id_keep, id, rho, p, V, RhoV) result(Et)
+    integer(kind=4), intent(in), value    :: id_keep
+    integer, intent(in), value            :: id
+    real(8), intent(in), dimension(4)     :: rho, p
+    real(8), intent(in), dimension(4,dim) :: V
+    real(8), intent(in), dimension(3)     :: RhoV
     real(8), dimension(3) :: Vm, RhoVIE, RhoVKE, VP, Et
     Vm(:)     = Phi4(V(:,id))
     RhoVIE(:) = RhoPhiU4(Vm(:), p(:)) * over_gamma_1    
@@ -89,12 +89,12 @@ contains
     Et(:)     = RhoVIE(:) + RhoVKE(:) + VP(:)
   end function EtKEEPPE4
 
-  attributes(device) function EtKEP4(id_keep,id,rho,p,V,RhoV) result(Et)
-    integer(kind=8), intent(in), value                  :: id_keep
-    integer, intent(in), value                          :: id
-    real(8), intent(in), dimension(4), device           :: rho, p
-    real(8), intent(in), dimension(4,dimension), device :: V
-    real(8), intent(in), dimension(3), device           :: RhoV
+  attributes(device) function EtKEP4(id_keep, id, rho, p, V, RhoV) result(Et)
+    integer(kind=8), intent(in), value    :: id_keep
+    integer, intent(in), value            :: id
+    real(8), intent(in), dimension(4)     :: rho, p
+    real(8), intent(in), dimension(4,dim) :: V
+    real(8), intent(in), dimension(3)     :: RhoV
     real(8), dimension(3) :: RhoVH, RhoVKE, Et
     real(8), dimension(4) :: P_over_Rho
     integer i
@@ -106,12 +106,12 @@ contains
 
   ! 6th-order accuracy !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  attributes(device) function  EtKEEP6(id_keep,id,rho,p,V,RhoV) result(Et)
-    integer(kind=2), intent(in), value                  :: id_keep
-    integer, intent(in), value                          :: id
-    real(8), intent(in), dimension(6), device           :: rho, p
-    real(8), intent(in), dimension(6,dimension), device :: V
-    real(8), intent(in), dimension(6), device           :: RhoV
+  attributes(device) function  EtKEEP6(id_keep, id, rho, p, V, RhoV) result(Et)
+    integer(kind=2), intent(in), value    :: id_keep
+    integer, intent(in), value            :: id
+    real(8), intent(in), dimension(6)     :: rho, p
+    real(8), intent(in), dimension(6,dim) :: V
+    real(8), intent(in), dimension(6)     :: RhoV
     real(8), dimension(6) :: P_over_Rho
     real(8), dimension(6) :: RhoVIE, RhoVKE, VP, Et
     P_over_Rho(:) = p(:) / rho(:)
@@ -121,12 +121,12 @@ contains
     Et(:)         = RhoVIE(:) + RhoVKE(:) + VP(:)
   end function EtKEEP6
 
-  attributes(device) function EtKEEPPE6(id_keep,id,rho,p,V,RhoV) result(Et)
-    integer(kind=4), intent(in), value                  :: id_keep
-    integer, intent(in), value                          :: id
-    real(8), intent(in), dimension(6), device           :: rho, p
-    real(8), intent(in), dimension(6,dimension), device :: V
-    real(8), intent(in), dimension(6), device           :: RhoV
+  attributes(device) function EtKEEPPE6(id_keep, id, rho, p, V, RhoV) result(Et)
+    integer(kind=4), intent(in), value    :: id_keep
+    integer, intent(in), value            :: id
+    real(8), intent(in), dimension(6)     :: rho, p
+    real(8), intent(in), dimension(6,dim) :: V
+    real(8), intent(in), dimension(6)     :: RhoV
     real(8), dimension(6) :: Vm, RhoVIE, RhoVKE, VP, Et
     Vm(:)     = Phi6(V(:,id))
     RhoVIE(:) = RhoPhiU6(Vm(:), p(:)) * over_gamma_1    
@@ -135,12 +135,12 @@ contains
     Et(:)     = RhoVIE(:) + RhoVKE(:) + VP(:)
   end function EtKEEPPE6
 
-  attributes(device) function EtKEP6(id_keep,id,rho,p,V,RhoV) result(Et)
-    integer(kind=8), intent(in), value                  :: id_keep
-    integer, intent(in), value                          :: id
-    real(8), intent(in), dimension(6), device           :: rho, p
-    real(8), intent(in), dimension(6,dimension), device :: V
-    real(8), intent(in), dimension(6), device           :: RhoV
+  attributes(device) function EtKEP6(id_keep, id, rho, p, V, RhoV) result(Et)
+    integer(kind=8), intent(in), value    :: id_keep
+    integer, intent(in), value            :: id
+    real(8), intent(in), dimension(6)     :: rho, p
+    real(8), intent(in), dimension(6,dim) :: V
+    real(8), intent(in), dimension(6)     :: RhoV
     real(8), dimension(6) :: RhoVH, RhoVKE, Et
     real(8), dimension(6) :: P_over_Rho
     integer i
@@ -152,60 +152,65 @@ contains
 
   !KEEP main!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  attributes(device) function KEEP2(id,rho,p,V,Normal) result(F)
+  attributes(device) function KEEP2(id, rho, u, v, w, p, Normal) result(F)
     use mod_globals, only : id_keep
-    integer, intent(in), value                          :: id
-    real(8), intent(in), dimension(2), device           :: rho, p
-    real(8), intent(in), dimension(2,dimension), device :: V
-    real(8), intent(in), dimension(dimension+2), device :: Normal
-    real(8), dimension(dimension+2) :: F
-    real(8), dimension(dimension)   :: Vm, V1, V2
-    V1(:) = V(1,:)
-    V2(:) = V(2,:)
+    integer, intent(in), value            :: id
+    real(8), intent(in), dimension(2)     :: rho, u, v, w, p
+    real(8), intent(in), dimension(dim+2) :: Normal
+    real(8), dimension(dim+2) :: F
+    real(8), dimension(dim)   :: Vm, V1, V2
+    V1(:) = (/u(1), v(1), w(1)/)
+    V2(:) = (/u(2), v(2), w(2)/)
     Vm(:) = 0.5d0 * (V1(:) + V2(:))
     F(1)  = 0.5d0 * (rho(1) + rho(2)) * Vm(id)
-    F(2:dimension+1) = F(1) * Vm(:) + 0.5d0 * (p(1) + p(2)) * Normal(2:dimension+1)
-    F(dimension+2) = Et2(id_keep,id,F(1),rho,p,V1,V2)
+    F(2:dim+1) = F(1) * Vm(:) + 0.5d0 * (p(1) + p(2)) * Normal(2:dim+1)
+    F(dim+2) = Et2(id_keep,id,F(1),rho,p,V1,V2)
   end function KEEP2
 
-  attributes(device) function KEEP4(id,rho,p,V,Normal) result(F)
+  attributes(device) function KEEP4(id, rho, u, v, w, p, Normal) result(F)
     use mod_globals, only : id_keep
-    integer, intent(in), value                          :: id
-    real(8), intent(in), dimension(4), device           :: rho, p
-    real(8), intent(in), dimension(4,dimension), device :: V
-    real(8), intent(in), dimension(dimension+2), device :: Normal
-    real(8), dimension(dimension+2) :: F
-    real(8), dimension(3)           :: RhoV, Energy
-    real(8), dimension(3,dimension) :: RhoVV_P
+    integer, intent(in), value            :: id
+    real(8), intent(in), dimension(4)     :: rho, u, v, w, p
+    real(8), intent(in), dimension(dim+2) :: Normal
+    real(8), dimension(dim+2) :: F
+    real(8), dimension(3)     :: RhoV, Energy
+    real(8), dimension(3,dim) :: RhoVV_P
+    real(8), dimension(4,dim) :: V4
     integer i
-    RhoV(:) = RhoPhi4(rho(:), V(:,id))
+    V4(:,1) = u
+    V4(:,2) = v
+    V4(:,3) = w
+    RhoV(:) = RhoPhi4(rho(:), V4(:,id))
     F(1)    = Flux4(RhoV(:))
-    do i = 1, dimension
-      RhoVV_P(:,i) = RhoPhiU4(RhoV(:), V(:,i)) + Phi4(p(:)) * Normal(i+1)
+    do i = 1, dim
+      RhoVV_P(:,i) = RhoPhiU4(RhoV(:), V4(:,i)) + Phi4(p(:)) * Normal(i+1)
       F(i+1)       = Flux4(RhoVV_P(:,i))
     enddo
-    Energy(:) =  Et4(id_keep,id,rho,p,V,RhoV)
-    F(dimension+2) = Flux4(Energy(:))
+    Energy(:) =  Et4(id_keep, id, rho, p, V4, RhoV)
+    F(dim+2) = Flux4(Energy(:))
   end function KEEP4
 
-  attributes(device) function KEEP6(id,rho,p,V,Normal) result(F)
+  attributes(device) function KEEP6(id, rho, u, v, w, p, Normal) result(F)
     use mod_globals, only : id_keep
-    integer, intent(in), value                          :: id
-    real(8), intent(in), dimension(6), device           :: rho, p
-    real(8), intent(in), dimension(6,dimension), device :: V
-    real(8), intent(in), dimension(dimension+2), device :: Normal
-    real(8), dimension(dimension+2) :: F
-    real(8), dimension(6)           :: RhoV, Energy
-    real(8), dimension(6,dimension) :: RhoVV_P
+    integer, intent(in), value            :: id
+    real(8), intent(in), dimension(6)     :: rho, u, v, w, p
+    real(8), intent(in), dimension(dim+2) :: Normal
+    real(8), dimension(dim+2) :: F
+    real(8), dimension(6)     :: RhoV, Energy
+    real(8), dimension(6,dim) :: RhoVV_P
+    real(8), dimension(6,dim) :: V6
     integer i
-    RhoV(:) = RhoPhi6(rho(:), V(:,id))
+    V6(:,1) = u
+    V6(:,2) = v
+    V6(:,3) = w
+    RhoV(:) = RhoPhi6(rho(:), V6(:,id))
     F(1)    = Flux6(RhoV(:))
-    do i = 1, dimension
-      RhoVV_P(:,i) = RhoPhiU6(RHoV(:), V(:,i)) + Phi6(p(:)) * Normal(i+1)
+    do i = 1, dim
+      RhoVV_P(:,i) = RhoPhiU6(RHoV(:), V6(:,i)) + Phi6(p(:)) * Normal(i+1)
       F(i+1)       = Flux6(RhoVV_P(:,i))
     enddo
-    Energy(:) = Et6(id_keep,id,rho,p,V,RhoV)
-    F(dimension+2) = Flux6(Energy(:))
+    Energy(:) = Et6(id_keep, id, rho, p, V6, RhoV)
+    F(dim+2) = Flux6(Energy(:))
   end function KEEP6
 end module calc_keep
 

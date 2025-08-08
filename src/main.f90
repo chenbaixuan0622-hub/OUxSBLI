@@ -1,7 +1,7 @@
 program main
   use, intrinsic :: iso_fortran_env
   use mpi
-  use mod_globals, only : id_RungeKutta, id_recal, dimension, nx, ny, nz, Lx, Ly, Lz, %
+  use mod_globals, only : id_RungeKutta, id_recal, dimension, nx, ny, nz, Lx, Ly, Lz, &
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
   & blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv
   use set
@@ -32,7 +32,7 @@ program main
   ! set grid information
   if (mod(myrank,2) == 0) then
     call set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
-    call set_Jacobian_y(nx, ny, nz, dx, dy, dz, Jacobian)
+    call set_Jacobian_xy(nx, ny, nz, dx, dy, dz, Jacobian)
     if (kind(id_recal) == 4) then
       write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"
       open(10, file=filename, action="read", form="unformatted", access="sequential", status="old", iostat=ios)
