@@ -40,11 +40,8 @@ program main
     Lz = Lz2
     mygpu = mygpu2
   endif
-  if (mod(myrank,2) == 0) then
-    call set_thread(myrank, threadsE, threadsF, threadsG, threadsEv, threadsFv, threadsGv, threads)
-    call set_block(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, threadsG, threadsGv, &
-                   blocks, blocksE, blocksEv, blocksF, blocksFv, blocksG, blocksGv)
-  endif
+  call set_block(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, threadsG, threadsGv, &
+                 blocks, blocksE, blocksEv, blocksF, blocksFv, blocksG, blocksGv)
   allocate(Q(5,nx,ny,nz), x(nx), dx(nx), y(ny), dy(ny), z(nz), dz(nz), Jacobian(nx,ny))
 
   ! set grid information
