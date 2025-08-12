@@ -255,8 +255,7 @@ contains
         v(it+2:it+3,jt,kt) = Q(3,i+2:i+3,j,k)
         w(it+2:it+3,jt,kt) = Q(4,i+2:i+3,j,k)
         p(it+2:it+3,jt,kt) = Q(5,i+2:i+3,j,k)
-    endif
-    if (3 <= i .and. it == 1) then
+    elseif (3 <= i .and. it == 1) then
       rho(it-2:it-1,jt,kt) = Q(1,i-2:i-1,j,k)
         u(it-2:it-1,jt,kt) = Q(2,i-2:i-1,j,k)
         v(it-2:it-1,jt,kt) = Q(3,i-2:i-1,j,k)
@@ -310,8 +309,7 @@ contains
         v(jt+2:jt+3,it,kt) = Q(3,i,j+2:j+3,k)
         w(jt+2:jt+3,it,kt) = Q(4,i,j+2:j+3,k)
         p(jt+2:jt+3,it,kt) = Q(5,i,j+2:j+3,k)
-    endif
-    if (3 <= j .and. jt == 1) then
+    elseif (3 <= j .and. jt == 1) then
       rho(jt-2:jt-1,it,kt) = Q(1,i,j-2:j-1,k)
         u(jt-2:jt-1,it,kt) = Q(2,i,j-2:j-1,k)
         v(jt-2:jt-1,it,kt) = Q(3,i,j-2:j-1,k)
@@ -370,8 +368,7 @@ contains
         v(kt+2:kt+3,jt,it) = Q(3,i,j,k+2:k+3)
         w(kt+2:kt+3,jt,it) = Q(4,i,j,k+2:k+3)
         p(kt+2:kt+3,jt,it) = Q(5,i,j,k+2:k+3)
-    endif
-    if (3 <= k .and. kt == 1) then
+    elseif (3 <= k .and. kt == 1) then
       rho(kt-2:kt-1,jt,it) = Q(1,i,j,k-2:k-1)
         u(kt-2:kt-1,jt,it) = Q(2,i,j,k-2:k-1)
         v(kt-2:kt-1,jt,it) = Q(3,i,j,k-2:k-1)
@@ -423,8 +420,7 @@ contains
         v(it+2,jt,kt) = Q(3,i+2,j,k)
         w(it+2,jt,kt) = Q(4,i+2,j,k)
         p(it+2,jt,kt) = Q(5,i+2,j,k)
-    endif
-    if (2 <= i .and. it == 1) then
+    elseif (2 <= i .and. it == 1) then
       rho(it-1,jt,kt) = Q(1,i-1,j,k)
         u(it-1,jt,kt) = Q(2,i-1,j,k)
         v(it-1,jt,kt) = Q(3,i-1,j,k)
@@ -475,8 +471,7 @@ contains
         v(jt+2,it,kt) = Q(3,i,j+2,k)
         w(jt+2,it,kt) = Q(4,i,j+2,k)
         p(jt+2,it,kt) = Q(5,i,j+2,k)
-    endif
-    if (2 <= j .and. jt == 1) then
+    elseif (2 <= j .and. jt == 1) then
       rho(jt-1,it,kt) = Q(1,i,j-1,k)
         u(jt-1,it,kt) = Q(2,i,j-1,k)
         v(jt-1,it,kt) = Q(3,i,j-1,k)
@@ -532,8 +527,7 @@ contains
         v(kt+2,jt,it) = Q(3,i,j,k+2)
         w(kt+2,jt,it) = Q(4,i,j,k+2)
         p(kt+2,jt,it) = Q(5,i,j,k+2)
-    endif
-    if (2 <= k .and. kt == 1) then
+    elseif (2 <= k .and. kt == 1) then
       rho(kt-1,jt,it) = Q(1,i,j,k-1)
         u(kt-1,jt,it) = Q(2,i,j,k-1)
         v(kt-1,jt,it) = Q(3,i,j,k-1)
