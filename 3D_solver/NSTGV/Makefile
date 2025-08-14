@@ -1,6 +1,6 @@
 FC = mpif90
 
-OUTPUT_OPTIN = -cuda -acc -fast -Minfo=accel -lnvhpcwrapnvtx
+OUTPUT_OPTIN = -cuda -acc -fast -Minfo=accel -Mchkptr -gpu=ptxinfo -lnvhpcwrapnvtx
 
 .SUFFIXES : .f90
 
