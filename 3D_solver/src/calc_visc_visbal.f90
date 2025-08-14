@@ -1,245 +1,327 @@
 module calc_visc_visbal
-  use mod_globals, only : threadsEv, threadsFv, threadsGv
+  use mod_globals, only : R, Pr, Prt, gamma, threadsEv, threadsFv, threadsGv
+  use mod_constant, only : Cp, gamma_1
+  use calc_sutherland, only : mu2, mu23, mu32
+  use calc_visc_base
   implicit none
 contains
-  attributes(device) subroutine calc_derivative_x2(nx, ny, nz, i, j, k, dx, dy, dz, mx, my, mz, u, v, w, txx, txy, txz, utxx, vtxy, wtxz)
-    integer, intent(in), value :: nx, ny, nz, i, j, k
-    real(8), intent(in), value :: dx, dy, dz, mx
-    real(8), intent(in)        :: my(2), mz(2)
-    real(8), intent(in)        :: u(-1:threadsEv%x+3,-1:threadsEv%y+2,-1:threadsEv%z+2)
-    real(8), intent(in)        :: v(-1:threadsEv%x+3,-1:threadsEv%y+2,-1:threadsEv%z+2)
-    real(8), intent(in)        :: w(-1:threadsEv%x+3,-1:threadsEv%y+2,-1:threadsEv%z+2)
-    real(8), intent(out)       :: txx, txy, txz, utxx, vtxy, wtxz
-    real(8) mux, mvx, mwx, muy, mvy, muz, mwz
-    mux = mx * (-u(i,j,k) + u(i+1,j,k)) * dx
-    mvx = mx * (-v(i,j,k) + v(i+1,j,k)) * dx
-    mwx = mx * (-w(i,j,k) + w(i+1,j,k)) * dx
-    muy = 0.25d0 * (my(1) * (-u(i,j-1,k) + u(i,j,k) - u(i+1,j-1,k) + u(i+1,j,k)) &
-                  + my(2) * (-u(i,j,k) + u(i,j+1,k) - u(i+1,j,k) + u(i+1,j+1,k))) * dy
-    mvy = 0.25d0 * (my(1) * (-v(i,j-1,k) + v(i,j,k) - v(i+1,j-1,k) + v(i+1,j,k)) &
-                  + my(2) * (-v(i,j,k) + v(i,j+1,k) - v(i+1,j,k) + v(i+1,j+1,k))) * dy
-    muz = 0.25d0 * (mz(1) * (-u(i,j,k-1) + u(i,j,k) - u(i+1,j,k-1) + u(i+1,j,k)) &
-                  + mz(2) * (-u(i,j,k) + u(i,j,k+1) - u(i+1,j,k) + u(i+1,j,k+1))) * dz
-    mwz = 0.25d0 * (mz(1) * (-w(i,j,k-1) + w(i,j,k) - w(i+1,j,k-1) + w(i+1,j,k)) &
-                  + mz(2) * (-w(i,j,k) + w(i,j,k+1) - w(i+1,j,k) + w(i+1,j,k+1))) * dz
-    txx  = 2.d0 * (2.d0 * mux - mvy - mwz) / 3.d0
-    txy  = muy + mvx
-    txz  = mwx + muz
-    utxx = 0.5d0 * (u(i,j,k) + u(i+1,j,k)) * txx
-    vtxy = 0.5d0 * (v(i,j,k) + v(i+1,j,k)) * txy
-    wtxz = 0.5d0 * (w(i,j,k) + w(i+1,j,k)) * txz
+  attributes(device) subroutine calc_derivative_x2(nx, ny, nz, i, j, k, dx, dy, dz, Q, txx, txy, txz, utxx, vtxy, wtxz, kTx)
+    integer, intent(in), value  :: nx, ny, nz, i, j, k
+    real(8), intent(in), device :: dx(nx-1), dy(ny-1), dz(nz-1), Q(5,nx,ny,nz)
+    real(8), intent(out)        :: txx, txy, txz, utxx, vtxy, wtxz, kTx
+    real(8), dimension(2,3,3), device :: T233
+    real(8), dimension(2,3), device   :: tmp2
+    real(8), dimension(2), device     :: Tx, my, mz
+    real(8) u, v, w, mx, mux, mvx, mwx, muy, mvy, muz, mwz
+    ! dTdx & mu
+    T233(:,:,:) = Q(5,i:i+1,j-1:j+1,k-1:k+1) / (R * Q(1,i:i+1,j-1:j+1,k-1:k+1))
+    Tx(:)       = T233(:,2,2)
+    mx          = mu2(Tx(:))
+    kTx         = Cp * mx * (-Tx(1) + Tx(2)) * dx(i) / Pr
+    tmp2(:,:)   = T233(:,:,2)
+    my(:)       = mu23(tmp2(:,:))
+    tmp2(:,:)   = T233(:,2,:)
+    mz(:)       = mu23(tmp2(:,:))
+    ! dudx & dudy 
+    tmp2(:,:)   = Q(2,i:i+1,j-1:j+1,k)
+    muy         = dy23(my(:), tmp2(:,:), dy(j))
+    mux         = mx * (-tmp2(1,2) + tmp2(2,2)) * dx(i)
+    u           = 0.5d0 * (tmp2(1,2) + tmp2(2,2))
+    ! dudz
+    tmp2(:,:)   = Q(2,i:i+1,j,k-1:k+1)
+    muz         = dy23(mz(:), tmp2(:,:), dz(k))
+    ! dvdx & dvdy
+    tmp2(:,:)   = Q(3,i:i+1,j-1:j+1,k)
+    mvy         = dy23(my(:), tmp2(:,:), dy(j))
+    mvx         = mx * (-tmp2(1,2) + tmp2(2,2)) * dx(i)
+    v           = 0.5d0 * (tmp2(1,2) + tmp2(2,2))
+    ! dwdx & dwdz
+    tmp2(:,:)   = Q(4,i:i+1,j,k-1:k+1)
+    mwz         = dy23(mz(:), tmp2(:,:), dz(k))
+    mwx         = mx * (-tmp2(1,2) + tmp2(2,2)) * dx(i)
+    w           = 0.5d0 * (tmp2(1,2) + tmp2(2,2))
+    txx         = 2.d0 * (2.d0 * mux - mvy - mwz) / 3.d0
+    txy         = muy + mvx
+    txz         = mwx + muz
+    utxx        = u * txx
+    vtxy        = v * txy
+    wtxz        = w * txz
   end subroutine calc_derivative_x2
-
-  attributes(device) subroutine calc_derivative_sgs_x2(nx, ny, nz, i, j, k, dx, dy, dz, mx, mtx, my, mty, mz, mtz, u, v, w, txx_txxsgs, txy_txysgs, txz_txzsgs, utxx, vtxy, wtxz)
-    integer, intent(in), value :: nx, ny, nz, i, j, k
-    real(8), intent(in), value :: dx, dy, dz, mx, mtx
-    real(8), intent(in)        :: my(2), mty(2), mz(2), mtz(2)
-    real(8), intent(in)        :: u(-1:threadsEv%x+3,-1:threadsEv%y+2,-1:threadsEv%z+2)
-    real(8), intent(in)        :: v(-1:threadsEv%x+3,-1:threadsEv%y+2,-1:threadsEv%z+2)
-    real(8), intent(in)        :: w(-1:threadsEv%x+3,-1:threadsEv%y+2,-1:threadsEv%z+2)
-    real(8), intent(out)       :: txx_txxsgs, txy_txysgs, txz_txzsgs, utxx, vtxy, wtxz
-    real(8) mux, muxsgs, mvx, mvxsgs, mwx, mwxsgs, muy, muysgs, mvy, mvysgs, muz, muzsgs, mwz, mwzsgs
-    real(8) txx, txxsgs, txy, txysgs, txz, txzsgs, tmp1, tmp2
-    tmp1 = (-u(i,j,k) + u(i+1,j,k)) * dx
-    mux    = mx  * tmp1
-    muxsgs = mtx * tmp1
-    tmp1 = (-v(i,j,k) + v(i+1,j,k)) * dx
-    mvx    = mx  * tmp1
-    mvxsgs = mtx * tmp1
-    tmp1 = (-w(i,j,k) + w(i+1,j,k)) * dx
-    mwx    = mx  * tmp1
-    mwxsgs = mtx * tmp1
-    tmp1 = -u(i,j-1,k) + u(i,j,k) - u(i+1,j-1,k) + u(i+1,j,k)
-    tmp2 = -u(i,j,k) + u(i,j+1,k) - u(i+1,j,k) + u(i+1,j+1,k)
-    muy    = 0.25d0 * (my(1)  * tmp1 + my(2)  * tmp2) * dy
-    muysgs = 0.25d0 * (mty(1) * tmp1 + mty(2) * tmp2) * dy
-    
-    tmp1 = -v(i,j-1,k) + v(i,j,k) - v(i+1,j-1,k) + v(i+1,j,k)
-    tmp2 = -v(i,j,k) + v(i,j+1,k) - v(i+1,j,k) + v(i+1,j+1,k)
-    mvy    = 0.25d0 * (my(1)  * tmp1 + my(2)  * tmp2) * dy
-    mvysgs = 0.25d0 * (mty(1) * tmp1 + mty(2) * tmp2) * dy
-
-    tmp1 = -u(i,j,k-1) + u(i,j,k) - u(i+1,j,k-1) + u(i+1,j,k)
-    tmp2 = -u(i,j,k) + u(i,j,k+1) - u(i+1,j,k) + u(i+1,j,k+1)
-    muz    = 0.25d0 * (mz(1)  * tmp1 + mz(2)  * tmp2) * dz
-    muzsgs = 0.25d0 * (mtz(1) * tmp1 + mtz(2) * tmp2) * dz
-
-    tmp1 = -w(i,j,k-1) + w(i,j,k) - w(i+1,j,k-1) + w(i+1,j,k)
-    tmp2 = -w(i,j,k) + w(i,j,k+1) - w(i+1,j,k) + w(i+1,j,k+1)
-    mwz    = 0.25d0 * (mz(1)  * tmp1 + mz(2)  * tmp2) * dz
-    mwzsgs = 0.25d0 * (mtz(1) * tmp1 + mtz(2) * tmp2) * dz
-    txx  = 2.d0 * (2.d0 * mux - mvy - mwz) / 3.d0
-    txy  = muy + mvx
-    txz  = mwx + muz
-    txxsgs = 2.d0 * (2.d0 * muxsgs - mvysgs - mwzsgs) / 3.d0
-    txysgs = muysgs + mvxsgs
-    txzsgs = mwxsgs + muzsgs
-    txx_txxsgs = txx + txxsgs
-    txy_txysgs = txy + txysgs
-    txz_txzsgs = txz + txzsgs
-    utxx = 0.5d0 * (u(i,j,k) + u(i+1,j,k)) * txx
-    vtxy = 0.5d0 * (v(i,j,k) + v(i+1,j,k)) * txy
-    wtxz = 0.5d0 * (w(i,j,k) + w(i+1,j,k)) * txz
-  end subroutine calc_derivative_sgs_x2
-
-  attributes(device) subroutine calc_derivative_y2(nx, ny, nz, i, j, k, dx, dy, dz, my, mx, mz, u, v, w, tyy, tyx, tyz, vtyy, utyx, wtyz)
-    integer, intent(in), value :: nx, ny, nz, i, j, k
-    real(8), intent(in), value :: dx, dy, dz, my
-    real(8), intent(in)        :: mx(2), mz(2)
-    real(8), intent(in)        :: u(-1:threadsFv%x+2,-1:threadsFv%y+3,-1:threadsFv%z+2)
-    real(8), intent(in)        :: v(-1:threadsFv%x+2,-1:threadsFv%y+3,-1:threadsFv%z+2)
-    real(8), intent(in)        :: w(-1:threadsFv%x+2,-1:threadsFv%y+3,-1:threadsFv%z+2)
-    real(8), intent(out)       :: tyy, tyx, tyz, vtyy, utyx, wtyz
-    real(8) muy, mvy, mwy, mux, mvx, mvz, mwz
-    muy = my * (-u(i,j,k) + u(i,j+1,k)) * dy
-    mvy = my * (-v(i,j,k) + v(i,j+1,k)) * dy
-    mwy = my * (-w(i,j,k) + w(i,j+1,k)) * dy
-    mux = 0.25d0 * (mx(1) * (-u(i-1,j,k) + u(i,j,k) - u(i-1,j+1,k) + u(i,j+1,k)) &
-                  + mx(2) * (-u(i,j,k) + u(i+1,j,k) - u(i,j+1,k) + u(i+1,j+1,k))) * dx
-    mvx = 0.25d0 * (mx(1) * (-v(i-1,j,k) + v(i,j,k) - v(i-1,j+1,k) + v(i,j+1,k)) &
-                  + mx(2) * (-v(i,j,k) + v(i+1,j,k) - v(i,j+1,k) + v(i+1,j+1,k))) * dx
-    mvz = 0.25d0 * (mz(1) * (-v(i,j,k-1) + v(i,j,k) - v(i,j+1,k-1) + v(i,j+1,k)) &
-                  + mz(2) * (-v(i,j,k) + v(i,j,k+1) - v(i,j+1,k) + v(i,j+1,k+1))) * dz
-    mwz = 0.25d0 * (mz(1) * (-w(i,j,k-1) + w(i,j,k) - w(i,j+1,k-1) + w(i,j+1,k)) &
-                  + mz(2) * (-w(i,j,k) + w(i,j,k+1) - w(i,j+1,k) + w(i,j+1,k+1))) * dz
-    tyy  = 2.d0 * (2.d0 * mvy - mwz - mux) / 3.d0
-    tyx  = muy + mvx
-    tyz  = mvz + mwy
-    utyx = 0.5d0 * (u(i,j,k) + u(i,j+1,k)) * tyx
-    vtyy = 0.5d0 * (v(i,j,k) + v(i,j+1,k)) * tyy
-    wtyz = 0.5d0 * (w(i,j,k) + w(i,j+1,k)) * tyz
+      
+  attributes(device) subroutine calc_derivative_les_x2(nx, ny, nz, i, j, k, dx, dy, dz, Q, mut, qc2, txx, txy, txz, utxx, vtxy, wtxz, kTx, Hsgs)
+    integer, intent(in), value  :: nx, ny, nz, i, j, k
+    real(8), intent(in), device :: dx(nx-1), dy(ny-1), dz(nz-1), Q(5,nx,ny,nz), mut(nx,ny,nz), qc2(nx,ny,nz)
+    real(8), intent(out)        :: txx, txy, txz, utxx, vtxy, wtxz, kTx, Hsgs
+    real(8), dimension(2,3,3), device :: T233
+    real(8), dimension(2,3), device   :: tmp2
+    real(8), dimension(4), device     :: H
+    real(8), dimension(2), device     :: Tx, my, mysgs, mz, mzsgs
+    real(8) u, v, w, mx, mxsgs, mux, muxsgs, mvx, mvxsgs, mwx, mwxsgs, muy, muysgs, mvy, mvysgs, muz, muzsgs, mwz, mwzsgs
+    ! dTdx & mu
+    T233(:,:,:) = Q(5,i:i+1,j-1:j+1,k-1:k+1) / (R * Q(1,i:i+1,j-1:j+1,k-1:k+1))
+    Tx(:)       = T233(:,2,2)
+    mx          = mu2(Tx(:))
+    kTx         = Cp * mx * (-Tx(1) + Tx(2)) * dx(i) / Pr
+    tmp2(:,:)   = T233(:,:,2)
+    my(:)       = mu23(tmp2(:,:))
+    tmp2(:,:)   = T233(:,2,:)
+    mz(:)       = mu23(tmp2(:,:))
+    ! SGS
+    mxsgs    = 0.5d0 * (mut(i,j,k) + mut(i+1,j,k))
+    mysgs(:) = (/0.25d0 * (mut(i,j-1,k) + mut(i,j,k) + mut(i+1,j-1,k) + mut(i+1,j,k)), &
+                 0.25d0 * (mut(i,j,k) + mut(i,j+1,k) + mut(i+1,j,k) + mut(i+1,j+1,k))/)
+    mzsgs(:) = (/0.25d0 * (mut(i,j,k-1) + mut(i,j,k) + mut(i+1,j,k-1) + mut(i+1,j,k)), &
+                 0.25d0 * (mut(i,j,k) + mut(i,j,k+1) + mut(i+1,j,k) + mut(i+1,j,k+1))/)
+    ! dudx & dudy 
+    tmp2(:,:) = Q(2,i:i+1,j-1:j+1,k)
+    muy       = dy23(my(:), tmp2(:,:), dy(j))
+    muysgs    = dy23(mysgs(:), tmp2(:,:), dy(j))
+    mux       = mx * (-tmp2(1,2) + tmp2(2,2)) * dx(i)
+    muxsgs    = mxsgs * (-tmp2(1,2) + tmp2(2,2)) * dx(i)
+    u         = 0.5d0 * (tmp2(1,2) + tmp2(2,2))
+    ! dudz
+    tmp2(:,:) = Q(2,i:i+1,j,k-1:k+1)
+    muz       = dy23(mz(:), tmp2(:,:), dz(k))
+    muzsgs    = dy23(mzsgs(:), tmp2(:,:), dz(k))
+    ! dvdx & dvdy
+    tmp2(:,:) = Q(3,i:i+1,j-1:j+1,k)
+    mvy       = dy23(my(:), tmp2(:,:), dy(j))
+    mvysgs    = dy23(mysgs(:), tmp2(:,:), dy(j))
+    mvx       = mx * (-tmp2(1,2) + tmp2(2,2)) * dx(i)
+    mvxsgs    = mxsgs * (-tmp2(1,2) + tmp2(2,2)) * dx(i)
+    v         = 0.5d0 * (tmp2(1,2) + tmp2(2,2))
+    ! dwdx & dwdz
+    tmp2(:,:) = Q(4,i:i+1,j,k-1:k+1)
+    mwz       = dy23(mz(:), tmp2(:,:), dz(k))
+    mwx       = mx * (-tmp2(1,2) + tmp2(2,2)) * dx(i)
+    mwxsgs    = mxsgs * (-tmp2(1,2) + tmp2(2,2)) * dx(i)
+    mwzsgs    = dy23(mzsgs(:), tmp2(:,:), dz(k))
+    w         = 0.5d0 * (tmp2(1,2) + tmp2(2,2))
+    txx       = 2.d0 * (2.d0 * mux - mvy - mwz) / 3.d0
+    txy       = muy + mvx
+    txz       = mwx + muz
+    utxx      = u * txx
+    vtxy      = v * txy
+    wtxz      = w 
+    txx = txx + 2.d0 * (2.d0 * muxsgs - mvysgs - mwzsgs) / 3.d0
+    txy = txy + muysgs + mvxsgs
+    txz = txz + mwxsgs + muzsgs
+    H(2:3) = (gamma * Q(5,i:i+1,j,k) / (Q(1,i:i+1,j,k) * gamma_1)) &
+             + 0.5d0 * (Q(2,i:i+1,j,k)**2 + Q(3,i:i+1,j,k)**2 + Q(4,i:i+1,j,k)**2) + qc2(i:i+1,j,k)
+    Hsgs   = -mx * (-H(2) + H(3)) * dx(i) / Prt
+  end subroutine calc_derivative_les_x2
+   
+  attributes(device) subroutine calc_derivative_y2(nx, ny, nz, i, j, k, dx, dy, dz, Q, tyx, tyy, tyz, utyx, vtyy, wtyz, kTy)
+    integer, intent(in), value  :: nx, ny, nz, i, j, k
+    real(8), intent(in), device :: dx(nx-1), dy(ny-1), dz(nz-1), Q(5,nx,ny,nz)
+    real(8), intent(out)        :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy
+    real(8), dimension(3,2,3), device :: T323
+    real(8), dimension(3,2), device   :: tmp2
+    real(8), dimension(2,3), device   :: tmp3
+    real(8), dimension(2), device     :: Ty, u2, v2, w2, mz, mx
+    real(8) my, muy, mvy, mwy, mvz, mwz, mux, mvx
+    ! dTdy
+    T323(:,:,:) = Q(5,i-1:i+1,j:j+1,k-1:k+1) / (R * Q(1,i-1:i+1,j:j+1,k-1:k+1))
+    tmp2(:,:)   = T323(:,:,2)
+    mx(:)       = mu23(tmp2(:,:))
+    Ty(:)       = T323(2,:,2)
+    my          = mu2(Ty(:))
+    kTy         = Cp * my * (-Ty(1) + Ty(2)) * dy(j) / Pr
+    tmp3(:,:)   = T323(2,:,:)
+    mz(:)       = mu32(tmp3(:,:))
+    ! dudx & dudy
+    tmp2(:,:)   = Q(2,i-1:i+1,j:j+1,k)
+    mux         = dy32(mx(:), tmp2(:,:), dx(i))
+    u2(:)       = tmp2(2,:)
+    muy         = my * (-u2(1) + u2(2)) * dy(j)
+    ! dvdx & dvdy
+    tmp2(:,:)   = Q(3,i-1:i+1,j:j+1,k)
+    mvx         = dy32(mx(:), tmp2(:,:), dx(i))
+    v2(:)       = tmp2(2,:)
+    mvy         = my * (-v2(1) + v2(2)) * dy(j)
+    ! dvdz
+    tmp3(:,:)   = Q(3,i,j:j+1,k-1:k+1)
+    mvz         = dy23(mz(:), tmp3(:,:), dz(k))
+    ! dwdz
+    tmp3(:,:)   = Q(4,i,j:j+1,k-1:k+1)
+    mwz         = dy23(mz(:), tmp3(:,:), dz(k))
+    w2(:)       = tmp3(:,2)
+    mwy         = my * (-w2(1) + w2(2)) * dy(j)
+    tyx         = muy + mvx
+    tyy         = 2.d0 * (2.d0 * mvy - mwz - mux) / 3.d0
+    tyz         = mvz + mwy
+    utyx        = 0.5d0 * (u2(1) + u2(2)) * tyx
+    vtyy        = 0.5d0 * (v2(1) + v2(2)) * tyy
+    wtyz        = 0.5d0 * (w2(1) + w2(2)) * tyz
   end subroutine calc_derivative_y2
 
-  attributes(device) subroutine calc_derivative_sgs_y2(nx, ny, nz, i, j, k, dx, dy, dz, my, mty, mx, mtx, mz, mtz, u, v, w, tyy_tyysgs, tyx_tyxsgs, tyz_tyzsgs, vtyy, utyx, wtyz)
-    integer, intent(in), value :: nx, ny, nz, i, j, k
-    real(8), intent(in), value :: dx, dy, dz, my, mty
-    real(8), intent(in)        :: mx(2), mtx(2), mz(2), mtz(2)
-    real(8), intent(in)        :: u(-1:threadsFv%x+2,-1:threadsFv%y+3,-1:threadsFv%z+2)
-    real(8), intent(in)        :: v(-1:threadsFv%x+2,-1:threadsFv%y+3,-1:threadsFv%z+2)
-    real(8), intent(in)        :: w(-1:threadsFv%x+2,-1:threadsFv%y+3,-1:threadsFv%z+2)
-    real(8), intent(out)       :: tyy_tyysgs, tyx_tyxsgs, tyz_tyzsgs, vtyy, utyx, wtyz
-    real(8) muy, muysgs, mvy, mvysgs, mwy, mwysgs, mux, muxsgs, mvx, mvxsgs, mvz, mvzsgs, mwz, mwzsgs
-    real(8) tyy, tyysgs, tyx, tyxsgs, tyz, tyzsgs, tmp1, tmp2
-    tmp1 = (-u(i,j,k) + u(i,j+1,k)) * dy
-    muy    = my  * tmp1
-    muysgs = mty * tmp1
-    tmp1 = (-v(i,j,k) + v(i,j+1,k)) * dy
-    mvy    = my  * tmp1
-    mvysgs = mty * tmp1
-    tmp1 = (-w(i,j,k) + w(i,j+1,k)) * dy
-    mwy    = my  * tmp1
-    mwysgs = mty * tmp1
-    tmp1 = -u(i-1,j,k) + u(i,j,k) - u(i-1,j+1,k) + u(i,j+1,k)
-    tmp2 = -u(i,j,k) + u(i+1,j,k) - u(i,j+1,k) + u(i+1,j+1,k)
-    mux    = 0.25d0 * (mx(1)  * tmp1 + mx(2)  * tmp2) * dx
-    muxsgs = 0.25d0 * (mtx(1) * tmp1 + mtx(2) * tmp2) * dx
-    
-    tmp1 = -v(i-1,j,k) + v(i,j,k) - v(i-1,j+1,k) + v(i,j+1,k)
-    tmp2 = -v(i,j,k) + v(i+1,j,k) - v(i,j+1,k) + v(i+1,j+1,k)
-    mvx    = 0.25d0 * (mx(1)  * tmp1 + mx(2)  * tmp2) * dx
-    mvxsgs = 0.25d0 * (mtx(1) * tmp1 + mtx(2) * tmp2) * dx
-    
-    tmp1 = -v(i,j,k-1) + v(i,j,k) - v(i,j+1,k-1) + v(i,j+1,k)
-    tmp2 = -v(i,j,k) + v(i,j,k+1) - v(i,j+1,k) + v(i,j+1,k+1)
-    mvz    = 0.25d0 * (mz(1)  * tmp1 + mz(2)  * tmp2) * dz
-    mvzsgs = 0.25d0 * (mtz(1) * tmp1 + mtz(2) * tmp2) * dz
-    
-    tmp1 = -w(i,j,k-1) + w(i,j,k) - w(i,j+1,k-1) + w(i,j+1,k)
-    tmp2 = -w(i,j,k) + w(i,j,k+1) - w(i,j+1,k) + w(i,j+1,k+1)
-    mwz    = 0.25d0 * (mz(1)  * tmp1 + mz(2)  * tmp2) * dz
-    mwzsgs = 0.25d0 * (mtz(1) * tmp1 + mtz(2) * tmp2) * dz
-    tyy  = 2.d0 * (2.d0 * mvy - mwz - mux) / 3.d0
-    tyx  = muy + mvx
-    tyz  = mvz + mwy
-    tyysgs = 2.d0 * (2.d0 * mvysgs - mwzsgs - muxsgs) / 3.d0
-    tyxsgs = muysgs + mvxsgs
-    tyzsgs = mvzsgs + mwysgs
-    tyx_tyxsgs = tyx + tyxsgs
-    tyy_tyysgs = tyy + tyysgs
-    tyz_tyzsgs = tyz + tyzsgs
-    utyx = 0.5d0 * (u(i,j,k) + u(i,j+1,k)) * tyx
-    vtyy = 0.5d0 * (v(i,j,k) + v(i,j+1,k)) * tyy
-    wtyz = 0.5d0 * (w(i,j,k) + w(i,j+1,k)) * tyz
-  end subroutine calc_derivative_sgs_y2
+  attributes(device) subroutine calc_derivative_les_y2(nx, ny, nz, i, j, k, dx, dy, dz, Q, mut, qc2, tyx, tyy, tyz, utyx, vtyy, wtyz, kTy, Hsgs)
+    integer, intent(in), value  :: nx, ny, nz, i, j, k
+    real(8), intent(in), device :: dx(nx-1), dy(ny-1), dz(nz-1), Q(5,nx,ny,nz), mut(nx,ny,nz), qc2(nx,ny,nz)
+    real(8), intent(out)        :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy, Hsgs
+    real(8), dimension(3,2,3), device :: T323
+    real(8), dimension(3,2), device   :: tmp2
+    real(8), dimension(2,3), device   :: tmp3
+    real(8), dimension(4), device     :: H
+    real(8), dimension(2), device     :: Ty, u2, v2, w2, mz, mzsgs, mx, mxsgs
+    real(8) my, mysgs, muy, muysgs, mvy, mvysgs, mwy, mwysgs, mvz, mvzsgs, mwz, mwzsgs, mux, muxsgs, mvx, mvxsgs
+    ! dTdy
+    T323(:,:,:) = Q(5,i-1:i+1,j:j+1,k-1:k+1) / (R * Q(1,i-1:i+1,j:j+1,k-1:k+1))
+    tmp2(:,:)   = T323(:,:,2)
+    mx(:)       = mu23(tmp2(:,:))
+    Ty(:)       = T323(2,:,2)
+    my          = mu2(Ty(:))
+    kTy         = Cp * my * (-Ty(1) + Ty(2)) * dy(j) / Pr
+    tmp3(:,:)   = T323(2,:,:)
+    mz(:)       = mu32(tmp3(:,:))
+    ! SGS
+    mysgs    = 0.5d0 * (mut(i,j,k) + mut(i,j+1,k))
+    mzsgs(:) = (/0.25d0 * (mut(i,j,k-1) + mut(i,j,k) + mut(i,j+1,k-1) + mut(i,j+1,k)), &
+                 0.25d0 * (mut(i,j,k) + mut(i,j,k+1) + mut(i,j+1,k) + mut(i,j+1,k+1))/)
+    mxsgs(:) = (/0.25d0 * (mut(i-1,j,k) + mut(i,j,k) + mut(i-1,j+1,k) + mut(i,j+1,k)), &
+                 0.25d0 * (mut(i,j,k) + mut(i+1,j,k) + mut(i,j+1,k) + mut(i+1,j+1,k))/)
+    ! dudx & dudy
+    tmp2(:,:) = Q(2,i-1:i+1,j:j+1,k)
+    mux       = dy32(mx(:), tmp2(:,:), dx(i))
+    muxsgs    = dy32(mxsgs(:), tmp2(:,:), dx(i))
+    u2(:)     = tmp2(2,:)
+    muy       = my * (-u2(1) + u2(2)) * dy(j)
+    muysgs    = my * (-u2(1) + u2(2)) * dy(j)
+    ! dvdx & dvdy
+    tmp2(:,:) = Q(3,i-1:i+1,j:j+1,k)
+    mvx       = dy32(mx(:), tmp2(:,:), dx(i))
+    mvxsgs    = dy32(mxsgs(:), tmp2(:,:), dx(i))
+    v2(:)     = tmp2(2,:)
+    mvy       = my * (-v2(1) + v2(2)) * dy(j)
+    mvysgs    = my * (-v2(1) + v2(2)) * dy(j)
+    ! dvdz
+    tmp3(:,:) = Q(3,i,j:j+1,k-1:k+1)
+    mvz       = dy23(mz(:), tmp3(:,:), dz(k))
+    mvzsgs    = dy23(mzsgs(:), tmp3(:,:), dz(k))
+    ! dwdz
+    tmp3(:,:) = Q(4,i,j:j+1,k-1:k+1)
+    mwz       = dy23(mz(:), tmp3(:,:), dz(k))
+    mwzsgs    = dy23(mzsgs(:), tmp3(:,:), dz(k))
+    w2(:)     = tmp3(:,2)
+    mwy       = my * (-w2(1) + w2(2)) * dy(j)
+    mwysgs    = my * (-w2(1) + w2(2)) * dy(j)
+    tyx       = muy + mvx
+    tyy       = 2.d0 * (2.d0 * mvy - mwz - mux) / 3.d0
+    tyz       = mvz + mwy
+    utyx      = 0.5d0 * (u2(1) + u2(2)) * tyx
+    vtyy      = 0.5d0 * (v2(1) + v2(2)) * tyy
+    wtyz      = 0.5d0 * (w2(1) + w2(2)) * tyz
+    tyx = tyx + muy + mvx
+    tyy = tyy + 2.d0 * (2.d0 * mvy - mwz - mux) / 3.d0
+    tyz = tyz + mvz + mwy
+    H(2:3) = (gamma * Q(5,i,j:j+1,k) / (Q(1,i,j:j+1,k) * gamma_1)) &
+             + 0.5d0 * (Q(2,i,j:j+1,k)**2 + Q(3,i,j:j+1,k)**2 + Q(4,i,j:j+1,k)**2) + qc2(i,j:j+1,k)
+    Hsgs   = -my * (-H(2) + H(3)) * dy(j) / Prt
+  end subroutine calc_derivative_les_y2
 
-  attributes(device) subroutine calc_derivative_z2(nx, ny, nz, i, j, k, dx, dy, dz, mz, mx, my, u, v, w, tzz, tzx, tzy, wtzz, utzx, vtzy)
-    integer, intent(in), value :: nx, ny, nz, i, j, k
-    real(8), intent(in), value :: dx, dy, dz, mz
-    real(8), intent(in)        :: mx(2), my(2)
-    real(8), intent(in)        :: u(-1:threadsGv%x+2,-1:threadsGv%y+2,-1:threadsGv%z+3)
-    real(8), intent(in)        :: v(-1:threadsGv%x+2,-1:threadsGv%y+2,-1:threadsGv%z+3)
-    real(8), intent(in)        :: w(-1:threadsGv%x+2,-1:threadsGv%y+2,-1:threadsGv%z+3)
-    real(8), intent(out)       :: tzz, tzx, tzy, wtzz, utzx, vtzy
-    real(8) muz, mvz, mwz, mux, mwx, mvy, mwy
-    muz = mz * (-u(i,j,k) + u(i,j,k+1)) * dz
-    mvz = mz * (-v(i,j,k) + v(i,j,k+1)) * dz
-    mwz = mz * (-w(i,j,k) + w(i,j,k+1)) * dz
-    mux = 0.25d0 * (mx(1) * (-u(i-1,j,k) + u(i,j,k) - u(i-1,j,k+1) + u(i,j,k+1)) &
-                  + mx(2) * (-u(i,j,k) + u(i+1,j,k) - u(i,j,k+1) + u(i+1,j,k+1))) * dx
-    mwx = 0.25d0 * (mx(1) * (-w(i-1,j,k) + w(i,j,k) - w(i-1,j,k+1) + w(i,j,k+1)) &
-                  + mx(2) * (-w(i,j,k) + w(i+1,j,k) - w(i,j,k+1) + w(i+1,j,k+1))) * dx
-    mvy = 0.25d0 * (my(1) * (-v(i,j-1,k) + v(i,j,k) - v(i,j-1,k+1) + v(i,j,k+1)) &
-                  + my(2) * (-v(i,j,k) + v(i,j+1,k) - v(i,j,k+1) + v(i,j+1,k+1))) * dy
-    mwy = 0.25d0 * (my(1) * (-w(i,j-1,k) + w(i,j,k) - w(i,j-1,k+1) + w(i,j,k+1)) &
-                  + my(2) * (-w(i,j,k) + w(i,j+1,k) - w(i,j,k+1) + w(i,j+1,k+1))) * dy
-    tzz  = 2.d0 * (2.d0 * mwz - mux - mvy) / 3.d0
-    tzx  = mwx + muz
-    tzy  = mvz + mwy
-    utzx = 0.5d0 * (u(i,j,k) + u(i,j,k+1)) * tzx
-    vtzy = 0.5d0 * (v(i,j,k) + v(i,j,k+1)) * tzy
-    wtzz = 0.5d0 * (w(i,j,k) + w(i,j,k+1)) * tzz
+  attributes(device) subroutine calc_derivative_z2(nx, ny, nz, i, j, k, dx, dy, dz, Q, tzx, tzy, tzz, utzx, vtzy, wtzz, kTz)
+    integer, intent(in), value  :: nx, ny, nz, i, j, k
+    real(8), intent(in), device :: dx(nx-1), dy(ny-1), dz(nz-1), Q(5,nx,ny,nz)
+    real(8), intent(out)        :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz
+    real(8), dimension(3,3,2), device :: T332
+    real(8), dimension(3,2), device   :: tmp2
+    real(8), dimension(2), device     :: Tz, u2, v2, w2, mx, my
+    real(8) mz, muz, mvz, mwz, mwx, mux, mvy, mwy
+    ! dTdz & mu
+    T332(:,:,:) = Q(5,i-1:i+1,j-1:j+1,k:k+1) / (R * Q(1,i-1:i+1,j-1:j+1,k:k+1))
+    tmp2(:,:)   = T332(:,2,:)
+    mx(:)       = mu32(tmp2(:,:))
+    tmp2(:,:)   = T332(2,:,:)
+    my(:)       = mu32(tmp2(:,:))
+    Tz(:)       = T332(2,2,:)
+    mz          = mu2(Tz(:))
+    !dudx & dudz
+    tmp2(:,:)   = Q(2,i-1:i+1,j,k:k+1)
+    mux         = dy32(mx(:), tmp2(:,:), dx(i))
+    u2(:)       = tmp2(2,:)
+    muz         = mz * (-u2(1) + u2(2)) * dz(k)
+    ! dvdy & dvdz
+    tmp2(:,:)   = Q(3,i,j-1:j+1,k:k+1)
+    mvy         = dy32(my(:), tmp2(:,:), dy(j))
+    v2(:)       = tmp2(2,:)
+    mvz         = mz * (-v2(1) + v2(2)) * dz(k)
+    ! dwdx
+    tmp2(:,:)   = Q(4,i-1:i+1,j,k:k+1)
+    mwx         = dy32(mx(:), tmp2(:,:), dx(i))
+    ! dwdz & dwdy
+    tmp2(:,:)   = Q(4,i,j-1:j+1,k:k+1)
+    w2(:)       = tmp2(2,:)
+    mwz         = mz * (-w2(1) + w2(2)) * dz(k)
+    mwy         = dy32(my(:), tmp2(:,:), dy(j))
+    tzx         = mwx + muz
+    tzy         = mvz + mwy
+    tzz         = 2.d0 * (2.d0 * mwz - mux - mvy) / 3.d0
+    utzx        = 0.5d0 * (u2(1) + u2(2)) * tzx
+    vtzy        = 0.5d0 * (v2(1) + v2(2)) * tzy
+    wtzz        = 0.5d0 * (w2(1) + w2(2)) * tzz
+    kTz         = Cp * mz * (-Tz(1) + Tz(2)) * dz(k) / Pr
   end subroutine calc_derivative_z2
-  
-  attributes(device) subroutine calc_derivative_sgs_z2(nx, ny, nz, i, j, k, dx, dy, dz, mz, mtz, mx, mtx, my, mty, u, v, w, tzz_tzzsgs, tzx_tzxsgs, tzy_tzysgs, wtzz, utzx, vtzy)
-    integer, intent(in), value :: nx, ny, nz, i, j, k
-    real(8), intent(in), value :: dx, dy, dz, mz, mtz
-    real(8), intent(in)        :: mx(2), mtx(2), my(2), mty(2)
-    real(8), intent(in)        :: u(-1:threadsGv%x+2,-1:threadsGv%y+2,-1:threadsGv%z+3)
-    real(8), intent(in)        :: v(-1:threadsGv%x+2,-1:threadsGv%y+2,-1:threadsGv%z+3)
-    real(8), intent(in)        :: w(-1:threadsGv%x+2,-1:threadsGv%y+2,-1:threadsGv%z+3)
-    real(8), intent(out)       :: tzz_tzzsgs, tzx_tzxsgs, tzy_tzysgs, wtzz, utzx, vtzy
-    real(8) muz, muzsgs, mvz, mvzsgs, mwz, mwzsgs, mux, muxsgs, mwx, mwxsgs, mvy, mvysgs, mwy, mwysgs
-    real(8) tzz, tzzsgs, tzx, tzxsgs, tzy, tzysgs, tmp1, tmp2
-    tmp1 = (-u(i,j,k) + u(i,j,k+1)) * dz
-    muz    = mz  * tmp1
-    muzsgs = mtz * tmp1
-    tmp1 = (-v(i,j,k) + v(i,j,k+1)) * dz
-    mvz    = mz  * tmp1
-    mvzsgs = mtz * tmp1
-    tmp1 = (-w(i,j,k) + w(i,j,k+1)) * dz
-    mwz    = mz  * tmp1
-    mwzsgs = mtz * tmp1
-    tmp1 = -u(i-1,j,k) + u(i,j,k) - u(i-1,j,k+1) + u(i,j,k+1)
-    tmp2 = -u(i,j,k) + u(i+1,j,k) - u(i,j,k+1) + u(i+1,j,k+1)
-    mux    = 0.25d0 * (mx(1)  * tmp1 + mx(2)  * tmp2) * dx
-    muxsgs = 0.25d0 * (mtx(1) * tmp1 + mtx(2) * tmp2) * dx
-    
-    tmp1 = -w(i-1,j,k) + w(i,j,k) - w(i-1,j,k+1) + w(i,j,k+1)
-    tmp2 = -w(i,j,k) + w(i+1,j,k) - w(i,j,k+1) + w(i+1,j,k+1)
-    mwx    = 0.25d0 * (mx(1)  * tmp1 + mx(2)  * tmp2) * dx
-    mwxsgs = 0.25d0 * (mtx(1) * tmp1 + mtx(2) * tmp2) * dx
-    
-    tmp1 = -v(i,j-1,k) + v(i,j,k) - v(i,j-1,k+1) + v(i,j,k+1)
-    tmp2 = -v(i,j,k) + v(i,j+1,k) - v(i,j,k+1) + v(i,j+1,k+1)
-    mvy    = 0.25d0 * (my(1)  * tmp1 + my(2)  * tmp2) * dy
-    mvysgs = 0.25d0 * (mty(1) * tmp1 + mty(2) * tmp2) * dy
-    
-    tmp1 = -w(i,j-1,k) + w(i,j,k) - w(i,j-1,k+1) + w(i,j,k+1)
-    tmp2 = -w(i,j,k) + w(i,j+1,k) - w(i,j,k+1) + w(i,j+1,k+1)
-    mwy    = 0.25d0 * (my(1)  * tmp1 + my(2)  * tmp2) * dy
-    mwysgs = 0.25d0 * (mty(1) * tmp1 + mty(2) * tmp2) * dy
-    tzz = 2.d0 * (2.d0 * mwz - mux - mvy) / 3.d0
-    tzx = mwx + muz
-    tzy = mvz + mwy
-    tzzsgs = 2.d0 * (2.d0 * mwzsgs - muxsgs - mvysgs) / 3.d0
-    tzxsgs = mwxsgs + muzsgs
-    tzysgs = mvzsgs + mwysgs
-    tzx_tzxsgs = tzx + tzxsgs
-    tzy_tzysgs = tzy + tzysgs
-    tzz_tzzsgs = tzz + tzzsgs
-    utzx = 0.5d0 * (u(i,j,k) + u(i,j,k+1)) * tzx
-    vtzy = 0.5d0 * (v(i,j,k) + v(i,j,k+1)) * tzy
-    wtzz = 0.5d0 * (w(i,j,k) + w(i,j,k+1)) * tzz
-  end subroutine calc_derivative_sgs_z2
+
+  attributes(device) subroutine calc_derivative_les_z2(nx, ny, nz, i, j, k, dx, dy, dz, Q, mut, qc2, tzx, tzy, tzz, utzx, vtzy, wtzz, kTz, Hsgs)
+    integer, intent(in), value  :: nx, ny, nz, i, j, k
+    real(8), intent(in), device :: dx(nx-1), dy(ny-1), dz(nz-1), Q(5,nx,ny,nz), mut(nx,ny,nz), qc2(nx,ny,nz)
+    real(8), intent(out)        :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz, Hsgs
+    real(8), dimension(3,3,2), device :: T332
+    real(8), dimension(3,2), device   :: tmp2
+    real(8), dimension(4), device     :: H
+    real(8), dimension(2), device     :: Tz, u2, v2, w2, mx, mxsgs, my, mysgs
+    real(8) mz, mzsgs, muz, muzsgs, mvz, mvzsgs, mwz, mwzsgs, mwx, mwxsgs, mux, muxsgs, mvy, mvysgs, mwy, mwysgs
+    T332(:,:,:) = Q(5,i-1:i+1,j-1:j+1,k:k+1) / (R * Q(1,i-1:i+1,j-1:j+1,k:k+1))
+    tmp2(:,:)   = T332(:,2,:)
+    mx(:)       = mu32(tmp2(:,:))
+    tmp2(:,:)   = T332(2,:,:)
+    my(:)       = mu32(tmp2(:,:))
+    Tz(:)       = T332(2,2,:)
+    mz          = mu2(Tz(:))
+    ! SGS
+    mzsgs    = 0.5d0 * (mut(i,j,k) + mut(i,j,k+1))
+    mxsgs(:) = (/0.25d0 * (mut(i-1,j,k) + mut(i,j,k) + mut(i-1,j,k+1) + mut(i,j,k+1)), &
+                 0.25d0 * (mut(i,j,k) + mut(i+1,j,k) + mut(i,j,k+1) + mut(i+1,j,k+1))/)
+    mysgs(:) = (/0.25d0 * (mut(i,j-1,k) + mut(i,j,k) + mut(i,j-1,k+1) + mut(i,j,k+1)), &
+                 0.25d0 * (mut(i,j,k) + mut(i,j+1,k) + mut(i,j,k+1) + mut(i,j+1,k+1))/)
+    ! dudx & dudz
+    tmp2(:,:) = Q(2,i-1:i+1,j,k:k+1)
+    mux       = dy32(mx(:), tmp2(:,:), dx(i))
+    muxsgs    = dy32(mxsgs(:), tmp2, dx(i))
+    u2(:)     = tmp2(2,:)
+    muz       = mz * (-u2(1) + u2(2)) * dz(k)
+    muzsgs    = mzsgs * (-u2(1) + u2(2)) * dz(k)
+    ! dvdy & dvdz
+    tmp2(:,:) = Q(3,i,j-1:j+1,k:k+1)
+    mvy       = dy32(my(:), tmp2(:,:), dy(j))
+    mvysgs    = dy32(mysgs(:), tmp2(:,:), dy(j))
+    v2(:)     = tmp2(2,:)
+    mvz       = mz * (-v2(1) + v2(2)) * dz(k)
+    mvzsgs    = mzsgs * (-v2(1) + v2(2)) * dz(k)
+    ! dwdx
+    tmp2(:,:) = Q(4,i-1:i+1,j,k:k+1)
+    mwx       = dy32(mx(:), tmp2(:,:), dx(i))
+    mwxsgs    = dy32(mxsgs(:), tmp2(:,:), dx(i))
+    ! dwdz & dwdy
+    tmp2(:,:) = Q(4,i,j-1:j+1,k:k+1)
+    w2(:)     = tmp2(2,:)
+    mwz       = mz * (-w2(1) + w2(2)) * dz(k)
+    mwzsgs    = mzsgs * (-w2(1) + w2(2)) * dz(k)
+    mwy       = dy32(my(:), tmp2(:,:), dy(j))
+    mwysgs    = dy32(mysgs(:), tmp2(:,:), dy(j))
+    tzx       = mwx + muz
+    tzy       = mvz + mwy
+    tzz       = 2.d0 * (2.d0 * mwz - mux - mvy) / 3.d0
+    utzx      = 0.5d0 * (u2(1) + u2(2)) * tzx
+    vtzy      = 0.5d0 * (v2(1) + v2(2)) * tzy
+    wtzz      = 0.5d0 * (w2(1) + w2(2)) * tzz
+    kTz       = Cp * mz * (-Tz(1) + Tz(2)) * dz(k) / Pr
+    tzx = tzx + mwxsgs + muzsgs
+    tzy = tzy + mvzsgs + mwysgs
+    tzz = tzz + 2.d0 * (2.d0 * mwzsgs - muxsgs - mvysgs) / 3.d0
+    H(2:3) = (gamma * Q(5,i,j,k:k+1) / (Q(1,i,j,k:k+1) * gamma_1)) &
+             + 0.5d0 * (Q(2,i,j,k:k+1)**2 + Q(3,i,j,k:k+1)**2 + Q(4,i,j,k:k+1)**2) + qc2(i,j,k:k+1)
+    Hsgs   = -mz * (-H(2) + H(3)) * dz(k) / Prt
+  end subroutine calc_derivative_les_z2
 end module calc_visc_visbal
 
