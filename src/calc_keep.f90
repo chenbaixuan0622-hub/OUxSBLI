@@ -26,11 +26,10 @@ contains
     real(8), intent(in), value          :: C
     real(8), intent(in), dimension(2)   :: rho, p
     real(8), intent(in), dimension(dim) :: V1, V2
-    real(8) :: IE, PV, KE, Et
-    IE = C * 0.5d0 * (p(1) / rho(1) + p(2) / rho(2)) * over_gamma_1
-    PV = 0.5d0 * (V1(id) * p(2) + V2(id) * p(1))
-    KE = 0.5d0 * C * vecsum(V1, V2)
-    Et = IE + PV + KE
+    real(8) Et
+    Et = C * 0.5d0 * (p(1) / rho(1) + p(2) / rho(2)) * over_gamma_1 ! internal energy
+    Et = Et + 0.5d0 * (V1(id) * p(2) + V2(id) * p(1)) ! pressure diffusion
+    Et = Et + 0.5d0 * C * vecsum(V1, V2) ! kinetic energy
   end function EtKEEP2
 
   attributes(device) function EtKEEPPE2(id_keep, id, C, rho, p, V1, V2) result(Et)
@@ -39,11 +38,10 @@ contains
     real(8), intent(in), value          :: C
     real(8), intent(in), dimension(2)   :: rho, p
     real(8), intent(in), dimension(dim) :: V1, V2
-    real(8) :: IE, PV, KE, Et
-    IE = 0.25d0 * (V1(id) + V2(id)) * (p(1) + p(2)) * over_gamma_1
-    PV = 0.5d0 * (V1(id) * p(2) + V2(id) * p(1))
-    KE = 0.5d0 * C * vecsum(V1, V2)
-    Et = IE + PV + KE
+    real(8) :: Et
+    Et = 0.25d0 * (V1(id) + V2(id)) * (p(1) + p(2)) * over_gamma_1 ! internal energy
+    Et = Et + 0.5d0 * (V1(id) * p(2) + V2(id) * p(1)) ! pressure diffusion
+    Et = Et + 0.5d0 * C * vecsum(V1, V2) ! kinetic energy
   end function EtKEEPPE2
 
   attributes(device) function EtKEP2(id_keep, id, C, rho, p, V1, V2) result(Et)
@@ -52,10 +50,9 @@ contains
     real(8), intent(in), value          :: C
     real(8), intent(in), dimension(2)   :: rho, p
     real(8), intent(in), dimension(dim) :: V1, V2
-    real(8) :: H, KE, Et
-    H  = C * 0.5d0 * gamma * over_gamma_1 * (p(1) / rho(1) + p(2) / rho(2))
-    KE = 0.5d0 * C * vecsum(V1, V2)
-    Et = H + KE
+    real(8) :: Et
+    Et = C * 0.5d0 * gamma * over_gamma_1 * (p(1) / rho(1) + p(2) / rho(2)) ! enthalpy
+    Et = Et + 0.5d0 * C * vecsum(V1, V2) ! kinetic energy
   end function EtKEP2
 
   ! 4th-order accuracy !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -67,12 +64,11 @@ contains
     real(8), intent(in), dimension(4,dim) :: V
     real(8), intent(in), dimension(3)     :: RhoV
     real(8), dimension(4) :: P_over_Rho
-    real(8), dimension(3) :: RhoVIE, RhoVKE, VP, Et
+    real(8), dimension(3) :: Et
     P_over_Rho(:) = p(:) / rho(:)
-    RhoVIE(:)     = RhoPhiU4(RhoV(:), P_over_Rho(:)) * over_gamma_1
-    RhoVKE(:)     = RhoUPhiPhi4(RhoV(:), V(:,:))
-    VP(:)         = PhiPsi4(V(:,id), p(:))
-    Et(:)         = RhoVIE(:) + RhoVKE(:) + VP(:)
+    Et(:) = RhoPhiU4(RhoV(:), P_over_Rho(:)) * over_gamma_1 ! internal energy
+    Et(:) = Et(:) + RhoUPhiPhi4(RhoV(:), V(:,:)) ! kinetic energy
+    Et(:) = Et(:) + PhiPsi4(V(:,id), p(:)) ! pressure diffusion
   end function EtKEEP4
 
   attributes(device) function EtKEEPPE4(id_keep, id, rho, p, V, RhoV) result(Et)
@@ -81,12 +77,11 @@ contains
     real(8), intent(in), dimension(4)     :: rho, p
     real(8), intent(in), dimension(4,dim) :: V
     real(8), intent(in), dimension(3)     :: RhoV
-    real(8), dimension(3) :: Vm, RhoVIE, RhoVKE, VP, Et
-    Vm(:)     = Phi4(V(:,id))
-    RhoVIE(:) = RhoPhiU4(Vm(:), p(:)) * over_gamma_1    
-    RhoVKE(:) = RhoUPhiPhi4(RhoV(:), V(:,:))
-    VP(:)     = PhiPsi4(V(:,id), p(:))
-    Et(:)     = RhoVIE(:) + RhoVKE(:) + VP(:)
+    real(8), dimension(3) :: Vm, Et
+    Vm(:) = Phi4(V(:,id))
+    Et(:) = RhoPhiU4(Vm(:), p(:)) * over_gamma_1 ! internal energy    
+    Et(:) = Et(:) + RhoUPhiPhi4(RhoV(:), V(:,:)) ! kinetic energy
+    Et(:) = Et(:) + PhiPsi4(V(:,id), p(:)) ! pressure diffusion
   end function EtKEEPPE4
 
   attributes(device) function EtKEP4(id_keep, id, rho, p, V, RhoV) result(Et)
@@ -95,13 +90,11 @@ contains
     real(8), intent(in), dimension(4)     :: rho, p
     real(8), intent(in), dimension(4,dim) :: V
     real(8), intent(in), dimension(3)     :: RhoV
-    real(8), dimension(3) :: RhoVH, RhoVKE, Et
+    real(8), dimension(3) :: Et
     real(8), dimension(4) :: P_over_Rho
-    integer i
     P_over_Rho(:) = p(:) / rho(:)
-    RhoVH(:)      = RhoPhiU4(RhoV(:), P_over_Rho(:)) * gamma * over_gamma_1
-    RhoVKE(:)     = RhoUPhiPhi4(RhoV(:), V(:,:))
-    Et(:)         = RhoVH(:) + RhoVKE(:)
+    Et(:) = RhoPhiU4(RhoV(:), P_over_Rho(:)) * gamma * over_gamma_1 ! enthalpy
+    Et(:) = Et(:) + RhoUPhiPhi4(RhoV(:), V(:,:)) ! kinetic energy
   end function EtKEP4
 
   ! 6th-order accuracy !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -112,13 +105,11 @@ contains
     real(8), intent(in), dimension(6)     :: rho, p
     real(8), intent(in), dimension(6,dim) :: V
     real(8), intent(in), dimension(6)     :: RhoV
-    real(8), dimension(6) :: P_over_Rho
-    real(8), dimension(6) :: RhoVIE, RhoVKE, VP, Et
+    real(8), dimension(6) :: P_over_Rho, Et
     P_over_Rho(:) = p(:) / rho(:)
-    RhoVIE(:)     = RhoPhiU6(RhoV(:), P_over_Rho(:)) * over_gamma_1
-    RhoVKE(:)     = RhoUPhiPhi6(RhoV(:), V(:,:))
-    VP(:)         = PhiPsi6(V(:,id), p(:))
-    Et(:)         = RhoVIE(:) + RhoVKE(:) + VP(:)
+    Et(:) = RhoPhiU6(RhoV(:), P_over_Rho(:)) * over_gamma_1 ! internal energy
+    Et(:) = Et(:) + RhoUPhiPhi6(RhoV(:), V(:,:)) ! kinetic energy
+    Et(:) = Et(:) + PhiPsi6(V(:,id), p(:)) ! pressure diffusion
   end function EtKEEP6
 
   attributes(device) function EtKEEPPE6(id_keep, id, rho, p, V, RhoV) result(Et)
@@ -127,12 +118,11 @@ contains
     real(8), intent(in), dimension(6)     :: rho, p
     real(8), intent(in), dimension(6,dim) :: V
     real(8), intent(in), dimension(6)     :: RhoV
-    real(8), dimension(6) :: Vm, RhoVIE, RhoVKE, VP, Et
-    Vm(:)     = Phi6(V(:,id))
-    RhoVIE(:) = RhoPhiU6(Vm(:), p(:)) * over_gamma_1    
-    RhoVKE(:) = RhoUPhiPhi6(RhoV(:), V(:,:))
-    VP(:)     = PhiPsi6(V(:,id), p(:))
-    Et(:)     = RhoVIE(:) + RhoVKE(:) + VP(:)
+    real(8), dimension(6) :: Vm, Et
+    Vm(:) = Phi6(V(:,id))
+    Et(:) = RhoPhiU6(Vm(:), p(:)) * over_gamma_1 ! internal energy    
+    Et(:) = Et(:) + RhoUPhiPhi6(RhoV(:), V(:,:)) ! kinetic energy
+    Et(:) = Et(:) + PhiPsi6(V(:,id), p(:)) ! pressure diffusion
   end function EtKEEPPE6
 
   attributes(device) function EtKEP6(id_keep, id, rho, p, V, RhoV) result(Et)
@@ -141,13 +131,10 @@ contains
     real(8), intent(in), dimension(6)     :: rho, p
     real(8), intent(in), dimension(6,dim) :: V
     real(8), intent(in), dimension(6)     :: RhoV
-    real(8), dimension(6) :: RhoVH, RhoVKE, Et
-    real(8), dimension(6) :: P_over_Rho
-    integer i
+    real(8), dimension(6) :: P_over_Rho, Et
     P_over_Rho(:) = p(:) / rho(:)
-    RhoVH(:)      = RhoPhiU6(RhoV(:), P_over_Rho(:)) * gamma * over_gamma_1
-    RhoVKE(:)     = RhoUPhiPhi6(RhoV(:), V(:,:))
-    Et(:)         = RhoVH(:) + RhoVKE(:)
+    Et(:) = RhoPhiU6(RhoV(:), P_over_Rho(:)) * gamma * over_gamma_1 ! enthalpy
+    Et(:) = Et(:) + RhoUPhiPhi6(RhoV(:), V(:,:)) ! kinetic energy
   end function EtKEP6
 
   !KEEP main!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -173,8 +160,7 @@ contains
     real(8), intent(in), dimension(4)     :: rho, u, v, w, p
     real(8), intent(in), dimension(dim+2) :: Normal
     real(8), dimension(dim+2) :: F
-    real(8), dimension(3)     :: RhoV, Energy
-    real(8), dimension(3,dim) :: RhoVV_P
+    real(8), dimension(3)     :: RhoV
     real(8), dimension(4,dim) :: V4
     integer i
     V4(:,1) = u
@@ -182,12 +168,18 @@ contains
     V4(:,3) = w
     RhoV(:) = RhoPhi4(rho(:), V4(:,id))
     F(1)    = Flux4(RhoV(:))
-    do i = 1, dim
-      RhoVV_P(:,i) = RhoPhiU4(RhoV(:), V4(:,i)) + Phi4(p(:)) * Normal(i+1)
-      F(i+1)       = Flux4(RhoVV_P(:,i))
-    enddo
-    Energy(:) =  Et4(id_keep, id, rho, p, V4, RhoV)
-    F(dim+2) = Flux4(Energy(:))
+    block
+      real(8) RhoVV_P(3)
+      do i = 1, dim
+        RhoVV_P(:) = RhoPhiU4(RhoV(:), V4(:,i)) + Phi4(p(:)) * Normal(i+1)
+        F(i+1)     = Flux4(RhoVV_P(:))
+      enddo
+    end block
+    block
+      real(8) Energy(3)
+      Energy(:) =  Et4(id_keep, id, rho, p, V4, RhoV)
+      F(dim+2) = Flux4(Energy(:))
+    end block
   end function KEEP4
 
   attributes(device) function KEEP6(id, rho, u, v, w, p, Normal) result(F)
@@ -196,8 +188,7 @@ contains
     real(8), intent(in), dimension(6)     :: rho, u, v, w, p
     real(8), intent(in), dimension(dim+2) :: Normal
     real(8), dimension(dim+2) :: F
-    real(8), dimension(6)     :: RhoV, Energy
-    real(8), dimension(6,dim) :: RhoVV_P
+    real(8), dimension(6)     :: RhoV
     real(8), dimension(6,dim) :: V6
     integer i
     V6(:,1) = u
@@ -205,12 +196,18 @@ contains
     V6(:,3) = w
     RhoV(:) = RhoPhi6(rho(:), V6(:,id))
     F(1)    = Flux6(RhoV(:))
-    do i = 1, dim
-      RhoVV_P(:,i) = RhoPhiU6(RHoV(:), V6(:,i)) + Phi6(p(:)) * Normal(i+1)
-      F(i+1)       = Flux6(RhoVV_P(:,i))
-    enddo
-    Energy(:) = Et6(id_keep, id, rho, p, V6, RhoV)
-    F(dim+2) = Flux6(Energy(:))
+    block
+      real(8) RhoVV_P(6)
+      do i = 1, dim
+        RhoVV_P(:) = RhoPhiU6(RhoV(:), V6(:,i)) + Phi6(p(:)) * Normal(i+1)
+        F(i+1)     = Flux6(RhoVV_P(:))
+      enddo
+    end block
+    block
+      real(8) Energy(6)
+      Energy(:) = Et6(id_keep, id, rho, p, V6, RhoV)
+      F(dim+2)  = Flux6(Energy(:))
+    end block
   end function KEEP6
 end module calc_keep
 
