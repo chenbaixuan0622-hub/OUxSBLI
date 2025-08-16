@@ -24,8 +24,12 @@ module print
     module procedure make_1d_for_print2, make_1d_for_print3
   end interface
   
-  interface send_recv_for_print
-    module procedure send_recv_for_print2, send_recv_for_print3
+  interface send_recv_for_print_even
+    module procedure send_recv_for_print_even2, send_recv_for_print_even3
+  end interface
+  
+  interface send_recv_for_print_odd
+    module procedure send_recv_for_print_odd2, send_recv_for_print_odd3
   end interface
 
   interface print_vtk
@@ -219,30 +223,35 @@ contains
     enddo;enddo;enddo
   end subroutine make_1d_for_print3
 
-  subroutine send_recv_for_print2(myrank, nranks, step, nx, ny, x, y, Jacobian_cpu, QJ, Q)
+  subroutine send_recv_for_print_even2(myrank, nranks, step, nx, ny, x, y, Jacobian_cpu, QJ, Q)
     integer, intent(in)         :: myrank, nranks, step, nx, ny
     real(8), intent(in)         :: x(nx), y(ny), Jacobian_cpu(nx,ny)
     real(8), intent(in), device :: QJ(4,nx,ny)
     real(8), intent(inout)      :: Q(4,nx,ny)
     integer ireq3(3), istat3(MPI_STATUS_SIZE,3), ierr
     real(4) rho1d(nx*ny), p1d(nx*ny), v1d(nx*ny*3)
-    if (mod(myrank,2) == 0) then
-      Q = QJ
-      call make_1d_for_print(nx, ny, Jacobian_cpu, Q, rho1d, p1d, v1d)
-      call MPI_ISEND(rho1d, nx*ny,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(1), ierr) 
-      call MPI_ISEND(p1d,   nx*ny,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(2), ierr) 
-      call MPI_ISEND(v1d,   nx*ny*3, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(3), ierr) 
-      call MPI_WAITALL(3, ireq3, istat3, ierr)
-    else
-      call MPI_IRECV(rho1d, nx*ny,   MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(1), ierr)
-      call MPI_IRECV(p1d,   nx*ny,   MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(2), ierr)
-      call MPI_IRECV(v1d,   nx*ny*3, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(3), ierr)
-      call MPI_WAITALL(3, ireq3, istat3, ierr)
-      call print_vtk(step, nx, ny, x, y, rho1d, p1d, v1d)
-    endif
-  end subroutine send_recv_for_print2
+    Q = QJ
+    call make_1d_for_print(nx, ny, Jacobian_cpu, Q, rho1d, p1d, v1d)
+    call MPI_ISEND(rho1d, nx*ny,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(1), ierr) 
+    call MPI_ISEND(p1d,   nx*ny,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(2), ierr) 
+    call MPI_ISEND(v1d,   nx*ny*3, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(3), ierr) 
+    call MPI_WAITALL(3, ireq3, istat3, ierr)
+  end subroutine send_recv_for_print_even2
 
-  subroutine send_recv_for_print3(myrank, nranks, step, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
+  subroutine send_recv_for_print_odd2(myrank, nranks, step, nx, ny, x, y, Jacobian_cpu, Q)
+    integer, intent(in)         :: myrank, nranks, step, nx, ny
+    real(8), intent(in)         :: x(nx), y(ny), Jacobian_cpu(nx,ny)
+    real(8), intent(inout)      :: Q(4,nx,ny)
+    integer ireq3(3), istat3(MPI_STATUS_SIZE,3), ierr
+    real(4) rho1d(nx*ny), p1d(nx*ny), v1d(nx*ny*3)
+    call MPI_IRECV(rho1d, nx*ny,   MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(1), ierr)
+    call MPI_IRECV(p1d,   nx*ny,   MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(2), ierr)
+    call MPI_IRECV(v1d,   nx*ny*3, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(3), ierr)
+    call MPI_WAITALL(3, ireq3, istat3, ierr)
+    call print_vtk(step, nx, ny, x, y, rho1d, p1d, v1d)
+  end subroutine send_recv_for_print_odd2
+
+  subroutine send_recv_for_print_even3(myrank, nranks, step, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
     integer, intent(in)         :: myrank, nranks, step, nx, ny, nz
     real(8), intent(in)         :: x(nx), y(ny), z(nz), Jacobian_cpu(nx,ny)
     real(8), intent(in), device :: QJ(5,nx,ny,nz)
@@ -250,21 +259,27 @@ contains
     real(4), intent(inout)      :: ke0, entropy0
     integer ireq3(3), istat3(MPI_STATUS_SIZE,3), ierr
     real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
-    if (mod(myrank,2) == 0) then
-      Q = QJ
-      call make_1d_for_print(nx, ny, nz, Jacobian_cpu, Q, rho1d, p1d, v1d)
-      call MPI_ISEND(rho1d, nx*ny*nz,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(1), ierr) 
-      call MPI_ISEND(p1d,   nx*ny*nz,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(2), ierr) 
-      call MPI_ISEND(v1d,   nx*ny*nz*3, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(3), ierr) 
-      call MPI_WAITALL(3, ireq3, istat3, ierr)
-    else
-      call MPI_IRECV(rho1d, nx*ny*nz,   MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(1), ierr)
-      call MPI_IRECV(p1d,   nx*ny*nz,   MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(2), ierr)
-      call MPI_IRECV(v1d,   nx*ny*nz*3, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(3), ierr)
-      call MPI_WAITALL(3, ireq3, istat3, ierr)
-      call print_vtk(step, nx, ny, nz, myrank, nranks, x, y, z, rho1d, p1d, v1d, ke0, entropy0)
-    endif
-  end subroutine send_recv_for_print3
+    Q = QJ
+    call make_1d_for_print(nx, ny, nz, Jacobian_cpu, Q, rho1d, p1d, v1d)
+    call MPI_ISEND(rho1d, nx*ny*nz,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(1), ierr) 
+    call MPI_ISEND(p1d,   nx*ny*nz,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(2), ierr) 
+    call MPI_ISEND(v1d,   nx*ny*nz*3, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(3), ierr) 
+    call MPI_WAITALL(3, ireq3, istat3, ierr)
+  end subroutine send_recv_for_print_even3
+
+  subroutine send_recv_for_print_odd3(myrank, nranks, step, nx, ny, nz, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
+    integer, intent(in)         :: myrank, nranks, step, nx, ny, nz
+    real(8), intent(in)         :: x(nx), y(ny), z(nz), Jacobian_cpu(nx,ny)
+    real(8), intent(inout)      :: Q(5,nx,ny,nz)
+    real(4), intent(inout)      :: ke0, entropy0
+    integer ireq3(3), istat3(MPI_STATUS_SIZE,3), ierr
+    real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
+    call MPI_IRECV(rho1d, nx*ny*nz,   MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(1), ierr)
+    call MPI_IRECV(p1d,   nx*ny*nz,   MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(2), ierr)
+    call MPI_IRECV(v1d,   nx*ny*nz*3, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, ireq3(3), ierr)
+    call MPI_WAITALL(3, ireq3, istat3, ierr)
+    call print_vtk(step, nx, ny, nz, myrank, nranks, x, y, z, rho1d, p1d, v1d, ke0, entropy0)
+  end subroutine send_recv_for_print_odd3
 
   subroutine print_vtk_2D(step, nx, ny, x, y, rho1d, p1d, v1d)
     integer, intent(in) :: step, nx, ny

@@ -73,10 +73,15 @@ contains
     integer, intent(in)                         :: myrank, ny, nz
     real(8), intent(inout), allocatable, device :: Qre(:), Qm(:)
     real(8), intent(inout), allocatable         :: Qm_cpu(:)
-    integer stat, ilen
+    integer stat, ilen, ierr
     type(cudaDeviceProp) prop
-    if (myrank == 0 .or. myrank == rerank) then
-      allocate(Qre(ny*(nz-6)*5), Qm(ny*5))
+    if (mod(myrank,2) == 0) then
+      allocate(Qre(ny*(nz-6)*5), Qm(ny*5), stat=ierr)
+      if (ierr /= 0) then
+        print *, "myrank is ", myrank, " memory allocation failed (Qm)", ierr
+      else
+        print *, "myrank is ", myrank, " memory allocation has completed (Qm)"
+      endif
     elseif (myrank == rerank+1) then
       stat = cudaSetDevice(0)
       stat = cudaGetDeviceProperties(prop, 0)
@@ -115,9 +120,13 @@ contains
     print *, "rank", myrank, " has found ", ndevices, " GPU devices"
     if (mod(myrank,2) == 0) then
       call check_gpu(mygpu)
-      allocate(QJ(5,nx,ny,nz), QJ2(5,nx,ny,nz), E(5,nx-1,ny-2,nz-2), F(5,nx-2,ny-1,nz-2), G(5,nx-2,ny-2,nz-1))
-      allocate(xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(nx,ny))
-      print *, "myrank is ", myrank, " memory allocation has completed"
+      allocate(QJ(5,nx,ny,nz), QJ2(5,nx,ny,nz), E(5,nx-1,ny-2,nz-2), F(5,nx-2,ny-1,nz-2), G(5,nx-2,ny-2,nz-1), stat=ierr)
+      allocate(xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(nx,ny), stat=ierr)
+      if (ierr /= 0) then
+        print *, "myrank is ", myrank, " memory allocation failed", ierr
+      else
+        print *, "myrank is ", myrank, " memory allocation has completed"
+      endif
       call pre_calc(nx, ny, nz, myrank, nranks, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q, overlap, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0)
       if (kind(id_forcing) == 4) then
         allocate(fx(nx-2,ny-2,nz-2), fy(nx-2,ny-2,nz-2), fz(nx-2,ny-2,nz-2))
@@ -166,9 +175,11 @@ contains
           endif
           if (kind(id_rescale) == 4) then
             call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
+            call nvtxStartRange("set bc", 4)
+          else
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJ2)
           endif
-          call nvtxStartRange("set bc", 4)
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
           !print *, "myrank is ", myrank, " set bc"
           call nvtxEndRange
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
@@ -193,8 +204,10 @@ contains
           endif
           if (kind(id_rescale) == 4) then
             call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
+          else
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJ2)
           endif
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call rescale_recv_send(2, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
@@ -215,13 +228,19 @@ contains
           endif
           if (kind(id_rescale) == 4) then
             call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
+          else
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJ)
           endif
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call rescale_recv_send(3, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
       enddo
-      call send_recv_for_print(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
+      if (mod(myrank, 2) == 0) then
+        call send_recv_for_print_even(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
+      else
+        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
+      endif
     enddo
 
     if (mod(myrank,2) == 0) then
@@ -309,8 +328,10 @@ contains
           endif
           if (kind(id_rescale) == 4) then
             call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
+          else
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
           endif
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call rescale_recv_send(1, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
@@ -331,8 +352,10 @@ contains
           endif
           if (kind(id_rescale) == 4) then
             call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
+          else
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
           endif
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call rescale_recv_send(2, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
@@ -353,8 +376,10 @@ contains
           endif
           if (kind(id_rescale) == 4) then
             call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
+          else
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
           endif
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call rescale_recv_send(3, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
@@ -375,13 +400,19 @@ contains
           endif
           if (kind(id_rescale) == 4) then
             call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
+          else
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJ)
           endif
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call rescale_recv_send(4, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
       enddo
-      call send_recv_for_print(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
+      if (mod(myrank, 2) == 0) then
+        call send_recv_for_print_even(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
+      else
+        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
+      endif
     enddo
 
     if (mod(myrank,2) == 0) then
@@ -469,24 +500,24 @@ contains
           ! calc R1
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
           call calc_step1(nx, ny, nz, c1, xix, etay, zetaz, E, F, G, QJ, QJs)
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
+          call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
           call calc_R(nx, ny, nz, xix, etay, zetaz, E, F, G, R1)
           ! calc R2
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
           call calc_step1(nx, ny, nz, c2, xix, etay, zetaz, E, F, G, QJ, QJs)
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
+          call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
           call calc_R(nx, ny, nz, xix, etay, zetaz, E, F, G, R2)
           do itr = 1, max_itr
             ! calc R1
             call calc_Gauss_step(nx, ny, nz, a11, a12, xix, etay, zetaz, R1, R2, QJ, QJs)
-            call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
             call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
             call calc_R(nx, ny, nz, xix, etay, zetaz, E, F, G, R1_new)
             ! calc R2
             call calc_Gauss_step(nx, ny, nz, a21, a22, xix, etay, zetaz, R1, R2, QJ, QJs)
-            call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
             call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
             call calc_R(nx, ny, nz, xix, etay, zetaz, E, F, G, R2_new)
             call calc_error(nx, ny, nz, R1, R2, R1_new, R2_new, err)
@@ -503,7 +534,11 @@ contains
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
         endif
       enddo
-      call send_recv_for_print(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
+      if (mod(myrank, 2) == 0) then
+        call send_recv_for_print_even(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
+      else
+        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
+      endif
     enddo
 
     if (mod(myrank,2) == 0) then

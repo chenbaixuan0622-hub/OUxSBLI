@@ -1,9 +1,24 @@
 module set_coordinate
+  use cudafor
   implicit none
   interface set_grid_cyclic
     module procedure set_grid_cyclic2, set_grid_cyclic4, set_grid_cyclic6
   end interface set_grid_cyclic
 contains
+  subroutine set_block(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, threadsG, threadsGv, &
+                       blocks, blocksE, blocksEv, blocksF, blocksFv, blocksG, blocksGv)
+    integer, intent(in)     :: nx, ny, nz
+    type(dim3), intent(in)  :: threadsE, threadsF, threadsG, threadsEv, threadsFv, threadsGv, threads
+    type(dim3), intent(out) :: blocksE,  blocksF,  blocksG,  blocksEv,  blocksFv,  blocksGv,  blocks
+    blocksE  = dim3((nx-1+threadsE%x -1)/threadsE%x, (ny-2+threadsE%y -1)/threadsE%y, (nz-2+threadsE%z -1)/threadsE%z)
+    blocksF  = dim3((nx-2+threadsF%x -1)/threadsF%x, (ny-1+threadsF%y -1)/threadsF%y, (nz-2+threadsF%z -1)/threadsF%z)
+    blocksG  = dim3((nx-2+threadsG%x -1)/threadsG%x, (ny-2+threadsG%y -1)/threadsG%y, (nz-1+threadsG%z -1)/threadsG%z)
+    blocksEv = dim3((nx-1+threadsEv%x-1)/threadsEv%x,(ny-2+threadsEv%y-1)/threadsEv%y,(nz-2+threadsEv%z-1)/threadsEv%z)
+    blocksFv = dim3((nx-2+threadsFv%x-1)/threadsFv%x,(ny-1+threadsFv%y-1)/threadsFv%y,(nz-2+threadsFv%z-1)/threadsFv%z)
+    blocksGv = dim3((nx-2+threadsGv%x-1)/threadsGv%x,(ny-2+threadsGv%y-1)/threadsGv%y,(nz-1+threadsGv%z-1)/threadsGv%z)
+    blocks   = dim3((nx-2+threads%x  -1)/threads%x,  (ny-2+threads%y  -1)/threads%y,  (nz-2+threads%z  -1)/threads%z)
+  end subroutine set_block
+
   subroutine set_xix(nx, dx, xix)
     integer, intent(in)  :: nx
     real(8), intent(in)  :: dx(nx-1)

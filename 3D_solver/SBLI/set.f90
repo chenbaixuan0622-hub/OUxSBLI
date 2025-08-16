@@ -8,44 +8,6 @@ module set
   use calc_para
   implicit none
 contains
-  subroutine set_block_thread(myrank, accuracy, nx, ny, nz, blocks, threads, blocksE, blocksF, blocksG, &
-                              & threadsE, threadsF, threadsG, blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv)
-    integer, intent(in) :: myrank, accuracy, nx, ny, nz
-    type(dim3), intent(out) :: blocksE,  blocksF,  blocksG,  blocksEv,  blocksFv,  blocksGv,  blocks
-    type(dim3), intent(out) :: threadsE, threadsF, threadsG, threadsEv, threadsFv, threadsGv, threads
-    if (myrank == 0) then
-      blocksE   = dim3((nx-accuracy+1)/64,(ny-accuracy)/1,(nz-accuracy)/1)
-      blocksF   = dim3((nx-accuracy)/7,(ny-accuracy+1)/8,(nz-accuracy)/1)
-      blocksG   = dim3((nx-accuracy)/7,(ny-accuracy)/1,(nz-accuracy+1)/8)
-      blocksEv  = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
-      blocksFv  = dim3((nx-accuracy)/7,(ny-accuracy+1)/8,(nz-accuracy)/1)
-      blocksGv  = dim3((nx-accuracy)/7,(ny-accuracy)/1,(nz-accuracy+1)/8)
-      blocks    = dim3((nx-accuracy)/73,(ny-accuracy)/1,(nz-accuracy)/1)
-      threadsE  = dim3(64,1,1)
-      threadsF  = dim3(7,8,1)
-      threadsG  = dim3(7,1,8)
-      threadsEv = dim3(32,1,1)
-      threadsFv = dim3(7,8,1)
-      threadsGv = dim3(7,1,8)
-      threads   = dim3(73,1,1)
-    elseif (myrank == 2) then
-      blocksE   = dim3((nx-accuracy+1)/64,(ny-accuracy)/1,(nz-accuracy)/1)
-      blocksF   = dim3((nx-accuracy)/179,(ny-accuracy+1)/1,(nz-accuracy)/1)
-      blocksG   = dim3((nx-accuracy)/179,(ny-accuracy)/1,(nz-accuracy+1)/1)
-      blocksEv  = dim3((nx-accuracy+1)/32,(ny-accuracy)/1,(nz-accuracy)/1)
-      blocksFv  = dim3((nx-accuracy)/179,(ny-accuracy+1)/1,(nz-accuracy)/1)
-      blocksGv  = dim3((nx-accuracy)/179,(ny-accuracy)/1,(nz-accuracy+1)/1)
-      blocks    = dim3((nx-accuracy)/179,(ny-accuracy)/1,(nz-accuracy)/1)
-      threadsE  = dim3(64,1,1)
-      threadsF  = dim3(179,1,1)
-      threadsG  = dim3(179,1,1)
-      threadsEv = dim3(32,1,1)
-      threadsFv = dim3(179,1,1)
-      threadsGv = dim3(179,1,1)
-      threads   = dim3(179,1,1)
-    endif
-  end subroutine set_block_thread
-
   subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, Lx1, x, y, z, dx, dy, dz)
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: Lx, Ly, Lz, Lx1
@@ -98,7 +60,7 @@ contains
     integer, intent(in), value     :: myrank, nx, ny, nz
     real(8), intent(in), device    :: Jacobian(nx,ny)
     real(8), intent(inout), device :: QJ(5,nx,ny,nz) ! Q / Jacobian
-    real(8), intent(in), device    :: Qre(ny*(nz-6)*5)
+    real(8), intent(in), device, optional :: Qre(ny*(nz-6)*5)
     integer i, j, k, l, No, ireq, ierr, istat(MPI_STATUS_SIZE)
     real(8) :: p_wall, rf = 0.89d0
     ! Riemann invariants
@@ -116,7 +78,7 @@ contains
     c0   = sqrt(gamma * p0 / rho0)
     if (myrank == 0) then
       if (kind(id_rescale) == 4) then
-        !$cuf kernel do(3)<<<*,*>>>
+        !$cuf kernel do(2)<<<*,*>>>
         do k = 1, nz-6
           do j = 2, ny-1
             do l = 1, 5
@@ -126,7 +88,7 @@ contains
               QJ(l,nx,j,k+3) = QJ(l,nx-1,j,k+3)
         enddo;enddo;enddo
       else
-        !$cuf kernel do(3)<<<*,*>>>
+        !$cuf kernel do(2)<<<*,*>>>
         do k = 4, nz-3
           do j = 2, ny-1
             do l = 1, 5
@@ -160,7 +122,7 @@ contains
           QJ(4,1,j,k) = 0.d0
           QJ(5,1,j,k) = (p0 * over_gamma_1 + 0.5d0 * rho0 * u0**2) * Jacobian_tmp
       enddo;enddo
-      !$cuf kernel do(3)<<<*,*>>>
+      !$cuf kernel do(2)<<<*,*>>>
       do k = 4, nz-3
         do j = 2, ny-1
           do l = 1, 5
@@ -201,13 +163,13 @@ contains
     enddo;enddo
 
     if (myrank == 2) then
-      No = int(dble(nx) * 0.33d0 / 35.d0)!int(dble(nx)*0.1d0)
+      No = int(dble(nx)*0.1d0)!int(dble(nx) * 0.33d0 / 35.d0)
       !$cuf kernel do(2)<<<*,*>>>
       do k = 1, nz
         do i = No, nx
           Jacobian_tmp = 1.d0 / Jacobian(i,ny)
           vin   = QJ(3,i,ny-1,k) / QJ(1,i,ny-1,k)
-          if (vin < 0.d0) then 
+          if (0.5d0 * uy > vin) then 
             QJ(1,i,ny,k) = rho2 * Jacobian_tmp
             QJ(2,i,ny,k) = rho2 * ux * Jacobian_tmp
             QJ(3,i,ny,k) = rho2 * uy * Jacobian_tmp
@@ -236,7 +198,7 @@ contains
     endif
 
     ! cyclic
-    !$cuf kernel do(3)<<<*,*>>>
+    !$cuf kernel do(2)<<<*,*>>>
     do j = 1, ny
       do i = 1, nx
         do l = 1, 5
