@@ -2,7 +2,7 @@
 FC             = nvfortran
 CC             = nvcc
 # CUDA
-CUDA_PATH      = /work/opt/local/aarch64/cores/nvidia/24.9/Linux_aarch64/24.9
+CUDA_PATH      = $(NVHPC_ROOT)
 CUDA_INC       = -I$(CUDA_PATH)/include -I$(CUDA_PATH)/compilers/include
 CUDA_LIB       = -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/compilers/lib64 -lcudart
 # Python and pybind11
@@ -22,6 +22,7 @@ vpath %h 	 ../src
 FSRC =mod_globals.o \
       mod_constant.o \
       set_coordinate.o \
+      mod_globals_c.o \
       calc_common_dim.o \
       calc_mat.o \
       calc_physical_quantities.o \
@@ -65,6 +66,7 @@ wrapper.o: $(FSRC:.f90=.o)
 cufd.so: wrapper.o
 
 mod_constant.o: mod_globals.mod
+mod_globals_c.o: mod_globals.mod set_coordinate.mod
 set_bc_common.o: mod_globals.mod mod_constant.mod
 set.o: mod_globals.mod mod_constant.mod set_bc_common.mod set_coordinate.mod
 calc_physical_quantities.o: mod_globals.mod mod_constant.mod
@@ -82,5 +84,5 @@ calc_hybrid.o: mod_globals.mod
 calc_steps.o: mod_globals.mod
 
 clean:
-	rm -f *.o *.so
+	rm -f *.o *.mod *.so
 
