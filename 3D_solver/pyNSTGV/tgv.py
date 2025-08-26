@@ -27,13 +27,15 @@ def set_grid(nx, ny, nz, Lx, Ly, Lz):
   return xc, yc, zc, dx, dy, dz
 
 def set_Jacobian(Nx, Ny, Nz, dx, dy, dz):
-  Jacobian = np.zeros(Ny, dtype=np.float64)
+  Jacobian = np.zeros((Ny,Nx), dtype=np.float64)
   for k in range(1,Nz-1):
     for j in range(1,Ny-1):
       for i in range(1,Nx-1):
-        Jacobian[j] = 8.e0 / ((dx[i-1] + dx[i]) * (dy[j-1] + dy[j]) * (dz[k-1] + dz[k]))
-  Jacobian[0]  = Jacobian[1]
-  Jacobian[-1] = Jacobian[-2]
+        Jacobian[j,i] = 8.e0 / ((dx[i-1] + dx[i]) * (dy[j-1] + dy[j]) * (dz[k-1] + dz[k]))
+  Jacobian[0,:]  = Jacobian[1,:]
+  Jacobian[-1,:] = Jacobian[-2,:]
+  Jacobian[:,0]  = Jacobian[:,1]
+  Jacobian[:,-1] = Jacobian[:,-2]
   return cp.asarray(Jacobian)
 
 
@@ -65,23 +67,4 @@ def set_init(nx, ny, nz, x, y, z, gamma, Rgas, rho0, v0, p0, T0, L0):
   Q[0,:,:,:]  = Q[-2,:,:,:]
   Q[-1,:,:,:] = Q[1,:,:,:]
   return Q
-
-
-def set_bc(Q, nx, ny, nz):
-  Q = cp.reshape(Q, (nz,ny,nx,5))
-  # x direction
-  Q[1:-1,1:-1,0,:]  = Q[1:-1,1:-1,-2,:]
-  Q[1:-1,1:-1,-1,:] = Q[1:-1,1:-1,1,:]
-  # y direction
-  Q[1:-1,0,1:-1,:]  = Q[1:-1,-2,1:-1,:]
-  Q[1:-1,-1,1:-1,:] = Q[1:-1,1,1:-1,:]
-  # corner
-  Q[1:-1,0,0,:]   = Q[1:-1,-2,-2,:]
-  Q[1:-1,0,-1,:]  = Q[1:-1,-2,1,:]
-  Q[1:-1,-1,0,:]  = Q[1:-1,1,-2,:]
-  Q[1:-1,-1,-1,:] = Q[1:-1,1,1,:]
-  # z direction
-  Q[0,:,:,:]  = Q[-2,:,:,:]
-  Q[-1,:,:,:] = Q[1,:,:,:]
-  return cp.ravel(Q)
 

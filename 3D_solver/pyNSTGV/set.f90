@@ -4,7 +4,7 @@ module set
   use set_coordinate
   implicit none
 contains
-  subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, xc, yc, zc, dx, dy, dz)
+  subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, xc, yc, zc, dx, dy, dz) bind(c, name="set_grid")
     use mod_globals, only : id_accuracy
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: Lx, Ly, Lz
@@ -12,7 +12,7 @@ contains
     call set_grid_cyclic(id_accuracy, nx, ny, nz, Lx, Ly, Lz, xc, yc, zc, dx, dy, dz)
   end subroutine set_grid
   
-  subroutine set_init(myrank, nx, ny, nz, x, y, z, Q)
+  subroutine set_init(myrank, nx, ny, nz, x, y, z, Q) bind(c, name="set_init")
     use mod_globals, only : id_accuracy
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
@@ -45,12 +45,12 @@ contains
     call set_bc_cyclic(id_accuracy, nx, ny, nz, Q)
   end subroutine set_init
   
-  subroutine set_bc(myrank, nx, ny, nz, Jacobian, Q, Qre)
+  subroutine set_bc(myrank, nx, ny, nz, Jacobian, Q, Qre) bind(c, name="set_bc")
     use mod_globals, only : id_accuracy
     integer, intent(in), value     :: myrank, nx, ny, nz
     real(8), intent(in), device    :: Jacobian(nx,ny,nz)
     real(8), intent(inout), device :: Q(5,nx,ny,nz)
-    real(8), intent(in), device    :: Qre(ny*(nz-6)*5)
+    real(8), intent(in), device, optional :: Qre(ny*(nz-6)*5)
     call set_bc_cyclic(id_accuracy, nx, ny, nz, Q)
   end subroutine set_bc
 
