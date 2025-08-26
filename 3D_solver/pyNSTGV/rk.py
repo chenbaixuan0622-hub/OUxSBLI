@@ -3,7 +3,6 @@ import cupy as cp
 import cufd
 from tqdm import tqdm
 from print import print_vtk
-from tgv import set_bc
 
 
 def RK44(Q, x, y, z, gamma, dt, dx, dy, dz, Jacobian, Nt, Np, dir):
@@ -19,25 +18,25 @@ def RK44(Q, x, y, z, gamma, dt, dx, dy, dz, Jacobian, Nt, Np, dir):
   xix   = cp.asarray(1.e0 / dx)
   etay  = cp.asarray(1.e0 / dy)
   zetaz = cp.asarray(1.e0 / dz)
+  Jacobian = cp.asarray(np.ravel(Jacobian))
   print(cp.cuda.runtime.runtimeGetVersion())
-  print(cp.cuda.compiler.get_rocm_path())
   for itr in tqdm(range(1, Np+1)):
     for n in range(Nt):
       cufd.calc_EFG_NS(Nx, Ny, Nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
       cufd.calc_step(Nx, Ny, Nz, 0.5e0, 1.e0, xix, etay, zetaz, E, F, G, QJ, Q1, Rs)
-      set_bc(Q1, Nx, Ny, Nz)
+      cufd.set_bc(Nx, Ny, Nz, Jacobian, Q1)
 
       cufd.calc_EFG_NS(Nx, Ny, Nz, xix, etay, zetaz, Jacobian, Q1, E, F, G)
       cufd.calc_step(Nx, Ny, Nz, 0.5e0, 2.e0, xix, etay, zetaz, E, F, G, QJ, Q1, Rs)
-      set_bc(Q1, Nx, Ny, Nz)
+      cufd.set_bc(Nx, Ny, Nz, Jacobian, Q1)
 
       cufd.calc_EFG_NS(Nx, Ny, Nz, xix, etay, zetaz, Jacobian, Q1, E, F, G)
       cufd.calc_step(Nx, Ny, Nz, 1.e0, 2.e0, xix, etay, zetaz, E, F, G, QJ, Q1, Rs)
-      set_bc(Q1, Nx, Ny, Nz)
+      cufd.set_bc(Nx, Ny, Nz, Jacobian, Q1)
 
       cufd.calc_EFG_NS(Nx, Ny, Nz, xix, etay, zetaz, Jacobian, Q1, E, F, G)
       cufd.calc_step4(Nx, Ny, Nz, xix, etay, zetaz, E, F, G, Rs, QJ)
-      set_bc(QJ, Nx, Ny, Nz)
+      cufd.set_bc(Nx, Ny, Nz, Jacobian, QJ)
     Q = QJ.reshape(Nz,Ny,Nx,5).get()
     print_vtk(x, y, z, gamma, Q, itr, dir)
 

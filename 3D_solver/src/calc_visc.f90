@@ -1,109 +1,11 @@
 module calc_visc
-  use mod_globals, only : id_visc, id_turbulence, id_av, gamma, R, Pr, Prt
-  use mod_constant, only : Cp, gamma_1
+  use mod_globals, only : id_visc, gamma, R, Pr, Prt, dt
+  use mod_constant, only : Cp, gamma_1, Cp_over_Pr
+  use calc_visc_common
+  use calc_rand
   implicit none
 contains
-  !dir$ inline
-  attributes(device) function interpolation6(a) result(ans)
-    real(8), intent(in), device :: a(6)
-    real(8) ans(3)
-    ans(:) = 0.0625d0 * (-a(1:3) + 9.d0 * (a(2:4) + a(3:5)) -a(4:6))
-  end function interpolation6
-
-  !dir$ inline
-  attributes(device) function dx6(a, dx) result(ans)
-    real(8), intent(in), device :: a(6)
-    real(8), intent(in), value  :: dx
-    real(8) ans(3)
-    ans(:) = 0.125d0 * (9.d0 * (-a(2:4) + a(3:5)) - (-a(1:3) + a(4:6)) / 3.d0) * dx
-  end function dx6
-
-  !dir$ inline
-  attributes(device) function dy5(a, dy) result(ans)
-    real(8), intent(in), device :: a(5)
-    real(8), intent(in), value  :: dy
-    real(8) ans
-    ans = (2.d0 * (-a(2) + a(4)) - 0.25d0 * (-a(1) + a(5))) * dy / 3.d0
-  end function dy5
-
-  !dir$ inline
-  attributes(device) function dy23(mu, a, dy) result(ans)
-    real(8), intent(in), device :: mu(2), a(2,3)
-    real(8), intent(in), value  :: dy
-    real(8) ans
-    ans = 0.25d0 * (mu(1) * (-a(1,1) + a(1,2) -a(2,1) + a(2,2)) &
-                  + mu(2) * (-a(1,2) + a(1,3) -a(2,2) + a(2,3))) * dy
-  end function dy23
-
-  attributes(device) function dy65(a, dy) result(ans)
-    real(8), intent(in), device :: a(6,5)
-    real(8), intent(in), value  :: dy
-    real(8) ans(3), a1(5), a2(5), a3(5), a4(5), a5(5), a6(5), ay(6)
-    a1 = a(1,:); a2 = a(2,:); a3 = a(3,:); a4 = a(4,:); a5 = a(5,:); a6 = a(6,:)
-    ay(1) = dy5(a1(:), dy); ay(2) = dy5(a2(:), dy); ay(3) = dy5(a3(:), dy)
-    ay(4) = dy5(a4(:), dy); ay(5) = dy5(a5(:), dy); ay(6) = dy5(a6(:), dy)
-    ans = interpolation6(ay(:))
-  end function dy65
-  
-  !dir$ inline
-  attributes(device) function dy32(mu, a, dy) result(ans)
-    real(8), intent(in), device :: mu(2), a(3,2)
-    real(8), intent(in), value  :: dy
-    real(8) ans
-    ans = 0.25d0 * (mu(1) * (-a(1,1) + a(2,1) - a(1,2) + a(2,2)) &
-                  + mu(2) * (-a(2,1) + a(3,1) - a(2,2) + a(3,2))) * dy
-  end function dy32
-
-  attributes(device) function dy56(a, dy) result(ans)
-    real(8), intent(in), device :: a(5,6)
-    real(8), intent(in), value  :: dy
-    real(8) ans(3), ay(6)
-    ay(1) = dy5(a(:,1), dy); ay(2) = dy5(a(:,2), dy); ay(3) = dy5(a(:,3), dy)
-    ay(4) = dy5(a(:,4), dy); ay(5) = dy5(a(:,5), dy); ay(6) = dy5(a(:,6), dy)
-    ans = interpolation6(ay(:))
-  end function dy56
-
-  !dir$ inline
-  attributes(device) function flux4(a) result(ans)
-    real(8), intent(in), device :: a(3)
-    real(8) ans
-    ans = 0.125d0 * ((9.d0 - 1.d0 / 3.d0) * a(2) - (a(1) + a(3)) / 3.d0)
-  end function flux4
-
-  attributes(device) subroutine tauxx4(mu, ux, vy, wz, u6, txx, utxx)
-    real(8), intent(in), dimension(3), device :: mu, ux, vy, wz
-    real(8), intent(in), dimension(6), device :: u6
-    real(8), intent(out) :: txx, utxx
-    real(8), dimension(3) :: tau, utau
-    tau(:)  = 2.d0 * mu(:) * (2.d0 * ux(:) - vy(:) - wz(:)) / 3.d0
-    utau(:) = interpolation6(u6(:)) * tau(:)
-    txx     = flux4(tau(:))
-    utxx    = flux4(utau(:))
-  end subroutine tauxx4
-
-  attributes(device) subroutine tauxy4(mu, uy, vx, v6, txy, vtxy)
-    real(8), intent(in), dimension(3), device :: mu, uy, vx
-    real(8), intent(in), dimension(6), device :: v6
-    real(8), intent(out) :: txy, vtxy
-    real(8), dimension(3) :: tau, vtau
-    tau(:)  = mu(:) * (uy(:) + vx(:))
-    vtau(:) = interpolation6(v6(:)) * tau(:)
-    txy     = flux4(tau(:))
-    vtxy    = flux4(vtau(:))
-  end subroutine tauxy4
-
-  !dir$ inline
-  attributes(device) function heat_conduction6(mu, T, dx) result(ans)
-    real(8), intent(in), device :: mu(3), T(6)
-    real(8), intent(in), value  :: dx
-    real(8), dimension(3) ::  kTx
-    real(8) :: ans
-    kTx(:) = Cp * mu(:) * dx6(T(:), dx) / Pr
-    ans = flux4(kTx(:))
-  end function heat_conduction6
-
-
-  attributes(global) subroutine calc_Ev(nx, ny, nz, dx, dy, dz, Q, E)
+  attributes(global) subroutine calc_Ev(nx, ny, nz, dx, dy, dz, Q, E, seed)
     use calc_sutherland, only : mu6, mu2, mu23
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
@@ -111,6 +13,7 @@ contains
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device    :: Q(5,nx,ny,nz)
     real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2)
+    integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
     integer i, j, k
     real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
@@ -168,7 +71,7 @@ contains
             real(8), device :: Tx(2)
             Tx(:) = T233(:,2,2)
             mx    = mu2(Tx(:))
-            kTx   = Cp * mx * (-Tx(1) + Tx(2)) * dx(i) / Pr
+            kTx   = Cp_over_Pr * mx * (-Tx(1) + Tx(2)) * dx(i)
           end block
           block
             real(8), device :: Ty(2,3)
@@ -210,6 +113,22 @@ contains
         txx  = 2.d0 * (2.d0 * mux - mvy - mwz) / 3.d0
         txy  = muy + mvx
         txz  = mwx + muz
+        if (present(seed) .and. id_visc == 1) then
+          block
+            real(8) std_t, std_q, over_V
+            real(8), device   :: T(2), rand(4)
+            real(8), constant :: kb = 1.380649d-23
+            T(:)   = Q(5,i:i+1,j,k) / (R * Q(1,i:i+1,j,k))
+            over_V = dx(i) * dy(j) * dz(k)
+            std_t  = sqrt(4.d0 * kb * over_V * (mx * (T(1) + T(2))) / (3.d0 * dt))
+            std_q  = sqrt(kb * over_V * (Cp_over_Pr * mx * (T(1)**2 + T(2)**2)) / dt)
+            rand   = box_muller4(seed(i,j,k), seed(i+1,j,k))
+            txx = txx + std_t * rand(1) 
+            txy = txy + std_t * rand(2)
+            txz = txz + std_t * rand(3)
+            kTx = kTx + std_q * rand(4)
+          end block
+        endif
         utxx = 0.5d0 * (u2(1) + u2(2)) * txx
         vtxy = 0.5d0 * (v2(1) + v2(2)) * txy
         wtxz = 0.5d0 * (w2(1) + w2(2)) * txz
@@ -303,7 +222,7 @@ contains
             real(8), device :: Tx(2)
             Tx(:) = T233(:,2,2)
             mx    = mu2(Tx(:))
-            kTx   = Cp * mx * (-Tx(1) + Tx(2)) * dx(i) / Pr
+            kTx   = Cp_over_Pr * mx * (-Tx(1) + Tx(2)) * dx(i)
           end block
           block
             real(8), device :: Ty(2,3)
@@ -371,7 +290,7 @@ contains
     E(5,i,j-1,k-1) = E(5,i,j-1,k-1) - (utxx + vtxy + wtxz + kTx + Hsgs)
   end subroutine calc_Ev_LES
   
-  attributes(global) subroutine calc_Fv(nx, ny, nz, dy, dx, dz, Q, F)
+  attributes(global) subroutine calc_Fv(nx, ny, nz, dy, dx, dz, Q, F, seed)
     use calc_sutherland, only : mu6, mu2, mu23, mu32
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
@@ -379,6 +298,7 @@ contains
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device    :: Q(5,nx,ny,nz)
     real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2)
+    integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
     integer i, j, k
     real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
@@ -441,7 +361,7 @@ contains
             real(8), device :: Ty(2)
             Ty(:) = T323(2,:,2)
             my    = mu2(Ty(:))
-            kTy   = Cp * my * (-Ty(1) + Ty(2)) * dy(j) / Pr
+            kTy   = Cp_over_Pr * my * (-Ty(1) + Ty(2)) * dy(j)
           end block
           block
             real(8), device :: Tz(2,3)
@@ -478,6 +398,22 @@ contains
         tyx  = muy + mvx
         tyy  = 2.d0 * (2.d0 * mvy - mwz - mux) / 3.d0
         tyz  = mvz + mwy
+        if (present(seed) .and. id_visc == 1) then
+          block
+            real(8) std_t, std_q, over_V
+            real(8), device   :: T(2), rand(4)
+            real(8), constant :: kb = 1.380649d-23
+            T(:)   = Q(5,i,j:j+1,k) / (R * Q(1,i,j:j+1,k))
+            over_V = dx(i) * dy(j) * dz(k)
+            std_t  = sqrt(4.d0 * kb * over_V * (my * (T(1) + T(2))) / (3.d0 * dt))
+            std_q  = sqrt(kb * over_V * (Cp_over_Pr * my * (T(1)**2 + T(2)**2)) / dt)
+            rand   = box_muller4(seed(i,j,k), seed(i,j+1,k))
+            tyx = tyx + std_t * rand(1)
+            tyy = tyy + std_t * rand(2)
+            tyz = tyz + std_t * rand(3)
+            kTy = kTy + std_q * rand(4)
+          end block
+        endif
         utyx = 0.5d0 * (u2(1) + u2(2)) * tyx
         vtyy = 0.5d0 * (v2(1) + v2(2)) * tyy
         wtyz = 0.5d0 * (w2(1) + w2(2)) * tyz
@@ -577,7 +513,7 @@ contains
             real(8), device :: Ty(2)
             Ty(:) = T323(2,:,2)
             my    = mu2(Ty(:))
-            kTy   = Cp * my * (-Ty(1) + Ty(2)) * dy(j) / Pr
+            kTy   = Cp_over_Pr * my * (-Ty(1) + Ty(2)) * dy(j)
           end block
           block
             real(8), device :: Tz(2,3)
@@ -641,7 +577,7 @@ contains
     F(5,i-1,j,k-1) = F(5,i-1,j,k-1) - (utyx + vtyy + wtyz + kTy + Hsgs)
   end subroutine calc_Fv_LES
   
-  attributes(global) subroutine calc_Gv(nx, ny, nz, dx, dy, dz, Q, G)
+  attributes(global) subroutine calc_Gv(nx, ny, nz, dx, dy, dz, Q, G, seed)
     use calc_sutherland, only : mu6, mu2, mu32
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
@@ -649,6 +585,7 @@ contains
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device    :: Q(5,nx,ny,nz)
     real(8), intent(inout), device :: G(5,nx-2,ny-2,nz-1)
+    integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
     integer i, j, k
     real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
@@ -716,7 +653,7 @@ contains
             real(8), device :: Tz(2)
             Tz(:)   = T332(2,2,:)
             mz      = mu2(Tz(:))
-            kTz     = Cp * mz * (-Tz(1) + Tz(2)) * dz(k) / Pr
+            kTz     = Cp_over_Pr * mz * (-Tz(1) + Tz(2)) * dz(k)
           end block
         end block
         block
@@ -748,6 +685,22 @@ contains
         tzx  = mwx + muz
         tzy  = mvz + mwy
         tzz  = 2.d0 * (2.d0 * mwz - mux - mvy) / 3.d0
+        if (present(seed) .and. id_visc == 1) then
+          block
+            real(8) std_t, std_q, over_V
+            real(8), device :: T(2), rand(4)
+            real(8), constant :: kb = 1.380649d-23
+            T(:)   = Q(5,i,j,k:k+1) / (R * Q(1,i,j,k:k+1))
+            over_V = dx(i) * dy(j) * dz(k)
+            std_t  = sqrt(4.d0 * kb * over_V * (mz * (T(1) + T(2))) / (3.d0 * dt))
+            std_q  = sqrt(kb * over_V * (Cp_over_Pr * mz * (T(1)**2 + T(2)**2)) / dt)
+            rand   = box_muller4(seed(i,j,k), seed(i,j,k+1))
+            tzx = tzx + std_t * rand(1)
+            tzy = tzy + std_t * rand(2)
+            tzz = tzz + std_t * rand(3)
+            kTz = kTz + std_q * rand(4)
+          end block
+        endif
         utzx = 0.5d0 * (u2(1) + u2(2)) * tzx
         vtzy = 0.5d0 * (v2(1) + v2(2)) * tzy
         wtzz = 0.5d0 * (w2(1) + w2(2)) * tzz
@@ -852,7 +805,7 @@ contains
             real(8), device :: Tz(2)
             Tz(:)   = T332(2,2,:)
             mz      = mu2(Tz(:))
-            kTz     = Cp * mz * (-Tz(1) + Tz(2)) * dz(k) / Pr
+            kTz     = Cp_over_Pr * mz * (-Tz(1) + Tz(2)) * dz(k)
           end block
         end block
         block

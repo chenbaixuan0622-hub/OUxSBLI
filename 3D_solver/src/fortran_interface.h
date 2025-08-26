@@ -18,6 +18,7 @@ extern "C" void calc_EFG_LES_forcing_c(int nx, int ny, int nz, double* dx, doubl
                                        double* Jacobian, double* QJ, double* E, double* F, double* G, \
                                        double* fx, double* fy, double* fz);
 
+
 extern "C" void calc_R_c(int nx, int ny, int nz, double* dx, double* dy, double* dz, \
                          double* E, double* F, double* G, double* R);
 extern "C" void calc_R_forcing_c(int nx, int ny, int nz, double* dx, double* dy, double* dz, \
@@ -50,3 +51,19 @@ extern "C" void calc_Gauss_step_c(int nx, int ny, int nz, double a1, double a2, 
 extern "C" void calc_Gauss_step_Q_c(int nx, int ny, int nz, double a1, double a2, \
                                     double* dx, double* dy, double* dz, double* R1, double* R2, double* Q);
 
+
+extern "C" int get_Nx_c(void);
+extern "C" int get_Ny_c(void);
+extern "C" int get_Nz_c(void);
+extern "C" int get_Nt_c(void);
+extern "C" int get_Np_c(void);
+extern "C" double get_Lx_c(void);
+extern "C" double get_Ly_c(void);
+extern "C" double get_Lz_c(void);
+extern "C" double get_dt_c(void);
+
+
+extern "C" void set_grid(int myrank, int nx, int ny, int nz, double Lx, double Ly, double Lz, \
+                         double *x, double *y, double *z, double *dx, double *dy, double *dz);
+
+extern "C" void set_bc(int myrank, int nx, int ny, int nz, double* Jacobian, double* Q);
