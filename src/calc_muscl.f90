@@ -32,11 +32,10 @@ contains
   !dir$ inline
   attributes(device) function d33(d1, d2, d3) result(ans)
     real(8), intent(in), value :: d1, d2, d3 
-    real(8) :: ans, da, db, dc
-    da = minmod(d1, 2.d0 * d2, 2.d0 * d3)
-    db = minmod(d2, 2.d0 * d1, 2.d0 * d3)
-    dc = minmod(d3, 2.d0 * d1, 2.d0 * d2)
-    ans = da - 2.d0 * db + dc
+    real(8) :: ans
+    ans =          minmod(d1, 2.d0 * d2, 2.d0 * d3) &
+          - 2.d0 * minmod(d2, 2.d0 * d1, 2.d0 * d3) &
+                 + minmod(d3, 2.d0 * d1, 2.d0 * d2)
   end function d33
 
   !dir$ inline
@@ -55,13 +54,19 @@ contains
     real(8), intent(in), value         :: sensor, a2, a3
     real(8), intent(in), device        :: d(3)
     real(8), constant :: b = (3.d0 - 1.d0 / 3.d0) / (1.d0 - 1.d0 / 3.d0)
-    real(8) :: dt1, dt2, dt3, dt4, alr(2)
-    dt1 = minmod(d(1), b * d(2))
-    dt2 = minmod(d(2), b * d(1))
-    dt3 = minmod(d(3), b * d(2))
-    dt4 = minmod(d(2), b * d(3))
-    alr(1) = a2 + 0.5d0 * (dt1 + 2.d0 * dt2) / 3.d0
-    alr(2) = a3 - 0.5d0 * (dt3 + 2.d0 * dt4) / 3.d0
+    real(8) :: alr(2)
+    block
+      real(8) dt1, dt2
+      dt1 = minmod(d(1), b * d(2))
+      dt2 = minmod(d(2), b * d(1))
+      alr(1) = a2 + 0.5d0 * (dt1 + 2.d0 * dt2) / 3.d0
+    end block
+    block
+      real(8) dt3, dt4
+      dt3 = minmod(d(3), b * d(2))
+      dt4 = minmod(d(2), b * d(3))
+      alr(2) = a3 - 0.5d0 * (dt3 + 2.d0 * dt4) / 3.d0
+    end block
   end function MUSCL3rdMinmod
 
   attributes(device) function MUSCL3rdThreshold(id_tvd, sensor, a2, a3, d) result(alr)
@@ -84,9 +89,9 @@ contains
     integer(kind=2), intent(in), value :: id_tvd
     real(8), intent(in), value         :: sensor, a2, a3
     real(8), intent(in), device        :: d(5)
-    real(8) :: phi = 1.d0 / 30.d0, d2(4), d3(3), alr(2)
-    d2(:)  = - d(1:4) +  d(2:5)
-    d3(:)  = -d2(1:3) + d2(2:4)
+    real(8), constant :: phi = 1.d0 / 30.d0
+    real(8) d3(3), alr(2)
+    d3(:)  = d(1:3) - 2.d0 * d(2:4) + d(3:5)
     alr(1) = a2 + (2.d0 * d(2) - 12.d0 * phi * d3(1) &
                   + 4.d0 * d(3) - (1.d0 - 12.d0 * phi) * d3(2)) / 12.d0
     alr(2) = a3 - (4.d0 * d(3) - (1.d0 - 12.d0 * phi) * d3(2) &
@@ -97,16 +102,22 @@ contains
     integer(kind=4), intent(in), value :: id_tvd
     real(8), intent(in), value         :: sensor,a2, a3
     real(8), intent(in), device        :: d(5)
-    real(8) delta1, delta2, delta3, dl, dr, alr(2)
-    delta1 = d(2) - d33(d(1), d(2), d(3)) / 6.d0
+    real(8) delta2, alr(2)
     delta2 = d(3) - d33(d(2), d(3), d(4)) / 6.d0
-    delta3 = d(4) - d33(d(3), d(4), d(5)) / 6.d0
-    dl     = minmod(delta1, 4.d0 * delta2)
-    dr     = minmod(delta2, 4.d0 * delta1)
-    alr(1) = a2 + (dl + 2.d0 * dr) / 6.d0
-    dl     = minmod(delta2, 4.d0 * delta3)
-    dr     = minmod(delta3, 4.d0 * delta2)
-    alr(2) = a3 - (dr + 2.d0 * dl) / 6.d0
+    block
+      real(8) delta1, dl, dr
+      delta1 = d(2) - d33(d(1), d(2), d(3)) / 6.d0
+      dl = minmod(delta1, 4.d0 * delta2)
+      dr = minmod(delta2, 4.d0 * delta1)
+      alr(1) = a2 + (dl + 2.d0 * dr) / 6.d0
+    end block
+    block
+      real(8) delta3, dl, dr
+      delta3 = d(4) - d33(d(3), d(4), d(5)) / 6.d0
+      dl = minmod(delta2, 4.d0 * delta3)
+      dr = minmod(delta3, 4.d0 * delta2)
+      alr(2) = a3 - (dr + 2.d0 * dl) / 6.d0
+    end block
   end function MUSCL4thTVD
 
   attributes(device) function MUSCL4thThreshold(id_tvd, sensor, a2, a3, d) result(alr)

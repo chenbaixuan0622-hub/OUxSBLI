@@ -33,8 +33,8 @@ contains
   attributes(device) function flux_KEEP6(id_scheme, id, rho, u, v, w, p, Normal, sensor) result(F)
     integer(kind=2), intent(in), value :: id_scheme
     integer, intent(in), value         :: id
-    real(8), intent(in), dimension(6)  :: rho, u, v, w, p
-    real(8), intent(in), dimension(5)  :: Normal
+    real(8), intent(in), contiguous    :: rho(6), u(6), v(6), w(6), p(6)
+    real(8), intent(in), contiguous    :: Normal(5)
     real(8), intent(in), value         :: sensor
     real(8) F(5)
     F = KEEP6(id, rho, u, v, w, p, Normal)
@@ -43,8 +43,8 @@ contains
   attributes(device) function flux_KEEP4(id_scheme, id, rho, u, v, w, p, Normal, sensor) result(F)
     integer(kind=2), intent(in), value :: id_scheme
     integer, intent(in), value         :: id
-    real(8), intent(in), dimension(4)  :: rho, u, v, w, p
-    real(8), intent(in), dimension(5)  :: Normal
+    real(8), intent(in), contiguous    :: rho(4), u(4), v(4), w(4), p(4)
+    real(8), intent(in), contiguous    :: Normal(5)
     real(8), intent(in), value         :: sensor
     real(8) F(5)
     F = KEEP4(id, rho, u, v, w, p, Normal)
@@ -53,8 +53,8 @@ contains
   attributes(device) function flux_KEEP2(id_scheme, id, rho, u, v, w, p, Normal, sensor) result(F)
     integer(kind=2), intent(in), value :: id_scheme
     integer, intent(in), value         :: id
-    real(8), intent(in), dimension(2)  :: rho, u, v, w, p
-    real(8), intent(in), dimension(5)  :: Normal
+    real(8), intent(in), contiguous    :: rho(2), u(2), v(2), w(2), p(2)
+    real(8), intent(in), contiguous    :: Normal(5)
     real(8), intent(in), value         :: sensor
     real(8) F(5)
     F = KEEP2(id, rho, u, v, w, p, Normal)
@@ -62,25 +62,24 @@ contains
 
   attributes(device) function flux_SLAU6(id_scheme, id, rho, u, v, w, p, Normal, sensor) result(F)
     use mod_globals, only : id_slau
-    real(kind=2), intent(in), value   :: id_scheme
-    integer, intent(in), value        :: id
-    real(8), intent(in), dimension(6) :: rho, u, v, w, p
-    real(8), intent(in), dimension(5) :: Normal
-    real(8), intent(in), value        :: sensor
-    real(8) wiggle, rho2(2), p2(2), V2(2,3), p4(4), F(5)
-    p4(:)  = p(2:5)
-    wiggle = wiggle_detector(p4)
+    real(kind=2), intent(in), value :: id_scheme
+    integer, intent(in), value      :: id
+    real(8), intent(in), contiguous :: rho(6), u(6), v(6), w(6), p(6)
+    real(8), intent(in), contiguous :: Normal(5)
+    real(8), intent(in), value      :: sensor
+    real(8) wiggle, rho2(2), p2(2), V2(2,3), F(5)
+    wiggle = wiggle_detector(p(2:5))
     call calc_6points(sensor, rho, u, v, w, p, rho2, p2, V2)
     F = SLAU(id_slau, id, rho2, p2, V2, Normal, wiggle, sensor)
   end function flux_SLAU6
 
   attributes(device) function flux_SLAU4(id_scheme, id, rho, u, v, w, p, Normal, sensor) result(F)
     use mod_globals, only : id_slau
-    real(kind=2), intent(in), value   :: id_scheme
-    integer, intent(in), value        :: id
-    real(8), intent(in), dimension(4) :: rho, u, v, w, p
-    real(8), intent(in), dimension(5) :: Normal
-    real(8), intent(in), value        :: sensor
+    real(kind=2), intent(in), value :: id_scheme
+    integer, intent(in), value      :: id
+    real(8), intent(in), contiguous :: rho(4), u(4), v(4), w(4), p(4)
+    real(8), intent(in), contiguous :: Normal(5)
+    real(8), intent(in), value      :: sensor
     real(8) wiggle, rho2(2), p2(2), V2(2,3), F(5)
     wiggle = wiggle_detector(p)
     call calc_4points(sensor, rho, u, v, w, p, rho2, p2, V2)
@@ -89,11 +88,11 @@ contains
 
   attributes(device) function flux_SLAU2(id_scheme, id, rho, u, v, w, p, Normal, sensor) result(F)
     use mod_globals, only : id_slau
-    real(kind=2), intent(in), value   :: id_scheme
-    integer, intent(in), value        :: id
-    real(8), intent(in), dimension(2) :: rho, u, v, w, p
-    real(8), intent(in), dimension(5) :: Normal
-    real(8), intent(in), value        :: sensor
+    real(kind=2), intent(in), value :: id_scheme
+    integer, intent(in), value      :: id
+    real(8), intent(in), contiguous :: rho(2), u(2), v(2), w(2), p(2)
+    real(8), intent(in), contiguous :: Normal(5)
+    real(8), intent(in), value      :: sensor
     real(8) V2(2,3), F(5)
     V2(:,1) = u
     V2(:,2) = v
@@ -104,8 +103,8 @@ contains
   attributes(device) function flux_Roe6(id_scheme, id, rho, u, v, w, p, Normal, sensor) result(F)
     integer(kind=4), intent(in), value :: id_scheme
     integer, intent(in), value         :: id
-    real(8), intent(in), dimension(6)  :: rho, u, v, w, p
-    real(8), intent(in), dimension(5)  :: Normal
+    real(8), intent(in), contiguous    :: rho(6), u(6), v(6), w(6), p(6)
+    real(8), intent(in), contiguous    :: Normal(5)
     real(8), intent(in), value         :: sensor
     real(8) rho2(2), p2(2), V2(2,3), p4(4), F(5)
     call calc_6points(sensor, rho, u, v, w, p, rho2, p2, V2)
@@ -115,8 +114,8 @@ contains
   attributes(device) function flux_Roe4(id_scheme, id, rho, u, v, w, p, Normal, sensor) result(F)
     integer(kind=4), intent(in), value :: id_scheme
     integer, intent(in), value         :: id
-    real(8), intent(in), dimension(4)  :: rho, u, v, w, p
-    real(8), intent(in), dimension(5)  :: Normal
+    real(8), intent(in), contiguous    :: rho(4), u(4), v(4), w(4), p(4)
+    real(8), intent(in), contiguous    :: Normal(5)
     real(8), intent(in), value         :: sensor
     real(8) rho2(2), p2(2), V2(2,3), F(5)
     call calc_4points(sensor, rho, u, v, w, p, rho2, p2, V2)
@@ -126,8 +125,8 @@ contains
   attributes(device) function flux_Roe2(id_scheme, id, rho, u, v, w, p, Normal, sensor) result(F)
     integer(kind=4), intent(in), value :: id_scheme
     integer, intent(in), value         :: id
-    real(8), intent(in), dimension(2)  :: rho, u, v, w, p
-    real(8), intent(in), dimension(5)  :: Normal
+    real(8), intent(in), contiguous    :: rho(2), u(2), v(2), w(2), p(2)
+    real(8), intent(in), contiguous    :: Normal(5)
     real(8), intent(in), value         :: sensor
     real(8) V2(2,3), F(5)
     V2(:,1) = u
@@ -137,11 +136,11 @@ contains
   end function flux_Roe2
 
   attributes(device) function flux_Weighted6(id_scheme, id, rho, u, v, w, p, Normal, sensor) result(F)
-    real(4), intent(in), value        :: id_scheme
-    integer, intent(in), value        :: id
-    real(8), intent(in), dimension(6) :: rho, u, v, w, p
-    real(8), intent(in), dimension(5) :: Normal
-    real(8), intent(in), value        :: sensor
+    real(4), intent(in), value      :: id_scheme
+    integer, intent(in), value      :: id
+    real(8), intent(in), contiguous :: rho(6), u(6), v(6), w(6), p(6)
+    real(8), intent(in), contiguous :: Normal(5)
+    real(8), intent(in), value      :: sensor
     real(8) F(5)
     real(2) slau
     F = (1.d0 - sensor) * KEEP6(id, rho, u, v, w, p, Normal) &
@@ -149,11 +148,11 @@ contains
   end function flux_Weighted6
 
   attributes(device) function flux_Weighted4(id_scheme, id, rho, u, v, w, p, Normal, sensor) result(F)
-    real(4), intent(in), value        :: id_scheme
-    integer, intent(in), value        :: id
-    real(8), intent(in), dimension(4) :: rho, u, v, w, p
-    real(8), intent(in), dimension(5) :: Normal
-    real(8), intent(in), value        :: sensor
+    real(4), intent(in), value      :: id_scheme
+    integer, intent(in), value      :: id
+    real(8), intent(in), contiguous :: rho(4), u(4), v(4), w(4), p(4)
+    real(8), intent(in), contiguous :: Normal(5)
+    real(8), intent(in), value      :: sensor
     real(8) F(5)
     real(2) slau
     F = (1.d0 - sensor) * KEEP4(id, rho, u, v, w, p, Normal) &
@@ -162,11 +161,11 @@ contains
 
   attributes(device) function flux_Weighted2(id_scheme, id, rho, u, v, w, p, Normal, sensor) result(F)
     use mod_globals, only : id_slau
-    real(4), intent(in), value        :: id_scheme
-    integer, intent(in), value        :: id
-    real(8), intent(in), dimension(2) :: rho, u, v, w, p
-    real(8), intent(in), dimension(5) :: Normal
-    real(8), intent(in), value        :: sensor
+    real(4), intent(in), value      :: id_scheme
+    integer, intent(in), value      :: id
+    real(8), intent(in), contiguous :: rho(2), u(2), v(2), w(2), p(2)
+    real(8), intent(in), contiguous :: Normal(5)
+    real(8), intent(in), value      :: sensor
     real(8) V2(2,3), F(5)
     V2(:,1) = u
     V2(:,2) = v
@@ -176,11 +175,11 @@ contains
   end function flux_Weighted2
 
   attributes(device) function flux_Threshold6(id_scheme, id, rho, u, v, w, p, Normal, sensor) result(F)
-    real(8), intent(in), value        :: id_scheme
-    integer, intent(in), value        :: id
-    real(8), intent(in), dimension(6) :: rho, u, v, w, p
-    real(8), intent(in), dimension(5) :: Normal
-    real(8), intent(in), value        :: sensor
+    real(8), intent(in), value      :: id_scheme
+    integer, intent(in), value      :: id
+    real(8), intent(in), contiguous :: rho(6), u(6), v(6), w(6), p(6)
+    real(8), intent(in), contiguous :: Normal(5)
+    real(8), intent(in), value      :: sensor
     real(8) F(5)
     real(2) slau
     if (sensor < threshold) then
@@ -191,11 +190,11 @@ contains
   end function flux_Threshold6
 
   attributes(device) function flux_Threshold4(id_scheme, id, rho, u, v, w, p, Normal, sensor) result(F)
-    real(8), intent(in), value        :: id_scheme
-    integer, intent(in), value        :: id
-    real(8), intent(in), dimension(4) :: rho, u, v, w, p
-    real(8), intent(in), dimension(5) :: Normal
-    real(8), intent(in), value        :: sensor
+    real(8), intent(in), value      :: id_scheme
+    integer, intent(in), value      :: id
+    real(8), intent(in), contiguous :: rho(4), u(4), v(4), w(4), p(4)
+    real(8), intent(in), contiguous :: Normal(5)
+    real(8), intent(in), value      :: sensor
     real(8) F(5)
     real(2) slau
     if (sensor < threshold) then
@@ -207,11 +206,11 @@ contains
 
   attributes(device) function flux_Threshold2(id_scheme, id, rho, u, v, w, p, Normal, sensor) result(F)
     use mod_globals, only : id_slau
-    real(8), intent(in), value        :: id_scheme
-    integer, intent(in), value        :: id
-    real(8), intent(in), dimension(2) :: rho, u, v, w, p
-    real(8), intent(in), dimension(5) :: Normal
-    real(8), intent(in), value        :: sensor
+    real(8), intent(in), value      :: id_scheme
+    integer, intent(in), value      :: id
+    real(8), intent(in), contiguous :: rho(2), u(2), v(2), w(2), p(2)
+    real(8), intent(in), contiguous :: Normal(5)
+    real(8), intent(in), value      :: sensor
     real(8) V2(2,3), F(5)
     V2(:,1) = u
     V2(:,2) = v
@@ -242,25 +241,44 @@ contains
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     fdx = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    if (i <= nx-1) then
-      rho(it:it+1,jt,kt) = Q(1,i:i+1,j,k)
-        u(it:it+1,jt,kt) = Q(2,i:i+1,j,k)
-        v(it:it+1,jt,kt) = Q(3,i:i+1,j,k)
-        w(it:it+1,jt,kt) = Q(4,i:i+1,j,k)
-        p(it:it+1,jt,kt) = Q(5,i:i+1,j,k)
-    endif
-    if (i <= nx-3 .and. it == blockDim%x) then
-      rho(it+2:it+3,jt,kt) = Q(1,i+2:i+3,j,k)
-        u(it+2:it+3,jt,kt) = Q(2,i+2:i+3,j,k)
-        v(it+2:it+3,jt,kt) = Q(3,i+2:i+3,j,k)
-        w(it+2:it+3,jt,kt) = Q(4,i+2:i+3,j,k)
-        p(it+2:it+3,jt,kt) = Q(5,i+2:i+3,j,k)
-    elseif (3 <= i .and. it == 1) then
-      rho(it-2:it-1,jt,kt) = Q(1,i-2:i-1,j,k)
-        u(it-2:it-1,jt,kt) = Q(2,i-2:i-1,j,k)
-        v(it-2:it-1,jt,kt) = Q(3,i-2:i-1,j,k)
-        w(it-2:it-1,jt,kt) = Q(4,i-2:i-1,j,k)
-        p(it-2:it-1,jt,kt) = Q(5,i-2:i-1,j,k)
+    rho(it,jt,kt) = Q(1,i,j,k)
+      u(it,jt,kt) = Q(2,i,j,k)
+      v(it,jt,kt) = Q(3,i,j,k)
+      w(it,jt,kt) = Q(4,i,j,k)
+      p(it,jt,kt) = Q(5,i,j,k)
+    if (it == blockDim%x) then ! 2nd-order
+      rho(it+1,jt,kt) = Q(1,i+1,j,k)
+        u(it+1,jt,kt) = Q(2,i+1,j,k)
+        v(it+1,jt,kt) = Q(3,i+1,j,k)
+        w(it+1,jt,kt) = Q(4,i+1,j,k)
+        p(it+1,jt,kt) = Q(5,i+1,j,k)
+      if (i <= nx-3) then ! 6th-order
+        rho(it+2:it+3,jt,kt) = Q(1,i+2:i+3,j,k)
+          u(it+2:it+3,jt,kt) = Q(2,i+2:i+3,j,k)
+          v(it+2:it+3,jt,kt) = Q(3,i+2:i+3,j,k)
+          w(it+2:it+3,jt,kt) = Q(4,i+2:i+3,j,k)
+          p(it+2:it+3,jt,kt) = Q(5,i+2:i+3,j,k)
+      elseif (i <= nx-2) then ! 4th-order
+        rho(it+2,jt,kt) = Q(1,i+2,j,k)
+          u(it+2,jt,kt) = Q(2,i+2,j,k)
+          v(it+2,jt,kt) = Q(3,i+2,j,k)
+          w(it+2,jt,kt) = Q(4,i+2,j,k)
+          p(it+2,jt,kt) = Q(5,i+2,j,k)
+      endif
+    elseif (it == 1) then
+      if (3 <= i) then ! 6th-order
+        rho(it-2:it-1,jt,kt) = Q(1,i-2:i-1,j,k)
+          u(it-2:it-1,jt,kt) = Q(2,i-2:i-1,j,k)
+          v(it-2:it-1,jt,kt) = Q(3,i-2:i-1,j,k)
+          w(it-2:it-1,jt,kt) = Q(4,i-2:i-1,j,k)
+          p(it-2:it-1,jt,kt) = Q(5,i-2:i-1,j,k)
+      elseif (2 <= i) then ! 4th-order
+        rho(it-1,jt,kt) = Q(1,i-1,j,k)
+          u(it-1,jt,kt) = Q(2,i-1,j,k)
+          v(it-1,jt,kt) = Q(3,i-1,j,k)
+          w(it-1,jt,kt) = Q(4,i-1,j,k)
+          p(it-1,jt,kt) = Q(5,i-1,j,k)
+      endif
     endif
     call syncthreads()
     if (3 <= i .and. i <= nx-3 .and. 8 <= kind(id_accuracy)) then
@@ -285,7 +303,6 @@ contains
     real(8), intent(out), device :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt
     integer(kind=2) id_slau_wall
-    real(8), device :: V2(2,3)
     real(8), dimension(-1:threadsF%y+3,threadsF%x,threadsF%z), shared :: rho, u, v, w, p
     real(8) fdy
     it = threadIdx%x
@@ -296,25 +313,44 @@ contains
     k = (blockIdx%z-1)*blockDim%z + kt + 1
     fdy = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    if (j <= ny-1) then
-      rho(jt:jt+1,it,kt) = Q(1,i,j:j+1,k)
-        u(jt:jt+1,it,kt) = Q(2,i,j:j+1,k)
-        v(jt:jt+1,it,kt) = Q(3,i,j:j+1,k)
-        w(jt:jt+1,it,kt) = Q(4,i,j:j+1,k)
-        p(jt:jt+1,it,kt) = Q(5,i,j:j+1,k)
-    endif
-    if (j <= ny-3 .and. jt == blockDim%y) then
-      rho(jt+2:jt+3,it,kt) = Q(1,i,j+2:j+3,k)
-        u(jt+2:jt+3,it,kt) = Q(2,i,j+2:j+3,k)
-        v(jt+2:jt+3,it,kt) = Q(3,i,j+2:j+3,k)
-        w(jt+2:jt+3,it,kt) = Q(4,i,j+2:j+3,k)
-        p(jt+2:jt+3,it,kt) = Q(5,i,j+2:j+3,k)
+    rho(jt,it,kt) = Q(1,i,j,k)
+      u(jt,it,kt) = Q(2,i,j,k)
+      v(jt,it,kt) = Q(3,i,j,k)
+      w(jt,it,kt) = Q(4,i,j,k)
+      p(jt,it,kt) = Q(5,i,j,k)
+    if (jt == blockDim%y) then ! 2nd-order
+      rho(jt+1,it,kt) = Q(1,i,j+1,k)
+        u(jt+1,it,kt) = Q(2,i,j+1,k)
+        v(jt+1,it,kt) = Q(3,i,j+1,k)
+        w(jt+1,it,kt) = Q(4,i,j+1,k)
+        p(jt+1,it,kt) = Q(5,i,j+1,k)
+      if (j <= ny-3) then ! 6th-order
+        rho(jt+2:jt+3,it,kt) = Q(1,i,j+2:j+3,k)
+          u(jt+2:jt+3,it,kt) = Q(2,i,j+2:j+3,k)
+          v(jt+2:jt+3,it,kt) = Q(3,i,j+2:j+3,k)
+          w(jt+2:jt+3,it,kt) = Q(4,i,j+2:j+3,k)
+          p(jt+2:jt+3,it,kt) = Q(5,i,j+2:j+3,k)
+      elseif (j <= ny-2) then ! 4th-order
+        rho(jt+2,it,kt) = Q(1,i,j+2,k)
+          u(jt+2,it,kt) = Q(2,i,j+2,k)
+          v(jt+2,it,kt) = Q(3,i,j+2,k)
+          w(jt+2,it,kt) = Q(4,i,j+2,k)
+          p(jt+2,it,kt) = Q(5,i,j+2,k)
+      endif
     elseif (3 <= j .and. jt == 1) then
-      rho(jt-2:jt-1,it,kt) = Q(1,i,j-2:j-1,k)
-        u(jt-2:jt-1,it,kt) = Q(2,i,j-2:j-1,k)
-        v(jt-2:jt-1,it,kt) = Q(3,i,j-2:j-1,k)
-        w(jt-2:jt-1,it,kt) = Q(4,i,j-2:j-1,k)
-        p(jt-2:jt-1,it,kt) = Q(5,i,j-2:j-1,k)
+      if (3 <= j) then ! 6th-order
+        rho(jt-2:jt-1,it,kt) = Q(1,i,j-2:j-1,k)
+          u(jt-2:jt-1,it,kt) = Q(2,i,j-2:j-1,k)
+          v(jt-2:jt-1,it,kt) = Q(3,i,j-2:j-1,k)
+          w(jt-2:jt-1,it,kt) = Q(4,i,j-2:j-1,k)
+          p(jt-2:jt-1,it,kt) = Q(5,i,j-2:j-1,k)
+      elseif (2 <= j) then ! 4th-order
+        rho(jt-1,it,kt) = Q(1,i,j-1,k)
+          u(jt-1,it,kt) = Q(2,i,j-1,k)
+          v(jt-1,it,kt) = Q(3,i,j-1,k)
+          w(jt-1,it,kt) = Q(4,i,j-1,k)
+          p(jt-1,it,kt) = Q(5,i,j-1,k)
+      endif
     endif
     call syncthreads()
     if (3 <= j .and. j <= ny-3 .and. 8 <= kind(id_accuracy)) then
@@ -328,10 +364,13 @@ contains
         F(:,i-1,j,k-1) = flux2(id_scheme,2,rho(jt:jt+1,it,kt),u(jt:jt+1,it,kt),&
                             v(jt:jt+1,it,kt),w(jt:jt+1,it,kt),p(jt:jt+1,it,kt),Normal_y,fdy)
       else
-        V2(:,1) = u(jt:jt+1,it,kt)
-        V2(:,2) = v(jt:jt+1,it,kt)
-        V2(:,3) = w(jt:jt+1,it,kt)
-        F(:,i-1,j,k-1) = SLAU(id_slau_wall,2,rho(jt:jt+1,it,kt),p(jt:jt+1,it,kt),V2,Normal_y)
+        block
+          real(8), device :: V2(2,3)
+          V2(:,1) = u(jt:jt+1,it,kt)
+          V2(:,2) = v(jt:jt+1,it,kt)
+          V2(:,3) = w(jt:jt+1,it,kt)
+          F(:,i-1,j,k-1) = SLAU(id_slau_wall,2,rho(jt:jt+1,it,kt),p(jt:jt+1,it,kt),V2,Normal_y)
+        end block
       endif
     endif
   end subroutine calc_F6
@@ -355,25 +394,44 @@ contains
     k = (blockIdx%z-1)*blockDim%z + kt
     fdz = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    if (k <= nz-1) then
-      rho(kt:kt+1,jt,it) = Q(1,i,j,k:k+1)
-        u(kt:kt+1,jt,it) = Q(2,i,j,k:k+1)
-        v(kt:kt+1,jt,it) = Q(3,i,j,k:k+1)
-        w(kt:kt+1,jt,it) = Q(4,i,j,k:k+1)
-        p(kt:kt+1,jt,it) = Q(5,i,j,k:k+1)
-    endif
-    if (k <= nz-3 .and. kt == blockDim%z) then
-      rho(kt+2:kt+3,jt,it) = Q(1,i,j,k+2:k+3)
-        u(kt+2:kt+3,jt,it) = Q(2,i,j,k+2:k+3)
-        v(kt+2:kt+3,jt,it) = Q(3,i,j,k+2:k+3)
-        w(kt+2:kt+3,jt,it) = Q(4,i,j,k+2:k+3)
-        p(kt+2:kt+3,jt,it) = Q(5,i,j,k+2:k+3)
-    elseif (3 <= k .and. kt == 1) then
-      rho(kt-2:kt-1,jt,it) = Q(1,i,j,k-2:k-1)
-        u(kt-2:kt-1,jt,it) = Q(2,i,j,k-2:k-1)
-        v(kt-2:kt-1,jt,it) = Q(3,i,j,k-2:k-1)
-        w(kt-2:kt-1,jt,it) = Q(4,i,j,k-2:k-1)
-        p(kt-2:kt-1,jt,it) = Q(5,i,j,k-2:k-1)
+    rho(kt,jt,it) = Q(1,i,j,k)
+      u(kt,jt,it) = Q(2,i,j,k)
+      v(kt,jt,it) = Q(3,i,j,k)
+      w(kt,jt,it) = Q(4,i,j,k)
+      p(kt,jt,it) = Q(5,i,j,k)
+    if (kt == blockDim%z) then ! 2nd-order
+      rho(kt+1,jt,it) = Q(1,i,j,k+1)
+        u(kt+1,jt,it) = Q(2,i,j,k+1)
+        v(kt+1,jt,it) = Q(3,i,j,k+1)
+        w(kt+1,jt,it) = Q(4,i,j,k+1)
+        p(kt+1,jt,it) = Q(5,i,j,k+1)
+      if (k <= nz-3) then ! 6th-order
+        rho(kt+2:kt+3,jt,it) = Q(1,i,j,k+2:k+3)
+          u(kt+2:kt+3,jt,it) = Q(2,i,j,k+2:k+3)
+          v(kt+2:kt+3,jt,it) = Q(3,i,j,k+2:k+3)
+          w(kt+2:kt+3,jt,it) = Q(4,i,j,k+2:k+3)
+          p(kt+2:kt+3,jt,it) = Q(5,i,j,k+2:k+3)
+      elseif (k <= nz-2) then ! 4th-order
+        rho(kt+2,jt,it) = Q(1,i,j,k+2)
+          u(kt+2,jt,it) = Q(2,i,j,k+2)
+          v(kt+2,jt,it) = Q(3,i,j,k+2)
+          w(kt+2,jt,it) = Q(4,i,j,k+2)
+          p(kt+2,jt,it) = Q(5,i,j,k+2)
+      endif
+    elseif (kt == 1) then
+      if (3 <= k) then ! 6th-order
+        rho(kt-2:kt-1,jt,it) = Q(1,i,j,k-2:k-1)
+          u(kt-2:kt-1,jt,it) = Q(2,i,j,k-2:k-1)
+          v(kt-2:kt-1,jt,it) = Q(3,i,j,k-2:k-1)
+          w(kt-2:kt-1,jt,it) = Q(4,i,j,k-2:k-1)
+          p(kt-2:kt-1,jt,it) = Q(5,i,j,k-2:k-1)
+      elseif (2 <= k) then ! 4th-order
+        rho(kt-1,jt,it) = Q(1,i,j,k-1)
+          u(kt-1,jt,it) = Q(2,i,j,k-1)
+          v(kt-1,jt,it) = Q(3,i,j,k-1)
+          w(kt-1,jt,it) = Q(4,i,j,k-1)
+          p(kt-1,jt,it) = Q(5,i,j,k-1)
+      endif
     endif
     call syncthreads()
     if (3 <= k .and. k <= nz-3 .and. 8 <= kind(id_accuracy)) then
@@ -407,20 +465,25 @@ contains
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     fdx = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    if (i <= nx-1) then
-      rho(it:it+1,jt,kt) = Q(1,i:i+1,j,k)
-        u(it:it+1,jt,kt) = Q(2,i:i+1,j,k)
-        v(it:it+1,jt,kt) = Q(3,i:i+1,j,k)
-        w(it:it+1,jt,kt) = Q(4,i:i+1,j,k)
-        p(it:it+1,jt,kt) = Q(5,i:i+1,j,k)
-    endif
-    if (i <= nx-2 .and. it == blockDim%x) then
-      rho(it+2,jt,kt) = Q(1,i+2,j,k)
-        u(it+2,jt,kt) = Q(2,i+2,j,k)
-        v(it+2,jt,kt) = Q(3,i+2,j,k)
-        w(it+2,jt,kt) = Q(4,i+2,j,k)
-        p(it+2,jt,kt) = Q(5,i+2,j,k)
-    elseif (2 <= i .and. it == 1) then
+    rho(it,jt,kt) = Q(1,i,j,k)
+      u(it,jt,kt) = Q(2,i,j,k)
+      v(it,jt,kt) = Q(3,i,j,k)
+      w(it,jt,kt) = Q(4,i,j,k)
+      p(it,jt,kt) = Q(5,i,j,k)
+    if (it == blockDim%x) then ! 2nd-order
+      rho(it+1,jt,kt) = Q(1,i+1,j,k)
+        u(it+1,jt,kt) = Q(2,i+1,j,k)
+        v(it+1,jt,kt) = Q(3,i+1,j,k)
+        w(it+1,jt,kt) = Q(4,i+1,j,k)
+        p(it+1,jt,kt) = Q(5,i+1,j,k)
+      if (i <= nx-2) then ! 4th-order
+        rho(it+2,jt,kt) = Q(1,i+2,j,k)
+          u(it+2,jt,kt) = Q(2,i+2,j,k)
+          v(it+2,jt,kt) = Q(3,i+2,j,k)
+          w(it+2,jt,kt) = Q(4,i+2,j,k)
+          p(it+2,jt,kt) = Q(5,i+2,j,k)
+      endif
+    elseif (2 <= i .and. it == 1) then ! 4th-order
       rho(it-1,jt,kt) = Q(1,i-1,j,k)
         u(it-1,jt,kt) = Q(2,i-1,j,k)
         v(it-1,jt,kt) = Q(3,i-1,j,k)
@@ -447,7 +510,6 @@ contains
     real(8), intent(out), device :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt
     integer(kind=2) id_slau_wall
-    real(8), device :: V2(2,3)
     real(8), dimension(0:threadsF%y+2,threadsF%x,threadsF%z), shared :: rho, u, v, w, p
     real(8) fdy
     it = threadIdx%x
@@ -458,20 +520,25 @@ contains
     k = (blockIdx%z-1)*blockDim%z + kt + 1
     fdy = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    if (j <= ny-1) then
-      rho(jt:jt+1,it,kt) = Q(1,i,j:j+1,k)
-        u(jt:jt+1,it,kt) = Q(2,i,j:j+1,k)
-        v(jt:jt+1,it,kt) = Q(3,i,j:j+1,k)
-        w(jt:jt+1,it,kt) = Q(4,i,j:j+1,k)
-        p(jt:jt+1,it,kt) = Q(5,i,j:j+1,k)
-    endif
-    if (j <= ny-2 .and. jt == blockDim%y) then
-      rho(jt+2,it,kt) = Q(1,i,j+2,k)
-        u(jt+2,it,kt) = Q(2,i,j+2,k)
-        v(jt+2,it,kt) = Q(3,i,j+2,k)
-        w(jt+2,it,kt) = Q(4,i,j+2,k)
-        p(jt+2,it,kt) = Q(5,i,j+2,k)
-    elseif (2 <= j .and. jt == 1) then
+    rho(jt,it,kt) = Q(1,i,j,k)
+      u(jt,it,kt) = Q(2,i,j,k)
+      v(jt,it,kt) = Q(3,i,j,k)
+      w(jt,it,kt) = Q(4,i,j,k)
+      p(jt,it,kt) = Q(5,i,j,k)
+    if (jt == blockDim%y) then ! 2nd-order
+      rho(jt+1,it,kt) = Q(1,i,j+1,k)
+        u(jt+1,it,kt) = Q(2,i,j+1,k)
+        v(jt+1,it,kt) = Q(3,i,j+1,k)
+        w(jt+1,it,kt) = Q(4,i,j+1,k)
+        p(jt+1,it,kt) = Q(5,i,j+1,k)
+      if (j <= ny-2) then ! 4th-order
+        rho(jt+2,it,kt) = Q(1,i,j+2,k)
+          u(jt+2,it,kt) = Q(2,i,j+2,k)
+          v(jt+2,it,kt) = Q(3,i,j+2,k)
+          w(jt+2,it,kt) = Q(4,i,j+2,k)
+          p(jt+2,it,kt) = Q(5,i,j+2,k)
+      endif
+    elseif (2 <= j .and. jt == 1) then ! 4th-order
       rho(jt-1,it,kt) = Q(1,i,j-1,k)
         u(jt-1,it,kt) = Q(2,i,j-1,k)
         v(jt-1,it,kt) = Q(3,i,j-1,k)
@@ -487,10 +554,13 @@ contains
         F(:,i-1,j,k-1) = flux2(id_scheme,2,rho(jt:jt+1,it,kt),u(jt:jt+1,it,kt),&
                             v(jt:jt+1,it,kt),w(jt:jt+1,it,kt),p(jt:jt+1,it,kt),Normal_y,fdy)
       else
-        V2(:,1) = u(jt:jt+1,it,kt)
-        V2(:,2) = v(jt:jt+1,it,kt)
-        V2(:,3) = w(jt:jt+1,it,kt)
-        F(:,i-1,j,k-1) = SLAU(id_slau_wall,2,rho(jt:jt+1,it,kt),p(jt:jt+1,it,kt),V2,Normal_y)
+        block
+          real(8), device :: V2(2,3)
+          V2(:,1) = u(jt:jt+1,it,kt)
+          V2(:,2) = v(jt:jt+1,it,kt)
+          V2(:,3) = w(jt:jt+1,it,kt)
+          F(:,i-1,j,k-1) = SLAU(id_slau_wall,2,rho(jt:jt+1,it,kt),p(jt:jt+1,it,kt),V2,Normal_y)
+        end block
       endif
     endif
   end subroutine calc_F4
@@ -514,20 +584,25 @@ contains
     k = (blockIdx%z-1)*blockDim%z + kt
     fdz = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    if (k <= nz-1) then
-      rho(kt:kt+1,jt,it) = Q(1,i,j,k:k+1)
-        u(kt:kt+1,jt,it) = Q(2,i,j,k:k+1)
-        v(kt:kt+1,jt,it) = Q(3,i,j,k:k+1)
-        w(kt:kt+1,jt,it) = Q(4,i,j,k:k+1)
-        p(kt:kt+1,jt,it) = Q(5,i,j,k:k+1)
-    endif
-    if (k <= nz-2 .and. kt == blockDim%z) then
-      rho(kt+2,jt,it) = Q(1,i,j,k+2)
-        u(kt+2,jt,it) = Q(2,i,j,k+2)
-        v(kt+2,jt,it) = Q(3,i,j,k+2)
-        w(kt+2,jt,it) = Q(4,i,j,k+2)
-        p(kt+2,jt,it) = Q(5,i,j,k+2)
-    elseif (2 <= k .and. kt == 1) then
+    rho(kt,jt,it) = Q(1,i,j,k)
+      u(kt,jt,it) = Q(2,i,j,k)
+      v(kt,jt,it) = Q(3,i,j,k)
+      w(kt,jt,it) = Q(4,i,j,k)
+      p(kt,jt,it) = Q(5,i,j,k)
+    if (kt == blockDim%z) then ! 2nd-order
+      rho(kt+1,jt,it) = Q(1,i,j,k+1)
+        u(kt+1,jt,it) = Q(2,i,j,k+1)
+        v(kt+1,jt,it) = Q(3,i,j,k+1)
+        w(kt+1,jt,it) = Q(4,i,j,k+1)
+        p(kt+1,jt,it) = Q(5,i,j,k+1)
+      if (k <= nz-2) then ! 4th-order
+        rho(kt+2,jt,it) = Q(1,i,j,k+2)
+          u(kt+2,jt,it) = Q(2,i,j,k+2)
+          v(kt+2,jt,it) = Q(3,i,j,k+2)
+          w(kt+2,jt,it) = Q(4,i,j,k+2)
+          p(kt+2,jt,it) = Q(5,i,j,k+2)
+      endif
+    elseif (2 <= k .and. kt == 1) then ! 4th-order
       rho(kt-1,jt,it) = Q(1,i,j,k-1)
         u(kt-1,jt,it) = Q(2,i,j,k-1)
         v(kt-1,jt,it) = Q(3,i,j,k-1)
@@ -552,21 +627,34 @@ contains
     real(8), intent(in), dimension(5,nx,ny,nz), device :: Q
     real(8), intent(in), dimension(nx,ny,nz), device   :: sensor
     real(8), intent(out), device :: E(5,nx-1,ny-2,nz-2)
-    integer i, j, k
-    real(8), device :: rho(2), u(2), v(2), w(2), p(2)
+    integer i, j, k, it, jt, kt
+    real(8), dimension(0:threadsE%x+2,threadsE%y,threadsE%z), shared :: rho, u, v, w, p
     real(8) fdx
-    i  = (blockIdx%x-1)*blockDim%x + threadIdx%x
-    j  = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
-    k  = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
+    it = threadIdx%x
+    jt = threadIdx%y
+    kt = threadIdx%z
+    i  = (blockIdx%x-1)*blockDim%x + it
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    k  = (blockIdx%z-1)*blockDim%z + kt + 1
     fdx = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
-    rho = Q(1,i:i+1,j,k)
-    u   = Q(2,i:i+1,j,k)
-    v   = Q(3,i:i+1,j,k)
-    w   = Q(4,i:i+1,j,k)
-    p   = Q(5,i:i+1,j,k)
-    E(:,i,j-1,k-1) = flux2(id_scheme, 1, rho, u, v, w, p, Normal_x, fdx)
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
+    rho(it,jt,kt) = Q(1,i,j,k)
+      u(it,jt,kt) = Q(2,i,j,k)
+      v(it,jt,kt) = Q(3,i,j,k)
+      w(it,jt,kt) = Q(4,i,j,k)
+      p(it,jt,kt) = Q(5,i,j,k)
+    if (it == blockDim%x) then
+      rho(it+1,jt,kt) = Q(1,i+1,j,k)
+        u(it+1,jt,kt) = Q(2,i+1,j,k)
+        v(it+1,jt,kt) = Q(3,i+1,j,k)
+        w(it+1,jt,kt) = Q(4,i+1,j,k)
+        p(it+1,jt,kt) = Q(5,i+1,j,k)
+    endif
+    call syncthreads()
+    E(:,i,j-1,k-1) = flux2(id_scheme,1,rho(it:it+1,jt,kt),u(it:it+1,jt,kt),&
+                           v(it:it+1,jt,kt),w(it:it+1,jt,kt),p(it:it+1,jt,kt),Normal_x,fdx)
   end subroutine calc_E2
-  
+
   attributes(global) subroutine calc_F2(id_accuracy, nx, ny, nz, Q, sensor, F)
     use mod_globals, only  : id_scheme, slau_wall
     use mod_constant, only : Normal_y
@@ -575,26 +663,42 @@ contains
     real(8), intent(in), dimension(5,nx,ny,nz), device :: Q
     real(8), intent(in), dimension(nx,ny,nz), device   :: sensor
     real(8), intent(out), device :: F(5,nx-2,ny-1,nz-2)
-    integer i, j, k
+    integer i, j, k, it, jt, kt
     integer(kind=2) id_slau_wall
-    real(8), device :: rho(2), u(2), v(2), w(2), p(2), V2(2,3)
+    real(8), dimension(0:threadsF%y+2,threadsF%x,threadsF%z), shared :: rho, u, v, w, p
     real(8) fdy
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
+    it = threadIdx%x
+    jt = threadIdx%y
+    kt = threadIdx%z
+    i = (blockIdx%x-1)*blockDim%x + it + 1
+    j = (blockIdx%y-1)*blockDim%y + jt
+    k = (blockIdx%z-1)*blockDim%z + kt + 1
     fdy = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
-    rho = Q(1,i,j:j+1,k)
-    u   = Q(2,i,j:j+1,k)
-    v   = Q(3,i,j:j+1,k)
-    w   = Q(4,i,j:j+1,k)
-    p   = Q(5,i,j:j+1,k)
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
+    rho(jt,it,kt) = Q(1,i,j,k)
+      u(jt,it,kt) = Q(2,i,j,k)
+      v(jt,it,kt) = Q(3,i,j,k)
+      w(jt,it,kt) = Q(4,i,j,k)
+      p(jt,it,kt) = Q(5,i,j,k)
+    if (jt == blockDim%y) then
+      rho(jt+1,it,kt) = Q(1,i,j+1,k)
+        u(jt+1,it,kt) = Q(2,i,j+1,k)
+        v(jt+1,it,kt) = Q(3,i,j+1,k)
+        w(jt+1,it,kt) = Q(4,i,j+1,k)
+        p(jt+1,it,kt) = Q(5,i,j+1,k)
+    endif
+    call syncthreads()
     if (kind(slau_wall) /= 4) then
-      F(:,i-1,j,k-1) = flux2(id_scheme, 2, rho, u, v, w, p, Normal_y, fdy)
+      F(:,i-1,j,k-1) = flux2(id_scheme,2,rho(jt:jt+1,it,kt),u(jt:jt+1,it,kt),&
+                             v(jt:jt+1,it,kt),w(jt:jt+1,it,kt),p(jt:jt+1,it,kt),Normal_y,fdy)
     else
-      V2(:,1) = u 
-      V2(:,2) = v
-      V2(:,3) = w
-      F(:,i-1,j,k-1) = SLAU(id_slau_wall, 2, rho, p, V2, Normal_y)
+      block
+        real(8), device :: V2(2,3)
+        V2(:,1) = u(jt:jt+1,it,kt)
+        V2(:,2) = v(jt:jt+1,it,kt)
+        V2(:,3) = w(jt:jt+1,it,kt)
+        F(:,i-1,j,k-1) = SLAU(id_slau_wall,2,rho(jt:jt+1,it,kt),p(jt:jt+1,it,kt),V2,Normal_y)
+      end block
     endif
   end subroutine calc_F2
   
@@ -606,19 +710,32 @@ contains
     real(8), intent(in), dimension(5,nx,ny,nz), device :: Q
     real(8), intent(in), dimension(nx,ny,nz), device   :: sensor
     real(8), intent(out), device :: G(5,nx-2,ny-2,nz-1)
-    integer i, j, k
-    real(8), device :: rho(2), u(2), v(2), w(2), p(2)
+    integer i, j, k, it, jt, kt
+    real(8), dimension(0:threadsG%z+2,threadsG%y,threadsG%x), shared :: rho, u, v, w, p
     real(8) :: fdz
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z
+    it = threadIdx%x
+    jt = threadIdx%y
+    kt = threadIdx%z
+    i = (blockIdx%x-1)*blockDim%x + it + 1
+    j = (blockIdx%y-1)*blockDim%y + jt + 1
+    k = (blockIdx%z-1)*blockDim%z + kt
     fdz = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
-    rho = Q(1,i,j,k:k+1)
-    u   = Q(2,i,j,k:k+1)
-    v   = Q(3,i,j,k:k+1)
-    w   = Q(4,i,j,k:k+1)
-    p   = Q(5,i,j,k:k+1)
-    G(:,i-1,j-1,k) = flux2(id_scheme, 3, rho, u, v, w, p, Normal_z, fdz)
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
+    rho(kt,jt,it) = Q(1,i,j,k)
+      u(kt,jt,it) = Q(2,i,j,k)
+      v(kt,jt,it) = Q(3,i,j,k)
+      w(kt,jt,it) = Q(4,i,j,k)
+      p(kt,jt,it) = Q(5,i,j,k)
+    if (kt == blockDim%z) then
+      rho(kt+1,jt,it) = Q(1,i,j,k+1)
+        u(kt+1,jt,it) = Q(2,i,j,k+1)
+        v(kt+1,jt,it) = Q(3,i,j,k+1)
+        w(kt+1,jt,it) = Q(4,i,j,k+1)
+        p(kt+1,jt,it) = Q(5,i,j,k+1)
+    endif
+    call syncthreads()
+    G(:,i-1,j-1,k) = flux2(id_scheme,3,rho(kt:kt+1,jt,it),u(kt:kt+1,jt,it), &
+                           v(kt:kt+1,jt,it),w(kt:kt+1,jt,it),p(kt:kt+1,jt,it),Normal_z,fdz)
   end subroutine calc_G2
 end module calc_flux
 
