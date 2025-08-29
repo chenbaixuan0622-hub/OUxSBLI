@@ -13,7 +13,7 @@ module calc_flux_base
     module procedure calc_EFG_Euler, calc_EFG_visc, calc_EFG_LES
   end interface calc_EFG
 contains
-  subroutine calc_EFG_Euler(id_visc, nx, ny, nz, dx, dy, dz, Jacobian, QJ, E, F, G)
+  subroutine calc_EFG_Euler(id_visc, nx, ny, nz, dx, dy, dz, Jacobian, QJ, E, F, G, seed)
     integer(kind=2), intent(in), value   :: id_visc
     integer, intent(in), value   :: nx, ny, nz
     real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
@@ -24,6 +24,7 @@ contains
     real(8), intent(out), device :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
     real(8), intent(out), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
     real(8), intent(out), device :: G(5,nx-accuracy,ny-accuracy,nz-accuracy+1)
+    integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
     real(8), dimension(5,nx,ny,nz), device :: Q(5,nx,ny,nz)
     real(8), dimension(nx,ny,nz), device   :: sensor
     integer stat
@@ -61,6 +62,7 @@ contains
       call calc_Ev<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, Q, E, seed)
       call calc_Fv<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, Q, F, seed)
       call calc_Gv<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, Q, G, seed)
+      call update_seed(nx, ny, nz, seed)
     else
       call calc_Ev<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, Q, E)
       call calc_Fv<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, Q, F)
@@ -70,7 +72,7 @@ contains
   end subroutine calc_EFG_visc
 
   
-  subroutine calc_EFG_LES(id_visc, nx, ny, nz, dx, dy, dz, Jacobian, QJ, E, F, G)
+  subroutine calc_EFG_LES(id_visc, nx, ny, nz, dx, dy, dz, Jacobian, QJ, E, F, G, seed)
     integer(kind=8), intent(in), value :: id_visc
     integer, intent(in), value   :: nx, ny, nz
     real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
@@ -81,6 +83,7 @@ contains
     real(8), intent(out), device :: E(5,nx-accuracy+1,ny-accuracy,nz-accuracy)
     real(8), intent(out), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
     real(8), intent(out), device :: G(5,nx-accuracy,ny-accuracy,nz-accuracy+1)
+    integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
     real(8), dimension(5,nx,ny,nz), device :: Q(5,nx,ny,nz)
     real(8), dimension(nx,ny,nz), device   :: sensor, mut, qc2
     integer stat

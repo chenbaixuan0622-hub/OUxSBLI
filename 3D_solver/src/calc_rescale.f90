@@ -88,8 +88,8 @@ contains
         !do j = 1, ny
         !  print *, "send j=", j, "Q", Qm_cpu(5*(j-1)+1), Qm_cpu(5*(j-1)+2)
         !enddo
+        call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq2(2), ierr)
       endif
-      call MPI_ISEND(Qm, 5*ny, MPI_REAL8, rerank+1, 1, MPI_COMM_WORLD, ireq2(2), ierr)
       !print *, "myrank=", myrank, "send Qre"
     endif
     if (myrank == 0) then
@@ -124,14 +124,21 @@ contains
     character(len=40) filename
     write(filename, "(a)") "data/rescaling.d"
 
-    call MPI_IRECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank, 0, MPI_COMM_WORLD, ireqs(1), ierr)
-    call MPI_IRECV(Qm,  5*ny,        MPI_REAL8, rerank, 1, MPI_COMM_WORLD, ireqs(2), ierr)
-    call MPI_WAITALL(2, ireqs, istats, ierr)
-    stat = cudaDeviceSynchronize()
-    stat = cudaMemcpy(Qm_cpu,  Qm,  5*ny,        cudaMemcpyDeviceToHost)
-    if (stat /= cudaSuccess) then
-      print *, "Qm  cudaMemcpy failed:", trim(cudaGetErrorString(stat))
+    if (num == 1) then
+      call MPI_IRECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank, 0, MPI_COMM_WORLD, ireqs(1), ierr)
+      call MPI_IRECV(Qm,  5*ny,        MPI_REAL8, rerank, 1, MPI_COMM_WORLD, ireqs(2), ierr)
+      call MPI_WAITALL(2, ireqs, istats, ierr)
+      stat = cudaDeviceSynchronize()
+      stat = cudaMemcpy(Qm_cpu,  Qm,  5*ny,        cudaMemcpyDeviceToHost)
+      if (stat /= cudaSuccess) then
+        print *, "Qm  cudaMemcpy failed:", trim(cudaGetErrorString(stat))
+      endif
+    else
+      call MPI_IRECV(Qre, 5*ny*(nz-6), MPI_REAL8, rerank, 0, MPI_COMM_WORLD, ireq, ierr)
+      call MPI_WAIT(ireq, istat, ierr)
+      stat = cudaDeviceSynchronize()
     endif
+
     stat = cudaMemcpy(Qre_cpu, Qre, 5*ny*(nz-6), cudaMemcpyDeviceToHost)
     if (stat /= cudaSuccess) then
       print *, "Qre cudaMemcpy failed:", trim(cudaGetErrorString(stat))
