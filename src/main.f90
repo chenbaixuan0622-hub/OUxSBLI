@@ -30,9 +30,9 @@ program main
   allocate(Q(dimension+2,nx,ny,nz), x(nx), dx(nx-1), y(ny), dy(ny-1), z(nz), dz(nz-1), Jacobian(nx,ny))
 
   ! set grid information
+  call set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
+  call set_Jacobian_xy(nx, ny, nz, dx, dy, dz, Jacobian)
   if (mod(myrank,2) == 0) then
-    call set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
-    call set_Jacobian_xy(nx, ny, nz, dx, dy, dz, Jacobian)
     if (kind(id_recal) == 4) then
       write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"
       open(10, file=filename, action="read", form="unformatted", access="sequential", status="old", iostat=ios)
@@ -60,9 +60,6 @@ program main
     else
       write(*,*) "wrong paramater was found"
     endif
-  else
-    call set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
-    call set_Jacobian_y(nx, ny, nz, dx, dy, dz, Jacobian)
   endif
 
   call cpu_time(t_start)
