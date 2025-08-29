@@ -115,18 +115,21 @@ contains
         txz  = mwx + muz
         if (present(seed) .and. id_visc == 1) then
           block
-            real(8) std_t, std_q, over_V
-            real(8), device   :: T(2), rand(4)
+            real(8) std_t, std_q, over_V, Zq
+            real(8), device   :: T(2), rand(4), Z(6), Zx(6)
             real(8), constant :: kb = 1.380649d-23
             T(:)   = Q(5,i:i+1,j,k) / (R * Q(1,i:i+1,j,k))
             over_V = dx(i) * dy(j) * dz(k)
-            std_t  = sqrt(4.d0 * kb * over_V * (mx * (T(1) + T(2))) / (3.d0 * dt))
-            std_q  = sqrt(kb * over_V * (Cp_over_Pr * mx * (T(1)**2 + T(2)**2)) / dt)
-            rand   = box_muller4(seed(i,j,k), seed(i+1,j,k))
-            txx = txx + std_t * rand(1) 
-            txy = txy + std_t * rand(2)
-            txz = txz + std_t * rand(3)
-            kTx = kTx + std_q * rand(4)
+            std_t  = sqrt(kb * over_V / dt * mx * (T(1) + T(2)))
+            std_q  = sqrt(kb * over_V / dt * mx * Cp_over_Pr * (T(1)**2 + T(2)**2))
+            Z   = Z_tilde(seed(i,j,k))
+            Zx  = Z_tilde(seed(i+1,j,k))
+            Z   = 0.5d0 * (Z + Zx)
+            Zq  = Zq_x(seed(i,j,k))
+            txx = txx + std_t * (2.d0 * Z(1) - Z(4) - Z(6)) / 3.d0
+            txy = txy + std_t * Z(2)
+            txz = txz + std_t * Z(3)
+            kTx = kTx + std_q * Zq
           end block
         endif
         utxx = 0.5d0 * (u2(1) + u2(2)) * txx
@@ -400,18 +403,21 @@ contains
         tyz  = mvz + mwy
         if (present(seed) .and. id_visc == 1) then
           block
-            real(8) std_t, std_q, over_V
-            real(8), device   :: T(2), rand(4)
+            real(8) std_t, std_q, over_V, Zq
+            real(8), device   :: T(2), rand(4), Z(6), Zy(6)
             real(8), constant :: kb = 1.380649d-23
             T(:)   = Q(5,i,j:j+1,k) / (R * Q(1,i,j:j+1,k))
             over_V = dx(i) * dy(j) * dz(k)
-            std_t  = sqrt(4.d0 * kb * over_V * (my * (T(1) + T(2))) / (3.d0 * dt))
-            std_q  = sqrt(kb * over_V * (Cp_over_Pr * my * (T(1)**2 + T(2)**2)) / dt)
-            rand   = box_muller4(seed(i,j,k), seed(i,j+1,k))
-            tyx = tyx + std_t * rand(1)
-            tyy = tyy + std_t * rand(2)
-            tyz = tyz + std_t * rand(3)
-            kTy = kTy + std_q * rand(4)
+            std_t  = sqrt(kb * over_V / dt * my * (T(1) + T(2)))
+            std_q  = sqrt(kb * over_V / dt * my * Cp_over_Pr * (T(1)**2 + T(2)**2))
+            Z   = Z_tilde(seed(i,j,k))
+            Zy  = Z_tilde(seed(i,j+1,k))
+            Z   = 0.5d0 * (Z + Zy)
+            Zq  = Zq_y(seed(i,j,k))
+            tyx = tyx + std_t * Z(2)
+            tyy = tyy + std_t * (2.d0 * Z(4) - Z(6) - Z(1)) / 3.d0
+            tyz = tyz + std_t * Z(5)
+            kTy = kTy + std_q * Zq
           end block
         endif
         utyx = 0.5d0 * (u2(1) + u2(2)) * tyx
@@ -687,18 +693,21 @@ contains
         tzz  = 2.d0 * (2.d0 * mwz - mux - mvy) / 3.d0
         if (present(seed) .and. id_visc == 1) then
           block
-            real(8) std_t, std_q, over_V
-            real(8), device :: T(2), rand(4)
+            real(8) std_t, std_q, over_V, Zq
+            real(8), device :: T(2), rand(4), Z(6), Zz(6)
             real(8), constant :: kb = 1.380649d-23
             T(:)   = Q(5,i,j,k:k+1) / (R * Q(1,i,j,k:k+1))
             over_V = dx(i) * dy(j) * dz(k)
-            std_t  = sqrt(4.d0 * kb * over_V * (mz * (T(1) + T(2))) / (3.d0 * dt))
-            std_q  = sqrt(kb * over_V * (Cp_over_Pr * mz * (T(1)**2 + T(2)**2)) / dt)
-            rand   = box_muller4(seed(i,j,k), seed(i,j,k+1))
-            tzx = tzx + std_t * rand(1)
-            tzy = tzy + std_t * rand(2)
-            tzz = tzz + std_t * rand(3)
-            kTz = kTz + std_q * rand(4)
+            std_t  = sqrt(kb * over_V / dt * mz * (T(1) + T(2)))
+            std_q  = sqrt(kb * over_V / dt * mz * Cp_over_Pr * (T(1)**2 + T(2)**2))
+            Z   = Z_tilde(seed(i,j,k))
+            Zz  = Z_tilde(seed(i,j,k+1))
+            Z   = 0.5d0 * (Z + Zz)
+            Zq  = Zq_y(seed(i,j,k))
+            tzx = tzx + std_t * Z(3)
+            tzy = tzy + std_t * Z(5)
+            tzz = tzz + std_t * (2.d0 * Z(6) - Z(1) - Z(4)) / 3.d0
+            kTz = kTz + std_q * Zq
           end block
         endif
         utzx = 0.5d0 * (u2(1) + u2(2)) * tzx
