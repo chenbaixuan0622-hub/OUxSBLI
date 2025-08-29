@@ -9,6 +9,7 @@ module calc_time_dev
   use calc_steps
   use calc_rescale
   use calc_para
+  use calc_rand
   use set
   use print
   implicit none
@@ -73,10 +74,15 @@ contains
     integer, intent(in)                         :: myrank, ny, nz
     real(8), intent(inout), allocatable, device :: Qre(:), Qm(:)
     real(8), intent(inout), allocatable         :: Qm_cpu(:)
-    integer stat, ilen
+    integer stat, ilen, ierr
     type(cudaDeviceProp) prop
-    if (myrank == 0 .or. myrank == rerank) then
-      allocate(Qre(ny*(nz-6)*5), Qm(ny*5))
+    if (mod(myrank,2) == 0) then
+      allocate(Qre(ny*(nz-6)*5), Qm(ny*5), stat=ierr)
+      if (ierr /= 0) then
+        print *, "myrank is ", myrank, " memory allocation failed (Qm)", ierr
+      else
+        print *, "myrank is ", myrank, " memory allocation has completed (Qm)"
+      endif
     elseif (myrank == rerank+1) then
       stat = cudaSetDevice(0)
       stat = cudaGetDeviceProperties(prop, 0)
@@ -104,8 +110,8 @@ contains
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     real(8), allocatable, device :: QJ(:,:,:,:), QJ2(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
     real(8), allocatable, device :: xix(:), etay(:), zetaz(:), Jacobian(:,:)
-    ! forcing !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: fx(:,:,:), fy(:,:,:), fz(:,:,:)
+    ! Landau !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    integer(8), allocatable, device :: seed(:,:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
 
@@ -115,15 +121,17 @@ contains
     print *, "rank", myrank, " has found ", ndevices, " GPU devices"
     if (mod(myrank,2) == 0) then
       call check_gpu(mygpu)
-      allocate(QJ(5,nx,ny,nz), QJ2(5,nx,ny,nz), E(5,nx-1,ny-2,nz-2), F(5,nx-2,ny-1,nz-2), G(5,nx-2,ny-2,nz-1))
-      allocate(xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(nx,ny))
-      print *, "myrank is ", myrank, " memory allocation has completed"
+      allocate(QJ(5,nx,ny,nz), QJ2(5,nx,ny,nz), E(5,nx-1,ny-2,nz-2), F(5,nx-2,ny-1,nz-2), G(5,nx-2,ny-2,nz-1), stat=ierr)
+      allocate(xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(nx,ny), stat=ierr)
+      if (ierr /= 0) then
+        print *, "myrank is ", myrank, " memory allocation failed", ierr
+      else
+        print *, "myrank is ", myrank, " memory allocation has completed"
+      endif
       call pre_calc(nx, ny, nz, myrank, nranks, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q, overlap, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0)
-      if (kind(id_forcing) == 4) then
-        allocate(fx(nx-2,ny-2,nz-2), fy(nx-2,ny-2,nz-2), fz(nx-2,ny-2,nz-2))
-        fx(:,:,:) = 0.d0
-        fy(:,:,:) = 0.d0
-        fz(:,:,:) = 0.d0
+      if (kind(id_LL) == 4) then
+        allocate(seed(nx,ny,nz))
+        call init_seed(nx, ny, nz, seed)
       endif
     else
       call MPI_RECV(ke0,      1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
@@ -142,23 +150,18 @@ contains
           if (kind(id_rescale) == 4) then
             call step_rescale(1, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ, Qm, Qre)
           endif
-          if (kind(id_forcing) == 2) then
-            call nvtxStartRange("calc flux", 1)
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
-            !print *, "myrank is ", myrank, " calc EFG"
-            call nvtxEndRange
-            call nvtxStartRange("calc step", 2)
-            call calc_step1(nx, ny, nz, 1.d0, xix, etay, zetaz, E, F, G, QJ, QJ2)
-            !print *, "myrank is ", myrank, " calc step"
-            call nvtxEndRange
+          call nvtxStartRange("calc flux", 1)
+          if (kind(id_LL) == 4) then
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G, seed)
           else
-            call nvtxStartRange("calc flux", 1)
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G, fx, fy, fz)
-            call nvtxEndRange
-            call nvtxStartRange("calc step", 2)
-            call calc_step1_forcing(nx, ny, nz, 1.d0, xix, etay, zetaz, E, F, G, fx, fy, fz, QJ, QJ2)
-            call nvtxEndRange
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
           endif
+          !print *, "myrank is ", myrank, " calc EFG"
+          call nvtxEndRange
+          call nvtxStartRange("calc step", 2)
+          call calc_step1(nx, ny, nz, 1.d0, xix, etay, zetaz, E, F, G, QJ, QJ2)
+          !print *, "myrank is ", myrank, " calc step"
+          call nvtxEndRange
           if (ndevices >= 2 .and. kind(id_exchange) == 4) then
             call nvtxStartRange("exchange", 3)
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ2)
@@ -166,9 +169,11 @@ contains
           endif
           if (kind(id_rescale) == 4) then
             call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
+            call nvtxStartRange("set bc", 4)
+          else
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJ2)
           endif
-          call nvtxStartRange("set bc", 4)
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
           !print *, "myrank is ", myrank, " set bc"
           call nvtxEndRange
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
@@ -181,20 +186,21 @@ contains
           if (kind(id_rescale) == 4) then
             call step_rescale(2, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ2, Qm, Qre)
           endif
-          if (kind(id_forcing) == 2) then
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G)
-            call calc_step2_3(nx, ny, nz, 0.75d0, 0.25d0, 0.25d0, 1.d0, xix, etay, zetaz, E, F, G, QJ, QJ2)
+          if (kind(id_LL) == 4) then
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G, seed)
           else
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G, fx, fy, fz)
-            call calc_step2_3_forcing(nx, ny, nz, 0.75d0, 0.25d0, 0.25d0, 1.d0, xix, etay, zetaz, E, F, G, fx, fy, fz, QJ, QJ2)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G)
           endif
+          call calc_step2_3(nx, ny, nz, 0.75d0, 0.25d0, 0.25d0, 1.d0, xix, etay, zetaz, E, F, G, QJ, QJ2)
           if (ndevices >= 2 .and. kind(id_exchange) == 4) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ2)
           endif
           if (kind(id_rescale) == 4) then
             call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
+          else
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJ2)
           endif
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJ2, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call rescale_recv_send(2, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
@@ -203,31 +209,36 @@ contains
           if (kind(id_rescale) == 4) then
             call step_rescale(3, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ2, Qm, Qre)
           endif
-          if (kind(id_forcing) == 2) then
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G)
-            call calc_step2_3(nx, ny, nz, 2.d0, 1.d0, 2.d0, 3.d0, xix, etay, zetaz, E, F, G, QJ2, QJ)
+          if (kind(id_LL) == 4) then
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G, seed)
           else
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G, fx, fy, fz)
-            call calc_step2_3_forcing(nx, ny, nz, 2.d0, 1.d0, 2.d0, 3.d0, xix, etay, zetaz, E, F, G, fx, fy, fz, QJ2, QJ)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G)
           endif
+          call calc_step2_3(nx, ny, nz, 2.d0, 1.d0, 2.d0, 3.d0, xix, etay, zetaz, E, F, G, QJ2, QJ)
           if (ndevices >= 2 .and. kind(id_exchange) == 4) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ)
           endif
           if (kind(id_rescale) == 4) then
             call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
+          else
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJ)
           endif
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call rescale_recv_send(3, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
       enddo
-      call send_recv_for_print(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
+      if (mod(myrank, 2) == 0) then
+        call send_recv_for_print_even(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
+      else
+        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
+      endif
     enddo
 
     if (mod(myrank,2) == 0) then
       deallocate(QJ, QJ2, E, F, G, xix, etay, zetaz, Jacobian)
-      if (kind(id_forcing) == 4) then
-        deallocate(fx, fy, fz)
+      if (kind(id_LL) == 4) then
+        deallocate(seed)
       endif
     endif
     if (kind(id_rescale) == 4) then
@@ -258,8 +269,8 @@ contains
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     real(8), allocatable, device :: QJ(:,:,:,:), QJs(:,:,:,:), Rs(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
     real(8), allocatable, device :: xix(:), etay(:), zetaz(:), Jacobian(:,:)
-    ! forcing !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: fx(:,:,:), fy(:,:,:), fz(:,:,:)
+    ! Landau !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    integer(8), allocatable, device :: seed(:,:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
 
@@ -276,11 +287,9 @@ contains
       print *, "myrank is ", myrank, " memory allocation has completed"
       call pre_calc(nx, ny, nz, myrank, nranks, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q, overlap, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0)
       Rs = 0.d0
-      if (kind(id_forcing) == 4) then
-        allocate(fx(nx-2,ny-2,nz-2), fy(nx-2,ny-2,nz-2), fz(nx-2,ny-2,nz-2))
-        fx(:,:,:) = 0.d0
-        fy(:,:,:) = 0.d0
-        fz(:,:,:) = 0.d0
+      if (kind(id_LL) == 4) then
+        allocate(seed(nx,ny,nz))
+        call init_seed(nx, ny, nz, seed)
       endif
     else
       call MPI_RECV(ke0,      1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
@@ -297,20 +306,21 @@ contains
           if (kind(id_rescale) == 4) then
             call step_rescale(1, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ, Qm, Qre)
           endif
-          if (kind(id_forcing) == 2) then
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
-            call calc_step(nx, ny, nz, 0.5d0, 1.d0, xix, etay, zetaz, E, F, G, QJ, QJs, Rs) ! QJs = Q2
+          if (kind(id_LL) == 4) then
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G, seed)
           else
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G, fx, fy, fz)
-            call calc_step_forcing(nx, ny, nz, 0.5d0, 1.d0, xix, etay, zetaz, E, F, G, fx, fy, fz, QJ, QJs, Rs) ! QJs = Q2
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
           endif
+          call calc_step(nx, ny, nz, 0.5d0, 1.d0, xix, etay, zetaz, E, F, G, QJ, QJs, Rs) ! QJs = Q2
           if (ndevices >= 2) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJs)
           endif
           if (kind(id_rescale) == 4) then
             call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
+          else
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
           endif
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call rescale_recv_send(1, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
@@ -319,20 +329,21 @@ contains
           if (kind(id_rescale) == 4) then
             call step_rescale(2, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJs, Qm, Qre)
           endif
-          if (kind(id_forcing) == 2) then
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
-            call calc_step(nx, ny, nz, 0.5d0, 2.d0, xix, etay, zetaz, E, F, G, QJ, QJs, Rs) ! QJs = Q3
+          if (kind(id_LL) == 4) then
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G, seed)
           else
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G, fx, fy, fz)
-            call calc_step_forcing(nx, ny, nz, 0.5d0, 2.d0, xix, etay, zetaz, E, F, G, fx, fy, fz, QJ, QJs, Rs) ! QJs = Q3
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
           endif
+          call calc_step(nx, ny, nz, 0.5d0, 2.d0, xix, etay, zetaz, E, F, G, QJ, QJs, Rs) ! QJs = Q3
           if (ndevices >= 2) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJs)
           endif
           if (kind(id_rescale) == 4) then
             call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
+          else
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
           endif
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call rescale_recv_send(2, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
@@ -341,20 +352,21 @@ contains
           if (kind(id_rescale) == 4) then
             call step_rescale(3, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJs, Qm, Qre)
           endif
-          if (kind(id_forcing) == 2) then
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
-            call calc_step(nx, ny, nz, 1.0d0, 2.d0, xix, etay, zetaz, E, F, G, QJ, QJs, Rs) ! QJs = Q4
+          if (kind(id_LL) == 4) then
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G, seed)
           else
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G, fx, fy, fz)
-            call calc_step_forcing(nx, ny, nz, 1.0d0, 2.d0, xix, etay, zetaz, E, F, G, fx, fy, fz, QJ, QJs, Rs) ! QJs = Q4
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
           endif
+          call calc_step(nx, ny, nz, 1.0d0, 2.d0, xix, etay, zetaz, E, F, G, QJ, QJs, Rs) ! QJs = Q4
           if (ndevices >= 2) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJs)
           endif
           if (kind(id_rescale) == 4) then
             call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
+          else
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
           endif
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call rescale_recv_send(3, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
@@ -363,31 +375,36 @@ contains
           if (kind(id_rescale) == 4) then
             call step_rescale(4, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJs, Qm, Qre)
           endif
-          if (kind(id_forcing) == 2) then
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
-            call calc_step4(nx, ny, nz, xix, etay, zetaz, E, F, G, Rs, QJ)
+          if (kind(id_LL) == 4) then
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G, seed)
           else
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G, fx, fy, fz)
-            call calc_step4_forcing(nx, ny, nz, xix, etay, zetaz, E, F, G, fx, fy, fz, Rs, QJ)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
           endif
+          call calc_step4(nx, ny, nz, xix, etay, zetaz, E, F, G, Rs, QJ)
           if (ndevices >= 2) then
             call exchange(id_rescale, myrank, nranks, overlap, nx, ny, nz, QJ)
           endif
           if (kind(id_rescale) == 4) then
             call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
+          else
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJ)
           endif
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call rescale_recv_send(4, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
         endif
       enddo
-      call send_recv_for_print(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
+      if (mod(myrank, 2) == 0) then
+        call send_recv_for_print_even(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
+      else
+        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
+      endif
     enddo
 
     if (mod(myrank,2) == 0) then
       deallocate(QJ, QJs, Rs, E, F, G, xix, etay, zetaz, Jacobian)
-      if (kind(id_forcing) == 4) then
-        deallocate(fx, fy, fz)
+      if (kind(id_LL) == 4) then
+        deallocate(seed)
       endif
     endif
     if (kind(id_rescale) == 4) then
@@ -419,8 +436,8 @@ contains
     real(8), allocatable, device :: QJ(:,:,:,:), QJs(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
     real(8), allocatable, device :: R1(:,:,:,:), R2(:,:,:,:), R1_new(:,:,:,:), R2_new(:,:,:,:)
     real(8), allocatable, device :: xix(:), etay(:), zetaz(:), Jacobian(:,:)
-    ! forcing !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: fx(:,:,:), fy(:,:,:), fz(:,:,:)
+    ! Landau !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    integer(8), allocatable, device :: seed(:,:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
 
@@ -438,11 +455,9 @@ contains
       allocate(xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(nx,ny))
       print *, "myrank is ", myrank, " memory allocation has completed"
       call pre_calc(nx, ny, nz, myrank, nranks, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q, overlap, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0)
-      if (kind(id_forcing) == 4) then
-        allocate(fx(nx-2,ny-2,nz-2), fy(nx-2,ny-2,nz-2), fz(nx-2,ny-2,nz-2))
-        fx(:,:,:) = 0.d0
-        fy(:,:,:) = 0.d0
-        fz(:,:,:) = 0.d0
+      if (kind(id_LL) == 4) then
+        allocate(seed(nx,ny,nz))
+        call init_seed(nx, ny, nz, seed)
       endif
     else
       call MPI_RECV(ke0,      1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
@@ -469,24 +484,24 @@ contains
           ! calc R1
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
           call calc_step1(nx, ny, nz, c1, xix, etay, zetaz, E, F, G, QJ, QJs)
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
+          call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
           call calc_R(nx, ny, nz, xix, etay, zetaz, E, F, G, R1)
           ! calc R2
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
           call calc_step1(nx, ny, nz, c2, xix, etay, zetaz, E, F, G, QJ, QJs)
-          call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
+          call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
           call calc_R(nx, ny, nz, xix, etay, zetaz, E, F, G, R2)
           do itr = 1, max_itr
             ! calc R1
             call calc_Gauss_step(nx, ny, nz, a11, a12, xix, etay, zetaz, R1, R2, QJ, QJs)
-            call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
             call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
             call calc_R(nx, ny, nz, xix, etay, zetaz, E, F, G, R1_new)
             ! calc R2
             call calc_Gauss_step(nx, ny, nz, a21, a22, xix, etay, zetaz, R1, R2, QJ, QJs)
-            call set_bc(myrank, nx, ny, nz, Jacobian, QJs, Qre)
+            call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
             call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
             call calc_R(nx, ny, nz, xix, etay, zetaz, E, F, G, R2_new)
             call calc_error(nx, ny, nz, R1, R2, R1_new, R2_new, err)
@@ -503,13 +518,17 @@ contains
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
         endif
       enddo
-      call send_recv_for_print(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
+      if (mod(myrank, 2) == 0) then
+        call send_recv_for_print_even(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
+      else
+        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
+      endif
     enddo
 
     if (mod(myrank,2) == 0) then
       deallocate(QJ, QJs, R1, R2, R1_new, R2_new, E, F, G, xix, etay, zetaz, Jacobian)
-      if (kind(id_forcing) == 4) then
-        deallocate(fx, fy, fz)
+      if (kind(id_LL) == 4) then
+        deallocate(seed)
       endif
     endif
     print *, "myrank is ", myrank, " deallocate GPU memory"

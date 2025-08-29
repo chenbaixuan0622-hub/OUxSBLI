@@ -1,5 +1,6 @@
 module mod_globals
   use cudafor
+  use iso_c_binding
   implicit none
   integer, parameter    :: dimension = 3
   integer, parameter    :: accuracy  = 2 
@@ -62,29 +63,29 @@ module mod_globals
   real(8), parameter :: Lx = 2.d0 * pi * L0
   real(8), parameter :: Ly = 2.d0 * pi * L0
   real(8), parameter :: Lz = 2.d0 * pi * L0
-  integer, parameter :: nx = 130!258
-  integer, parameter :: ny = 130!258
-  integer, parameter :: nz = 130!258
+  integer, parameter :: nx = 66!129!258
+  integer, parameter :: ny = 66!129!258
+  integer, parameter :: nz = 66!129!258
 
   integer, parameter :: nre1 = 1
   integer, parameter :: nre2 = nx
   integer, parameter :: rerank = 0
 
   ! GPU
-  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/43,(ny-accuracy)/4,(nz-accuracy)/1)
-  type(dim3) :: blocksF   = dim3((nx-accuracy)/128,(ny-accuracy+1)/1,(nz-accuracy)/1)
-  type(dim3) :: blocksG   = dim3((nx-accuracy)/128,(ny-accuracy)/1,(nz-accuracy+1)/1)
-  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/43,(ny-accuracy)/4,(nz-accuracy)/1)
-  type(dim3) :: blocksFv  = dim3((nx-accuracy)/128,(ny-accuracy+1)/1,(nz-accuracy)/1)
-  type(dim3) :: blocksGv  = dim3((nx-accuracy)/128,(ny-accuracy)/1,(nz-accuracy+1)/1)
-  type(dim3) :: blocks    = dim3((nx-accuracy)/128,(ny-accuracy)/1,(nz-accuracy)/1)
-  type(dim3) :: threadsE  = dim3(43,4,1)
-  type(dim3) :: threadsF  = dim3(128,1,1)
-  type(dim3) :: threadsG  = dim3(128,1,1)
-  type(dim3) :: threadsEv = dim3(43,4,1)
-  type(dim3) :: threadsFv = dim3(128,1,1)
-  type(dim3) :: threadsGv = dim3(128,1,1)
-  type(dim3) :: threads   = dim3(128,1,1)
+  type(dim3), parameter :: threadsE  = dim3(5,32,1)
+  type(dim3), parameter :: threadsF  = dim3(32,5,1)
+  type(dim3), parameter :: threadsG  = dim3(32,1,5)
+  type(dim3), parameter :: threadsEv = dim3(5,32,1)
+  type(dim3), parameter :: threadsFv = dim3(32,5,1)
+  type(dim3), parameter :: threadsGv = dim3(32,1,5)
+  type(dim3), parameter :: threads   = dim3(32,8,1)
+  type(dim3), parameter :: blocksE  = dim3((nx-1+threadsE%x -1)/threadsE%x, (ny-2+threadsE%y -1)/threadsE%y, (nz-2+threadsE%z -1)/threadsE%z)
+  type(dim3), parameter :: blocksF  = dim3((nx-2+threadsF%x -1)/threadsF%x, (ny-1+threadsF%y -1)/threadsF%y, (nz-2+threadsF%z -1)/threadsF%z)
+  type(dim3), parameter :: blocksG  = dim3((nx-2+threadsG%x -1)/threadsG%x, (ny-2+threadsG%y -1)/threadsG%y, (nz-1+threadsG%z -1)/threadsG%z)
+  type(dim3), parameter :: blocksEv = dim3((nx-1+threadsEv%x-1)/threadsEv%x,(ny-2+threadsEv%y-1)/threadsEv%y,(nz-2+threadsEv%z-1)/threadsEv%z)
+  type(dim3), parameter :: blocksFv = dim3((nx-2+threadsFv%x-1)/threadsFv%x,(ny-1+threadsFv%y-1)/threadsFv%y,(nz-2+threadsFv%z-1)/threadsFv%z)
+  type(dim3), parameter :: blocksGv = dim3((nx-2+threadsGv%x-1)/threadsGv%x,(ny-2+threadsGv%y-1)/threadsGv%y,(nz-1+threadsGv%z-1)/threadsGv%z)
+  type(dim3), parameter :: blocks   = dim3((nx-2+threads%x  -1)/threads%x,  (ny-2+threads%y  -1)/threads%y,  (nz-2+threads%z  -1)/threads%z)
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -260,6 +260,77 @@ extern "C" void calc_Gauss_step_Q_wrapper(int nx, int ny, int nz, double a1, dou
 }
 
 
+extern "C" int get_Nx_wrapper(void) {
+  return get_Nx_c();
+}
+
+
+extern "C" int get_Ny_wrapper(void) {
+  return get_Ny_c();
+}
+
+
+extern "C" int get_Nz_wrapper(void) {
+  return get_Nz_c();
+}
+
+
+extern "C" int get_Nt_wrapper(void) {
+  return get_Nt_c();
+}
+
+
+extern "C" int get_Np_wrapper(void) {
+  return get_Np_c();
+}
+
+
+extern "C" double get_Lx_wrapper(void) {
+  return get_Lx_c();
+}
+
+
+extern "C" double get_Ly_wrapper(void) {
+  return get_Ly_c();
+}
+
+
+extern "C" double get_Lz_wrapper(void) {
+  return get_Lz_c();
+}
+
+
+extern "C" double get_dt_wrapper(void) {
+  return get_dt_c();
+}
+
+
+extern "C" void set_grid_wrapper(int nx, int ny, int nz, double Lx, double Ly, double Lz, \
+                                 py::array_t<double> x_obj,  py::array_t<double> y_obj,  py::array_t<double> z_obj, \
+                                 py::array_t<double> dx_obj, py::array_t<double> dy_obj, py::array_t<double> dz_obj) {
+  auto x_buf = x_obj.request();
+  double *x  = static_cast<double*>(x_buf.ptr);
+  auto y_buf = y_obj.request();
+  double *y  = static_cast<double*>(y_buf.ptr);
+  auto z_buf = z_obj.request();
+  double *z  = static_cast<double*>(z_buf.ptr);
+  auto dx_buf = dx_obj.request();
+  double *dx = static_cast<double*>(dx_buf.ptr);
+  auto dy_buf = dy_obj.request();
+  double *dy = static_cast<double*>(dy_buf.ptr);
+  auto dz_buf = dz_obj.request();
+  double *dz = static_cast<double*>(dz_buf.ptr);
+  set_grid(0, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz);
+}
+
+
+extern "C" void set_bc_wrapper(int nx, int ny, int nz, py::object Jacobian_obj, py::object Q_obj){
+  double *Jacobian = get_cuda_pointer<double>(Jacobian_obj);
+  double *Q        = get_cuda_pointer<double>(Q_obj);
+  set_bc(0, nx, ny, nz, Jacobian, Q);
+}
+
+
 PYBIND11_MODULE(cufd, m) {
   m.def("calc_EFG_Euler", &calc_EFG_Euler_wrapper, 
         py::arg("nx"), py::arg("ny"), py::arg("nz"),
@@ -327,5 +398,22 @@ PYBIND11_MODULE(cufd, m) {
   m.def("calc_error", &calc_error_wrapper);
   m.def("calc_Gauss_step", &calc_Gauss_step_wrapper);
   m.def("calc_Gauss_step_Q", &calc_Gauss_step_Q_wrapper);
+  m.def("get_Nx", &get_Nx_wrapper);
+  m.def("get_Ny", &get_Ny_wrapper);
+  m.def("get_Nz", &get_Nz_wrapper);
+  m.def("get_Nt", &get_Nt_wrapper);
+  m.def("get_Np", &get_Np_wrapper);
+  m.def("get_Lx", &get_Lx_wrapper);
+  m.def("get_Ly", &get_Ly_wrapper);
+  m.def("get_Lz", &get_Lz_wrapper);
+  m.def("get_dt", &get_dt_wrapper);
+  m.def("set_grid", &set_grid_wrapper,
+        py::arg("nx"), py::arg("ny"), py::arg("nz"),
+        py::arg("Lx"), py::arg("Ly"), py::arg("Lz"),
+        py::arg("x"),  py::arg("y"),  py::arg("z"),
+        py::arg("dx"), py::arg("dy"), py::arg("dz"));
+  m.def("set_bc", &set_bc_wrapper,
+        py::arg("nx"), py::arg("ny"), py::arg("nz"),
+        py::arg("Jacobian"), py::arg("Q"));
 }
 
