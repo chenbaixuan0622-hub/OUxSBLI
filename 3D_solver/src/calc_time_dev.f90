@@ -108,7 +108,7 @@ contains
     real(8), allocatable, device :: Qre(:), Qm(:)
     real(8), allocatable, pinned :: Qm_cpu(:)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: QJ(:,:,:,:), QJ2(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
+    real(8), allocatable, device :: ruvwp(:,:,:,:), QJ(:,:,:,:), QJ2(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
     real(8), allocatable, device :: xix(:), etay(:), zetaz(:), Jacobian(:,:)
     ! Landau !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     integer(8), allocatable, device :: seed(:,:,:)
@@ -121,7 +121,7 @@ contains
     print *, "rank", myrank, " has found ", ndevices, " GPU devices"
     if (mod(myrank,2) == 0) then
       call check_gpu(mygpu)
-      allocate(QJ(5,nx,ny,nz), QJ2(5,nx,ny,nz), E(5,nx-1,ny-2,nz-2), F(5,nx-2,ny-1,nz-2), G(5,nx-2,ny-2,nz-1), stat=ierr)
+      allocate(ruvwp(5,nx,ny,nz), QJ(5,nx,ny,nz), QJ2(5,nx,ny,nz), E(5,nx-1,ny-2,nz-2), F(5,nx-2,ny-1,nz-2), G(5,nx-2,ny-2,nz-1), stat=ierr)
       allocate(xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(nx,ny), stat=ierr)
       if (ierr /= 0) then
         print *, "myrank is ", myrank, " memory allocation failed", ierr
@@ -152,9 +152,9 @@ contains
           endif
           call nvtxStartRange("calc flux", 1)
           if (kind(id_LL) == 4) then
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G, seed)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, ruvwp, E, F, G, seed)
           else
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, ruvwp, E, F, G)
           endif
           !print *, "myrank is ", myrank, " calc EFG"
           call nvtxEndRange
@@ -187,9 +187,9 @@ contains
             call step_rescale(2, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ2, Qm, Qre)
           endif
           if (kind(id_LL) == 4) then
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G, seed)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, ruvwp, E, F, G, seed)
           else
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, ruvwp, E, F, G)
           endif
           call calc_step2_3(nx, ny, nz, 0.75d0, 0.25d0, 0.25d0, 1.d0, xix, etay, zetaz, E, F, G, QJ, QJ2)
           if (ndevices >= 2 .and. kind(id_exchange) == 4) then
@@ -210,9 +210,9 @@ contains
             call step_rescale(3, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ2, Qm, Qre)
           endif
           if (kind(id_LL) == 4) then
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G, seed)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, ruvwp, E, F, G, seed)
           else
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, E, F, G)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, ruvwp, E, F, G)
           endif
           call calc_step2_3(nx, ny, nz, 2.d0, 1.d0, 2.d0, 3.d0, xix, etay, zetaz, E, F, G, QJ2, QJ)
           if (ndevices >= 2 .and. kind(id_exchange) == 4) then
@@ -236,7 +236,7 @@ contains
     enddo
 
     if (mod(myrank,2) == 0) then
-      deallocate(QJ, QJ2, E, F, G, xix, etay, zetaz, Jacobian)
+      deallocate(ruvwp, QJ, QJ2, E, F, G, xix, etay, zetaz, Jacobian)
       if (kind(id_LL) == 4) then
         deallocate(seed)
       endif
@@ -267,7 +267,7 @@ contains
     real(8), allocatable, device :: Qre(:), Qm(:)
     real(8), allocatable, pinned :: Qm_cpu(:)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: QJ(:,:,:,:), QJs(:,:,:,:), Rs(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
+    real(8), allocatable, device :: ruvwp(:,:,:,:), QJ(:,:,:,:), QJs(:,:,:,:), Rs(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
     real(8), allocatable, device :: xix(:), etay(:), zetaz(:), Jacobian(:,:)
     ! Landau !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     integer(8), allocatable, device :: seed(:,:,:)
@@ -282,7 +282,7 @@ contains
     endif
     if (mod(myrank,2) == 0) then
       call check_gpu(mygpu)
-      allocate(QJ(5,nx,ny,nz), QJs(5,nx,ny,nz), Rs(5,nx-2,ny-2,nz-2), E(5,nx-1,ny-2,nz-2), F(5,nx-2,ny-1,nz-2), G(5,nx-2,ny-2,nz-1))
+      allocate(ruvwp(5,nx,ny,nz), QJ(5,nx,ny,nz), QJs(5,nx,ny,nz), Rs(5,nx-2,ny-2,nz-2), E(5,nx-1,ny-2,nz-2), F(5,nx-2,ny-1,nz-2), G(5,nx-2,ny-2,nz-1))
       allocate(xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(nx,ny))
       print *, "myrank is ", myrank, " memory allocation has completed"
       call pre_calc(nx, ny, nz, myrank, nranks, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q, overlap, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0)
@@ -307,9 +307,9 @@ contains
             call step_rescale(1, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ, Qm, Qre)
           endif
           if (kind(id_LL) == 4) then
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G, seed)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, ruvwp, E, F, G, seed)
           else
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, ruvwp, E, F, G)
           endif
           call calc_step(nx, ny, nz, 0.5d0, 1.d0, xix, etay, zetaz, E, F, G, QJ, QJs, Rs) ! QJs = Q2
           if (ndevices >= 2) then
@@ -330,9 +330,9 @@ contains
             call step_rescale(2, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJs, Qm, Qre)
           endif
           if (kind(id_LL) == 4) then
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G, seed)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, ruvwp, E, F, G, seed)
           else
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, ruvwp, E, F, G)
           endif
           call calc_step(nx, ny, nz, 0.5d0, 2.d0, xix, etay, zetaz, E, F, G, QJ, QJs, Rs) ! QJs = Q3
           if (ndevices >= 2) then
@@ -353,9 +353,9 @@ contains
             call step_rescale(3, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJs, Qm, Qre)
           endif
           if (kind(id_LL) == 4) then
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G, seed)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, ruvwp, E, F, G, seed)
           else
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, ruvwp, E, F, G)
           endif
           call calc_step(nx, ny, nz, 1.0d0, 2.d0, xix, etay, zetaz, E, F, G, QJ, QJs, Rs) ! QJs = Q4
           if (ndevices >= 2) then
@@ -376,9 +376,9 @@ contains
             call step_rescale(4, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJs, Qm, Qre)
           endif
           if (kind(id_LL) == 4) then
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G, seed)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, ruvwp, E, F, G, seed)
           else
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, ruvwp, E, F, G)
           endif
           call calc_step4(nx, ny, nz, xix, etay, zetaz, E, F, G, Rs, QJ)
           if (ndevices >= 2) then
@@ -402,7 +402,7 @@ contains
     enddo
 
     if (mod(myrank,2) == 0) then
-      deallocate(QJ, QJs, Rs, E, F, G, xix, etay, zetaz, Jacobian)
+      deallocate(ruvwp, QJ, QJs, Rs, E, F, G, xix, etay, zetaz, Jacobian)
       if (kind(id_LL) == 4) then
         deallocate(seed)
       endif
@@ -416,7 +416,8 @@ contains
     endif
     print *, "myrank is ", myrank, " deallocate GPU memory"
   end subroutine RungeKutta_4th
-  
+ 
+
   subroutine Gauss_RungeKutta(id_RungeKutta, myrank, mygpu, nx, ny, nz, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q)
     use mod_globals, only : id_visc
     integer(kind=8), intent(in) :: id_RungeKutta
@@ -433,7 +434,7 @@ contains
     real(8), allocatable, device :: Qre(:), Qm(:)
     real(8), allocatable, pinned :: Qm_cpu(:)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: QJ(:,:,:,:), QJs(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
+    real(8), allocatable, device :: ruvwp(:,:,:,:), QJ(:,:,:,:), QJs(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
     real(8), allocatable, device :: R1(:,:,:,:), R2(:,:,:,:), R1_new(:,:,:,:), R2_new(:,:,:,:)
     real(8), allocatable, device :: xix(:), etay(:), zetaz(:), Jacobian(:,:)
     ! Landau !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -449,7 +450,7 @@ contains
     endif
     if (mod(myrank,2) == 0) then
       call check_gpu(mygpu)
-      allocate(QJ(5,nx,ny,nz), QJs(5,nx,ny,nz), R1(5,nx-2,ny-2,nz-2), R2(5,nx-2,ny-2,nz-2))
+      allocate(ruvwp(5,nx,ny,nz), QJ(5,nx,ny,nz), QJs(5,nx,ny,nz), R1(5,nx-2,ny-2,nz-2), R2(5,nx-2,ny-2,nz-2))
       allocate(R1_new(5,nx-2,ny-2,nz-2), R2_new(5,nx-2,ny-2,nz-2))
       allocate(E(5,nx-1,ny-2,nz-2), F(5,nx-2,ny-1,nz-2), G(5,nx-2,ny-2,nz-1))
       allocate(xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(nx,ny))
@@ -482,27 +483,27 @@ contains
       do t1 = 1, nt
         if (mod(myrank,2) == 0) then
           ! calc R1
-          call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
+          call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, ruvwp, E, F, G)
           call calc_step1(nx, ny, nz, c1, xix, etay, zetaz, E, F, G, QJ, QJs)
           call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
-          call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
+          call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, ruvwp, E, F, G)
           call calc_R(nx, ny, nz, xix, etay, zetaz, E, F, G, R1)
           ! calc R2
-          call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, E, F, G)
+          call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, ruvwp, E, F, G)
           call calc_step1(nx, ny, nz, c2, xix, etay, zetaz, E, F, G, QJ, QJs)
           call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
-          call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
+          call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, ruvwp, E, F, G)
           call calc_R(nx, ny, nz, xix, etay, zetaz, E, F, G, R2)
           do itr = 1, max_itr
             ! calc R1
             call calc_Gauss_step(nx, ny, nz, a11, a12, xix, etay, zetaz, R1, R2, QJ, QJs)
             call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, ruvwp, E, F, G)
             call calc_R(nx, ny, nz, xix, etay, zetaz, E, F, G, R1_new)
             ! calc R2
             call calc_Gauss_step(nx, ny, nz, a21, a22, xix, etay, zetaz, R1, R2, QJ, QJs)
             call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
-            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, E, F, G)
+            call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, ruvwp, E, F, G)
             call calc_R(nx, ny, nz, xix, etay, zetaz, E, F, G, R2_new)
             call calc_error(nx, ny, nz, R1, R2, R1_new, R2_new, err)
             if (err < tol) exit
@@ -526,7 +527,7 @@ contains
     enddo
 
     if (mod(myrank,2) == 0) then
-      deallocate(QJ, QJs, R1, R2, R1_new, R2_new, E, F, G, xix, etay, zetaz, Jacobian)
+      deallocate(ruvwp, QJ, QJs, R1, R2, R1_new, R2_new, E, F, G, xix, etay, zetaz, Jacobian)
       if (kind(id_LL) == 4) then
         deallocate(seed)
       endif
