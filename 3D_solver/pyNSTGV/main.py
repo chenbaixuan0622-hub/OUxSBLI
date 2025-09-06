@@ -1,19 +1,19 @@
 import numpy as np
+import time
+import cufd
+import os
+import sys
+sys.path.append(os.pardir)
+from mod import set_grid, mod_time
 from rk import RK44
-from tgv import set_grid, set_init, set_Jacobian
+from tgv import set_init, set_Jacobian
 
 
 def main():
-  # grid info
-  Nx    = 130
-  Ny    = 130
-  Nz    = 130
-  L0    = 1.524e-3
-  Lx    = 2.e0 * np.pi * L0
-  Ly    = 2.e0 * np.pi * L0
-  Lz    = 2.e0 * np.pi * L0
-
+  Nx, Ny, Nz, x, y, z, dx, dy, dz, Jacobian = set_grid()
+  Nt, Np, dt = mod_time()
   # physical properties
+  L0    = 1.524e-3
   gamma = 1.4e0
   Rgas  = 287.03e0
   M0    = 0.1e0
@@ -25,18 +25,12 @@ def main():
   rho0  = mu0 * Re / (v0 * L0)
   p0    = rho0 * Rgas * T
 
-  # time
-  CFL   = 0.03e0
-  dt    = CFL * (Lx / (Nx-1)) / v0
-  dtn   = v0 * dt / L0
-  Np    = 100
-  Nt    = int(20.e0 / (Np * dtn))
-
   dir = "./data"
-  x, y, z, dx, dy, dz = set_grid(Nx, Ny, Nz, Lx, Ly, Lz)
-  Jacobian = set_Jacobian(Nx, Ny, Nz, dx, dy, dz)
   Q = set_init(Nx, Ny, Nz, x, y, z, gamma, Rgas, rho0, v0, p0, T, L0)
+  t1 = time.time()
   RK44(Q, x, y, z, gamma, dt, dx, dy, dz, Jacobian, Nt, Np, dir)
+  t2 = time.time()
+  print("Elapsed time:", t2-t1)
 
 
 main()
