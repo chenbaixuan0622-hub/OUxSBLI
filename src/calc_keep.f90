@@ -118,20 +118,11 @@ contains
 
   !KEEP main!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  attributes(device) function KEEP2(id, rho, u, v, w, p, Normal) result(F)
+  attributes(device) function KEEP2(rho, u, v, w, uu, p, Normal) result(F)
     use mod_globals, only : id_keep
-    integer, intent(in), value            :: id
-    real(8), intent(in), dimension(2)     :: rho, u, v, w, p
+    real(8), intent(in), dimension(2)     :: rho, u, v, w, uu, p
     real(8), intent(in), dimension(dim+2) :: Normal
-    real(8) F(dim+2), uu(2)
-    select case(id)
-    case(1)
-      uu(:) = u(:)
-    case(2)
-      uu(:) = v(:)
-    case(3)
-      uu(:) = w(:)
-    end select
+    real(8) F(dim+2)
     F(1) = 0.25d0 * (rho(1) + rho(2)) * (uu(1) + uu(2))
     F(2) = 0.5d0 * (F(1) * (u(1) + u(2)) + (p(1) + p(2)) * Normal(2))
     F(3) = 0.5d0 * (F(1) * (v(1) + v(2)) + (p(1) + p(2)) * Normal(3))
@@ -139,20 +130,11 @@ contains
     F(5) = Et2(id_keep,F(1),rho,p,u,v,w,uu)
   end function KEEP2
 
-  attributes(device) function KEEP4(id, rho, u, v, w, p, Normal) result(F)
+  attributes(device) function KEEP4(rho, u, v, w, uu, p, Normal) result(F)
     use mod_globals, only : id_keep
-    integer, intent(in), value            :: id
-    real(8), intent(in), dimension(4)     :: rho, u, v, w, p
+    real(8), intent(in), dimension(4)     :: rho, u, v, w, uu, p
     real(8), intent(in), dimension(dim+2) :: Normal
-    real(8) F(dim+2), RhoV(3), uu(4)
-    select case(id)
-    case(1)
-      uu(:) = u(:)
-    case(2)
-      uu(:) = v(:)
-    case(3)
-      uu(:) = w(:)
-    end select
+    real(8) F(dim+2), RhoV(3)
     RhoV(:) = RhoPhi4(rho(:), uu(:))
     F(1)    = Flux4(RhoV(:))
     block
@@ -171,20 +153,11 @@ contains
     end block
   end function KEEP4
 
-  attributes(device) function KEEP6(id, rho, u, v, w, p, Normal) result(F)
+  attributes(device) function KEEP6(rho, u, v, w, uu, p, Normal) result(F)
     use mod_globals, only : id_keep
-    integer, intent(in), value            :: id
-    real(8), intent(in), dimension(6)     :: rho, u, v, w, p
+    real(8), intent(in), dimension(6)     :: rho, u, v, w, uu, p
     real(8), intent(in), dimension(dim+2) :: Normal
-    real(8) F(dim+2), RhoV(6), uu(6)
-    select case(id)
-    case(1)
-      uu(:) = u(:)
-    case(2)
-      uu(:) = v(:)
-    case(3)
-      uu(:) = w(:)
-    end select
+    real(8) F(dim+2), RhoV(6)
     RhoV(:) = RhoPhi6(rho(:), uu(:))
     F(1)    = Flux6(RhoV(:))
     block
