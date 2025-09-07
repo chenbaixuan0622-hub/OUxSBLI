@@ -1,5 +1,5 @@
 module calc_visc_common
-  use mod_constant, only : Cp, Cp_over_Pr
+  use mod_constant, only : Cp, Cp_over_Pr, one_third
   implicit none
 contains
   !dir$ inline
@@ -14,7 +14,7 @@ contains
     real(8), intent(in), device :: a(6)
     real(8), intent(in), value  :: dx
     real(8) ans(3)
-    ans(:) = 0.125d0 * (9.d0 * (-a(2:4) + a(3:5)) - (-a(1:3) + a(4:6)) / 3.d0) * dx
+    ans(:) = 0.125d0 * (9.d0 * (-a(2:4) + a(3:5)) - (-a(1:3) + a(4:6)) * one_third) * dx
   end function dx6
 
   !dir$ inline
@@ -22,7 +22,7 @@ contains
     real(8), intent(in), device :: a(5)
     real(8), intent(in), value  :: dy
     real(8) ans
-    ans = (2.d0 * (-a(2) + a(4)) - 0.25d0 * (-a(1) + a(5))) * dy / 3.d0
+    ans = (2.d0 * (-a(2) + a(4)) - 0.25d0 * (-a(1) + a(5))) * dy * one_third
   end function dy5
 
   !dir$ inline
@@ -66,7 +66,7 @@ contains
   attributes(device) function flux4(a) result(ans)
     real(8), intent(in), device :: a(3)
     real(8) ans
-    ans = 0.125d0 * ((9.d0 - 1.d0 / 3.d0) * a(2) - (a(1) + a(3)) / 3.d0)
+    ans = 0.125d0 * ((9.d0 - one_third) * a(2) - (a(1) + a(3)) * one_third)
   end function flux4
 
   attributes(device) subroutine tauxx4(mu, ux, vy, wz, u6, txx, utxx)
@@ -74,7 +74,7 @@ contains
     real(8), intent(in), dimension(6), device :: u6
     real(8), intent(out)  :: txx, utxx
     real(8), dimension(3) :: tmp
-    tmp(:) = 2.d0 * mu(:) * (2.d0 * ux(:) - vy(:) - wz(:)) / 3.d0 ! tau
+    tmp(:) = 2.d0 * mu(:) * (2.d0 * ux(:) - vy(:) - wz(:)) * one_third ! tau
     txx    = flux4(tmp(:))
     tmp(:) = interpolation6(u6(:)) * tmp(:) ! u tau
     utxx   = flux4(tmp(:))
