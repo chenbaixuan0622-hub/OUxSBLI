@@ -1,6 +1,6 @@
 module calc_visc
   use mod_globals, only : id_visc, gamma, R, Pr, Prt, dt
-  use mod_constant, only : Cp, gamma_1, Cp_over_Pr
+  use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third
   use calc_visc_common
   use calc_rand
   implicit none
@@ -110,7 +110,7 @@ contains
           w2(:)     = w213(:,2)
           mwx       = mx * (-w2(1) + w2(2)) * dx(i)
         end block
-        txx  = 2.d0 * (2.d0 * mux - mvy - mwz) / 3.d0
+        txx  = 2.d0 * (2.d0 * mux - mvy - mwz) * one_third
         txy  = muy + mvx
         txz  = mwx + muz
         if (present(seed) .and. id_visc == 1) then
@@ -126,7 +126,7 @@ contains
             Zx  = Z_tilde(seed(i+1,j,k))
             Z   = 0.5d0 * (Z + Zx)
             Zq  = Zq_x(seed(i,j,k))
-            txx = txx + std_t * (2.d0 * Z(1) - Z(4) - Z(6)) / 3.d0
+            txx = txx + std_t * (2.d0 * Z(1) - Z(4) - Z(6)) * one_third
             txy = txy + std_t * Z(2)
             txz = txz + std_t * Z(3)
             kTx = kTx + std_q * Zq
@@ -200,12 +200,12 @@ contains
         block
           real(8) :: mutx, H(4)
           mutx = 0.0625d0 * (-mut(i-1,j,k) + 9.d0 * (mut(i,j,k) + mut(i+1,j,k)) -mut(i+2,j,k))
-          txx  = txx + 2.d0 * mutx * (2.d0 * ux3(2) - vy3(2) - wz3(2)) / 3.d0
+          txx  = txx + 2.d0 * mutx * (2.d0 * ux3(2) - vy3(2) - wz3(2)) * one_third
           txy  = txy + mutx * (uy3(2) + vx3(2))
           txz  = txz + mutx * (wx3(2) + uz3(2))
           H(:) = (gamma * Q(5,i-1:i+2,j,k) / (Q(1,i-1:i+2,j,k) * gamma_1)) &
                  + 0.5d0 * (Q(2,i-1:i+2,j,k)**2 + Q(3,i-1:i+2,j,k)**2 + Q(4,i-1:i+2,j,k)**2) + qc2(i-1:i+2,j,k)
-          Hsgs = -mutx * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) / 3.d0) * dx(i) / Prt
+          Hsgs = -mutx * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dx(i) / Prt
         end block
       end block
     else
@@ -271,12 +271,12 @@ contains
           mwx       = mx * (-w2(1) + w2(2)) * dx(i)
           mwxsgs    = mxsgs * (-w2(1) + w2(2)) * dx(i)
         end block
-        txx  = 2.d0 * (2.d0 * mux - mvy - mwz) / 3.d0
+        txx  = 2.d0 * (2.d0 * mux - mvy - mwz) * one_third
         txy  = muy + mvx
         txz  = mwx + muz
         utxx = 0.5d0 * (u2(1) + u2(2)) * txx
         vtxy = 0.5d0 * (v2(1) + v2(2)) * txy
-        txx = txx + 2.d0 * (2.d0 * muxsgs - mvysgs - mwzsgs) / 3.d0
+        txx = txx + 2.d0 * (2.d0 * muxsgs - mvysgs - mwzsgs) * one_third
         txy = txy + muysgs + mvxsgs
         txz = txz + mwxsgs + muzsgs
         block
@@ -399,7 +399,7 @@ contains
           mwy       = my * (-w2(1) + w2(2)) * dy(j)
         end block
         tyx  = muy + mvx
-        tyy  = 2.d0 * (2.d0 * mvy - mwz - mux) / 3.d0
+        tyy  = 2.d0 * (2.d0 * mvy - mwz - mux) * one_third
         tyz  = mvz + mwy
         if (present(seed) .and. id_visc == 1) then
           block
@@ -415,7 +415,7 @@ contains
             Z   = 0.5d0 * (Z + Zy)
             Zq  = Zq_y(seed(i,j,k))
             tyx = tyx + std_t * Z(2)
-            tyy = tyy + std_t * (2.d0 * Z(4) - Z(6) - Z(1)) / 3.d0
+            tyy = tyy + std_t * (2.d0 * Z(4) - Z(6) - Z(1)) * one_third
             tyz = tyz + std_t * Z(5)
             kTy = kTy + std_q * Zq
           end block
@@ -490,11 +490,11 @@ contains
           real(8) muty
           muty   = 0.0625d0 * (-mut(i,j-1,k) + 9.d0 * (mut(i,j,k) + mut(i,j+1,k)) -mut(i,j+2,k))
           tyx = tyx + muty * (uy3(2) + vx3(2))
-          tyy = tyy + 2.d0 * muty * (2.d0 * vy3(2) - ux3(2) - wz3(2)) / 3.d0
+          tyy = tyy + 2.d0 * muty * (2.d0 * vy3(2) - ux3(2) - wz3(2)) * one_third
           tyz = tyz + muty * (vz3(2) + wy3(2))
           H(:)   = (gamma * Q(5,i,j-1:j+2,k) / (Q(1,i,j-1:j+2,k) * gamma_1)) &
                    + 0.5d0 * (Q(2,i,j-1:j+2,k)**2 + Q(3,i,j-1:j+2,k)**2 + Q(4,i,j-1:j+2,k)**2) + qc2(i,j-1:j+2,k)
-          Hsgs   = -muty * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) / 3.d0) * dy(j) / Prt
+          Hsgs   = -muty * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dy(j) / Prt
         end block
       end block
     else
@@ -561,13 +561,13 @@ contains
           mwysgs    = mysgs * (-w2(1) + w2(2)) * dy(j)
         end block
           tyx  = muy + mvx
-          tyy  = 2.d0 * (2.d0 * mvy - mwz - mux) / 3.d0
+          tyy  = 2.d0 * (2.d0 * mvy - mwz - mux) * one_third
           tyz  = mvz + mwy
           utyx = 0.5d0 * (u2(1) + u2(2)) * tyx
           vtyy = 0.5d0 * (v2(1) + v2(2)) * tyy
           wtyz = 0.5d0 * (w2(1) + w2(2)) * tyz
           tyx  = tyx + muysgs + mvxsgs
-          tyy  = tyy + 2.d0 * (2.d0 * mvysgs - mwzsgs - muxsgs) / 3.d0
+          tyy  = tyy + 2.d0 * (2.d0 * mvysgs - mwzsgs - muxsgs) * one_third
           tyz  = tyz + mvzsgs + mwysgs
         block
           real(8), device :: H(2)
@@ -690,7 +690,7 @@ contains
         end block
         tzx  = mwx + muz
         tzy  = mvz + mwy
-        tzz  = 2.d0 * (2.d0 * mwz - mux - mvy) / 3.d0
+        tzz  = 2.d0 * (2.d0 * mwz - mux - mvy) * one_third
         if (present(seed) .and. id_visc == 1) then
           block
             real(8) std_t, std_q, over_V, Zq
@@ -706,7 +706,7 @@ contains
             Zq  = Zq_y(seed(i,j,k))
             tzx = tzx + std_t * Z(3)
             tzy = tzy + std_t * Z(5)
-            tzz = tzz + std_t * (2.d0 * Z(6) - Z(1) - Z(4)) / 3.d0
+            tzz = tzz + std_t * (2.d0 * Z(6) - Z(1) - Z(4)) * one_third
             kTz = kTz + std_q * Zq
           end block
         endif
@@ -781,10 +781,10 @@ contains
           mutz = 0.0625d0 * (-mut(i,j,k-1) + 9.d0 * (mut(i,j,k) + mut(i,j,k+1)) -mut(i,j,k+2))
           tzx  = tzx + mutz * (wx3(2) + uz3(2))
           tzy  = tzy + mutz * (vz3(2) + wy3(2))
-          tzz  = tzz + 2.d0 * mutz * (2.d0 * wz3(2) - ux3(2) - vy3(2)) / 3.d0
+          tzz  = tzz + 2.d0 * mutz * (2.d0 * wz3(2) - ux3(2) - vy3(2)) * one_third
           H(:) = (gamma * Q(5,i,j,k-1:k+2) / (Q(1,i,j,k-1:k+2) * gamma_1)) &
                  + 0.5d0 * (Q(2,i,j,k-1:k+2)**2 + Q(3,i,j,k-1:k+2)**2 + Q(4,i,j,k-1:k+2)**2) + qc2(i,j,k-1:k+2)
-          Hsgs = -mutz * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) / 3.d0) * dz(k) / Prt
+          Hsgs = -mutz * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dz(k) / Prt
         end block
       end block
     else
@@ -852,13 +852,13 @@ contains
         end block
         tzx  = mwx + muz
         tzy  = mvz + mwy
-        tzz  = 2.d0 * (2.d0 * mwz - mux - mvy) / 3.d0
+        tzz  = 2.d0 * (2.d0 * mwz - mux - mvy) * one_third
         utzx = 0.5d0 * (u2(1) + u2(2)) * tzx
         vtzy = 0.5d0 * (v2(1) + v2(2)) * tzy
         wtzz = 0.5d0 * (w2(1) + w2(2)) * tzz
         tzx  = tzx + mwx + muz
         tzy  = tzy + mvz + mwy
-        tzz  = tzz + 2.d0 * (2.d0 * mwz - mux - mvy) / 3.d0
+        tzz  = tzz + 2.d0 * (2.d0 * mwz - mux - mvy) * one_third
         block
           real(8), device :: H(2)
           H(:) = (gamma * Q(5,i,j,k:k+1) / (Q(1,i,j,k:k+1) * gamma_1)) &
