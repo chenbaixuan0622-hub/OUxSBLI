@@ -1,6 +1,6 @@
 module calc_sutherland
   use mod_globals, only : gamma, R, Pr
-  use mod_constant, only : Cp
+  use mod_constant, only : Cp_over_Pr, mu0, over_T0, T0_S
   implicit none
   interface calc_mu
     module procedure calc_mu2, calc_mu4
@@ -10,9 +10,7 @@ contains
   attributes(device) function mu(T) result(ans)
     real(8), intent(in), value :: T
     real(8) :: ans
-    real(8), constant :: mu0 = 1.716d-5
-    real(8), constant :: T0  = 273.2d0, S = 111.d0, T0_S = 384.2d0 !T0 + S
-    ans = mu0 * ((T0_S) / (T + S)) * (T / T0) ** 1.5d0
+    ans = mu0 * (384.2d0 / (T + 111.d0)) * (T * over_T0) ** 1.5d0
   end function mu
 
   !dir$ inline
@@ -65,7 +63,7 @@ contains
   attributes(device) subroutine calc_kappa(T1,T2,kappa)
     real(8), intent(in), value  :: T1, T2
     real(8), intent(out)        :: kappa
-    kappa =  0.5d0 * (mu(T1) + mu(T2)) * Cp / Pr
+    kappa =  0.5d0 * (mu(T1) + mu(T2)) * Cp_over_Pr
   end subroutine calc_kappa
 end module calc_sutherland
 
