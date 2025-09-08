@@ -6,6 +6,12 @@ module mod_constant
   real(8), parameter :: over_gamma_1 = 1.d0 / (gamma - 1.d0)
   real(8), parameter :: Cp = gamma * R * over_gamma_1
   real(8), parameter :: Cp_over_Pr = Cp / Pr
+  real(8), parameter :: mu0 = 1.716d-5
+  real(8), parameter :: over_T0 = 1.d0 / 273.2d0, T0_S = 384.2d0 !T0 + S
+  real(8), parameter :: one_third = 1.d0 / 3.d0
+  real(8), parameter :: one_sixth = 1.d0 / 6.d0
+  real(8), parameter :: one_twelfth = 1.d0 / 12.d0
+  real(8), parameter :: one_sixty   = 1.d0 / 60.d0
   real(8), constant  :: Normal_x(5) = (/0.d0, 1.d0, 0.d0, 0.d0, 0.d0/)
   real(8), constant  :: Normal_y(5) = (/0.d0, 0.d0, 1.d0, 0.d0, 0.d0/)
   real(8), constant  :: Normal_z(5) = (/0.d0, 0.d0, 0.d0, 1.d0, 0.d0/)

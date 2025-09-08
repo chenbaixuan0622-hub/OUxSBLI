@@ -1,6 +1,6 @@
 module calc_visc
   use mod_globals, only : id_visc, gamma, R, Pr, Prt, dt
-  use mod_constant, only : Cp, gamma_1, Cp_over_Pr
+  use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third
   use calc_visc_common
   use calc_rand
   implicit none
@@ -22,43 +22,73 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (id_visc ==2 .and. 3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
       block
-        real(8), dimension(6), device :: u6, v6, w6
-        real(8), dimension(3), device :: ux3, vx3, wx3, uy3, vy3, uz3, wz3, mu
-        block
-          real(8), device :: u651(6,5)
-          u651(:,:) = Q(2,i-2:i+3,j-2:j+2,k)
-          uy3(:)    = dy65(u651(:,:), dy(j))
-          u6(:)     = u651(:,3) 
-          ux3(:)    = dx6(u6(:), dx(i))
-        end block
-        block
-          real(8), device :: u615(6,5)
-          u615(:,:) = Q(2,i-2:i+3,j,k-2:k+2)
-          uz3(:)    = dy65(u615(:,:), dz(k))
-        end block
-        block
-          real(8), device :: v651(6,5)
-          v651(:,:) = Q(3,i-2:i+3,j-2:j+2,k)
-          vy3(:)    = dy65(v651(:,:), dy(j))
-          v6(:)     = v651(:,3) 
-          vx3(:)    = dx6(v6(:), dx(i))
-        end block
-        block
-          real(8), device :: w615(6,5)
-          w615(:,:) = Q(4,i-2:i+3,j,k-2:k+2)
-          wz3(:)    = dy65(w615(:,:), dz(k))
-          w6(:)     = w615(:,3) 
-          wx3(:)    = dx6(w6(:), dx(i))
-        end block
-        block
+        real(8), device :: mu(3)
+        block ! dQdx
           real(8), device :: T6(6)
           T6(:) = Q(5,i-2:i+3,j,k) / (R * Q(1,i-2:i+3,j,k))
           mu(:) = mu6(T6(:))
           kTx   = heat_conduction6(mu(:), T6(:), dx(i))
         end block
-        call tauxx4(mu(:), ux3(:), vy3(:), wz3(:), u6(:), txx, utxx)
-        call tauxy4(mu(:), uy3(:), vx3(:), v6(:), txy, vtxy)
-        call tauxy4(mu(:), wx3(:), uz3(:), w6(:), txz, wtxz)
+
+
+        block ! txx
+          real(8), device :: u6(6), ux3(3), vy3(3), wz3(3)
+          u6(:)  = Q(2,i-2:i+3,j,k) 
+          ux3(:) = dx6(u6(:), dx(i))
+          block
+            real(8), device :: vy6(6)
+            integer itr
+            do itr = 0, 5
+              vy6(itr+1) = (2.d0 * (-Q(3,i-2+itr,j-1,k) + Q(3,i-2+itr,j+1,k)) &
+                        - 0.25d0 * (-Q(3,i-2+itr,j-2,k) + Q(3,i-2+itr,j+2,k))) * dy(j) * one_third
+            enddo
+            vy3(:) = interpolation6(vy6(:))
+          end block
+          block
+            real(8), device :: wz6(6)
+            integer itr
+            do itr = 0, 5
+              wz6(itr+1) = (2.d0 * (-Q(4,i-2+itr,j,k-1) + Q(4,i-2+itr,j,k+1)) &
+                        - 0.25d0 * (-Q(4,i-2+itr,j,k-2) + Q(4,i-2+itr,j,k+2))) * dz(k) * one_third
+            enddo
+            wz3(:) = interpolation6(wz6(:))
+          end block
+          call tauxx4(mu(:), ux3(:), vy3(:), wz3(:), u6(:), txx, utxx)
+        end block
+
+
+        block ! txy
+          real(8), device :: v6(6), vx3(3), uy3(3)
+          v6(:)  = Q(3,i-2:i+3,j,k) 
+          vx3(:) = dx6(v6(:), dx(i))
+          block
+            real(8), device :: uy6(6)
+            integer itr
+            do itr = 0, 5
+              uy6(itr+1) = (2.d0 * (-Q(2,i-2+itr,j-1,k) + Q(2,i-2+itr,j+1,k)) &
+                        - 0.25d0 * (-Q(2,i-2+itr,j-2,k) + Q(2,i-2+itr,j+2,k))) * dy(j) * one_third
+            enddo
+            uy3(:) = interpolation6(uy6(:))
+          end block
+          call tauxy4(mu(:), uy3(:), vx3(:), v6(:), txy, vtxy)
+        end block
+
+
+        block ! txz
+          real(8), device :: w6(6), wx3(3), uz3(3)
+          w6(:)  = Q(4,i-2:i+3,j,k) 
+          wx3(:) = dx6(w6(:), dx(i))
+          block
+            real(8), device :: uz6(6)
+            integer itr
+            do itr = 0, 5
+              uz6(itr+1) = (2.d0 * (-Q(2,i-2+itr,j,k-1) + Q(2,i-2+itr,j,k+1)) &
+                        - 0.25d0 * (-Q(2,i-2+itr,j,k-2) + Q(2,i-2+itr,j,k+2))) * dz(k) * one_third
+            enddo
+            uz3(:) = interpolation6(uz6(:))
+          end block
+          call tauxy4(mu(:), wx3(:), uz3(:), w6(:), txz, wtxz)
+        end block
       end block
     else
       block
@@ -110,7 +140,7 @@ contains
           w2(:)     = w213(:,2)
           mwx       = mx * (-w2(1) + w2(2)) * dx(i)
         end block
-        txx  = 2.d0 * (2.d0 * mux - mvy - mwz) / 3.d0
+        txx  = 2.d0 * (2.d0 * mux - mvy - mwz) * one_third
         txy  = muy + mvx
         txz  = mwx + muz
         if (present(seed) .and. id_visc == 1) then
@@ -126,7 +156,7 @@ contains
             Zx  = Z_tilde(seed(i+1,j,k))
             Z   = 0.5d0 * (Z + Zx)
             Zq  = Zq_x(seed(i,j,k))
-            txx = txx + std_t * (2.d0 * Z(1) - Z(4) - Z(6)) / 3.d0
+            txx = txx + std_t * (2.d0 * Z(1) - Z(4) - Z(6)) * one_third
             txy = txy + std_t * Z(2)
             txz = txz + std_t * Z(3)
             kTx = kTx + std_q * Zq
@@ -142,7 +172,8 @@ contains
     E(4,i,j-1,k-1) = E(4,i,j-1,k-1) - txz
     E(5,i,j-1,k-1) = E(5,i,j-1,k-1) - (utxx + vtxy + wtxz + kTx)
   end subroutine calc_Ev
-  
+ 
+
   attributes(global) subroutine calc_Ev_LES(nx, ny, nz, dx, dy, dz, Q, mut, qc2, E)
     use calc_sutherland, only : mu6, mu2, mu23
     integer, intent(in), value     :: nx, ny, nz
@@ -160,52 +191,85 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (id_visc ==2 .and. 3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
       block
-        real(8), dimension(6), device :: u6, v6, w6
-        real(8), dimension(3), device :: ux3, vx3, wx3, uy3, vy3, uz3, wz3, mu
-        block
-          real(8), device :: u651(6,5)
-          u651(:,:) = Q(2,i-2:i+3,j-2:j+2,k)
-          uy3(:)    = dy65(u651(:,:), dy(j))
-          u6(:)     = u651(:,3) 
-          ux3(:)    = dx6(u6(:), dx(i))
-        end block
-        block
-          real(8), device :: u615(6,5)
-          u615(:,:) = Q(2,i-2:i+3,j,k-2:k+2)
-          uz3(:)    = dy65(u615(:,:), dz(k))
-        end block
-        block
-          real(8), device :: v651(6,5)
-          v651(:,:) = Q(3,i-2:i+3,j-2:j+2,k)
-          vy3(:)    = dy65(v651(:,:), dy(j))
-          v6(:)     = v651(:,3) 
-          vx3(:)    = dx6(v6(:), dx(i))
-        end block
-        block
-          real(8), device :: w615(6,5)
-          w615(:,:) = Q(4,i-2:i+3,j,k-2:k+2)
-          wz3(:)    = dy65(w615(:,:), dz(k))
-          w6(:)     = w615(:,3) 
-          wx3(:)    = dx6(w6(:), dx(i))
-        end block
-        block
+        real(8), device :: mu(3)
+        real(8) mutx
+        mutx = 0.0625d0 * (-mut(i-1,j,k) + 9.d0 * (mut(i,j,k) + mut(i+1,j,k)) -mut(i+2,j,k))
+        block ! dQdx
           real(8), device :: T6(6)
           T6(:) = Q(5,i-2:i+3,j,k) / (R * Q(1,i-2:i+3,j,k))
           mu(:) = mu6(T6(:))
           kTx   = heat_conduction6(mu(:), T6(:), dx(i))
         end block
-        call tauxx4(mu(:), ux3(:), vy3(:), wz3(:), u6(:), txx, utxx)
-        call tauxy4(mu(:), uy3(:), vx3(:), v6(:), txy, vtxy)
-        call tauxy4(mu(:), wx3(:), uz3(:), w6(:), txz, wtxz)
-        block
-          real(8) :: mutx, H(4)
-          mutx = 0.0625d0 * (-mut(i-1,j,k) + 9.d0 * (mut(i,j,k) + mut(i+1,j,k)) -mut(i+2,j,k))
-          txx  = txx + 2.d0 * mutx * (2.d0 * ux3(2) - vy3(2) - wz3(2)) / 3.d0
+
+
+        block ! txx
+          real(8), device :: u6(6), ux3(3), vy3(3), wz3(3)
+          u6(:)  = Q(2,i-2:i+3,j,k) 
+          ux3(:) = dx6(u6(:), dx(i))
+          block
+            real(8), device :: vy6(6)
+            integer itr
+            do itr = 0, 5
+              vy6(itr+1) = (2.d0 * (-Q(3,i-2+itr,j-1,k) + Q(3,i-2+itr,j+1,k)) &
+                        - 0.25d0 * (-Q(3,i-2+itr,j-2,k) + Q(3,i-2+itr,j+2,k))) * dy(j) * one_third
+            enddo
+            vy3(:) = interpolation6(vy6(:))
+          end block
+          block
+            real(8), device :: wz6(6)
+            integer itr
+            do itr = 0, 5
+              wz6(itr+1) = (2.d0 * (-Q(4,i-2+itr,j,k-1) + Q(4,i-2+itr,j,k+1)) &
+                        - 0.25d0 * (-Q(4,i-2+itr,j,k-2) + Q(4,i-2+itr,j,k+2))) * dz(k) * one_third
+            enddo
+            wz3(:) = interpolation6(wz6(:))
+          end block
+          call tauxx4(mu(:), ux3(:), vy3(:), wz3(:), u6(:), txx, utxx)
+          txx  = txx + 2.d0 * mutx * (2.d0 * ux3(2) - vy3(2) - wz3(2)) * one_third
+        end block
+
+
+        block ! txy
+          real(8), device :: v6(6), vx3(3), uy3(3)
+          v6(:)  = Q(3,i-2:i+3,j,k) 
+          vx3(:) = dx6(v6(:), dx(i))
+          block
+            real(8), device :: uy6(6)
+            integer itr
+            do itr = 0, 5
+              uy6(itr+1) = (2.d0 * (-Q(2,i-2+itr,j-1,k) + Q(2,i-2+itr,j+1,k)) &
+                        - 0.25d0 * (-Q(2,i-2+itr,j-2,k) + Q(2,i-2+itr,j+2,k))) * dy(j) * one_third
+            enddo
+            uy3(:) = interpolation6(uy6(:))
+          end block
+          call tauxy4(mu(:), uy3(:), vx3(:), v6(:), txy, vtxy)
           txy  = txy + mutx * (uy3(2) + vx3(2))
+        end block
+
+
+        block ! txz
+          real(8), device :: w6(6), wx3(3), uz3(3)
+          w6(:)  = Q(4,i-2:i+3,j,k) 
+          wx3(:) = dx6(w6(:), dx(i))
+          block
+            real(8), device :: uz6(6)
+            integer itr
+            do itr = 0, 5
+              uz6(itr+1) = (2.d0 * (-Q(2,i-2+itr,j,k-1) + Q(2,i-2+itr,j,k+1)) &
+                        - 0.25d0 * (-Q(2,i-2+itr,j,k-2) + Q(2,i-2+itr,j,k+2))) * dz(k) * one_third
+            enddo
+            uz3(:) = interpolation6(uz6(:))
+          end block
+          call tauxy4(mu(:), wx3(:), uz3(:), w6(:), txz, wtxz)
           txz  = txz + mutx * (wx3(2) + uz3(2))
+        end block
+
+
+        block
+          real(8) :: H(4)
           H(:) = (gamma * Q(5,i-1:i+2,j,k) / (Q(1,i-1:i+2,j,k) * gamma_1)) &
                  + 0.5d0 * (Q(2,i-1:i+2,j,k)**2 + Q(3,i-1:i+2,j,k)**2 + Q(4,i-1:i+2,j,k)**2) + qc2(i-1:i+2,j,k)
-          Hsgs = -mutx * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) / 3.d0) * dx(i) / Prt
+          Hsgs = -mutx * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dx(i) / Prt
         end block
       end block
     else
@@ -271,12 +335,12 @@ contains
           mwx       = mx * (-w2(1) + w2(2)) * dx(i)
           mwxsgs    = mxsgs * (-w2(1) + w2(2)) * dx(i)
         end block
-        txx  = 2.d0 * (2.d0 * mux - mvy - mwz) / 3.d0
+        txx  = 2.d0 * (2.d0 * mux - mvy - mwz) * one_third
         txy  = muy + mvx
         txz  = mwx + muz
         utxx = 0.5d0 * (u2(1) + u2(2)) * txx
         vtxy = 0.5d0 * (v2(1) + v2(2)) * txy
-        txx = txx + 2.d0 * (2.d0 * muxsgs - mvysgs - mwzsgs) / 3.d0
+        txx = txx + 2.d0 * (2.d0 * muxsgs - mvysgs - mwzsgs) * one_third
         txy = txy + muysgs + mvxsgs
         txz = txz + mwxsgs + muzsgs
         block
@@ -292,7 +356,8 @@ contains
     E(4,i,j-1,k-1) = E(4,i,j-1,k-1) - txz
     E(5,i,j-1,k-1) = E(5,i,j-1,k-1) - (utxx + vtxy + wtxz + kTx + Hsgs)
   end subroutine calc_Ev_LES
-  
+ 
+
   attributes(global) subroutine calc_Fv(nx, ny, nz, dy, dx, dz, Q, F, seed)
     use calc_sutherland, only : mu6, mu2, mu23, mu32
     integer, intent(in), value     :: nx, ny, nz
@@ -310,43 +375,73 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (id_visc == 2 .and. 3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-2) then
       block
-        real(8), dimension(6), device :: u6, v6, w6
-        real(8), dimension(3), device :: uy3, vy3, wy3, vz3, wz3, ux3, vx3, mu
-        block
-          real(8), device :: u561(5,6)
-          u561(:,:) = Q(2,i-2:i+2,j-2:j+3,k)
-          ux3(:)    = dy56(u561(:,:), dx(i))
-          u6(:)     = u561(3,:)
-          uy3(:)    = dx6(u6(:), dy(j))
-        end block
-        block
-          real(8), device :: v561(5,6)
-          v561(:,:) = Q(3,i-2:i+2,j-2:j+3,k)
-          vx3(:)    = dy56(v561(:,:), dx(i))
-          v6(:)     = v561(3,:)
-          vy3(:)    = dx6(v6(:), dy(j))
-        end block
-        block
-          real(8), device :: v165(6,5)
-          v165(:,:) = Q(3,i,j-2:j+3,k-2:k+2)
-          vz3(:)    = dy65(v165(:,:), dz(k))
-        end block
-        block
-          real(8), device :: w165(6,5)
-          w165(:,:) = Q(4,i,j-2:j+3,k-2:k+2)
-          w6(:)     = w165(:,3)
-          wz3(:)    = dy65(w165(:,:), dz(k))
-          wy3(:)    = dx6(w6(:), dy(j))
-        end block
-        block
+        real(8), device :: mu(3)
+        block ! dQdy
           real(8), device :: T6(6)
           T6(:) = Q(5,i,j-2:j+3,k) / (R * Q(1,i,j-2:j+3,k))
           mu(:) = mu6(T6(:))
           kTy   = heat_conduction6(mu(:), T6(:), dy(j))
         end block
-        call tauxy4(mu(:), uy3(:), vx3(:), u6(:), tyx, utyx)
-        call tauxx4(mu(:), vy3(:), wz3(:), ux3(:), v6(:), tyy, vtyy)
-        call tauxy4(mu(:), vz3(:), wy3(:), w6(:), tyz, wtyz)
+        
+
+        block ! tyx
+          real(8), device :: u6(6), uy3(3), vx3(3)
+          u6(:)  = Q(2,i,j-2:j+3,k)
+          uy3(:) = dx6(u6(:), dy(j))
+          block
+            real(8), device :: vx6(6)
+            integer itr
+            do itr = 0, 5
+              vx6(itr+1) = (2.d0 * (-Q(3,i-1,j-2+itr,k) + Q(3,i+1,j-2+itr,k)) &
+                        - 0.25d0 * (-Q(3,i-2,j-2+itr,k) + Q(3,i+2,j-2+itr,k))) * dx(i) * one_third
+            enddo
+            vx3(:) = interpolation6(vx6(:))
+          end block
+          call tauxy4(mu(:), uy3(:), vx3(:), u6(:), tyx, utyx)
+        end block
+
+
+        block ! tyy
+          real(8), device :: v6(6), vy3(3), wz3(3), ux3(3)
+          v6(:)  = Q(3,i,j-2:j+3,k)
+          vy3(:) = dx6(v6(:), dy(j))
+          block
+            real(8), device :: wz6(6)
+            integer itr
+            do itr = 0, 5
+              wz6(itr+1) = (2.d0 * (-Q(4,i,j-2+itr,k-1) + Q(4,i,j-2+itr,k+1)) &
+                        - 0.25d0 * (-Q(4,i,j-2+itr,k-2) + Q(4,i,j-2+itr,k+2))) * dz(k) * one_third
+            enddo
+            wz3(:) = interpolation6(wz6(:))
+          end block
+          block
+            real(8), device :: ux6(6)
+            integer itr
+            do itr = 0, 5
+              ux6(itr+1) = (2.d0 * (-Q(2,i-1,j-2+itr,k) + Q(2,i+1,j-2+itr,k)) &
+                        - 0.25d0 * (-Q(2,i-2,j-2+itr,k) + Q(2,i+2,j-2+itr,k))) * dx(i) * one_third
+            enddo
+            ux3(:) = interpolation6(ux6(:))
+          end block
+          call tauxx4(mu(:), vy3(:), wz3(:), ux3(:), v6(:), tyy, vtyy)
+        end block
+
+
+        block ! tyz
+          real(8), device :: w6(6), wy3(3), vz3(3)
+          w6(:)  = Q(4,i,j-2:j+3,k)
+          wy3(:) = dx6(w6(:), dy(j))
+          block
+            real(8), device :: vz6(6)
+            integer itr
+            do itr = 0, 5
+              vz6(itr+1) = (2.d0 * (-Q(3,i,j-2+itr,k-1) + Q(3,i,j-2+itr,k+1)) &
+                        - 0.25d0 * (-Q(3,i,j-2+itr,k-2) + Q(3,i,j-2+itr,k+2))) * dz(k) * one_third
+            enddo
+            vz3(:) = interpolation6(vz6(:))
+          end block
+          call tauxy4(mu(:), vz3(:), wy3(:), w6(:), tyz, wtyz)
+        end block
       end block
     else
       block
@@ -399,7 +494,7 @@ contains
           mwy       = my * (-w2(1) + w2(2)) * dy(j)
         end block
         tyx  = muy + mvx
-        tyy  = 2.d0 * (2.d0 * mvy - mwz - mux) / 3.d0
+        tyy  = 2.d0 * (2.d0 * mvy - mwz - mux) * one_third
         tyz  = mvz + mwy
         if (present(seed) .and. id_visc == 1) then
           block
@@ -415,7 +510,7 @@ contains
             Z   = 0.5d0 * (Z + Zy)
             Zq  = Zq_y(seed(i,j,k))
             tyx = tyx + std_t * Z(2)
-            tyy = tyy + std_t * (2.d0 * Z(4) - Z(6) - Z(1)) / 3.d0
+            tyy = tyy + std_t * (2.d0 * Z(4) - Z(6) - Z(1)) * one_third
             tyz = tyz + std_t * Z(5)
             kTy = kTy + std_q * Zq
           end block
@@ -430,7 +525,8 @@ contains
     F(4,i-1,j,k-1) = F(4,i-1,j,k-1) - tyz
     F(5,i-1,j,k-1) = F(5,i-1,j,k-1) - (utyx + vtyy + wtyz + kTy)
   end subroutine calc_Fv
-  
+ 
+
   attributes(global) subroutine calc_Fv_LES(nx, ny, nz, dy, dx, dz, Q, mut, qc2, F)
     use calc_sutherland, only : mu6, mu2, mu23, mu32
     integer, intent(in), value     :: nx, ny, nz
@@ -448,53 +544,85 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (id_visc == 2 .and. 3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-2) then
       block
-        real(8), dimension(6), device   :: u6, v6, w6
-        real(8), dimension(3), device   :: uy3, vy3, wy3, vz3, wz3, ux3, vx3, mu
-        block
-          real(8), device :: u561(5,6)
-          u561(:,:) = Q(2,i-2:i+2,j-2:j+3,k)
-          ux3(:)    = dy56(u561(:,:), dx(i))
-          u6(:)     = u561(3,:)
-          uy3(:)    = dx6(u6(:), dy(j))
-        end block
-        block
-          real(8), device :: v561(5,6)
-          v561(:,:) = Q(3,i-2:i+2,j-2:j+3,k)
-          vx3(:)    = dy56(v561(:,:), dx(i))
-          v6(:)     = v561(3,:)
-          vy3(:)    = dx6(v6(:), dy(j))
-        end block
-        block
-          real(8), device :: v165(6,5)
-          v165(:,:) = Q(3,i,j-2:j+3,k-2:k+2)
-          vz3(:)    = dy65(v165(:,:), dz(k))
-        end block
-        block
-          real(8), device :: w165(6,5)
-          w165(:,:) = Q(4,i,j-2:j+3,k-2:k+2)
-          w6(:)     = w165(:,3)
-          wz3(:)    = dy65(w165(:,:), dz(k))
-          wy3(:)    = dx6(w6(:), dy(j))
-        end block
-        block
+        real(8), device :: mu(3)
+        real(8) muty
+        muty = 0.0625d0 * (-mut(i,j-1,k) + 9.d0 * (mut(i,j,k) + mut(i,j+1,k)) -mut(i,j+2,k))
+        block ! dQdy
           real(8), device :: T6(6)
           T6(:) = Q(5,i,j-2:j+3,k) / (R * Q(1,i,j-2:j+3,k))
           mu(:) = mu6(T6(:))
           kTy   = heat_conduction6(mu(:), T6(:), dy(j))
         end block
-        call tauxy4(mu(:), uy3(:), vx3(:), u6(:), tyx, utyx)
-        call tauxx4(mu(:), vy3(:), wz3(:), ux3(:), v6(:), tyy, vtyy)
-        call tauxy4(mu(:), vz3(:), wy3(:), w6(:), tyz, wtyz)
+        
+
+        block ! tyx
+          real(8), device :: u6(6), uy3(3), vx3(3)
+          u6(:)  = Q(2,i,j-2:j+3,k)
+          uy3(:) = dx6(u6(:), dy(j))
+          block
+            real(8), device :: vx6(6)
+            integer itr
+            do itr = 0, 5
+              vx6(itr+1) = (2.d0 * (-Q(3,i-1,j-2+itr,k) + Q(3,i+1,j-2+itr,k)) &
+                        - 0.25d0 * (-Q(3,i-2,j-2+itr,k) + Q(3,i+2,j-2+itr,k))) * dx(i) * one_third
+            enddo
+            vx3(:) = interpolation6(vx6(:))
+          end block
+          call tauxy4(mu(:), uy3(:), vx3(:), u6(:), tyx, utyx)
+          tyx = tyx + muty * (uy3(2) + vx3(2))
+        end block
+
+
+        block ! tyy
+          real(8), device :: v6(6), vy3(3), wz3(3), ux3(3)
+          v6(:)  = Q(3,i,j-2:j+3,k)
+          vy3(:) = dx6(v6(:), dy(j))
+          block
+            real(8), device :: wz6(6)
+            integer itr
+            do itr = 0, 5
+              wz6(itr+1) = (2.d0 * (-Q(4,i,j-2+itr,k-1) + Q(4,i,j-2+itr,k+1)) &
+                        - 0.25d0 * (-Q(4,i,j-2+itr,k-2) + Q(4,i,j-2+itr,k+2))) * dz(k) * one_third
+            enddo
+            wz3(:) = interpolation6(wz6(:))
+          end block
+          block
+            real(8), device :: ux6(6)
+            integer itr
+            do itr = 0, 5
+              ux6(itr+1) = (2.d0 * (-Q(2,i-1,j-2+itr,k) + Q(2,i+1,j-2+itr,k)) &
+                        - 0.25d0 * (-Q(2,i-2,j-2+itr,k) + Q(2,i+2,j-2+itr,k))) * dx(i) * one_third
+            enddo
+            ux3(:) = interpolation6(ux6(:))
+          end block
+          call tauxx4(mu(:), vy3(:), wz3(:), ux3(:), v6(:), tyy, vtyy)
+          tyy = tyy + 2.d0 * muty * (2.d0 * vy3(2) - ux3(2) - wz3(2)) * one_third
+        end block
+
+
+        block ! tyz
+          real(8), device :: w6(6), wy3(3), vz3(3)
+          w6(:)  = Q(4,i,j-2:j+3,k)
+          wy3(:) = dx6(w6(:), dy(j))
+          block
+            real(8), device :: vz6(6)
+            integer itr
+            do itr = 0, 5
+              vz6(itr+1) = (2.d0 * (-Q(3,i,j-2+itr,k-1) + Q(3,i,j-2+itr,k+1)) &
+                        - 0.25d0 * (-Q(3,i,j-2+itr,k-2) + Q(3,i,j-2+itr,k+2))) * dz(k) * one_third
+            enddo
+            vz3(:) = interpolation6(vz6(:))
+          end block
+          call tauxy4(mu(:), vz3(:), wy3(:), w6(:), tyz, wtyz)
+          tyz = tyz + muty * (vz3(2) + wy3(2))
+        end block
+
+
         block
           real(8), device :: H(4)
-          real(8) muty
-          muty   = 0.0625d0 * (-mut(i,j-1,k) + 9.d0 * (mut(i,j,k) + mut(i,j+1,k)) -mut(i,j+2,k))
-          tyx = tyx + muty * (uy3(2) + vx3(2))
-          tyy = tyy + 2.d0 * muty * (2.d0 * vy3(2) - ux3(2) - wz3(2)) / 3.d0
-          tyz = tyz + muty * (vz3(2) + wy3(2))
           H(:)   = (gamma * Q(5,i,j-1:j+2,k) / (Q(1,i,j-1:j+2,k) * gamma_1)) &
                    + 0.5d0 * (Q(2,i,j-1:j+2,k)**2 + Q(3,i,j-1:j+2,k)**2 + Q(4,i,j-1:j+2,k)**2) + qc2(i,j-1:j+2,k)
-          Hsgs   = -muty * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) / 3.d0) * dy(j) / Prt
+          Hsgs   = -muty * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dy(j) / Prt
         end block
       end block
     else
@@ -561,13 +689,13 @@ contains
           mwysgs    = mysgs * (-w2(1) + w2(2)) * dy(j)
         end block
           tyx  = muy + mvx
-          tyy  = 2.d0 * (2.d0 * mvy - mwz - mux) / 3.d0
+          tyy  = 2.d0 * (2.d0 * mvy - mwz - mux) * one_third
           tyz  = mvz + mwy
           utyx = 0.5d0 * (u2(1) + u2(2)) * tyx
           vtyy = 0.5d0 * (v2(1) + v2(2)) * tyy
           wtyz = 0.5d0 * (w2(1) + w2(2)) * tyz
           tyx  = tyx + muysgs + mvxsgs
-          tyy  = tyy + 2.d0 * (2.d0 * mvysgs - mwzsgs - muxsgs) / 3.d0
+          tyy  = tyy + 2.d0 * (2.d0 * mvysgs - mwzsgs - muxsgs) * one_third
           tyz  = tyz + mvzsgs + mwysgs
         block
           real(8), device :: H(2)
@@ -582,7 +710,8 @@ contains
     F(4,i-1,j,k-1) = F(4,i-1,j,k-1) - tyz
     F(5,i-1,j,k-1) = F(5,i-1,j,k-1) - (utyx + vtyy + wtyz + kTy + Hsgs)
   end subroutine calc_Fv_LES
-  
+ 
+
   attributes(global) subroutine calc_Gv(nx, ny, nz, dx, dy, dz, Q, G, seed)
     use calc_sutherland, only : mu6, mu2, mu32
     integer, intent(in), value     :: nx, ny, nz
@@ -600,43 +729,73 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (id_visc == 2 .and. 3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-3) then
       block
-        real(8), dimension(6), device :: u6, v6, w6
-        real(8), dimension(3), device :: uz3, vz3, wz3, wx3, ux3, vy3, wy3, mu
-        block
-          real(8), device :: u516(5,6)
-          u516(:,:) = Q(2,i-2:i+2,j,k-2:k+3)
-          ux3(:)    = dy56(u516(:,:), dx(i))
-          u6(:)     = u516(3,:)
-          uz3(:)    = dx6(u6(:), dz(k))
-        end block
-        block
-          real(8), device :: v156(5,6)
-          v156(:,:) = Q(3,i,j-2:j+2,k-2:k+3)
-          vy3(:)    = dy56(v156(:,:), dy(j))
-          v6(:)     = v156(3,:)
-          vz3(:)    = dx6(v6(:), dz(k))
-        end block
-        block
-          real(8), device :: w516(5,6)
-          w516(:,:) = Q(4,i-2:i+2,j,k-2:k+3)
-          wx3(:)    = dy56(w516(:,:), dx(i))
-        end block
-        block
-          real(8), device :: w156(5,6)
-          w156(:,:) = Q(4,i,j-2:j+2,k-2:k+3)
-          wy3(:)    = dy56(w156(:,:), dy(j))
-          w6(:)     = w156(3,:)
-          wz3(:)    = dx6(w6(:), dz(k))
-        end block
-        block
-          real(8), device :: T332(3,3,2), T6(6)
+        real(8), device :: mu(3)
+        block ! dQdz
+          real(8), device :: T6(6)
           T6(:) = Q(5,i,j,k-2:k+3) / (R * Q(1,i,j,k-2:k+3))
           mu(:) = mu6(T6(:))
           kTz   = heat_conduction6(mu(:), T6(:), dz(k))
         end block
-        call tauxy4(mu(:), wx3(:), uz3(:), u6(:), tzx, utzx)
-        call tauxy4(mu(:), vz3(:), wy3(:), v6(:), tzy, vtzy)
-        call tauxx4(mu(:), wz3(:), ux3(:), vy3(:), w6(:), tzz, wtzz)
+        
+
+        block ! tzx
+          real(8), device :: u6(6), uz3(3), wx3(3)
+          u6(:)  = Q(2,i,j,k-2:k+3)
+          uz3(:) = dx6(u6(:), dz(k))
+          block
+            real(8), device :: wx6(6)
+            integer itr
+            do itr = 0, 5
+              wx6(itr+1) = (2.d0 * (-Q(4,i-1,j,k-2+itr) + Q(4,i+1,j,k-2+itr)) &
+                        - 0.25d0 * (-Q(4,i-2,j,k-2+itr) + Q(4,i+2,j,k-2+itr))) * dx(i) * one_third
+            enddo
+            wx3(:) = interpolation6(wx6(:))
+          end block
+          call tauxy4(mu(:), wx3(:), uz3(:), u6(:), tzx, utzx)
+        end block
+
+
+        block ! tzy
+          real(8), device :: v6(6), vz3(3), wy3(3)
+          v6(:)  = Q(3,i,j,k-2:k+3)
+          vz3(:) = dx6(v6(:), dz(k))
+          block
+            real(8), device :: wy6(6)
+            integer itr
+            do itr = 0, 5
+              wy6(itr+1) = (2.d0 * (-Q(4,i,j-1,k-2+itr) + Q(4,i,j+1,k-2+itr)) &
+                        - 0.25d0 * (-Q(4,i,j-2,k-2+itr) + Q(4,i,j+2,k-2+itr))) * dy(j) * one_third
+            enddo
+            wy3(:) = interpolation6(wy6(:))
+          end block
+          call tauxy4(mu(:), vz3(:), wy3(:), v6(:), tzy, vtzy)
+        end block
+
+
+        block ! tzz
+          real(8), device :: w6(6), wz3(3), ux3(3), vy3(3)
+          w6(:)  = Q(4,i,j,k-2:k+3)
+          wz3(:) = dx6(w6(:), dz(k))
+          block
+            real(8), device :: ux6(6)
+            integer itr
+            do itr = 0, 5
+              ux6(itr+1) = (2.d0 * (-Q(2,i-1,j,k-2+itr) + Q(2,i+1,j,k-2+itr)) &
+                        - 0.25d0 * (-Q(2,i-2,j,k-2+itr) + Q(2,i+2,j,k-2+itr))) * dx(i) * one_third
+            enddo
+            ux3(:) = interpolation6(ux6(:))
+          end block
+          block
+            real(8), device :: vy6(6)
+            integer itr
+            do itr = 0, 5
+              vy6(itr+1) = (2.d0 * (-Q(3,i,j-1,k-2+itr) + Q(3,i,j+1,k-2+itr)) &
+                        - 0.25d0 * (-Q(3,i,j-2,k-2+itr) + Q(3,i,j+2,k-2+itr))) * dy(j) * one_third
+            enddo
+            vy3(:) = interpolation6(vy6(:))
+          end block
+          call tauxx4(mu(:), wz3(:), ux3(:), vy3(:), w6(:), tzz, wtzz)
+        end block
       end block
     else
       block
@@ -690,7 +849,7 @@ contains
         end block
         tzx  = mwx + muz
         tzy  = mvz + mwy
-        tzz  = 2.d0 * (2.d0 * mwz - mux - mvy) / 3.d0
+        tzz  = 2.d0 * (2.d0 * mwz - mux - mvy) * one_third
         if (present(seed) .and. id_visc == 1) then
           block
             real(8) std_t, std_q, over_V, Zq
@@ -706,7 +865,7 @@ contains
             Zq  = Zq_y(seed(i,j,k))
             tzx = tzx + std_t * Z(3)
             tzy = tzy + std_t * Z(5)
-            tzz = tzz + std_t * (2.d0 * Z(6) - Z(1) - Z(4)) / 3.d0
+            tzz = tzz + std_t * (2.d0 * Z(6) - Z(1) - Z(4)) * one_third
             kTz = kTz + std_q * Zq
           end block
         endif
@@ -720,6 +879,7 @@ contains
     G(4,i-1,j-1,k) = G(4,i-1,j-1,k) - tzz
     G(5,i-1,j-1,k) = G(5,i-1,j-1,k) - (utzx + vtzy + wtzz + kTz)
   end subroutine calc_Gv
+
 
   attributes(global) subroutine calc_Gv_LES(nx, ny, nz, dx, dy, dz, Q, mut, qc2, G)
     use calc_sutherland, only : mu6, mu2, mu32
@@ -738,53 +898,85 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (id_visc == 2 .and. 3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-3) then
       block
-        real(8), dimension(6), device :: u6, v6, w6
-        real(8), dimension(3), device :: uz3, vz3, wz3, wx3, ux3, vy3, wy3, mu
-        block
-          real(8), device :: u516(5,6)
-          u516(:,:) = Q(2,i-2:i+2,j,k-2:k+3)
-          ux3(:)    = dy56(u516(:,:), dx(i))
-          u6(:)     = u516(3,:)
-          uz3(:)    = dx6(u6(:), dz(k))
-        end block
-        block
-          real(8), device :: v156(5,6)
-          v156(:,:) = Q(3,i,j-2:j+2,k-2:k+3)
-          vy3(:)    = dy56(v156(:,:), dy(j))
-          v6(:)     = v156(3,:)
-          vz3(:)    = dx6(v6(:), dz(k))
-        end block
-        block
-          real(8), device :: w516(5,6)
-          w516(:,:) = Q(4,i-2:i+2,j,k-2:k+3)
-          wx3(:)    = dy56(w516(:,:), dx(i))
-        end block
-        block
-          real(8), device :: w156(5,6)
-          w156(:,:) = Q(4,i,j-2:j+2,k-2:k+3)
-          wy3(:)    = dy56(w156(:,:), dy(j))
-          w6(:)     = w156(3,:)
-          wz3(:)    = dx6(w6(:), dz(k))
-        end block
-        block
-          real(8), device :: T332(3,3,2), T6(6)
+        real(8), device :: mu(3)
+        real(8) mutz
+        mutz = 0.0625d0 * (-mut(i,j,k-1) + 9.d0 * (mut(i,j,k) + mut(i,j,k+1)) -mut(i,j,k+2))
+        block ! dQdz
+          real(8), device :: T6(6)
           T6(:) = Q(5,i,j,k-2:k+3) / (R * Q(1,i,j,k-2:k+3))
           mu(:) = mu6(T6(:))
           kTz   = heat_conduction6(mu(:), T6(:), dz(k))
         end block
-        call tauxy4(mu(:), wx3(:), uz3(:), u6(:), tzx, utzx)
-        call tauxy4(mu(:), vz3(:), wy3(:), v6(:), tzy, vtzy)
-        call tauxx4(mu(:), wz3(:), ux3(:), vy3(:), w6(:), tzz, wtzz)
+        
+
+        block ! tzx
+          real(8), device :: u6(6), uz3(3), wx3(3)
+          u6(:)  = Q(2,i,j,k-2:k+3)
+          uz3(:) = dx6(u6(:), dz(k))
+          block
+            real(8), device :: wx6(6)
+            integer itr
+            do itr = 0, 5
+              wx6(itr+1) = (2.d0 * (-Q(4,i-1,j,k-2+itr) + Q(4,i+1,j,k-2+itr)) &
+                        - 0.25d0 * (-Q(4,i-2,j,k-2+itr) + Q(4,i+2,j,k-2+itr))) * dx(i) * one_third
+            enddo
+            wx3(:) = interpolation6(wx6(:))
+          end block
+          call tauxy4(mu(:), wx3(:), uz3(:), u6(:), tzx, utzx)
+          tzx  = tzx + mutz * (wx3(2) + uz3(2))
+        end block
+
+
+        block ! tzy
+          real(8), device :: v6(6), vz3(3), wy3(3)
+          v6(:)  = Q(3,i,j,k-2:k+3)
+          vz3(:) = dx6(v6(:), dz(k))
+          block
+            real(8), device :: wy6(6)
+            integer itr
+            do itr = 0, 5
+              wy6(itr+1) = (2.d0 * (-Q(4,i,j-1,k-2+itr) + Q(4,i,j+1,k-2+itr)) &
+                        - 0.25d0 * (-Q(4,i,j-2,k-2+itr) + Q(4,i,j+2,k-2+itr))) * dy(j) * one_third
+            enddo
+            wy3(:) = interpolation6(wy6(:))
+          end block
+          call tauxy4(mu(:), vz3(:), wy3(:), v6(:), tzy, vtzy)
+          tzy  = tzy + mutz * (vz3(2) + wy3(2))
+        end block
+
+
+        block ! tzz
+          real(8), device :: w6(6), wz3(3), ux3(3), vy3(3)
+          w6(:)  = Q(4,i,j,k-2:k+3)
+          wz3(:) = dx6(w6(:), dz(k))
+          block
+            real(8), device :: ux6(6)
+            integer itr
+            do itr = 0, 5
+              ux6(itr+1) = (2.d0 * (-Q(2,i-1,j,k-2+itr) + Q(2,i+1,j,k-2+itr)) &
+                        - 0.25d0 * (-Q(2,i-2,j,k-2+itr) + Q(2,i+2,j,k-2+itr))) * dx(i) * one_third
+            enddo
+            ux3(:) = interpolation6(ux6(:))
+          end block
+          block
+            real(8), device :: vy6(6)
+            integer itr
+            do itr = 0, 5
+              vy6(itr+1) = (2.d0 * (-Q(3,i,j-1,k-2+itr) + Q(3,i,j+1,k-2+itr)) &
+                        - 0.25d0 * (-Q(3,i,j-2,k-2+itr) + Q(3,i,j+2,k-2+itr))) * dy(j) * one_third
+            enddo
+            vy3(:) = interpolation6(vy6(:))
+          end block
+          call tauxx4(mu(:), wz3(:), ux3(:), vy3(:), w6(:), tzz, wtzz)
+          tzz  = tzz + 2.d0 * mutz * (2.d0 * wz3(2) - ux3(2) - vy3(2)) * one_third
+        end block
+ 
+
         block
           real(8), device :: H(4)
-          real(8) mutz
-          mutz = 0.0625d0 * (-mut(i,j,k-1) + 9.d0 * (mut(i,j,k) + mut(i,j,k+1)) -mut(i,j,k+2))
-          tzx  = tzx + mutz * (wx3(2) + uz3(2))
-          tzy  = tzy + mutz * (vz3(2) + wy3(2))
-          tzz  = tzz + 2.d0 * mutz * (2.d0 * wz3(2) - ux3(2) - vy3(2)) / 3.d0
           H(:) = (gamma * Q(5,i,j,k-1:k+2) / (Q(1,i,j,k-1:k+2) * gamma_1)) &
                  + 0.5d0 * (Q(2,i,j,k-1:k+2)**2 + Q(3,i,j,k-1:k+2)**2 + Q(4,i,j,k-1:k+2)**2) + qc2(i,j,k-1:k+2)
-          Hsgs = -mutz * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) / 3.d0) * dz(k) / Prt
+          Hsgs = -mutz * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dz(k) / Prt
         end block
       end block
     else
@@ -852,13 +1044,13 @@ contains
         end block
         tzx  = mwx + muz
         tzy  = mvz + mwy
-        tzz  = 2.d0 * (2.d0 * mwz - mux - mvy) / 3.d0
+        tzz  = 2.d0 * (2.d0 * mwz - mux - mvy) * one_third
         utzx = 0.5d0 * (u2(1) + u2(2)) * tzx
         vtzy = 0.5d0 * (v2(1) + v2(2)) * tzy
         wtzz = 0.5d0 * (w2(1) + w2(2)) * tzz
         tzx  = tzx + mwx + muz
         tzy  = tzy + mvz + mwy
-        tzz  = tzz + 2.d0 * (2.d0 * mwz - mux - mvy) / 3.d0
+        tzz  = tzz + 2.d0 * (2.d0 * mwz - mux - mvy) * one_third
         block
           real(8), device :: H(2)
           H(:) = (gamma * Q(5,i,j,k:k+1) / (Q(1,i,j,k:k+1) * gamma_1)) &
