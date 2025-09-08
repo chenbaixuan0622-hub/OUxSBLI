@@ -10,8 +10,7 @@ contains
   attributes(device) function mu(T) result(ans)
     real(8), intent(in), value :: T
     real(8) :: ans
-    real(8), constant :: S = 111.d0
-    ans = mu0 * ((T0_S) / (T + S)) * (T * over_T0) ** 1.5d0
+    ans = mu0 * (384.2d0 / (T + 111.d0)) * (T * over_T0) ** 1.5d0
   end function mu
 
   !dir$ inline
