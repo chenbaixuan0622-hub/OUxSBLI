@@ -8,6 +8,22 @@ contains
     real(8) ans(3)
     ans(:) = 0.0625d0 * (-a(1:3) + 9.d0 * (a(2:4) + a(3:5)) -a(4:6))
   end function interpolation6
+  
+  !dir$ inline
+  attributes(device) function interpolation6_scalar(a1, a2, a3, a4, a5, a6) result(ans)
+    real(8), intent(in), value :: a1, a2, a3, a4, a5, a6
+    real(8) ans(3)
+    ans(1) = 0.0625d0 * (-a1 + 9.d0 * (a2 + a3) -a4)
+    ans(2) = 0.0625d0 * (-a2 + 9.d0 * (a3 + a4) -a5)
+    ans(3) = 0.0625d0 * (-a3 + 9.d0 * (a4 + a5) -a6)
+  end function interpolation6_scalar
+
+  !$dir inline
+  attributes(device) function dy5(a1, a2, a3, a4, d) result(ans)
+    real(8), intent(in), value :: a1, a2, a3, a4, d
+    real(8) ans
+    ans = (2.d0 * (-a2 + a3) - 0.25d0 * (-a1 + a4)) * d * one_third
+  end function dy5
 
   !dir$ inline
   attributes(device) function dx6(a, dx) result(ans)
