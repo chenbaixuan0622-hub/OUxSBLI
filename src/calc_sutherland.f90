@@ -52,12 +52,28 @@ contains
   end function mu23
 
   !dir$ inline
+  attributes(device) subroutine mu_23(T, m1, m2)
+    real(8), intent(in), device :: T(2,3)
+    real(8), intent(out)        :: m1, m2
+    m1 = 0.25d0 * (mu(T(1,1)) + mu(T(1,2)) + mu(T(2,1)) + mu(T(2,2)))
+    m2 = 0.25d0 * (mu(T(1,2)) + mu(T(1,3)) + mu(T(2,2)) + mu(T(2,3)))
+  end subroutine mu_23
+
+  !dir$ inline
   attributes(device) function mu32(T) result(ans)
     real(8), intent(in), device :: T(3,2)
     real(8) ans(2)
     ans(1) = 0.25d0 * (mu(T(1,1)) + mu(T(2,1)) + mu(T(1,2)) + mu(T(2,2)))
     ans(2) = 0.25d0 * (mu(T(2,1)) + mu(T(3,1)) + mu(T(2,2)) + mu(T(3,2)))
   end function mu32
+
+  !dir$ inline
+  attributes(device) subroutine mu_32(T, m1, m2)
+    real(8), intent(in), device :: T(3,2)
+    real(8), intent(out)        :: m1, m2
+    m1 = 0.25d0 * (mu(T(1,1)) + mu(T(2,1)) + mu(T(1,2)) + mu(T(2,2)))
+    m2 = 0.25d0 * (mu(T(2,1)) + mu(T(3,1)) + mu(T(2,2)) + mu(T(3,2)))
+  end subroutine mu_32
 
   !dir$ inline
   attributes(device) subroutine calc_kappa(T1,T2,kappa)
