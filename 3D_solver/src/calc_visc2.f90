@@ -386,7 +386,7 @@ contains
     integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
     real(8), shared :: u(threadsGv%z+1,0:threadsGv%x+1,threadsGv%y)
     real(8), shared :: v(threadsGv%z+1,0:threadsGv%y+1,threadsGv%x)
-    real(8), shared :: w(threadsGv%z+1,0:threadsGv%y+1,0:threadsGv%x+1)
+    real(8), shared :: w(threadsGv%z+1,0:threadsGv%x+1,0:threadsGv%y+1)
     integer i, j, k, it, jt, kt
     real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz
     real(8) mz, muz, mvz, mwz, mwx, mux, mvy, mwy
@@ -399,11 +399,11 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     u(kt,it-1:it+1,jt)        = Q(2,i-1:i+1,j,k)
     v(kt,jt-1:jt+1,it)        = Q(3,i,j-1:j+1,k)
-    w(kt,jt-1:jt+1,it-1:it+1) = Q(4,i-1:i+1,j-1:j+1,k)
+    w(kt,it-1:it+1,jt-1:jt+1) = Q(4,i-1:i+1,j-1:j+1,k)
     if (kt == blockDim%z) then
       u(kt+1,it-1:it+1,jt)        = Q(2,i-1:i+1,j,k+1)
       v(kt+1,jt-1:jt+1,it)        = Q(3,i,j-1:j+1,k+1)
-      w(kt+1,jt-1:jt+1,it-1:it+1) = Q(4,i-1:i+1,j-1:j+1,k+1)
+      w(kt+1,it-1:it+1,jt-1:jt+1) = Q(4,i-1:i+1,j-1:j+1,k+1)
     endif 
     call syncthreads()
 
@@ -418,8 +418,8 @@ contains
       !              + mx2 * (-w(kt,jt,it) + w(kt,jt,it+1) - w(kt+1,jt,it) + w(kt+1,jt,it+1))) * dx(i)
       mux = 0.25d0 * (mx1 * (-u(kt,it-1,jt) - u(kt+1,it-1,jt)) + (mx1 - mx2) * (u(kt,it,jt) + u(kt+1,it,jt)) &
                     + mx2 * ( u(kt,it+1,jt) + u(kt+1,it+1,jt))) * dx(i)
-      mwx = 0.25d0 * (mx1 * (-w(kt,jt,it-1) - w(kt+1,jt,it-1)) + (mx1 - mx2) * (w(kt,jt,it) + w(kt+1,jt,it)) &
-                    + mx2 * ( w(kt,jt,it+1) + w(kt+1,jt,it+1))) * dx(i)
+      mwx = 0.25d0 * (mx1 * (-w(kt,it-1,jt) - w(kt+1,it-1,jt)) + (mx1 - mx2) * (w(kt,it,jt) + w(kt+1,it,jt)) &
+                    + mx2 * ( w(kt,it+1,jt) + w(kt+1,it+1,jt))) * dx(i)
     end block
     block
       real(8) my1, my2
@@ -432,8 +432,8 @@ contains
       !                 + my2    * (-Q(4,i,j,k) + Q(4,i,j+1,k) - Q(4,i,j,k+1) + Q(4,i,j+1,k+1))) * dy(j)
       mvy = 0.25d0 * (my1 * (-v(kt,jt-1,it) - v(kt+1,jt-1,it)) + (my1 - my2) * (v(kt,jt,it) + v(kt+1,jt,it)) &
                     + my2 * ( v(kt,jt+1,it) + v(kt+1,jt+1,it))) * dy(j)
-      mwy = 0.25d0 * (my1 * (-w(kt,jt-1,it) - w(kt+1,jt-1,it)) + (my1 - my2) * (w(kt,jt,it) + w(kt+1,jt,it)) &
-                    + my2 * ( w(kt,jt+1,it) + w(kt+1,jt+1,it))) * dy(j)
+      mwy = 0.25d0 * (my1 * (-w(kt,it,jt-1) - w(kt+1,it,jt-1)) + (my1 - my2) * (w(kt,it,jt) + w(kt+1,it,jt)) &
+                    + my2 * ( w(kt,it,jt+1) + w(kt+1,it,jt+1))) * dy(j)
     end block
     block
       real(8), device :: Tz(2)
@@ -443,7 +443,7 @@ contains
     end block
     muz = mz * (-u(kt,it,jt) + u(kt+1,it,jt)) * dz(k)
     mvz = mz * (-v(kt,jt,it) + v(kt+1,jt,it)) * dz(k)
-    mwz = mz * (-w(kt,jt,it) + w(kt+1,jt,it)) * dz(k)
+    mwz = mz * (-w(kt,it,jt) + w(kt+1,it,jt)) * dz(k)
     tzx  = mwx + muz
     tzy  = mvz + mwy
     tzz  = 2.d0 * (2.d0 * mwz - mux - mvy) * one_third
@@ -469,7 +469,7 @@ contains
     endif
     utzx = 0.5d0 * (u(kt,it,jt) + u(kt+1,it,jt)) * tzx
     vtzy = 0.5d0 * (v(kt,jt,it) + v(kt+1,jt,it)) * tzy
-    wtzz = 0.5d0 * (w(kt,jt,it) + w(kt+1,jt,it)) * tzz
+    wtzz = 0.5d0 * (w(kt,it,jt) + w(kt+1,it,jt)) * tzz
     G(2,i-1,j-1,k) = G(2,i-1,j-1,k) - tzx
     G(3,i-1,j-1,k) = G(3,i-1,j-1,k) - tzy
     G(4,i-1,j-1,k) = G(4,i-1,j-1,k) - tzz
