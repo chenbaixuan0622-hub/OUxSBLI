@@ -5,7 +5,8 @@ module calc_flux_base
   use calc_physical_quantities
   use calc_hybrid
   use calc_flux
-  use calc_visc
+  use calc_visc2
+  use calc_visc4
   use calc_les
   use set
   implicit none
@@ -59,14 +60,26 @@ contains
     call calc_G<<<blocksG,threadsG,3>>>(id_accuracy, nx, ny, nz, ruvwp, sensor, G)
     stat = cudaDeviceSynchronize()
     if (present(seed)) then
-      call calc_Ev<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, E, seed)
-      call calc_Fv<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, F, seed)
-      call calc_Gv<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, G, seed)
+      if (id_visc == 2) then
+        call calc_Ev4<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, E, seed)
+        call calc_Fv4<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, F, seed)
+        call calc_Gv4<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, G, seed)
+      else
+        call calc_Ev2<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, E, seed)
+        call calc_Fv2<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, F, seed)
+        call calc_Gv2<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, G, seed)
+      endif
       call update_seed(nx, ny, nz, seed)
     else
-      call calc_Ev<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, E)
-      call calc_Fv<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, F)
-      call calc_Gv<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, G)
+      if (id_visc == 2) then
+        call calc_Ev4<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, E)
+        call calc_Fv4<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, F)
+        call calc_Gv4<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, G)
+      else
+        call calc_Ev2<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, E)
+        call calc_Fv2<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, F)
+        call calc_Gv2<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, G)
+      endif
     endif
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_visc
@@ -97,9 +110,15 @@ contains
     call calc_mut<<<blocks,threads>>>(nx, ny, nz, dx, dy, dz, ruvwp, mut, qc2)
     stat = cudaDeviceSynchronize()
     call set_bc_mut(nx, ny, nz, mut, qc2)
-    call calc_Ev_LES<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, mut, qc2, E)
-    call calc_Fv_LES<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, mut, qc2, F)
-    call calc_Gv_LES<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, mut, qc2, G)
+    if (id_visc == 2) then
+      call calc_Ev_LES4<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, mut, qc2, E)
+      call calc_Fv_LES4<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, mut, qc2, F)
+      call calc_Gv_LES4<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, mut, qc2, G)
+    else
+      call calc_Ev_LES2<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, mut, qc2, E)
+      call calc_Fv_LES2<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, mut, qc2, F)
+      call calc_Gv_LES2<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, mut, qc2, G)
+    endif
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_LES
 end module calc_flux_base
