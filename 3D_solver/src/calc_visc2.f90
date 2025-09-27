@@ -238,13 +238,13 @@ contains
   end subroutine store_shared_z
 
 
-  attributes(global) subroutine calc_Ev2(nx, ny, nz, dx, dy, dz, Q, E, seed)
-    use calc_sutherland, only : mu6, mu2, mu_23
+  attributes(global) subroutine calc_Ev2(nx, ny, nz, dx, dy, dz, Q, T, E, seed)
+    use calc_sutherland, only : mu, mu2
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device    :: Q(5,nx,ny,nz)
+    real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz)
     real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2)
     integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
     real(8), shared :: u(threadsEv%x+1,0:threadsEv%y+1,0:threadsEv%z+1)
@@ -252,7 +252,7 @@ contains
     real(8), shared :: w(threadsEv%x+1,0:threadsEv%z+1,threadsEv%y)
     integer i, j, k, it, jt, kt
     real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx
-    real(8) mx, mux, mvx, mwx, muy, mvy, muz, mwz
+    real(8) m1, m2, mx, mux, mvx, mwx, muy, mvy, muz, mwz
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -262,17 +262,14 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     call store_shared_x(nx, ny, nz, i, j, k, it, jt, kt, Q, u, v, w)
 
-    block
-      real(8), device :: Tx(2)
-      Tx(:) = Q(5,i:i+1,j,k) / (R * Q(1,i:i+1,j,k))
-      mx    = mu2(Tx(:))
-      kTx   = Cp_over_Pr * mx * (-Tx(1) + Tx(2)) * dx(i)
-    end block
+    m1 = mu(T(i,j,k))
+    m2 = mu(T(i+1,j,k))
+    mx  = 0.5d0 * (m1 + mu(T(i+1,j,k)))
+    kTx = Cp_over_Pr * mx * (-T(i,j,k) + T(i+1,j,k)) * dx(i)
     block
       real(8) my1, my2
-      real(8), device :: Ty(2,3)
-      Ty(:,:) = Q(5,i:i+1,j-1:j+1,k) / (R * Q(1,i:i+1,j-1:j+1,k))
-      call mu_23(Ty(:,:), my1, my2)
+      my1 = 0.25d0 * (mu(T(i,j-1,k)) + m1 + mu(T(i+1,j-1,k)) + m2)
+      my2 = 0.25d0 * (m1 + mu(T(i,j+1,k)) + m2 + mu(T(i+1,j+1,k)))
       !muy = 0.25d0 * (my1 * (-u(it,jt-1,kt) + u(it,jt,kt) - u(it+1,jt-1,kt) + u(it+1,jt,kt)) &
       !              + my2 * (-u(it,jt,kt) + u(it,jt+1,kt) - u(it+1,jt,kt) + u(it+1,jt+1,kt))) * dy(j)
       !mvy = 0.25d0 * (my1 * (-v(it,jt-1,kt) + v(it,jt,kt) - v(it+1,jt-1,kt) + v(it+1,jt,kt)) &
@@ -284,9 +281,9 @@ contains
     end block
     block
       real(8) mz1, mz2
-      real(8), device :: Tz(2,3)
-      Tz(:,:) = Q(5,i:i+1,j,k-1:k+1) / (R * Q(1,i:i+1,j,k-1:k+1))
-      call mu_23(Tz(:,:), mz1, mz2)
+      m2  = mu(T(i,j,k+1))
+      mz1 = 0.25d0 * (mu(T(i,j,k-1)) + m1 + mu(T(i+1,j,k-1)) + m2)
+      mz2 = 0.25d0 * (m1 + mu(T(i,j,k+1)) + m2 + mu(T(i+1,j,k+1)))
       !muz = 0.25d0 * (mz1 * (-u(it,jt,kt-1) + u(it,jt,kt) - u(it+1,jt,kt-1) + u(it+1,jt,kt)) &
       !              + mz2 * (-u(it,jt,kt) + u(it,jt,kt+1) - u(it+1,jt,kt) + u(it+1,jt,kt+1))) * dz(k)
       !mwz = 0.25d0 * (mz1 * (-w(it,kt-1,jt) + w(it,kt,jt) - w(it+1,kt-1,jt) + w(it+1,kt,jt)) &
@@ -304,14 +301,12 @@ contains
     txz  = mwx + muz
     if (present(seed)) then
       block
-        real(8) std_t, std_q, over_V, Zq, T1, T2
+        real(8) std_t, std_q, over_V, Zq
         real(8), device    :: rand(4), Z(6), Zx(6)
         real(8), parameter :: kb_over_dt = 1.380649d-23 / dt
-        T1  = Q(5,i,j,k)   / (R * Q(1,i,j,k))
-        T2  = Q(5,i+1,j,k) / (R * Q(1,i+1,j,k))
         over_V = dx(i) * dy(j) * dz(k)
-        std_t  = sqrt(kb_over_dt * over_V * mx * (T1 + T2))
-        std_q  = sqrt(kb_over_dt * over_V * mx * Cp_over_Pr * (T1**2 + T2**2))
+        std_t  = sqrt(kb_over_dt * over_V * mx * (T(i,j,k) + T(i+1,j,k)))
+        std_q  = sqrt(kb_over_dt * over_V * mx * Cp_over_Pr * (T(i,j,k)**2 + T(i+1,j,k)**2))
         Z   = Z_tilde(seed(i,j,k))
         Zx  = Z_tilde(seed(i+1,j,k))
         Z   = 0.5d0 * (Z + Zx)
@@ -332,13 +327,13 @@ contains
   end subroutine calc_Ev2
  
 
-  attributes(global) subroutine calc_Ev_LES2(nx, ny, nz, dx, dy, dz, Q, mut, qc2, E)
+  attributes(global) subroutine calc_Ev_LES2(nx, ny, nz, dx, dy, dz, Q, T, mut, qc2, E)
     use calc_sutherland, only : mu6, mu2, mu23
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device    :: Q(5,nx,ny,nz)
+    real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz)
     real(8), intent(in), device    :: mut(nx,ny,nz), qc2(nx,ny,nz)
     real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k
@@ -415,13 +410,13 @@ contains
   end subroutine calc_Ev_LES2
  
 
-  attributes(global) subroutine calc_Fv2(nx, ny, nz, dy, dx, dz, Q, F, seed)
-    use calc_sutherland, only : mu6, mu2, mu_23, mu_32
+  attributes(global) subroutine calc_Fv2(nx, ny, nz, dy, dx, dz, Q, T, F, seed)
+    use calc_sutherland, only : mu, mu2
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device    :: Q(5,nx,ny,nz)
+    real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz)
     real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2)
     integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
     real(8), shared :: u(threadsFv%y+1,0:threadsFv%x+1,threadsFv%z)
@@ -429,7 +424,7 @@ contains
     real(8), shared :: w(threadsFv%y+1,0:threadsFv%z+1,threadsFv%x)
     integer i, j, k, it, jt, kt
     real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy
-    real(8) my, muy, mvy, mwy, mvz, mwz, mux, mvx
+    real(8) m1, m2, my, muy, mvy, mwy, mvz, mwz, mux, mvx
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -439,11 +434,12 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     call store_shared_y(nx, ny, nz, i, j, k, it, jt, kt, Q, u, v, w)
 
+    m1 = mu(T(i,j,k))
+    m2 = mu(T(i,j+1,k))
     block
       real(8) mx1, mx2
-      real(8), device :: Tx(3,2)
-      Tx(:,:) = Q(5,i-1:i+1,j:j+1,k) / (R * Q(1,i-1:i+1,j:j+1,k))
-      call mu_23(Tx(:,:), mx1, mx2)
+      mx1 = 0.25d0 * (mu(T(i-1,j,k)) + m1 + mu(T(i-1,j+1,k)) + m2)
+      mx2 = 0.25d0 * (m1 + mu(T(i+1,j,k)) + m2 + mu(T(i+1,j+1,k)))
       !mux = 0.25d0 * (mx1 * (-u(jt,it-1,kt) + u(jt,it,kt) - u(jt+1,it-1,kt) + u(jt+1,it,kt)) &
       !              + mx2 * (-u(jt,it,kt) + u(jt,it+1,kt) - u(jt+1,it,kt) + u(jt+1,it+1,kt))) * dx(i)
       !mvx = 0.25d0 * (mx1 * (-v(jt,it-1,kt) + v(jt,it,kt) - v(jt+1,it-1,kt) + v(jt+1,it,kt)) &
@@ -453,17 +449,12 @@ contains
       mvx = 0.25d0 * (mx1 * (-v(jt,it-1,kt) - v(jt+1,it-1,kt)) + (mx1 - mx2) * (v(jt,it,kt) + v(jt+1,it,kt)) &
                     + mx2 * ( v(jt,it+1,kt) + v(jt+1,it+1,kt))) * dx(i)
     end block
-    block
-      real(8), device :: Ty(2)
-      Ty(:) = Q(5,i,j:j+1,k) / (R * Q(1,i,j:j+1,k))
-      my    = mu2(Ty(:))
-      kTy   = Cp_over_Pr * my * (-Ty(1) + Ty(2)) * dy(j)
-    end block
+    my  = 0.5d0 * (m1 + m2)
+    kTy = Cp_over_Pr * my * (-T(i,j,k) + T(i,j+1,k)) * dy(j)
     block
       real(8) mz1, mz2
-      real(8), device :: Tz(2,3)
-      Tz(:,:) = Q(5,i,j:j+1,k-1:k+1) / (R * Q(1,i,j:j+1,k-1:k+1))
-      call mu_32(Tz(:,:), mz1, mz2)
+      mz1 = 0.25d0 * (mu(T(i,j,k-1)) + m1 + mu(T(i,j+1,k-1)) + m2)
+      mz2 = 0.25d0 * (m1 + mu(T(i,j,k+1)) + m2 + mu(T(i,j+1,k+1)))
       !mvz = 0.25d0 * (mz1 * (-v(jt,it,kt-1) + v(jt,it,kt) - v(jt+1,it,kt-1) + v(jt+1,it,kt)) &
       !              + mz2 * (-v(jt,it,kt) + v(jt,it,kt+1) - v(jt+1,it,kt) + v(jt+1,it,kt+1))) * dz(k)
       !mwz = 0.25d0 * (mz1 * (-w(jt,kt-1,it) + w(jt,kt,it) - w(jt+1,kt-1,it) + w(jt+1,kt,it)) &
@@ -509,13 +500,13 @@ contains
   end subroutine calc_Fv2
  
 
-  attributes(global) subroutine calc_Fv_LES2(nx, ny, nz, dy, dx, dz, Q, mut, qc2, F)
+  attributes(global) subroutine calc_Fv_LES2(nx, ny, nz, dy, dx, dz, Q, T, mut, qc2, F)
     use calc_sutherland, only : mu6, mu2, mu23, mu32
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device    :: Q(5,nx,ny,nz)
+    real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz)
     real(8), intent(in), device    :: mut(nx,ny,nz), qc2(nx,ny,nz)
     real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k
@@ -592,13 +583,13 @@ contains
   end subroutine calc_Fv_LES2
  
 
-  attributes(global) subroutine calc_Gv2(nx, ny, nz, dx, dy, dz, Q, G, seed)
-    use calc_sutherland, only : mu6, mu2, mu_32
+  attributes(global) subroutine calc_Gv2(nx, ny, nz, dx, dy, dz, Q, T, G, seed)
+    use calc_sutherland, only : mu, mu2
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device    :: Q(5,nx,ny,nz)
+    real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz)
     real(8), intent(inout), device :: G(5,nx-2,ny-2,nz-1)
     integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
     real(8), shared :: u(threadsGv%z+1,0:threadsGv%x+1,threadsGv%y)
@@ -606,7 +597,7 @@ contains
     real(8), shared :: w(threadsGv%z+1,0:threadsGv%x+1,0:threadsGv%y+1)
     integer i, j, k, it, jt, kt
     real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz
-    real(8) mz, muz, mvz, mwz, mwx, mux, mvy, mwy
+    real(8) m1, m2, mz, muz, mvz, mwz, mwx, mux, mvy, mwy
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -616,11 +607,12 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     call store_shared_z(nx, ny, nz, i, j, k, it, jt, kt, Q, u, v, w)
 
+    m1 = mu(T(i,j,k))
+    m2 = mu(T(i,j,k+1))
     block
       real(8) mx1, mx2
-      real(8), device :: Tx(3,2)
-      Tx(:,:) = Q(5,i-1:i+1,j,k:k+1) / (R * Q(1,i-1:i+1,j,k:k+1))
-      call mu_32(Tx(:,:), mx1, mx2)
+      mx1 = 0.25d0 * (mu(T(i-1,j,k)) + m1 + mu(T(i-1,j,k+1)) + m2)
+      mx2 = 0.25d0 * (m1 + mu(T(i+1,j,k)) + m2 + mu(T(i+1,j,k+1)))
       !mux = 0.25d0 * (mx1 * (-u(kt,it-1,jt) + u(kt,it,jt) - u(kt+1,it-1,jt) + u(kt+1,it,jt)) &
       !              + mx2 * (-u(kt,it,jt) + u(kt,it+1,jt) - u(kt+1,it,jt) + u(kt+1,it+1,jt))) * dx(i)
       !mwx = 0.25d0 * (mx1 * (-w(kt,jt,it-1) + w(kt,jt,it) - w(kt+1,jt,it-1) + w(kt+1,jt,it)) &
@@ -632,9 +624,8 @@ contains
     end block
     block
       real(8) my1, my2
-      real(8), device :: Ty(3,2)
-      Ty(:,:) = Q(5,i,j-1:j+1,k:k+1) / (R * Q(1,i,j-1:j+1,k:k+1))
-      call mu_32(Ty(:,:), my1, my2)
+      my1 = 0.25d0 * (mu(T(i,j-1,k)) + m1 + mu(T(i,j-1,k+1)) + m2)
+      my2 = 0.25d0 * (m1 + mu(T(i,j+1,k)) + m2 + mu(T(i,j+1,k+1)))
       !mvy = 0.25d0 * (my1 * (-v(kt,jt-1,it) + v(kt,jt,it) - v(kt+1,jt-1,it) + v(kt+1,jt,it)) &
       !              + my2 * (-v(kt,jt,it) + v(kt,jt+1,it) - v(kt+1,jt,it) + v(kt+1,jt+1,it))) * dy(j)
       !mwy    = 0.25d0 * (my1    * (-Q(4,i,j-1,k) + Q(4,i,j,k) - Q(4,i,j-1,k+1) + Q(4,i,j,k+1)) &
@@ -644,12 +635,8 @@ contains
       mwy = 0.25d0 * (my1 * (-w(kt,it,jt-1) - w(kt+1,it,jt-1)) + (my1 - my2) * (w(kt,it,jt) + w(kt+1,it,jt)) &
                     + my2 * ( w(kt,it,jt+1) + w(kt+1,it,jt+1))) * dy(j)
     end block
-    block
-      real(8), device :: Tz(2)
-      Tz(:)   = Q(5,i,j,k:k+1) / (R * Q(1,i,j,k:k+1))
-      mz      = mu2(Tz(:))
-      kTz     = Cp_over_Pr * mz * (-Tz(1) + Tz(2)) * dz(k)
-    end block
+    mz  = 0.5d0 * (m1 + m2)
+    kTz = Cp_over_Pr * mz * (-T(i,j,k) + T(i,j,k+1)) * dz(k)
     muz = mz * (-u(kt,it,jt) + u(kt+1,it,jt)) * dz(k)
     mvz = mz * (-v(kt,jt,it) + v(kt+1,jt,it)) * dz(k)
     mwz = mz * (-w(kt,it,jt) + w(kt+1,it,jt)) * dz(k)
@@ -686,13 +673,13 @@ contains
   end subroutine calc_Gv2
 
 
-  attributes(global) subroutine calc_Gv_LES2(nx, ny, nz, dx, dy, dz, Q, mut, qc2, G)
+  attributes(global) subroutine calc_Gv_LES2(nx, ny, nz, dx, dy, dz, Q, T, mut, qc2, G)
     use calc_sutherland, only : mu6, mu2, mu32
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device    :: Q(5,nx,ny,nz)
+    real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz)
     real(8), intent(in), device    :: mut(nx,ny,nz), qc2(nx,ny,nz)
     real(8), intent(inout), device :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k
