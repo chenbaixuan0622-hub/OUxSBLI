@@ -51,9 +51,9 @@ contains
     real(8), intent(out), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
     real(8), intent(out), device :: G(5,nx-accuracy,ny-accuracy,nz-accuracy+1)
     integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
-    real(8), dimension(nx,ny,nz), device   :: sensor
+    real(8), dimension(nx,ny,nz), device :: T, sensor
     integer stat
-    call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, ruvwp)
+    call calc_quantities_T_3D(nx, ny, nz, Jacobian, QJ, ruvwp, T)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, dx, dy, dz, ruvwp, sensor)
     call calc_E<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, ruvwp, sensor, E)
     call calc_F<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, ruvwp, sensor, F)
@@ -61,24 +61,24 @@ contains
     stat = cudaDeviceSynchronize()
     if (present(seed)) then
       if (id_visc == 2) then
-        call calc_Ev4<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, E, seed)
-        call calc_Fv4<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, F, seed)
-        call calc_Gv4<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, G, seed)
+        call calc_Ev4<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, T, E, seed)
+        call calc_Fv4<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, T, F, seed)
+        call calc_Gv4<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, T, G, seed)
       else
-        call calc_Ev2<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, E, seed)
-        call calc_Fv2<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, F, seed)
-        call calc_Gv2<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, G, seed)
+        call calc_Ev2<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, T, E, seed)
+        call calc_Fv2<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, T, F, seed)
+        call calc_Gv2<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, T, G, seed)
       endif
       call update_seed(nx, ny, nz, seed)
     else
       if (id_visc == 2) then
-        call calc_Ev4<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, E)
-        call calc_Fv4<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, F)
-        call calc_Gv4<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, G)
+        call calc_Ev4<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, T, E)
+        call calc_Fv4<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, T, F)
+        call calc_Gv4<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, T, G)
       else
-        call calc_Ev2<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, E)
-        call calc_Fv2<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, F)
-        call calc_Gv2<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, G)
+        call calc_Ev2<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, T, E)
+        call calc_Fv2<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, T, F)
+        call calc_Gv2<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, T, G)
       endif
     endif
     stat = cudaDeviceSynchronize()
@@ -98,11 +98,11 @@ contains
     real(8), intent(out), device :: F(5,nx-accuracy,ny-accuracy+1,nz-accuracy)
     real(8), intent(out), device :: G(5,nx-accuracy,ny-accuracy,nz-accuracy+1)
     integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
-    real(8), dimension(nx,ny,nz), device   :: sensor, mut, qc2
+    real(8), dimension(nx,ny,nz), device :: T, sensor, mut, qc2
     integer stat
     mut = 0.d0
     qc2 = 0.d0
-    call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, ruvwp)
+    call calc_quantities_T_3D(nx, ny, nz, Jacobian, QJ, ruvwp, T)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, dx, dy, dz, ruvwp, sensor)
     call calc_E<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, ruvwp, sensor, E)
     call calc_F<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, ruvwp, sensor, F)
@@ -111,13 +111,13 @@ contains
     stat = cudaDeviceSynchronize()
     call set_bc_mut(nx, ny, nz, mut, qc2)
     if (id_visc == 2) then
-      call calc_Ev_LES4<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, mut, qc2, E)
-      call calc_Fv_LES4<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, mut, qc2, F)
-      call calc_Gv_LES4<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, mut, qc2, G)
+      call calc_Ev_LES4<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, T, mut, qc2, E)
+      call calc_Fv_LES4<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, T, mut, qc2, F)
+      call calc_Gv_LES4<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, T, mut, qc2, G)
     else
-      call calc_Ev_LES2<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, mut, qc2, E)
-      call calc_Fv_LES2<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, mut, qc2, F)
-      call calc_Gv_LES2<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, mut, qc2, G)
+      call calc_Ev_LES2<<<blocksEv,threadsEv,1>>>(nx, ny, nz, dx, dy, dz, ruvwp, T, mut, qc2, E)
+      call calc_Fv_LES2<<<blocksFv,threadsFv,2>>>(nx, ny, nz, dy, dx, dz, ruvwp, T, mut, qc2, F)
+      call calc_Gv_LES2<<<blocksGv,threadsGv,3>>>(nx, ny, nz, dx, dy, dz, ruvwp, T, mut, qc2, G)
     endif
     stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_LES

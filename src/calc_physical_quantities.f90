@@ -20,10 +20,10 @@ contains
   end subroutine set_q
 
   subroutine calc_quantities_2D(nx,ny,Jacobian,QJ,rho,u,v,p)
-    integer, intent(in), value                      :: nx, ny
-    real(8), intent(in), dimension(nx,ny), device   :: Jacobian
-    real(8), intent(in), dimension(4,nx,ny), device :: QJ ! Q / Jacobian
-    real(8), intent(out), dimension(nx,ny), device  :: rho, u, v, p
+    integer, intent(in), value   :: nx, ny
+    real(8), intent(in), device  :: Jacobian(nx,ny)
+    real(8), intent(in), device  :: QJ(4,nx,ny) ! Q / Jacobian
+    real(8), intent(out), device :: rho(nx,ny), u(nx,ny), v(nx,ny), p(nx,ny)
     integer i, j
     real(8) :: over_Q1
     !$cuf kernel do(2) <<<*,*>>>
@@ -33,7 +33,7 @@ contains
         rho(i,j) = Jacobian(i,j) * QJ(1,i,j)
         u(i,j)   = QJ(2,i,j) * over_Q1
         v(i,j)   = QJ(3,i,j) * over_Q1
-        p(i,j)   = gamma_1 * (Jacobian(i,j) * QJ(4,i,j)- 0.5d0 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))
+        p(i,j)   = gamma_1 * (Jacobian(i,j) * QJ(4,i,j)- 0.5d0 * rho(i,j) * (u(i,j)*u(i,j) + v(i,j)*v(i,j)))
     enddo;enddo
   end subroutine calc_quantities_2D
 
@@ -53,8 +53,32 @@ contains
           Q(2,i,j,k) = QJ(2,i,j,k) * over_Q1
           Q(3,i,j,k) = QJ(3,i,j,k) * over_Q1
           Q(4,i,j,k) = QJ(4,i,j,k) * over_Q1
-          Q(5,i,j,k) = gamma_1 * (Jacobian(i,j) * QJ(5,i,j,k) - 0.5d0 * Q(1,i,j,k) * (Q(2,i,j,k)**2 + Q(3,i,j,k)**2 + Q(4,i,j,k)**2))
+          Q(5,i,j,k) = gamma_1 * (Jacobian(i,j) * QJ(5,i,j,k) - 0.5d0 * Q(1,i,j,k) * &
+                      (Q(2,i,j,k)*Q(2,i,j,k) + Q(3,i,j,k)*Q(3,i,j,k) + Q(4,i,j,k)*Q(4,i,j,k)))
     enddo;enddo;enddo
   end subroutine calc_quantities_3D
+  
+  subroutine calc_quantities_T_3D(nx, ny, nz, Jacobian, QJ, Q, T)
+    integer, intent(in), value   :: nx, ny, nz
+    real(8), intent(in), device  :: Jacobian(nx,ny)
+    real(8), intent(in), device  :: QJ(5,nx,ny,nz) ! Q / Jacobian
+    real(8), intent(out), device :: Q(5,nx,ny,nz)
+    real(8), intent(out), device :: T(nx,ny,nz)
+    integer i, j, k
+    real(8) :: over_Q1
+    !$cuf kernel do(3) <<<*,*>>>
+    do k = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          over_Q1    = 1.d0 / QJ(1,i,j,k)
+          Q(1,i,j,k) = Jacobian(i,j) * QJ(1,i,j,k)
+          Q(2,i,j,k) = QJ(2,i,j,k) * over_Q1
+          Q(3,i,j,k) = QJ(3,i,j,k) * over_Q1
+          Q(4,i,j,k) = QJ(4,i,j,k) * over_Q1
+          Q(5,i,j,k) = gamma_1 * (Jacobian(i,j) * QJ(5,i,j,k) - 0.5d0 * Q(1,i,j,k) * &
+                      (Q(2,i,j,k)*Q(2,i,j,k) + Q(3,i,j,k)*Q(3,i,j,k) + Q(4,i,j,k)*Q(4,i,j,k)))
+          T(i,j,k)   = Q(5,i,j,k) / (R * Q(1,i,j,k))
+    enddo;enddo;enddo
+  end subroutine calc_quantities_T_3D
 end module calc_physical_quantities
 
