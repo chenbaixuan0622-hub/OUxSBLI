@@ -20,7 +20,6 @@ OBJ =	mod_globals.o \
       calc_mat.o \
       calc_physical_quantities.o \
       calc_rand.o \
-      calc_visc_common.o \
       calc_visc2.o \
       calc_visc4.o \
       calc_les.o \
@@ -58,8 +57,8 @@ calc_physical_quantities.o: mod_globals.mod mod_constant.mod
 calc_common.o: mod_globals.mod
 calc_keep.o: mod_globals.mod mod_constant.mod 
 calc_visc_common.o: mod_constant.mod
-calc_visc2.o: mod_globals.mod mod_constant.mod calc_visc_common.mod calc_rand.mod
-calc_visc4.o: mod_globals.mod mod_constant.mod calc_visc_common.mod calc_rand.mod
+calc_visc2.o: mod_globals.mod mod_constant.mod calc_rand.mod
+calc_visc4.o: mod_globals.mod mod_constant.mod calc_rand.mod
 calc_mat.o: mod_globals.mod calc_common_dim.mod
 calc_slau.o: mod_globals.mod mod_constant.mod calc_common.mod calc_hybrid.mod
 calc_roe.o: mod_globals.mod calc_common.mod calc_common_dim.mod calc_physical_quantities.mod calc_mat.mod

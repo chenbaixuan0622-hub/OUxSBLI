@@ -1,5 +1,5 @@
 module set_init_common
-  use mod_globals, only : gamma, R
+  use mod_globals, only : gamma, R, Taw, rf
   use mod_constant, only : Cp, gamma_1, over_gamma_1
   implicit none
 contains
@@ -185,13 +185,13 @@ contains
   end subroutine calc_rms
 
 
-  subroutine set_init_tbl(nx, ny, nz, xs, ys, zs, rand, blt0, blt, rf, u0, p0, T0, M0, Q)
+  subroutine set_init_tbl(nx, ny, nz, xs, ys, zs, rand, blt0, blt, u0, p0, T0, M0, Q)
     integer, intent(in)  :: nx, ny, nz
     real(8), intent(in)  :: xs(nx), ys(ny), zs(nz)
-    real(8), intent(in)  :: rand, blt0, blt, rf, u0, p0, T0, M0
+    real(8), intent(in)  :: rand, blt0, blt, u0, p0, T0, M0
     real(8), intent(out) :: Q(5,nx,ny,nz)
     integer i, j, k
-    real(8) :: eta, rho, u, v, w, T, Tw, Taw, p_wall
+    real(8) :: eta, rho, u, v, w, T, Tw, p_wall
     real(8) :: fd, pi = acos(-1.d0)
     ! random
     real(8), allocatable :: randum(:,:,:,:), ustd(:,:,:), vstd(:,:,:), wstd(:,:,:), Tstd(:,:,:)
@@ -247,35 +247,20 @@ contains
           wstd(i,j,k) = fd * wstd(i,j,k)
           Tstd(i,j,k) = fd * Tstd(i,j,k)
     enddo;enddo;enddo
-    block
-      real(8) urms1, vrms1, wrms1, Trms1, urms2, vrms2, wrms2, Trms2
-      call calc_rms(nx, ny, nz, ustd, urms1)
-      call calc_rms(nx, ny, nz, vstd, vrms1)
-      call calc_rms(nx, ny, nz, wstd, wrms1)
-      call calc_rms(nx, ny, nz, Tstd, Trms1)
-      call calc_Gaussian_filter_x(nx, ny, nz, 3, xs, ustd)
-      call calc_Gaussian_filter_y(nx, ny, nz, 3, ys, ustd)
-      call calc_Gaussian_filter_z(nx, ny, nz, 3, zs, ustd)
-      call calc_Gaussian_filter_x(nx, ny, nz, 3, xs, vstd)
-      call calc_Gaussian_filter_y(nx, ny, nz, 3, ys, vstd)
-      call calc_Gaussian_filter_z(nx, ny, nz, 3, zs, vstd)
-      call calc_Gaussian_filter_x(nx, ny, nz, 3, xs, wstd)
-      call calc_Gaussian_filter_y(nx, ny, nz, 3, ys, wstd)
-      call calc_Gaussian_filter_z(nx, ny, nz, 3, zs, wstd)
-      call calc_Gaussian_filter_x(nx, ny, nz, 3, xs, Tstd)
-      call calc_Gaussian_filter_y(nx, ny, nz, 3, ys, Tstd)
-      call calc_Gaussian_filter_z(nx, ny, nz, 3, zs, Tstd)
-      call set_bc_cyclic_x_cpu(nx, ny, nz, ustd, vstd, wstd, Tstd)
-      call set_bc_cyclic_z_cpu(nx, ny, nz, ustd, vstd, wstd, Tstd)
-      call calc_rms(nx, ny, nz, ustd, urms2)
-      call calc_rms(nx, ny, nz, vstd, vrms2)
-      call calc_rms(nx, ny, nz, wstd, wrms2)
-      call calc_rms(nx, ny, nz, Tstd, Trms2)
-      ustd = ustd * urms1 / urms2
-      vstd = vstd * vrms1 / vrms2
-      wstd = wstd * wrms1 / wrms2
-      Tstd = Tstd * Trms1 / Trms2
-    end block
+    call calc_Gaussian_filter_x(nx, ny, nz, 3, xs, ustd)
+    call calc_Gaussian_filter_y(nx, ny, nz, 3, ys, ustd)
+    call calc_Gaussian_filter_z(nx, ny, nz, 3, zs, ustd)
+    call calc_Gaussian_filter_x(nx, ny, nz, 3, xs, vstd)
+    call calc_Gaussian_filter_y(nx, ny, nz, 3, ys, vstd)
+    call calc_Gaussian_filter_z(nx, ny, nz, 3, zs, vstd)
+    call calc_Gaussian_filter_x(nx, ny, nz, 3, xs, wstd)
+    call calc_Gaussian_filter_y(nx, ny, nz, 3, ys, wstd)
+    call calc_Gaussian_filter_z(nx, ny, nz, 3, zs, wstd)
+    call calc_Gaussian_filter_x(nx, ny, nz, 3, xs, Tstd)
+    call calc_Gaussian_filter_y(nx, ny, nz, 3, ys, Tstd)
+    call calc_Gaussian_filter_z(nx, ny, nz, 3, zs, Tstd)
+    call set_bc_cyclic_x_cpu(nx, ny, nz, ustd, vstd, wstd, Tstd)
+    call set_bc_cyclic_z_cpu(nx, ny, nz, ustd, vstd, wstd, Tstd)
     ! add fluctuation
     do k = 1, nz
       do j = 1, ny
@@ -283,9 +268,8 @@ contains
           eta = 5.d0 * ys(j) / blt0
           u   = min(u0, u0 * (0.0015d0 * eta**4 - 0.0181d0 * eta**3 + 0.029d0 * eta**2 + 0.3192 * eta + 0.0003d0))
           v   = 0.d0
-          Taw = T0 * (1.d0 + rf * 0.5d0 * gamma_1 * M0**2)
           Tw  = Taw
-          T   = Tw + (Taw - Tw) * u / u0 - rf * u**2 / (2.d0 * Cp)
+          T   = Tw + (Taw - Tw) * u / u0 - rf * u**2 / (2.d0 * gamma * R / (gamma - 1.d0))
           u   = u + ustd(i,j,k)
           v   = v + vstd(i,j,k)
           w   = wstd(i,j,k)

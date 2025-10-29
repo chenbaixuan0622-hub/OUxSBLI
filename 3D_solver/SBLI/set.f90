@@ -1,81 +1,108 @@
 module set
   use cudafor
   use mpi
-  use mod_globals, only : id_rescale, ny1, nre2, gamma, R, Cp, Pr, u0, p0, T0, M0, blt, rho2, p2, ux, uy
+  use mod_globals, only : id_rescale, ny1, nre2, gamma, R, Cp, Pr, u0, p0, T0, M0, blt, beta, ny2, rho2, p2, ux, uy, rf, Taw
   use mod_constant, only : Cp, gamma_1, over_gamma_1
   use set_bc_common
+  use set_bc_tbl_sbli
   use set_init_common
   use calc_para
   implicit none
+  integer No
 contains
   subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, Lx1, x, y, z, dx, dy, dz)
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: Lx, Ly, Lz, Lx1
     real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
-    integer i, j, k
-    real(8) dx1, dy1, dz1
-    dx1 = Lx / dble(nx-1)
-    dy1 = dx1
-    dz1 = Lz / dble(nz-1)
+    integer i, j, k, nx1, ny_b
+    real(8) dx1, dy1, dz1, ximp, Lx_s
+    dx1  = 20.d0 * blt / dble(512)
+    dy1  = dx1
+    dz1  = Lz / dble(nz-1)
+    ximp = 0.9d0 * Lx1 + 30.d0 * blt
 
     if (myrank == 0) then
       x(1) = 0.d0
+      do i = 1, nx-1
+        dx(i) = dx1
+        x(i+1) = x(i) + dx(i)
+      enddo
     else
-      x(1) = Lx1
+      x(1) = 0.9d0 * Lx1
+      nx1  = int(0.9d0 * dble(nx-1))
+      ! computational region
+      do i = 1, nx1
+        dx(i)  = dx1
+        x(i+1) = x(i) + dx(i)
+      enddo
+      ! buffer region
+      do i = nx1 + 1, nx-1
+        dx(i)  = dx1 * (1.d0 + 3.d0 * dble(i-nx1) / dble(nx-nx1))
+        x(i+1) = x(i) + dx(i)
+      enddo
     endif
-    do i = 1, nx-1
-      dx(i) = dx1
-      x(i+1) = x(i) + dx(i)
-    enddo
+    x(:) = x(:) - ximp
 
     y(1) = 0.d0
     do j = 1, ny-1
       if (y(j) <= 3.d0 * blt) then
         dy(j) = min(1.d0, max(0.07d0, dble(j)/dble(128))) * dy1
-      elseif (3.d0 * blt <= y(j) .and. y(j) <= 8.d0 * blt) then
-        dy(j) = 1.5d0 * dy1
+        ny_b  = j
       else
-        dy(j) = 1.75d0 * dy1
+        dy(j) = dy1 * (1.d0 + 0.75d0 * dble(j-ny_b) / dble(ny2-ny_b))
       endif
       y(j+1) = y(j) + dy(j)
     enddo
-    print *, y(ny)
+
+    if (myrank == 2) then
+      Lx_s = y(ny) / dble(beta) / blt
+      do i = 1, nx
+        if (x(i) / blt + Lx_s >= 0.d0) then
+          No = i
+          exit
+        endif
+      enddo
+      print *, "tan(beta)=", tan(beta)
+      print *, "length of shock=", Lx_s
+      print *, "height of shock=", y(ny) / blt
+      print *, "x(No)=", x(No) / blt
+    endif
 
     z(1) = 0.d0
     do k = 1, nz-1
       dz(k) = dz1
       z(k+1) = z(k) + dz(k)
     enddo
+    z(:) = z(:) - 0.5d0 * Lz
   end subroutine set_grid
+
 
   subroutine set_init(myrank, nx, ny, nz, xs, ys, zs, Q)
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: xs(nx), ys(ny), zs(nz)
     real(8), intent(out) :: Q(5,nx,ny,nz)
-    real(8) :: rf = 0.89d0
-    call set_init_tbl(nx, ny, nz, xs, ys, zs, 0.75d0*blt, blt, rf, u0, p0, T0, M0, Q)
+    call set_init_tbl(nx, ny, nz, xs, ys, zs, 0.1d0, 0.75d0*blt, blt, u0, p0, T0, M0, Q)
   end subroutine set_init
-  
+
+
   subroutine set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
     integer, intent(in), value     :: myrank, nx, ny, nz
     real(8), intent(in), device    :: Jacobian(nx,ny)
     real(8), intent(inout), device :: QJ(5,nx,ny,nz) ! Q / Jacobian
     real(8), intent(in), device, optional :: Qre(ny*(nz-6)*5)
-    integer i, j, k, l, No, ireq, ierr, istat(MPI_STATUS_SIZE)
-    real(8) :: p_wall, rf = 0.89d0
+    integer i, j, k, l, ireq, ierr, istat(MPI_STATUS_SIZE)
+    real(8) :: p_wall
     ! Riemann invariants
-    real(8) :: rhoin, pin, cin, vin, Rp, Rm, rhob, ub, vb, cb, pb
-    real(8) :: rho0, c0, v0 = 0.d0, Taw, T
+    real(8) :: rhoin, pin, cin, vin, Rp, Rm, rhob, ub, vb, cb, pb, v0 = 0.d0
     ! parallel
     real(8), device :: Q1d(3*(ny1-2)*(nz-6)*5)
-    !real(8) Q_cpu(3*(ny1-2)*(nz-6)*5)
     ! cache
     real(8) Jacobian_tmp
     ! temperature and density at top
-    Taw  = T0 * (1.d0 + rf * 0.5d0 * gamma_1 * M0**2)
-    T    = Taw - rf * u0**2 / (2.d0 * (gamma * R * over_gamma_1))
-    rho0 = p0 / (R * T)
-    c0   = sqrt(gamma * p0 / rho0)
+    real(8), parameter :: T    = Taw - rf * u0**2 / (2.d0 * Cp)
+    real(8), parameter :: rho0 = p0 / (R * T)
+    real(8), parameter :: c0   = sqrt(gamma * p0 / rho0)
+    real(8), parameter :: c2   = sqrt(gamma * p2 / rho2)
     if (myrank == 0) then
       if (kind(id_rescale) == 4) then
         !$cuf kernel do(2)<<<*,*>>>
@@ -161,9 +188,10 @@ contains
         p_wall = gamma_1 * (QJ(5,i,2,k) - 0.5d0 * (QJ(2,i,2,k)**2 + QJ(3,i,2,k)**2 + QJ(4,i,2,k)**2) / QJ(1,i,2,k))
         QJ(5,i,1,k) = p_wall * over_gamma_1
     enddo;enddo
+    !call set_bc_Riemann_tbl_top_down(nx, ny, nz, 3, 1, nx, Jacobian, QJ)
+    !call set_bc_Neumann_tbl_top_down(nx, ny, nz, 3, 1, nx, Jacobian, QJ)
 
     if (myrank == 2) then
-      No = int(dble(nx)*0.1d0)!int(dble(nx) * 0.33d0 / 35.d0)
       !$cuf kernel do(2)<<<*,*>>>
       do k = 1, nz
         do i = No, nx
@@ -180,9 +208,8 @@ contains
                     / QJ(1,i,ny-1,k)) * Jacobian(i,ny-1)
             rhoin = QJ(1,i,ny-1,k) * Jacobian(i,ny-1)
             cin   = sqrt(gamma * pin / rhoin)
-            c0    = sqrt(gamma * p2 / rho2)
             Rp    = vin + 2.d0 * cin * over_gamma_1
-            Rm    = v0  - 2.d0 * c0  * over_gamma_1
+            Rm    = v0  - 2.d0 * c2  * over_gamma_1
             vb    = 0.5d0 * (Rp + Rm)
             cb    = 0.25d0 * gamma_1 * (Rp - Rm)
             rhob  = cin * rhoin / cb
@@ -197,23 +224,13 @@ contains
       enddo;enddo
     endif
 
-    ! cyclic
-    !$cuf kernel do(2)<<<*,*>>>
-    do j = 1, ny
-      do i = 1, nx
-        do l = 1, 5
-          QJ(l,i,j,1) = QJ(l,i,j,nz-5)
-          QJ(l,i,j,2) = QJ(l,i,j,nz-4)
-          QJ(l,i,j,3) = QJ(l,i,j,nz-3)
-          QJ(l,i,j,nz-2) = QJ(l,i,j,4)
-          QJ(l,i,j,nz-1) = QJ(l,i,j,5)
-          QJ(l,i,j,nz)   = QJ(l,i,j,6)
-    enddo;enddo;enddo
+    call set_bc_cyclic_z(nx, ny, nz, QJ)
 
     if (myrank == 0) then
       call MPI_WAIT(ireq, istat, ierr)
     endif
   end subroutine set_bc
+
 
   subroutine set_bc_mut(nx,ny,nz,mut,qc2)
     integer, intent(in), value      :: nx, ny, nz
@@ -259,7 +276,8 @@ contains
         qc2(i,j,nz)   = qc2(i,j,6)
     enddo;enddo
   end subroutine set_bc_mut
-  
+
+
   subroutine calc_forcing(nx, ny, nz, dx, dy, dz, Q, fx, fy, fz)
     integer, intent(in), value   :: nx, ny, nz
     real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
