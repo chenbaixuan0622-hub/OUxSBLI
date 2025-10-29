@@ -1,10 +1,90 @@
 module calc_visc4
-  use mod_globals, only : id_visc, gamma, R, Pr, Prt, dt
-  use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third
-  use calc_visc_common
+  use mod_globals, only : id_visc, gamma, R, Pr, Prt, dt, threadsEv, threadsFv, threadsGv
+  use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third, two_third, one_twelfth
   use calc_rand
   implicit none
+  real(8), parameter :: one_24 = 1.d0 / 24.d0
 contains
+  !dir$ inline
+  attributes(device) function flux4(a) result(ans)
+    real(8), intent(in), device :: a(3)
+    real(8) ans
+    ans = (-a(1) + 26.d0 * a(2) - a(3)) * one_24
+  end function flux4
+
+
+  !$dir inline
+  attributes(device) subroutine calc_tau_straight(mu, u, vy, wz, d, t11, ut11)
+    real(8), intent(in)        :: mu(3), u(6), vy(6), wz(6)
+    real(8), intent(in), value :: d
+    real(8), intent(out)       :: t11, ut11
+    real(8) tmp(3)
+    tmp(:) = (2.25d0 * (-u(2:4) + u(3:5)) - (-u(1:3) + u(4:6)) * one_twelfth) * d
+    tmp(:) = tmp(:) - 0.0625d0 * (-vy(1:3) + 9.d0 * (vy(2:4) + vy(3:5)) - vy(4:6))
+    tmp(:) = tmp(:) - 0.0625d0 * (-wz(1:3) + 9.d0 * (wz(2:4) + wz(3:5)) - wz(4:6))
+    tmp(:) = two_third * mu(:) * tmp(:)
+    t11    = (-tmp(1) + 26.d0 * tmp(2) - tmp(3)) * one_24
+    tmp(1) = 0.0625d0 * (-u(1) + 9.d0 * (u(2) + u(3)) - u(4)) * tmp(1)
+    tmp(2) = 0.0625d0 * (-u(2) + 9.d0 * (u(3) + u(4)) - u(5)) * tmp(2)
+    tmp(3) = 0.0625d0 * (-u(3) + 9.d0 * (u(4) + u(5)) - u(6)) * tmp(3)
+    ut11   = (-tmp(1) + 26.d0 * tmp(2) - tmp(3)) * one_24
+  end subroutine calc_tau_straight
+
+
+  !$dir inline
+  attributes(device) subroutine calc_tau_straight_LES(mu, mut, u, vy, wz, d, t11, ut11)
+    real(8), intent(in)        :: mu(3), mut(3), u(6), vy(6), wz(6)
+    real(8), intent(in), value :: d
+    real(8), intent(out)       :: t11, ut11
+    real(8) tmp1(3), tmp2(3)
+    tmp1(:) = (2.25d0 * (-u(2:4) + u(3:5)) - (-u(1:3) + u(4:6)) * one_twelfth) * d
+    tmp1(:) = tmp1(:) - 0.0625d0 * (-vy(1:3) + 9.d0 * (vy(2:4) + vy(3:5)) - vy(4:6))
+    tmp1(:) = tmp1(:) - 0.0625d0 * (-wz(1:3) + 9.d0 * (wz(2:4) + wz(3:5)) - wz(4:6))
+    tmp2(:) = two_third * mu(:) * tmp1(:)
+    tmp2(1) = 0.0625d0 * (-u(1) + 9.d0 * (u(2) + u(3)) - u(4)) * tmp2(1)
+    tmp2(2) = 0.0625d0 * (-u(2) + 9.d0 * (u(3) + u(4)) - u(5)) * tmp2(2)
+    tmp2(3) = 0.0625d0 * (-u(3) + 9.d0 * (u(4) + u(5)) - u(6)) * tmp2(3)
+    ut11    = (-tmp2(1) + 26.d0 * tmp2(2) - tmp2(3)) * one_24
+    tmp2(:) = two_third * (mu(:) + mut(:)) * tmp1(:)
+    t11     = (-tmp2(1) + 26.d0 * tmp2(2) - tmp2(3)) * one_24
+  end subroutine calc_tau_straight_LES
+
+
+  !$dir inline
+  attributes(device) subroutine calc_tau_cross(mu, v, uy, d, t12, vt12)
+    real(8), intent(in)        :: mu(3), v(6), uy(6)
+    real(8), intent(in), value :: d
+    real(8), intent(out)       :: t12, vt12
+    real(8) tmp(3)
+    tmp(:) = (1.125d0 * (-v(2:4) + v(3:5)) - (-v(1:3) + v(4:6)) * one_24) * d
+    tmp(:) = tmp(:) + 0.0625d0 * (-uy(1:3) + 9.d0 * (uy(2:4) + uy(3:5)) - uy(4:6))
+    tmp(:) = mu(:) * tmp(:)
+    t12    = (-tmp(1) + 26.d0 * tmp(2) - tmp(3)) * one_24
+    tmp(1) = 0.0625d0 * (-v(1) + 9.d0 * (v(2) + v(3)) - v(4)) * tmp(1)
+    tmp(2) = 0.0625d0 * (-v(2) + 9.d0 * (v(3) + v(4)) - v(5)) * tmp(2)
+    tmp(3) = 0.0625d0 * (-v(3) + 9.d0 * (v(4) + v(5)) - v(6)) * tmp(3)
+    vt12   = (-tmp(1) + 26.d0 * tmp(2) - tmp(3)) * one_24
+  end subroutine calc_tau_cross
+
+
+  !$dir inline
+  attributes(device) subroutine calc_tau_cross_LES(mu, mut, v, uy, d, t12, vt12)
+    real(8), intent(in)        :: mu(3), mut(3), v(6), uy(6)
+    real(8), intent(in), value :: d
+    real(8), intent(out)       :: t12, vt12
+    real(8) tmp1(3), tmp2(3)
+    tmp1(:) = (1.125d0 * (-v(2:4) + v(3:5)) - (-v(1:3) + v(4:6)) * one_24) * d
+    tmp1(:) = tmp1(:) + 0.0625d0 * (-uy(1:3) + 9.d0 * (uy(2:4) + uy(3:5)) - uy(4:6))
+    tmp2(:) = mu(:) * tmp1(:)
+    tmp2(1) = 0.0625d0 * (-v(1) + 9.d0 * (v(2) + v(3)) - v(4)) * tmp2(1)
+    tmp2(2) = 0.0625d0 * (-v(2) + 9.d0 * (v(3) + v(4)) - v(5)) * tmp2(2)
+    tmp2(3) = 0.0625d0 * (-v(3) + 9.d0 * (v(4) + v(5)) - v(6)) * tmp2(3)
+    vt12    = (-tmp2(1) + 26.d0 * tmp2(2) - tmp2(3)) * one_24
+    tmp2(:) = (mu(:) + mut(:)) * tmp1(:)
+    t12     = (-tmp2(1) + 26.d0 * tmp2(2) - tmp2(3)) * one_24
+  end subroutine calc_tau_cross_LES
+
+
   attributes(global) subroutine calc_Ev4(nx, ny, nz, dx, dy, dz, Q, T, mu, E, seed)
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
@@ -13,89 +93,53 @@ contains
     real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
     real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2)
     integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
-    integer i, j, k
+    real(8), shared ::  u(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
+    real(8), shared ::  v(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
+    real(8), shared ::  w(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
+    real(8), shared :: uy(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
+    real(8), shared :: vy(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
+    real(8), shared :: uz(-2:threadsEv%x+3,threadsEv%z,threadsEv%y)
+    real(8), shared :: wz(-2:threadsEv%x+3,threadsEv%z,threadsEv%y)
+    integer i, j, k, it, jt, kt, ii, i_base
     real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
+    it = threadIdx%x
+    jt = threadIdx%y
+    kt = threadIdx%z
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    k  = (blockIdx%z-1)*blockDim%z + kt + 1
+    i_base = (blockIdx%x-1)*blockDim%x
+    do ii = it-2, threadsEv%x+3, blockDim%x
+      i = i_base + ii
+      if (1 <= i .and. i <= nx .and. j <= ny .and. k <= nz) then
+        u(ii,jt,kt) = Q(2,i,j,k)
+        v(ii,jt,kt) = Q(3,i,j,k)
+        w(ii,jt,kt) = Q(4,i,j,k)
+      endif
+      if (1 <= i .and. i <= nx .and. 3 <= j .and. j <= ny-2 .and. k <= nz) then
+        uy(ii,jt,kt) = (two_third * (-Q(2,i,j-1,k) + Q(2,i,j+1,k)) - one_twelfth * (-Q(2,i,j-2,k) + Q(2,i,j+2,k))) * dy(j)
+        vy(ii,jt,kt) = (two_third * (-Q(3,i,j-1,k) + Q(3,i,j+1,k)) - one_twelfth * (-Q(3,i,j-2,k) + Q(3,i,j+2,k))) * dy(j)
+      endif
+      if (1 <= i .and. i <= nx .and. j <= ny .and. 3 <= k .and. k <= nz-2) then
+        uz(ii,jt,kt) = (two_third * (-Q(2,i,j,k-1) + Q(2,i,j,k+1)) - one_twelfth * (-Q(2,i,j,k-2) + Q(2,i,j,k+2))) * dz(k)
+        wz(ii,jt,kt) = (two_third * (-Q(4,i,j,k-1) + Q(4,i,j,k+1)) - one_twelfth * (-Q(4,i,j,k-2) + Q(4,i,j,k+2))) * dz(k)
+      endif
+    enddo
+    call syncthreads()
+    i  = (blockIdx%x-1)*blockDim%x + it
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
       block
         real(8), device :: mu3(3)
+        mu3(:) = 0.0625d0 * (9.d0 * (mu(i-1:i+1,j,k) + mu(i:i+2,j,k)) - (mu(i-2:i,j,k) + mu(i+1:i+3,j,k)))
         block ! dQdx
           real(8), device :: kTx3(3)
-          mu3(:)  = 0.0625d0 * (9.d0 * (mu(i-1:i+1,j,k) + mu(i:i+2,j,k)) - (mu(i-2:i,j,k) + mu(i+1:i+3,j,k)))
-          kTx3(:) = Cp_over_Pr * mu3(:) * 0.125d0 * &
-                    (9.d0 * (-T(i-1:i+1,j,k) + T(i:i+2,j,k)) - (-T(i-2:i,j,k) + T(i+1:i+3,j,k)) * one_third) * dx(i)
+          kTx3(:) = Cp_over_Pr * mu3(:) * &
+                    (1.125d0 * (-T(i-1:i+1,j,k) + T(i:i+2,j,k)) - (-T(i-2:i,j,k) + T(i+1:i+3,j,k)) * one_24) * dx(i)
           kTx     = flux4(kTx3(:))
         end block
-
-
-        block ! txx
-          real(8), device :: ux3(3), vy3(3), wz3(3)
-          ux3(:) = 0.125d0 * (9.d0 * (-Q(2,i-1:i+1,j,k) + Q(2,i:i+2,j,k)) &
-                                   - (-Q(2,i-2:i,j,k)   + Q(2,i+1:i+3,j,k)) * one_third) * dx(i)
-          block
-            real(8) vy_1, vy_2, vy_3, vy_4, vy_5, vy_6
-            vy_1 = dy5(Q(3,i-2,j-2,k), Q(3,i-2,j-1,k), Q(3,i-2,j+1,k), Q(3,i-2,j+2,k), dy(j))
-            vy_2 = dy5(Q(3,i-1,j-2,k), Q(3,i-1,j-1,k), Q(3,i-1,j+1,k), Q(3,i-1,j+2,k), dy(j))
-            vy_3 = dy5(Q(3,i  ,j-2,k), Q(3,i  ,j-1,k), Q(3,i  ,j+1,k), Q(3,i  ,j+2,k), dy(j))
-            vy_4 = dy5(Q(3,i+1,j-2,k), Q(3,i+1,j-1,k), Q(3,i+1,j+1,k), Q(3,i+1,j+2,k), dy(j))
-            vy_5 = dy5(Q(3,i+2,j-2,k), Q(3,i+2,j-1,k), Q(3,i+2,j+1,k), Q(3,i+2,j+2,k), dy(j))
-            vy_6 = dy5(Q(3,i+3,j-2,k), Q(3,i+3,j-1,k), Q(3,i+3,j+1,k), Q(3,i+3,j+2,k), dy(j))
-            vy3(:) = interpolation6_scalar(vy_1, vy_2, vy_3, vy_4, vy_5, vy_6)
-          end block
-          block
-            real(8) wz_1, wz_2, wz_3, wz_4, wz_5, wz_6
-            wz_1 = dy5(Q(4,i-2,j,k-2), Q(4,i-2,j,k-1), Q(4,i-2,j,k+1), Q(4,i-2,j,k+2), dz(k))
-            wz_2 = dy5(Q(4,i-1,j,k-2), Q(4,i-1,j,k-1), Q(4,i-1,j,k+1), Q(4,i-1,j,k+2), dz(k))
-            wz_3 = dy5(Q(4,i  ,j,k-2), Q(4,i  ,j,k-1), Q(4,i  ,j,k+1), Q(4,i  ,j,k+2), dz(k))
-            wz_4 = dy5(Q(4,i+1,j,k-2), Q(4,i+1,j,k-1), Q(4,i+1,j,k+1), Q(4,i+1,j,k+2), dz(k))
-            wz_5 = dy5(Q(4,i+2,j,k-2), Q(4,i+2,j,k-1), Q(4,i+2,j,k+1), Q(4,i+2,j,k+2), dz(k))
-            wz_6 = dy5(Q(4,i+3,j,k-2), Q(4,i+3,j,k-1), Q(4,i+3,j,k+1), Q(4,i+3,j,k+2), dz(k))
-            wz3(:) = interpolation6_scalar(wz_1, wz_2, wz_3, wz_4, wz_5, wz_6)
-          end block
-          call tauxx_4(mu3(:), ux3(:), vy3(:), wz3(:), &
-                      Q(2,i-2,j,k), Q(2,i-1,j,k), Q(2,i,j,k), Q(2,i+1,j,k), Q(2,i+2,j,k), Q(2,i+3,j,k), txx, utxx)
-        end block
-
-
-        block ! txy
-          real(8), device :: vx3(3), uy3(3)
-          vx3(:) = 0.125d0 * (9.d0 * (-Q(3,i-1:i+1,j,k) + Q(3,i:i+2,j,k)) &
-                                   - (-Q(3,i-2:i,j,k)   + Q(3,i+1:i+3,j,k)) * one_third) * dx(i)
-          block
-            real(8) uy_1, uy_2, uy_3, uy_4, uy_5, uy_6
-            uy_1 = dy5(Q(2,i-2,j-2,k), Q(2,i-2,j-1,k), Q(2,i-2,j+1,k), Q(2,i-2,j+2,k), dy(j))
-            uy_2 = dy5(Q(2,i-1,j-2,k), Q(2,i-1,j-1,k), Q(2,i-1,j+1,k), Q(2,i-1,j+2,k), dy(j))
-            uy_3 = dy5(Q(2,i  ,j-2,k), Q(2,i  ,j-1,k), Q(2,i  ,j+1,k), Q(2,i  ,j+2,k), dy(j))
-            uy_4 = dy5(Q(2,i+1,j-2,k), Q(2,i+1,j-1,k), Q(2,i+1,j+1,k), Q(2,i+1,j+2,k), dy(j))
-            uy_5 = dy5(Q(2,i+2,j-2,k), Q(2,i+2,j-1,k), Q(2,i+2,j+1,k), Q(2,i+2,j+2,k), dy(j))
-            uy_6 = dy5(Q(2,i+3,j-2,k), Q(2,i+3,j-1,k), Q(2,i+3,j+1,k), Q(2,i+3,j+2,k), dy(j))
-            uy3(:) = interpolation6_scalar(uy_1, uy_2, uy_3, uy_4, uy_5, uy_6)
-          end block
-          call tauxy_4(mu3(:), uy3(:), vx3(:), &
-                      Q(3,i-2,j,k), Q(3,i-1,j,k), Q(3,i,j,k), Q(3,i+1,j,k), Q(3,i+2,j,k), Q(3,i+3,j,k), txy, vtxy)
-        end block
-
-
-        block ! txz
-          real(8), device :: wx3(3), uz3(3)
-          wx3(:) = 0.125d0 * (9.d0 * (-Q(4,i-1:i+1,j,k) + Q(4,i:i+2,j,k)) &
-                                   - (-Q(4,i-2:i,j,k)   + Q(4,i+1:i+3,j,k)) * one_third) * dx(i)
-          block
-            real(8) uz_1, uz_2, uz_3, uz_4, uz_5, uz_6
-            uz_1 = dy5(Q(2,i-2,j,k-2), Q(2,i-2,j,k-1), Q(2,i-2,j,k+1), Q(2,i-2,j,k+2), dz(k))
-            uz_2 = dy5(Q(2,i-1,j,k-2), Q(2,i-1,j,k-1), Q(2,i-1,j,k+1), Q(2,i-1,j,k+2), dz(k))
-            uz_3 = dy5(Q(2,i  ,j,k-2), Q(2,i  ,j,k-1), Q(2,i  ,j,k+1), Q(2,i  ,j,k+2), dz(k))
-            uz_4 = dy5(Q(2,i+1,j,k-2), Q(2,i+1,j,k-1), Q(2,i+1,j,k+1), Q(2,i+1,j,k+2), dz(k))
-            uz_5 = dy5(Q(2,i+2,j,k-2), Q(2,i+2,j,k-1), Q(2,i+2,j,k+1), Q(2,i+2,j,k+2), dz(k))
-            uz_6 = dy5(Q(2,i+3,j,k-2), Q(2,i+3,j,k-1), Q(2,i+3,j,k+1), Q(2,i+3,j,k+2), dz(k))
-            uz3(:) = interpolation6_scalar(uz_1, uz_2, uz_3, uz_4, uz_5, uz_6)
-          end block
-          call tauxy_4(mu3(:), wx3(:), uz3(:), &
-                      Q(4,i-2,j,k), Q(4,i-1,j,k), Q(4,i,j,k), Q(4,i+1,j,k), Q(4,i+2,j,k), Q(4,i+3,j,k), txz, wtxz)
-        end block
+        call calc_tau_straight(mu3, u(it-2:it+3,jt,kt), vy(it-2:it+3,jt,kt), wz(it-2:it+3,jt,kt), dx(i), txx, utxx)
+        call calc_tau_cross(mu3, v(it-2:it+3,jt,kt), uy(it-2:it+3,jt,kt), dx(i), txy, vtxy)
+        call calc_tau_cross(mu3, w(it-2:it+3,jt,kt), uz(it-2:it+3,jt,kt), dx(i), txz, wtxz)
       end block
     else
       block
@@ -120,15 +164,15 @@ contains
           mwz = 0.25d0 * (mz(1) * (-Q(4,i,j,k-1) + Q(4,i,j,k) - Q(4,i+1,j,k-1) + Q(4,i+1,j,k)) &
                         + mz(2) * (-Q(4,i,j,k) + Q(4,i,j,k+1) - Q(4,i+1,j,k) + Q(4,i+1,j,k+1))) * dz(k)
         end block
-        mux = mx * (-Q(2,i,j,k) + Q(2,i+1,j,k)) * dx(i)
-        mvx = mx * (-Q(3,i,j,k) + Q(3,i+1,j,k)) * dx(i)
-        mwx = mx * (-Q(4,i,j,k) + Q(4,i+1,j,k)) * dx(i)
-        txx  = 2.d0 * (2.d0 * mux - mvy - mwz) * one_third
+        mux  = mx * (-u(it,jt,kt) + u(it+1,jt,kt)) * dx(i)
+        mvx  = mx * (-v(it,jt,kt) + v(it+1,jt,kt)) * dx(i)
+        mwx  = mx * (-v(it,jt,kt) + w(it+1,jt,kt)) * dx(i)
+        txx  = two_third * (2.d0 * mux - mvy - mwz)
         txy  = muy + mvx
         txz  = mwx + muz
-        utxx = 0.5d0 * (Q(2,i,j,k) + Q(2,i+1,j,k)) * txx
-        vtxy = 0.5d0 * (Q(3,i,j,k) + Q(3,i+1,j,k)) * txy
-        wtxz = 0.5d0 * (Q(4,i,j,k) + Q(4,i+1,j,k)) * txz
+        utxx = 0.5d0 * (u(it,jt,kt) + u(it+1,jt,kt)) * txx
+        vtxy = 0.5d0 * (v(it,jt,kt) + v(it+1,jt,kt)) * txy
+        wtxz = 0.5d0 * (w(it,jt,kt) + w(it+1,jt,kt)) * txz
       end block
     endif
     E(2,i,j-1,k-1) = E(2,i,j-1,k-1) - txx
@@ -146,101 +190,58 @@ contains
     real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
     real(8), intent(in), device    :: mut(nx,ny,nz), qc2(nx,ny,nz)
     real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2)
-    integer i, j, k
+    real(8), shared ::  u(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
+    real(8), shared ::  v(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
+    real(8), shared ::  w(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
+    real(8), shared :: uy(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
+    real(8), shared :: vy(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
+    real(8), shared :: uz(-2:threadsEv%x+3,threadsEv%z,threadsEv%y)
+    real(8), shared :: wz(-2:threadsEv%x+3,threadsEv%z,threadsEv%y)
+    integer i, j, k, it, jt, kt, ii, i_base
     real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx, Hsgs
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
+    it = threadIdx%x
+    jt = threadIdx%y
+    kt = threadIdx%z
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    k  = (blockIdx%z-1)*blockDim%z + kt + 1
+    i_base = (blockIdx%x-1)*blockDim%x
+    do ii = it-2, threadsEv%x+3, blockDim%x
+      i = i_base + ii
+      if (1 <= i .and. i <= nx .and. j <= ny .and. k <= nz) then
+        u(ii,jt,kt) = Q(2,i,j,k)
+        v(ii,jt,kt) = Q(3,i,j,k)
+        w(ii,jt,kt) = Q(4,i,j,k)
+      endif
+      if (1 <= i .and. i <= nx .and. 3 <= j .and. j <= ny-2 .and. k <= nz) then
+        uy(ii,jt,kt) = (two_third * (-Q(2,i,j-1,k) + Q(2,i,j+1,k)) - one_twelfth * (-Q(2,i,j-2,k) + Q(2,i,j+2,k))) * dy(j)
+        vy(ii,jt,kt) = (two_third * (-Q(3,i,j-1,k) + Q(3,i,j+1,k)) - one_twelfth * (-Q(3,i,j-2,k) + Q(3,i,j+2,k))) * dy(j)
+      endif
+      if (1 <= i .and. i <= nx .and. j <= ny .and. 3 <= k .and. k <= nz-2) then
+        uz(ii,jt,kt) = (two_third * (-Q(2,i,j,k-1) + Q(2,i,j,k+1)) - one_twelfth * (-Q(2,i,j,k-2) + Q(2,i,j,k+2))) * dz(k)
+        wz(ii,jt,kt) = (two_third * (-Q(4,i,j,k-1) + Q(4,i,j,k+1)) - one_twelfth * (-Q(4,i,j,k-2) + Q(4,i,j,k+2))) * dz(k)
+      endif
+    enddo
+    call syncthreads()
+    i  = (blockIdx%x-1)*blockDim%x + it
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
       block
-        real(8), device :: mu3(3)
-        real(8) mutx
-        mutx = 0.0625d0 * (-mut(i-1,j,k) + 9.d0 * (mut(i,j,k) + mut(i+1,j,k)) -mut(i+2,j,k))
+        real(8), device :: mu3(3), mut3(3)
+        mu3(:)  = 0.0625d0 * (9.d0 * ( mu(i-1:i+1,j,k)  + mu(i:i+2,j,k)) - ( mu(i-2:i,j,k) +  mu(i+1:i+3,j,k)))
+        mut3(:) = 0.0625d0 * (9.d0 * (mut(i-1:i+1,j,k) + mut(i:i+2,j,k)) - (mut(i-2:i,j,k) + mut(i+1:i+3,j,k)))
         block ! dQdx
           real(8), device :: kTx3(3)
-          mu3(:)  = 0.0625d0 * (9.d0 * (mu(i-1:i+1,j,k) + mu(i:i+2,j,k)) - (mu(i-2:i,j,k) + mu(i+1:i+3,j,k)))
-          kTx3(:) = Cp_over_Pr * mu3(:) * 0.125d0 * &
-                    (9.d0 * (-T(i-1:i+1,j,k) + T(i:i+2,j,k)) - (-T(i-2:i,j,k) + T(i+1:i+3,j,k)) * one_third) * dx(i)
+          kTx3(:) = Cp_over_Pr * mu3(:) * &
+                    (1.125d0 * (-T(i-1:i+1,j,k) + T(i:i+2,j,k)) - (-T(i-2:i,j,k) + T(i+1:i+3,j,k)) * one_24) * dx(i)
           kTx     = flux4(kTx3(:))
         end block
-
-
-        block ! txx
-          real(8), device :: ux3(3), vy3(3), wz3(3)
-          ux3(:) = 0.125d0 * (9.d0 * (-Q(2,i-1:i+1,j,k) + Q(2,i:i+2,j,k)) &
-                                   - (-Q(2,i-2:i,j,k)   + Q(2,i+1:i+3,j,k)) * one_third) * dx(i)
-          block
-            real(8) vy_1, vy_2, vy_3, vy_4, vy_5, vy_6
-            vy_1 = dy5(Q(3,i-2,j-2,k), Q(3,i-2,j-1,k), Q(3,i-2,j+1,k), Q(3,i-2,j+2,k), dy(j))
-            vy_2 = dy5(Q(3,i-1,j-2,k), Q(3,i-1,j-1,k), Q(3,i-1,j+1,k), Q(3,i-1,j+2,k), dy(j))
-            vy_3 = dy5(Q(3,i  ,j-2,k), Q(3,i  ,j-1,k), Q(3,i  ,j+1,k), Q(3,i  ,j+2,k), dy(j))
-            vy_4 = dy5(Q(3,i+1,j-2,k), Q(3,i+1,j-1,k), Q(3,i+1,j+1,k), Q(3,i+1,j+2,k), dy(j))
-            vy_5 = dy5(Q(3,i+2,j-2,k), Q(3,i+2,j-1,k), Q(3,i+2,j+1,k), Q(3,i+2,j+2,k), dy(j))
-            vy_6 = dy5(Q(3,i+3,j-2,k), Q(3,i+3,j-1,k), Q(3,i+3,j+1,k), Q(3,i+3,j+2,k), dy(j))
-            vy3(:) = interpolation6_scalar(vy_1, vy_2, vy_3, vy_4, vy_5, vy_6)
-          end block
-          block
-            real(8) wz_1, wz_2, wz_3, wz_4, wz_5, wz_6
-            wz_1 = dy5(Q(4,i-2,j,k-2), Q(4,i-2,j,k-1), Q(4,i-2,j,k+1), Q(4,i-2,j,k+2), dz(k))
-            wz_2 = dy5(Q(4,i-1,j,k-2), Q(4,i-1,j,k-1), Q(4,i-1,j,k+1), Q(4,i-1,j,k+2), dz(k))
-            wz_3 = dy5(Q(4,i  ,j,k-2), Q(4,i  ,j,k-1), Q(4,i  ,j,k+1), Q(4,i  ,j,k+2), dz(k))
-            wz_4 = dy5(Q(4,i+1,j,k-2), Q(4,i+1,j,k-1), Q(4,i+1,j,k+1), Q(4,i+1,j,k+2), dz(k))
-            wz_5 = dy5(Q(4,i+2,j,k-2), Q(4,i+2,j,k-1), Q(4,i+2,j,k+1), Q(4,i+2,j,k+2), dz(k))
-            wz_6 = dy5(Q(4,i+3,j,k-2), Q(4,i+3,j,k-1), Q(4,i+3,j,k+1), Q(4,i+3,j,k+2), dz(k))
-            wz3(:) = interpolation6_scalar(wz_1, wz_2, wz_3, wz_4, wz_5, wz_6)
-          end block
-          call tauxx_4(mu3(:), ux3(:), vy3(:), wz3(:), &
-                      Q(2,i-2,j,k), Q(2,i-1,j,k), Q(2,i,j,k), Q(2,i+1,j,k), Q(2,i+2,j,k), Q(2,i+3,j,k), txx, utxx)
-          txx  = txx + 2.d0 * mutx * (2.d0 * ux3(2) - vy3(2) - wz3(2)) * one_third
-        end block
-
-
-        block ! txy
-          real(8), device :: vx3(3), uy3(3)
-          vx3(:) = 0.125d0 * (9.d0 * (-Q(3,i-1:i+1,j,k) + Q(3,i:i+2,j,k)) &
-                                   - (-Q(3,i-2:i,j,k)   + Q(3,i+1:i+3,j,k)) * one_third) * dx(i)
-          block
-            real(8) uy_1, uy_2, uy_3, uy_4, uy_5, uy_6
-            uy_1 = dy5(Q(2,i-2,j-2,k), Q(2,i-2,j-1,k), Q(2,i-2,j+1,k), Q(2,i-2,j+2,k), dy(j))
-            uy_2 = dy5(Q(2,i-1,j-2,k), Q(2,i-1,j-1,k), Q(2,i-1,j+1,k), Q(2,i-1,j+2,k), dy(j))
-            uy_3 = dy5(Q(2,i  ,j-2,k), Q(2,i  ,j-1,k), Q(2,i  ,j+1,k), Q(2,i  ,j+2,k), dy(j))
-            uy_4 = dy5(Q(2,i+1,j-2,k), Q(2,i+1,j-1,k), Q(2,i+1,j+1,k), Q(2,i+1,j+2,k), dy(j))
-            uy_5 = dy5(Q(2,i+2,j-2,k), Q(2,i+2,j-1,k), Q(2,i+2,j+1,k), Q(2,i+2,j+2,k), dy(j))
-            uy_6 = dy5(Q(2,i+3,j-2,k), Q(2,i+3,j-1,k), Q(2,i+3,j+1,k), Q(2,i+3,j+2,k), dy(j))
-            uy3(:) = interpolation6_scalar(uy_1, uy_2, uy_3, uy_4, uy_5, uy_6)
-          end block
-          call tauxy_4(mu3(:), uy3(:), vx3(:), &
-                      Q(3,i-2,j,k), Q(3,i-1,j,k), Q(3,i,j,k), Q(3,i+1,j,k), Q(3,i+2,j,k), Q(3,i+3,j,k), txy, vtxy)
-          txy  = txy + mutx * (uy3(2) + vx3(2))
-        end block
-
-
-        block ! txz
-          real(8), device :: wx3(3), uz3(3)
-          wx3(:) = 0.125d0 * (9.d0 * (-Q(4,i-1:i+1,j,k) + Q(4,i:i+2,j,k)) &
-                                   - (-Q(4,i-2:i,j,k)   + Q(4,i+1:i+3,j,k)) * one_third) * dx(i)
-          block
-            real(8) uz_1, uz_2, uz_3, uz_4, uz_5, uz_6
-            uz_1 = dy5(Q(2,i-2,j,k-2), Q(2,i-2,j,k-1), Q(2,i-2,j,k+1), Q(2,i-2,j,k+2), dz(k))
-            uz_2 = dy5(Q(2,i-1,j,k-2), Q(2,i-1,j,k-1), Q(2,i-1,j,k+1), Q(2,i-1,j,k+2), dz(k))
-            uz_3 = dy5(Q(2,i  ,j,k-2), Q(2,i  ,j,k-1), Q(2,i  ,j,k+1), Q(2,i  ,j,k+2), dz(k))
-            uz_4 = dy5(Q(2,i+1,j,k-2), Q(2,i+1,j,k-1), Q(2,i+1,j,k+1), Q(2,i+1,j,k+2), dz(k))
-            uz_5 = dy5(Q(2,i+2,j,k-2), Q(2,i+2,j,k-1), Q(2,i+2,j,k+1), Q(2,i+2,j,k+2), dz(k))
-            uz_6 = dy5(Q(2,i+3,j,k-2), Q(2,i+3,j,k-1), Q(2,i+3,j,k+1), Q(2,i+3,j,k+2), dz(k))
-            uz3(:) = interpolation6_scalar(uz_1, uz_2, uz_3, uz_4, uz_5, uz_6)
-          end block
-          call tauxy_4(mu3(:), wx3(:), uz3(:), &
-                      Q(4,i-2,j,k), Q(4,i-1,j,k), Q(4,i,j,k), Q(4,i+1,j,k), Q(4,i+2,j,k), Q(4,i+3,j,k), txz, wtxz)
-          txz  = txz + mutx * (wx3(2) + uz3(2))
-        end block
-
-
+        call calc_tau_straight_LES(mu3, mut3, u(it-2:it+3,jt,kt), vy(it-2:it+3,jt,kt), wz(it-2:it+3,jt,kt), dx(i), txx, utxx)
+        call calc_tau_cross_LES(mu3, mut3, v(it-2:it+3,jt,kt), uy(it-2:it+3,jt,kt), dx(i), txy, vtxy)
+        call calc_tau_cross_LES(mu3, mut3, w(it-2:it+3,jt,kt), uz(it-2:it+3,jt,kt), dx(i), txz, wtxz)
         block
           real(8) :: H(4)
-          H(:) = (gamma * Q(5,i-1:i+2,j,k) / (Q(1,i-1:i+2,j,k) * gamma_1)) &
-                 + 0.5d0 * (Q(2,i-1:i+2,j,k)**2 + Q(3,i-1:i+2,j,k)**2 + Q(4,i-1:i+2,j,k)**2) + qc2(i-1:i+2,j,k)
-          Hsgs = -mutx * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dx(i) / Prt
+          H(:) = Cp * T(i-1:i+2,j,k) + 0.5d0 * (u(it-1:it+2,jt,kt)**2 + v(it-1:it+2,jt,kt)**2 + w(it-1:it+2,jt,kt)**2) + qc2(i-1:i+2,j,k)
+          Hsgs = -flux4(mut3) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dx(i) / Prt
         end block
       end block
     else
@@ -281,25 +282,24 @@ contains
           mwzsgs = 0.25d0 * (mzsgs(1) * (-Q(4,i,j,k-1) + Q(4,i,j,k) - Q(4,i+1,j,k-1) + Q(4,i+1,j,k)) &
                            + mzsgs(2) * (-Q(4,i,j,k) + Q(4,i,j,k+1) - Q(4,i+1,j,k) + Q(4,i+1,j,k+1))) * dz(k)
         end block
-        mux    = mx    * (-Q(2,i,j,k) + Q(2,i+1,j,k)) * dx(i)
-        muxsgs = mxsgs * (-Q(2,i,j,k) + Q(2,i+1,j,k)) * dx(i)
-        mvx    = mx    * (-Q(3,i,j,k) + Q(3,i+1,j,k)) * dx(i)
-        mvxsgs = mxsgs * (-Q(3,i,j,k) + Q(3,i+1,j,k)) * dx(i)
-        mwx    = mx    * (-Q(4,i,j,k) + Q(4,i+1,j,k)) * dx(i)
-        mwxsgs = mxsgs * (-Q(4,i,j,k) + Q(4,i+1,j,k)) * dx(i)
-        txx  = 2.d0 * (2.d0 * mux - mvy - mwz) * one_third
-        txy  = muy + mvx
-        txz  = mwx + muz
-        utxx = 0.5d0 * (Q(2,i,j,k) + Q(2,i+1,j,k)) * txx
-        vtxy = 0.5d0 * (Q(3,i,j,k) + Q(3,i+1,j,k)) * txy
-        wtxz = 0.5d0 * (Q(4,i,j,k) + Q(4,i+1,j,k)) * txz
-        txx = txx + 2.d0 * (2.d0 * muxsgs - mvysgs - mwzsgs) * one_third
-        txy = txy + muysgs + mvxsgs
-        txz = txz + mwxsgs + muzsgs
+        mux    = mx    * (-u(it,jt,kt) + u(it+1,jt,kt)) * dx(i)
+        muxsgs = mxsgs * (-u(it,jt,kt) + u(it+1,jt,kt)) * dx(i)
+        mvx    = mx    * (-v(it,jt,kt) + v(it+1,jt,kt)) * dx(i)
+        mvxsgs = mxsgs * (-v(it,jt,kt) + v(it+1,jt,kt)) * dx(i)
+        mwx    = mx    * (-w(it,jt,kt) + w(it+1,jt,kt)) * dx(i)
+        mwxsgs = mxsgs * (-w(it,jt,kt) + w(it+1,jt,kt)) * dx(i)
+        txx    = two_third * (2.d0 * mux - mvy - mwz)
+        txy    = muy + mvx
+        txz    = mwx + muz
+        utxx   = 0.5d0 * (u(it,jt,kt) + u(it+1,jt,kt)) * txx
+        vtxy   = 0.5d0 * (v(it,jt,kt) + v(it+1,jt,kt)) * txy
+        wtxz   = 0.5d0 * (w(it,jt,kt) + w(it+1,jt,kt)) * txz
+        txx    = txx + two_third * (2.d0 * muxsgs - mvysgs - mwzsgs)
+        txy    = txy + muysgs + mvxsgs
+        txz    = txz + mwxsgs + muzsgs
         block
           real(8), device :: H(2)
-          H(:) = (gamma * Q(5,i:i+1,j,k) / (Q(1,i:i+1,j,k) * gamma_1)) &
-                 + 0.5d0 * (Q(2,i:i+1,j,k)**2 + Q(3,i:i+1,j,k)**2 + Q(4,i:i+1,j,k)**2) + qc2(i:i+1,j,k)
+          H(:) = Cp * T(i:i+1,j,k) + 0.5d0 * (u(it:it+1,jt,kt)**2 + v(it:it+1,jt,kt)**2 + w(it:it+1,jt,kt)**2) + qc2(i:i+1,j,k)
           Hsgs = -mx * (-H(1) + H(2)) * dx(i) / Prt
         end block
       end block
@@ -319,96 +319,58 @@ contains
     real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
     real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2)
     integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
-    integer i, j, k
+    real(8), shared ::  u(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
+    real(8), shared ::  v(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
+    real(8), shared ::  w(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
+    real(8), shared :: ux(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
+    real(8), shared :: vx(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
+    real(8), shared :: vz(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
+    real(8), shared :: wz(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
+    integer i, j, k, it, jt, kt, jj, j_base
     real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
+    it = threadIdx%x
+    jt = threadIdx%y
+    kt = threadIdx%z
+    i  = (blockIdx%x-1)*blockDim%x + it + 1
+    k  = (blockIdx%z-1)*blockDim%z + kt + 1
+    j_base = (blockIdx%y-1)*blockDim%y
+    do jj = jt-2, threadsFv%y+3, blockDim%y
+      j = j_base + jj
+      if (i <= nx .and. 1 <= j .and. j <= ny .and. k <= nz) then
+        u(jj,it,kt) = Q(2,i,j,k)
+        v(jj,it,kt) = Q(3,i,j,k)
+        w(jj,it,kt) = Q(4,i,j,k)
+      endif
+      if (3 <= i .and. i <= nx-2 .and. 1 <= j .and. j <= ny .and. k <= nz) then
+        ux(jj,it,kt) = (two_third * (-Q(2,i-1,j,k) + Q(2,i+1,j,k)) - one_twelfth * (-Q(2,i-2,j,k) + Q(2,i+2,j,k))) * dx(i)
+        vx(jj,it,kt) = (two_third * (-Q(3,i-1,j,k) + Q(3,i+1,j,k)) - one_twelfth * (-Q(3,i-2,j,k) + Q(3,i+2,j,k))) * dx(i)
+      endif
+      if (i <= nx .and. 1 <= j .and. j <= ny .and. 3 <= k .and. k <= nz-2) then
+        vz(jj,it,kt) = (two_third * (-Q(3,i,j,k-1) + Q(3,i,j,k+1)) - one_twelfth * (-Q(3,i,j,k-2) + Q(3,i,j,k+2))) * dz(k)
+        wz(jj,it,kt) = (two_third * (-Q(4,i,j,k-1) + Q(4,i,j,k+1)) - one_twelfth * (-Q(4,i,j,k-2) + Q(4,i,j,k+2))) * dz(k)
+      endif
+    enddo
+    call syncthreads()
+    j  = (blockIdx%y-1)*blockDim%y + jt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-2) then
       block
         real(8), device :: mu3(3)
+        mu3(:) = 0.0625d0 * (9.d0 * (mu(i,j-1:j+1,k) + mu(i,j:j+2,k)) - (mu(i,j-2:j,k) + mu(i,j+1:j+3,k)))
         block ! dQdy
           real(8), device :: kTy3(3)
-          mu3(:)  = 0.0625d0 * (9.d0 * (mu(i,j-1:j+1,k) + mu(i,j:j+2,k)) - (mu(i,j-2:j,k) + mu(i,j+1:j+3,k)))
-          kTy3(:) = Cp_over_Pr * mu3(:) * 0.125d0 * &
-                    (9.d0 * (-T(i,j-1:j+1,k) + T(i,j:j+2,k)) - (-T(i,j-2:j,k) + T(i,j+1:j+3,k)) * one_third) * dy(j)
+          kTy3(:) = Cp_over_Pr * mu3(:) * &
+                    (1.125d0 * (-T(i,j-1:j+1,k) + T(i,j:j+2,k)) - (-T(i,j-2:j,k) + T(i,j+1:j+3,k)) * one_24) * dy(j)
           kTy     = flux4(kTy3(:))
         end block
-        
-
-        block ! tyx
-          real(8), device :: uy3(3), vx3(3)
-          uy3(:) = 0.125d0 * (9.d0 * (-Q(2,i,j-1:j+1,k) + Q(2,i,j:j+1,k)) &
-                                   - (-Q(2,i,j-2:j,k)   + Q(2,i,j+1:j+3,k)) * one_third) * dy(j)
-          block
-            real(8) vx_1, vx_2, vx_3, vx_4, vx_5, vx_6
-            vx_1 = dy5(Q(3,i-2,j-2,k), Q(3,i-1,j-2,k), Q(3,i+1,j-2,k), Q(3,i+2,j-2,k), dx(i))
-            vx_2 = dy5(Q(3,i-2,j-1,k), Q(3,i-1,j-1,k), Q(3,i+1,j-1,k), Q(3,i+2,j-1,k), dx(i))
-            vx_3 = dy5(Q(3,i-2,j  ,k), Q(3,i-1,j  ,k), Q(3,i+1,j  ,k), Q(3,i+2,j  ,k), dx(i))
-            vx_4 = dy5(Q(3,i-2,j+1,k), Q(3,i-1,j+1,k), Q(3,i+1,j+1,k), Q(3,i+2,j+1,k), dx(i))
-            vx_5 = dy5(Q(3,i-2,j+2,k), Q(3,i-1,j+2,k), Q(3,i+1,j+2,k), Q(3,i+2,j+2,k), dx(i))
-            vx_6 = dy5(Q(3,i-2,j+3,k), Q(3,i-1,j+3,k), Q(3,i+1,j+3,k), Q(3,i+2,j+3,k), dx(i))
-            vx3(:) = interpolation6_scalar(vx_1, vx_2, vx_3, vx_4, vx_5, vx_6)
-          end block
-          call tauxy_4(mu3(:), uy3(:), vx3(:), &
-                      Q(2,i,j-2,k), Q(2,i,j-1,k), Q(2,i,j,k), Q(2,i,j+1,k), Q(2,i,j+2,k), Q(2,i,j+3,k), tyx, utyx)
-        end block
-
-
-        block ! tyy
-          real(8), device :: vy3(3), wz3(3), ux3(3)
-          vy3(:) = 0.125d0 * (9.d0 * (-Q(3,i,j-1:j+1,k) + Q(3,i,j:j+1,k)) &
-                                   - (-Q(3,i,j-2:j,k)   + Q(3,i,j+1:j+3,k)) * one_third) * dy(j)
-          block
-            real(8) wz_1, wz_2, wz_3, wz_4, wz_5, wz_6
-            wz_1 = dy5(Q(4,i,j-2,k-2), Q(4,i,j-2,k-1), Q(4,i,j-2,k+1), Q(4,i,j-2,k+2), dz(k))
-            wz_2 = dy5(Q(4,i,j-1,k-2), Q(4,i,j-1,k-1), Q(4,i,j-1,k+1), Q(4,i,j-1,k+2), dz(k))
-            wz_3 = dy5(Q(4,i,j  ,k-2), Q(4,i,j  ,k-1), Q(4,i,j  ,k+1), Q(4,i,j  ,k+2), dz(k))
-            wz_4 = dy5(Q(4,i,j+1,k-2), Q(4,i,j+1,k-1), Q(4,i,j+1,k+1), Q(4,i,j+1,k+2), dz(k))
-            wz_5 = dy5(Q(4,i,j+2,k-2), Q(4,i,j+2,k-1), Q(4,i,j+2,k+1), Q(4,i,j+2,k+2), dz(k))
-            wz_6 = dy5(Q(4,i,j+3,k-2), Q(4,i,j+3,k-1), Q(4,i,j+3,k+1), Q(4,i,j+3,k+2), dz(k))
-            wz3(:) = interpolation6_scalar(wz_1, wz_2, wz_3, wz_4, wz_5, wz_6)
-          end block
-          block
-            real(8) ux_1, ux_2, ux_3, ux_4, ux_5, ux_6
-            ux_1 = dy5(Q(2,i-2,j-2,k), Q(2,i-1,j-2,k), Q(2,i+1,j-2,k), Q(2,i+2,j-2,k), dx(i))
-            ux_2 = dy5(Q(2,i-2,j-1,k), Q(2,i-1,j-1,k), Q(2,i+1,j-1,k), Q(2,i+2,j-1,k), dx(i))
-            ux_3 = dy5(Q(2,i-2,j  ,k), Q(2,i-1,j  ,k), Q(2,i+1,j  ,k), Q(2,i+2,j  ,k), dx(i))
-            ux_4 = dy5(Q(2,i-2,j+1,k), Q(2,i-1,j+1,k), Q(2,i+1,j+1,k), Q(2,i+2,j+1,k), dx(i))
-            ux_5 = dy5(Q(2,i-2,j+2,k), Q(2,i-1,j+2,k), Q(2,i+1,j+2,k), Q(2,i+2,j+2,k), dx(i))
-            ux_6 = dy5(Q(2,i-2,j+3,k), Q(2,i-1,j+3,k), Q(2,i+1,j+3,k), Q(2,i+2,j+3,k), dx(i))
-            ux3(:) = interpolation6_scalar(ux_1, ux_2, ux_3, ux_4, ux_5, ux_6)
-          end block
-          call tauxx_4(mu3(:), vy3(:), wz3(:), ux3(:), &
-                      Q(3,i,j-2,k), Q(3,i,j-1,k), Q(3,i,j,k), Q(3,i,j+1,k), Q(3,i,j+2,k), Q(3,i,j+3,k), tyy, vtyy)
-        end block
-
-
-        block ! tyz
-          real(8), device :: wy3(3), vz3(3)
-          wy3(:) = 0.125d0 * (9.d0 * (-Q(4,i,j-1:j+1,k) + Q(4,i,j:j+1,k)) &
-                                   - (-Q(4,i,j-2:j,k)   + Q(4,i,j+1:j+3,k)) * one_third) * dy(j)
-          block
-            real(8) vz_1, vz_2, vz_3, vz_4, vz_5, vz_6
-            vz_1 = dy5(Q(3,i,j-2,k-2), Q(3,i,j-2,k-1), Q(3,i,j-2,k+1), Q(3,i,j-2,k+2), dz(k))
-            vz_2 = dy5(Q(3,i,j-1,k-2), Q(3,i,j-1,k-1), Q(3,i,j-1,k+1), Q(3,i,j-1,k+2), dz(k))
-            vz_3 = dy5(Q(3,i,j,  k-2), Q(3,i,j  ,k-1), Q(3,i,j  ,k+1), Q(3,i,j  ,k+2), dz(k))
-            vz_4 = dy5(Q(3,i,j+1,k-2), Q(3,i,j+1,k-1), Q(3,i,j+1,k+1), Q(3,i,j+1,k+2), dz(k))
-            vz_5 = dy5(Q(3,i,j+2,k-2), Q(3,i,j+2,k-1), Q(3,i,j+2,k+1), Q(3,i,j+2,k+2), dz(k))
-            vz_6 = dy5(Q(3,i,j+3,k-2), Q(3,i,j+3,k-1), Q(3,i,j+3,k+1), Q(3,i,j+3,k+2), dz(k))
-            vz3(:) = interpolation6_scalar(vz_1, vz_2, vz_3, vz_4, vz_5, vz_6)
-          end block
-          call tauxy_4(mu3(:), vz3(:), wy3(:), &
-                      Q(4,i,j-2,k), Q(4,i,j-1,k), Q(4,i,j,k), Q(4,i,j+1,k), Q(4,i,j+2,k), Q(4,i,j+3,k), tyz, wtyz)
-        end block
+        call calc_tau_straight(mu3, v(jt-2:jt+3,it,kt), wz(jt-2:jt+3,it,kt), ux(jt-2:jt+3,it,kt), dy(j), tyy, vtyy)
+        call calc_tau_cross(mu3, u(jt-2:jt+3,it,kt), vx(jt-2:jt+3,it,kt), dy(j), tyx, utyx)
+        call calc_tau_cross(mu3, w(jt-2:jt+3,it,kt), vz(jt-2:jt+3,it,kt), dy(j), tyz, wtyz)
       end block
     else
       block
-        real(8) m1, m2, my, muy, mvy, mwy, mvz, mwz, mux, mvx
-        m1  = mu(T(i,j,k))
-        m2  = mu(T(i,j+1,k))
-        my  = 0.5d0 * (m1 + m2)
+        real(8) my, muy, mvy, mwy, mvz, mwz, mux, mvx
+        my  = 0.5d0 * (mu(i,j,k) + mu(i,j+1,k))
         kTy = Cp_over_Pr * my * (-T(i,j,k) + T(i,j+1,k)) * dy(j)
         block
           real(8), device :: mx(2)
@@ -430,15 +392,15 @@ contains
           mwz = 0.25d0 * (mz(1) * (-Q(4,i,j,k-1) + Q(4,i,j,k) - Q(4,i,j+1,k-1) + Q(4,i,j+1,k)) &
                         + mz(2) * (-Q(4,i,j,k) + Q(4,i,j,k+1) - Q(4,i,j+1,k) + Q(4,i,j+1,k+1))) * dz(k)
         end block
-        muy = my * (-Q(2,i,j,k) + Q(2,i,j+1,k)) * dy(j)
-        mvy = my * (-Q(3,i,j,k) + Q(3,i,j+1,k)) * dy(j)
-        mwy = my * (-Q(4,i,j,k) + Q(4,i,j+1,k)) * dy(j)
+        muy  = my * (-u(jt,it,kt) + u(jt+1,it,kt)) * dy(j)
+        mvy  = my * (-v(jt,it,kt) + v(jt+1,it,kt)) * dy(j)
+        mwy  = my * (-w(jt,it,kt) + w(jt+1,it,kt)) * dy(j)
         tyx  = muy + mvx
-        tyy  = 2.d0 * (2.d0 * mvy - mwz - mux) * one_third
+        tyy  = two_third * (2.d0 * mvy - mwz - mux)
         tyz  = mvz + mwy
-        utyx = 0.5d0 * (Q(2,i,j,k) + Q(2,i,j+1,k)) * tyx
-        vtyy = 0.5d0 * (Q(3,i,j,k) + Q(3,i,j+1,k)) * tyy
-        wtyz = 0.5d0 * (Q(4,i,j,k) + Q(4,i,j+1,k)) * tyz
+        utyx = 0.5d0 * (u(jt,it,kt) + u(jt+1,it,kt)) * tyx
+        vtyy = 0.5d0 * (v(jt,it,kt) + v(jt+1,it,kt)) * tyy
+        wtyz = 0.5d0 * (w(jt,it,kt) + w(jt+1,it,kt)) * tyz
       end block
     endif
     F(2,i-1,j,k-1) = F(2,i-1,j,k-1) - tyx
@@ -456,101 +418,58 @@ contains
     real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
     real(8), intent(in), device    :: mut(nx,ny,nz), qc2(nx,ny,nz)
     real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2)
-    integer i, j, k
+    real(8), shared ::  u(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
+    real(8), shared ::  v(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
+    real(8), shared ::  w(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
+    real(8), shared :: ux(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
+    real(8), shared :: vx(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
+    real(8), shared :: vz(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
+    real(8), shared :: wz(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
+    integer i, j, k, it, jt, kt, jj, j_base
     real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy, Hsgs
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
+    it = threadIdx%x
+    jt = threadIdx%y
+    kt = threadIdx%z
+    i  = (blockIdx%x-1)*blockDim%x + it + 1
+    k  = (blockIdx%z-1)*blockDim%z + kt + 1
+    j_base = (blockIdx%y-1)*blockDim%y
+    do jj = jt-2, threadsFv%y+3, blockDim%y
+      j = j_base + jj
+      if (i <= nx .and. 1 <= j .and. j <= ny .and. k <= nz) then
+        u(jj,it,kt) = Q(2,i,j,k)
+        v(jj,it,kt) = Q(3,i,j,k)
+        w(jj,it,kt) = Q(4,i,j,k)
+      endif
+      if (3 <= i .and. i <= nx-2 .and. 1 <= j .and. j <= ny .and. k <= nz) then
+        ux(jj,it,kt) = (two_third * (-Q(2,i-1,j,k) + Q(2,i+1,j,k)) - one_twelfth * (-Q(2,i-2,j,k) + Q(2,i+2,j,k))) * dx(i)
+        vx(jj,it,kt) = (two_third * (-Q(3,i-1,j,k) + Q(3,i+1,j,k)) - one_twelfth * (-Q(3,i-2,j,k) + Q(3,i+2,j,k))) * dx(i)
+      endif
+      if (i <= nx .and. 1 <= j .and. j <= ny .and. 3 <= k .and. k <= nz-2) then
+        vz(jj,it,kt) = (two_third * (-Q(3,i,j,k-1) + Q(3,i,j,k+1)) - one_twelfth * (-Q(3,i,j,k-2) + Q(3,i,j,k+2))) * dz(k)
+        wz(jj,it,kt) = (two_third * (-Q(4,i,j,k-1) + Q(4,i,j,k+1)) - one_twelfth * (-Q(4,i,j,k-2) + Q(4,i,j,k+2))) * dz(k)
+      endif
+    enddo
+    call syncthreads()
+    j  = (blockIdx%y-1)*blockDim%y + jt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-2) then
       block
-        real(8), device :: mu3(3)
-        real(8) muty
-        muty = 0.0625d0 * (-mut(i,j-1,k) + 9.d0 * (mut(i,j,k) + mut(i,j+1,k)) -mut(i,j+2,k))
+        real(8), device :: mu3(3), mut3(3)
+        mu3(:)  = 0.0625d0 * (9.d0 * ( mu(i,j-1:j+1,k) +  mu(i,j:j+2,k)) - ( mu(i,j-2:j,k) +  mu(i,j+1:j+3,k)))
+        mut3(:) = 0.0625d0 * (9.d0 * (mut(i,j-1:j+1,k) + mut(i,j:j+2,k)) - (mut(i,j-2:j,k) + mut(i,j+1:j+3,k)))
         block ! dQdy
           real(8), device :: kTy3(3)
-          mu3(:)  = 0.0625d0 * (9.d0 * (mu(i,j-1:j+1,k) + mu(i,j:j+2,k)) - (mu(i,j-2:j,k) + mu(i,j+1:j+3,k)))
-          kTy3(:) = Cp_over_Pr * mu3(:) * 0.125d0 * &
-                    (9.d0 * (-T(i,j-1:j+1,k) + T(i,j:j+2,k)) - (-T(i,j-2:j,k) + T(i,j+1:j+3,k)) * one_third) * dy(j)
+          kTy3(:) = Cp_over_Pr * mu3(:) * &
+                    (1.125d0 * (-T(i,j-1:j+1,k) + T(i,j:j+2,k)) - (-T(i,j-2:j,k) + T(i,j+1:j+3,k)) * one_24) * dy(j)
           kTy     = flux4(kTy3(:))
         end block
-        
-
-        block ! tyx
-          real(8), device :: uy3(3), vx3(3)
-          uy3(:) = 0.125d0 * (9.d0 * (-Q(2,i,j-1:j+1,k) + Q(2,i,j:j+1,k)) &
-                                   - (-Q(2,i,j-2:j,k)   + Q(2,i,j+1:j+3,k)) * one_third) * dy(j)
-          block
-            real(8) vx_1, vx_2, vx_3, vx_4, vx_5, vx_6
-            vx_1 = dy5(Q(3,i-2,j-2,k), Q(3,i-1,j-2,k), Q(3,i+1,j-2,k), Q(3,i+2,j-2,k), dx(i))
-            vx_2 = dy5(Q(3,i-2,j-1,k), Q(3,i-1,j-1,k), Q(3,i+1,j-1,k), Q(3,i+2,j-1,k), dx(i))
-            vx_3 = dy5(Q(3,i-2,j  ,k), Q(3,i-1,j  ,k), Q(3,i+1,j  ,k), Q(3,i+2,j  ,k), dx(i))
-            vx_4 = dy5(Q(3,i-2,j+1,k), Q(3,i-1,j+1,k), Q(3,i+1,j+1,k), Q(3,i+2,j+1,k), dx(i))
-            vx_5 = dy5(Q(3,i-2,j+2,k), Q(3,i-1,j+2,k), Q(3,i+1,j+2,k), Q(3,i+2,j+2,k), dx(i))
-            vx_6 = dy5(Q(3,i-2,j+3,k), Q(3,i-1,j+3,k), Q(3,i+1,j+3,k), Q(3,i+2,j+3,k), dx(i))
-            vx3(:) = interpolation6_scalar(vx_1, vx_2, vx_3, vx_4, vx_5, vx_6)
-          end block
-          call tauxy_4(mu3(:), uy3(:), vx3(:), &
-                      Q(2,i,j-2,k), Q(2,i,j-1,k), Q(2,i,j,k), Q(2,i,j+1,k), Q(2,i,j+2,k), Q(2,i,j+3,k), tyx, utyx)
-          tyx = tyx + muty * (uy3(2) + vx3(2))
-        end block
-
-
-        block ! tyy
-          real(8), device :: vy3(3), wz3(3), ux3(3)
-          vy3(:) = 0.125d0 * (9.d0 * (-Q(3,i,j-1:j+1,k) + Q(3,i,j:j+1,k)) &
-                                   - (-Q(3,i,j-2:j,k)   + Q(3,i,j+1:j+3,k)) * one_third) * dy(j)
-          block
-            real(8) wz_1, wz_2, wz_3, wz_4, wz_5, wz_6
-            wz_1 = dy5(Q(4,i,j-2,k-2), Q(4,i,j-2,k-1), Q(4,i,j-2,k+1), Q(4,i,j-2,k+2), dz(k))
-            wz_2 = dy5(Q(4,i,j-1,k-2), Q(4,i,j-1,k-1), Q(4,i,j-1,k+1), Q(4,i,j-1,k+2), dz(k))
-            wz_3 = dy5(Q(4,i,j  ,k-2), Q(4,i,j  ,k-1), Q(4,i,j  ,k+1), Q(4,i,j  ,k+2), dz(k))
-            wz_4 = dy5(Q(4,i,j+1,k-2), Q(4,i,j+1,k-1), Q(4,i,j+1,k+1), Q(4,i,j+1,k+2), dz(k))
-            wz_5 = dy5(Q(4,i,j+2,k-2), Q(4,i,j+2,k-1), Q(4,i,j+2,k+1), Q(4,i,j+2,k+2), dz(k))
-            wz_6 = dy5(Q(4,i,j+3,k-2), Q(4,i,j+3,k-1), Q(4,i,j+3,k+1), Q(4,i,j+3,k+2), dz(k))
-            wz3(:) = interpolation6_scalar(wz_1, wz_2, wz_3, wz_4, wz_5, wz_6)
-          end block
-          block
-            real(8) ux_1, ux_2, ux_3, ux_4, ux_5, ux_6
-            ux_1 = dy5(Q(2,i-2,j-2,k), Q(2,i-1,j-2,k), Q(2,i+1,j-2,k), Q(2,i+2,j-2,k), dx(i))
-            ux_2 = dy5(Q(2,i-2,j-1,k), Q(2,i-1,j-1,k), Q(2,i+1,j-1,k), Q(2,i+2,j-1,k), dx(i))
-            ux_3 = dy5(Q(2,i-2,j  ,k), Q(2,i-1,j  ,k), Q(2,i+1,j  ,k), Q(2,i+2,j  ,k), dx(i))
-            ux_4 = dy5(Q(2,i-2,j+1,k), Q(2,i-1,j+1,k), Q(2,i+1,j+1,k), Q(2,i+2,j+1,k), dx(i))
-            ux_5 = dy5(Q(2,i-2,j+2,k), Q(2,i-1,j+2,k), Q(2,i+1,j+2,k), Q(2,i+2,j+2,k), dx(i))
-            ux_6 = dy5(Q(2,i-2,j+3,k), Q(2,i-1,j+3,k), Q(2,i+1,j+3,k), Q(2,i+2,j+3,k), dx(i))
-            ux3(:) = interpolation6_scalar(ux_1, ux_2, ux_3, ux_4, ux_5, ux_6)
-          end block
-          call tauxx_4(mu3(:), vy3(:), wz3(:), ux3(:), &
-                      Q(3,i,j-2,k), Q(3,i,j-1,k), Q(3,i,j,k), Q(3,i,j+1,k), Q(3,i,j+2,k), Q(3,i,j+3,k), tyy, vtyy)
-          tyy = tyy + 2.d0 * muty * (2.d0 * vy3(2) - ux3(2) - wz3(2)) * one_third
-        end block
-
-
-        block ! tyz
-          real(8), device :: wy3(3), vz3(3)
-          wy3(:) = 0.125d0 * (9.d0 * (-Q(4,i,j-1:j+1,k) + Q(4,i,j:j+1,k)) &
-                                   - (-Q(4,i,j-2:j,k)   + Q(4,i,j+1:j+3,k)) * one_third) * dy(j)
-          block
-            real(8) vz_1, vz_2, vz_3, vz_4, vz_5, vz_6
-            vz_1 = dy5(Q(3,i,j-2,k-2), Q(3,i,j-2,k-1), Q(3,i,j-2,k+1), Q(3,i,j-2,k+2), dz(k))
-            vz_2 = dy5(Q(3,i,j-1,k-2), Q(3,i,j-1,k-1), Q(3,i,j-1,k+1), Q(3,i,j-1,k+2), dz(k))
-            vz_3 = dy5(Q(3,i,j,  k-2), Q(3,i,j  ,k-1), Q(3,i,j  ,k+1), Q(3,i,j  ,k+2), dz(k))
-            vz_4 = dy5(Q(3,i,j+1,k-2), Q(3,i,j+1,k-1), Q(3,i,j+1,k+1), Q(3,i,j+1,k+2), dz(k))
-            vz_5 = dy5(Q(3,i,j+2,k-2), Q(3,i,j+2,k-1), Q(3,i,j+2,k+1), Q(3,i,j+2,k+2), dz(k))
-            vz_6 = dy5(Q(3,i,j+3,k-2), Q(3,i,j+3,k-1), Q(3,i,j+3,k+1), Q(3,i,j+3,k+2), dz(k))
-            vz3(:) = interpolation6_scalar(vz_1, vz_2, vz_3, vz_4, vz_5, vz_6)
-          end block
-          call tauxy_4(mu3(:), vz3(:), wy3(:), &
-                      Q(4,i,j-2,k), Q(4,i,j-1,k), Q(4,i,j,k), Q(4,i,j+1,k), Q(4,i,j+2,k), Q(4,i,j+3,k), tyz, wtyz)
-          tyz = tyz + muty * (vz3(2) + wy3(2))
-        end block
-
-
+        call calc_tau_straight_LES(mu3, mut3, v(jt-2:jt+3,it,kt), wz(jt-2:jt+3,it,kt), ux(jt-2:jt+3,it,kt), dy(j), tyy, vtyy)
+        call calc_tau_cross_LES(mu3, mut3, u(jt-2:jt+3,it,kt), vx(jt-2:jt+3,it,kt), dy(j), tyx, utyx)
+        call calc_tau_cross_LES(mu3, mut3, w(jt-2:jt+3,it,kt), vz(jt-2:jt+3,it,kt), dy(j), tyz, wtyz)
         block
           real(8), device :: H(4)
-          H(:)   = (gamma * Q(5,i,j-1:j+2,k) / (Q(1,i,j-1:j+2,k) * gamma_1)) &
-                   + 0.5d0 * (Q(2,i,j-1:j+2,k)**2 + Q(3,i,j-1:j+2,k)**2 + Q(4,i,j-1:j+2,k)**2) + qc2(i,j-1:j+2,k)
-          Hsgs   = -muty * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dy(j) / Prt
+          H(:) = Cp * T(i,j-1:j+2,k) + 0.5d0 * (u(jt-1:jt+2,it,kt)**2 + v(jt-1:jt+2,it,kt)**2 + w(jt-1:jt+2,it,kt)**2) + qc2(i,j-1:j+2,k)
+          Hsgs = -flux4(mut) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dy(j) / Prt
         end block
       end block
     else
@@ -591,25 +510,24 @@ contains
           mwzsgs = 0.25d0 * (mzsgs(1) * (-Q(4,i,j,k-1) + Q(4,i,j,k) - Q(4,i,j+1,k-1) + Q(4,i,j+1,k)) &
                            + mzsgs(2) * (-Q(4,i,j,k) + Q(4,i,j,k+1) - Q(4,i,j+1,k) + Q(4,i,j+1,k+1))) * dz(k)
         end block
-        muy    = my    * (-Q(2,i,j,k) + Q(2,i,j+1,k)) * dy(j)
-        muysgs = mysgs * (-Q(2,i,j,k) + Q(2,i,j+1,k)) * dy(j)
-        mvy    = my    * (-Q(3,i,j,k) + Q(3,i,j+1,k)) * dy(j)
-        mvysgs = mysgs * (-Q(3,i,j,k) + Q(3,i,j+1,k)) * dy(j)
-        mwy    = my    * (-Q(4,i,j,k) + Q(4,i,j+1,k)) * dy(j)
-        mwysgs = mysgs * (-Q(4,i,j,k) + Q(4,i,j+1,k)) * dy(j)
+        muy    = my    * (-u(jt,it,kt) + u(jt+1,it,kt)) * dy(j)
+        muysgs = mysgs * (-u(jt,it,kt) + u(jt+1,it,kt)) * dy(j)
+        mvy    = my    * (-v(jt,it,kt) + v(jt+1,it,kt)) * dy(j)
+        mvysgs = mysgs * (-v(jt,it,kt) + v(jt+1,it,kt)) * dy(j)
+        mwy    = my    * (-w(jt,it,kt) + w(jt+1,it,kt)) * dy(j)
+        mwysgs = mysgs * (-w(jt,it,kt) + w(jt+1,it,kt)) * dy(j)
         tyx    = muy + mvx
-        tyy    = 2.d0 * (2.d0 * mvy - mwz - mux) * one_third
+        tyy    = two_third * (2.d0 * mvy - mwz - mux)
         tyz    = mvz + mwy
-        utyx   = 0.5d0 * (Q(2,i,j,k) + Q(2,i,j+1,k)) * tyx
-        vtyy   = 0.5d0 * (Q(3,i,j,k) + Q(3,i,j+1,k)) * tyy
-        wtyz   = 0.5d0 * (Q(4,i,j,k) + Q(4,i,j+1,k)) * tyz
+        utyx   = 0.5d0 * (u(jt,it,kt) + u(jt+1,it,kt)) * tyx
+        vtyy   = 0.5d0 * (v(jt,it,kt) + v(jt+1,it,kt)) * tyy
+        wtyz   = 0.5d0 * (w(jt,it,kt) + w(jt+1,it,kt)) * tyz
         tyx    = tyx + muysgs + mvxsgs
-        tyy    = tyy + 2.d0 * (2.d0 * mvysgs - mwzsgs - muxsgs) * one_third
+        tyy    = tyy + two_third * (2.d0 * mvysgs - mwzsgs - muxsgs)
         tyz    = tyz + mvzsgs + mwysgs
         block
           real(8), device :: H(2)
-          H(:) = (gamma * Q(5,i,j:j+1,k) / (Q(1,i,j:j+1,k) * gamma_1)) &
-                 + 0.5d0 * (u2(:)**2 + v2(:)**2 + w2(:)**2) + qc2(i,j:j+1,k)
+          H(:) = Cp * T(i,j:j+1,k) + 0.5d0 * (u(jt:jt+1,it,kt)**2 + v(jt:jt+1,it,kt)**2 + w(jt:jt+1,it,kt)**2) + qc2(i,j:j+1,k)
           Hsgs = -my * (-H(1) + H(2)) * dy(j) / Prt
         end block
       end block
@@ -629,96 +547,58 @@ contains
     real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
     real(8), intent(inout), device :: G(5,nx-2,ny-2,nz-1)
     integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
-    integer i, j, k
+    real(8), shared ::  u(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
+    real(8), shared ::  v(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
+    real(8), shared ::  w(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
+    real(8), shared :: wx(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
+    real(8), shared :: wy(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
+    real(8), shared :: ux(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
+    real(8), shared :: vy(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
+    integer i, j, k, it, jt, kt, kk, k_base
     real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z
+    it = threadIdx%x
+    jt = threadIdx%y
+    kt = threadIdx%z
+    i  = (blockIdx%x-1)*blockDim%x + it + 1
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    k_base = (blockIdx%z-1)*blockDim%z
+    do kk = kt-2, threadsGv%z+3, blockDim%z
+      k = k_base + kk
+      if (i <= nx .and. j <= ny .and. 1 <= k .and. k <= nz) then
+        u(kk,jt,it) = Q(2,i,j,k)
+        v(kk,jt,it) = Q(3,i,j,k)
+        w(kk,jt,it) = Q(4,i,j,k)
+      endif
+      if (3 <= i .and. i <= nx-2 .and. j <= ny .and. 1 <= k .and. k <= nz) then
+        ux(kk,jt,it) = (two_third * (-Q(2,i-1,j,k) + Q(2,i+1,j,k)) - one_twelfth * (-Q(2,i-2,j,k) + Q(2,i+2,j,k))) * dx(i)
+        wx(kk,jt,it) = (two_third * (-Q(4,i-1,j,k) + Q(4,i+1,j,k)) - one_twelfth * (-Q(4,i-2,j,k) + Q(4,i+2,j,k))) * dx(i)
+      endif
+      if (i <= nx .and. 3 <= j .and. j <= ny-2 .and. 1 <= k .and. k <= nz) then
+        vy(kk,jt,it) = (two_third * (-Q(3,i,j-1,k) + Q(3,i,j+1,k)) - one_twelfth * (-Q(3,i,j-2,k) + Q(3,i,j+2,k))) * dy(j)
+        wy(kk,jt,it) = (two_third * (-Q(4,i,j-1,k) + Q(4,i,j+1,k)) - one_twelfth * (-Q(4,i,j-2,k) + Q(4,i,j+2,k))) * dy(j)
+      endif
+    enddo
+    call syncthreads()
+    k  = (blockIdx%z-1)*blockDim%z + kt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-3) then
       block
         real(8), device :: mu3(3)
+        mu3(:) = 0.0625d0 * (9.d0 * (mu(i,j,k-1:k+1) + mu(i,j,k:k+2)) - (mu(i,j,k-2:k) + mu(i,j,k+1:k+3)))
         block ! dQdz
           real(8), device :: kTz3(3)
-          mu3(:)  = 0.0625d0 * (9.d0 * (mu(i,j,k-1:k+1) + mu(i,j,k:k+2)) - (mu(i,j,k-2:k) + mu(i,j,k+1:k+3)))
-          kTz3(:) = Cp_over_Pr * mu3(:) * 0.125d0 * &
-                    (9.d0 * (-T(i,j,k-1:k+1) + T(i,j,k:k+2)) - (-T(i,j,k-2:k) + T(i,j,k+1:k+3)) * one_third) * dz(k)
+          kTz3(:) = Cp_over_Pr * mu3(:) * &
+                    (1.125d0 * (-T(i,j,k-1:k+1) + T(i,j,k:k+2)) - (-T(i,j,k-2:k) + T(i,j,k+1:k+3)) * one_24) * dz(k)
           kTz     = flux4(kTz3(:))
         end block
-        
-
-        block ! tzx
-          real(8), device :: uz3(3), wx3(3)
-          uz3(:) = 0.125d0 * (9.d0 * (-Q(2,i,j,k-1:k+1) + Q(2,i,j,k:k+1)) &
-                                   - (-Q(2,i,j,k-2:k)   + Q(2,i,j,k+1:k+3)) * one_third) * dz(k)
-          block
-            real(8) wx_1, wx_2, wx_3, wx_4, wx_5, wx_6
-            wx_1 = dy5(Q(4,i-2,j,k-2), Q(4,i-1,j,k-2), Q(4,i+1,j,k-2), Q(4,i+2,j,k-2), dx(i))
-            wx_2 = dy5(Q(4,i-2,j,k-1), Q(4,i-1,j,k-1), Q(4,i+1,j,k-1), Q(4,i+2,j,k-1), dx(i))
-            wx_3 = dy5(Q(4,i-2,j,k  ), Q(4,i-1,j,k  ), Q(4,i+1,j,k  ), Q(4,i+2,j,k  ), dx(i))
-            wx_4 = dy5(Q(4,i-2,j,k+1), Q(4,i-1,j,k+1), Q(4,i+1,j,k+1), Q(4,i+2,j,k+1), dx(i))
-            wx_5 = dy5(Q(4,i-2,j,k+2), Q(4,i-1,j,k+2), Q(4,i+1,j,k+2), Q(4,i+2,j,k+2), dx(i))
-            wx_6 = dy5(Q(4,i-2,j,k+3), Q(4,i-1,j,k+3), Q(4,i+1,j,k+3), Q(4,i+2,j,k+3), dx(i))
-            wx3(:) = interpolation6_scalar(wx_1, wx_2, wx_3, wx_4, wx_5, wx_6)
-          end block
-          call tauxy_4(mu3(:), wx3(:), uz3(:), &
-                      Q(2,i,j,k-2), Q(2,i,j,k-1), Q(2,i,j,k), Q(2,i,j,k+1), Q(2,i,j,k+2), Q(2,i,j,k+3), tzx, utzx)
-        end block
-
-
-        block ! tzy
-          real(8), device :: vz3(3), wy3(3)
-          vz3(:) = 0.125d0 * (9.d0 * (-Q(3,i,j,k-1:k+1) + Q(3,i,j,k:k+1)) &
-                                   - (-Q(3,i,j,k-2:k)   + Q(3,i,j,k+1:k+3)) * one_third) * dz(k)
-          block
-            real(8) wy_1, wy_2, wy_3, wy_4, wy_5, wy_6
-            wy_1 = dy5(Q(4,i,j-2,k-2), Q(4,i,j-1,k-2), Q(4,i,j+1,k-2), Q(4,i,j+2,k-2), dy(j))
-            wy_2 = dy5(Q(4,i,j-2,k-1), Q(4,i,j-1,k-1), Q(4,i,j+1,k-1), Q(4,i,j+2,k-1), dy(j))
-            wy_3 = dy5(Q(4,i,j-2,k  ), Q(4,i,j-1,k  ), Q(4,i,j+1,k  ), Q(4,i,j+2,k  ), dy(j))
-            wy_4 = dy5(Q(4,i,j-2,k+1), Q(4,i,j-1,k+1), Q(4,i,j+1,k+1), Q(4,i,j+2,k+1), dy(j))
-            wy_5 = dy5(Q(4,i,j-2,k+2), Q(4,i,j-1,k+2), Q(4,i,j+1,k+2), Q(4,i,j+2,k+2), dy(j))
-            wy_6 = dy5(Q(4,i,j-2,k+3), Q(4,i,j-1,k+3), Q(4,i,j+1,k+3), Q(4,i,j+2,k+3), dy(j))
-            wy3(:) = interpolation6_scalar(wy_1, wy_2, wy_3, wy_4, wy_5, wy_6)
-          end block
-          call tauxy_4(mu3(:), vz3(:), wy3(:), &
-                      Q(3,i,j,k-2), Q(3,i,j,k-1), Q(3,i,j,k), Q(3,i,j,k+1), Q(3,i,j,k+2), Q(3,i,j,k+3), tzy, vtzy)
-        end block
-
-
-        block ! tzz
-          real(8), device :: wz3(3), ux3(3), vy3(3)
-          wz3(:) = 0.125d0 * (9.d0 * (-Q(4,i,j,k-1:k+1) + Q(4,i,j,k:k+1)) &
-                                   - (-Q(4,i,j,k-2:k)   + Q(4,i,j,k+1:k+3)) * one_third) * dz(k)
-          block
-            real(8) ux_1, ux_2, ux_3, ux_4, ux_5, ux_6
-            ux_1 = dy5(Q(2,i-2,j,k-2), Q(2,i-1,j,k-2), Q(2,i+1,j,k-2), Q(2,i+2,j,k-2), dx(i))
-            ux_2 = dy5(Q(2,i-2,j,k-1), Q(2,i-1,j,k-1), Q(2,i+1,j,k-1), Q(2,i+2,j,k-1), dx(i))
-            ux_3 = dy5(Q(2,i-2,j,k  ), Q(2,i-1,j,k  ), Q(2,i+1,j,k  ), Q(2,i+2,j,k  ), dx(i))
-            ux_4 = dy5(Q(2,i-2,j,k+1), Q(2,i-1,j,k+1), Q(2,i+1,j,k+1), Q(2,i+2,j,k+1), dx(i))
-            ux_5 = dy5(Q(2,i-2,j,k+2), Q(2,i-1,j,k+2), Q(2,i+1,j,k+2), Q(2,i+2,j,k+2), dx(i))
-            ux_6 = dy5(Q(2,i-2,j,k+3), Q(2,i-1,j,k+3), Q(2,i+1,j,k+3), Q(2,i+2,j,k+3), dx(i))
-            ux3(:) = interpolation6_scalar(ux_1, ux_2, ux_3, ux_4, ux_5, ux_6)
-          end block
-          block
-            real(8) vy_1, vy_2, vy_3, vy_4, vy_5, vy_6
-            vy_1 = dy5(Q(3,i,j-2,k-2), Q(3,i,j-1,k-2), Q(3,i,j+1,k-2), Q(3,i,j+2,k-2), dy(j))
-            vy_2 = dy5(Q(3,i,j-2,k-1), Q(3,i,j-1,k-1), Q(3,i,j+1,k-1), Q(3,i,j+2,k-1), dy(j))
-            vy_3 = dy5(Q(3,i,j-2,k  ), Q(3,i,j-1,k  ), Q(3,i,j+1,k  ), Q(3,i,j+2,k  ), dy(j))
-            vy_4 = dy5(Q(3,i,j-2,k+1), Q(3,i,j-1,k+1), Q(3,i,j+1,k+1), Q(3,i,j+2,k+1), dy(j))
-            vy_5 = dy5(Q(3,i,j-2,k+2), Q(3,i,j-1,k+2), Q(3,i,j+1,k+2), Q(3,i,j+2,k+2), dy(j))
-            vy_6 = dy5(Q(3,i,j-2,k+3), Q(3,i,j-1,k+3), Q(3,i,j+1,k+3), Q(3,i,j+2,k+3), dy(j))
-            vy3(:) = interpolation6_scalar(vy_1, vy_2, vy_3, vy_4, vy_5, vy_6)
-          end block
-          call tauxx_4(mu3(:), wz3(:), ux3(:), vy3(:), &
-                      Q(4,i,j,k-2), Q(4,i,j,k-1), Q(4,i,j,k), Q(4,i,j,k+1), Q(4,i,j,k+2), Q(4,i,j,k+3), tzz, wtzz)
-        end block
+        call calc_tau_straight(mu3, w(kt-2:kt+3,jt,it), ux(kt-2:kt+3,jt,it), vy(kt-2:kt+3,jt,it), dz(k), tzz, wtzz)
+        call calc_tau_cross(mu3, u(kt-2:kt+3,jt,it), wx(kt-2:kt+3,jt,it), dz(k), tzx, utzx)
+        call calc_tau_cross(mu3, v(kt-2:kt+3,jt,it), wy(kt-2:kt+3,jt,it), dz(k), tzy, vtzy)
       end block
     else
       block
-        real(8) m1, m2, mz, muz, mvz, mwz, mwx, mux, mvy, mwy
-        m1  = mu(T(i,j,k))
-        m2  = mu(T(i,j,k+1))
-        mz  = 0.5d0 * (m1 + m2)
+        real(8) mz, muz, mvz, mwz, mwx, mux, mvy, mwy
+        mz  = 0.5d0 * (mu(i,j,k) + mu(i,j,k+1))
         kTz = Cp_over_Pr * mz * (-T(i,j,k) + T(i,j,k+1)) * dz(k)
         block
           real(8), device :: mx(2)
@@ -740,15 +620,15 @@ contains
         end block
         mz   = 0.5d0 * (mu(i,j,k) + mu(i,j,k+1))
         kTz  = Cp_over_Pr * mz * (-T(i,j,k) + T(i,j,k+1)) * dz(k)
-        muz  = mz * (-Q(2,i,j,k) + Q(2,i,j,k+1)) * dz(k)
-        mvz  = mz * (-Q(3,i,j,k) + Q(3,i,j,k+1)) * dz(k)
-        mwz  = mz * (-Q(4,i,j,k) + Q(4,i,j,k+1)) * dz(k)
+        muz  = mz * (-u(kt,jt,it) + u(kt+1,jt,it)) * dz(k)
+        mvz  = mz * (-v(kt,jt,it) + v(kt+1,jt,it)) * dz(k)
+        mwz  = mz * (-w(kt,jt,it) + w(kt+1,jt,it)) * dz(k)
         tzx  = mwx + muz
         tzy  = mvz + mwy
-        tzz  = 2.d0 * (2.d0 * mwz - mux - mvy) * one_third
-        utzx = 0.5d0 * (Q(2,i,j,k) + Q(2,i,j,k+1)) * tzx
-        vtzy = 0.5d0 * (Q(3,i,j,k) + Q(3,i,j,k+1)) * tzy
-        wtzz = 0.5d0 * (Q(4,i,j,k) + Q(4,i,j,k+1)) * tzz
+        tzz  = two_third * (2.d0 * mwz - mux - mvy)
+        utzx = 0.5d0 * (u(kt,jt,it) + u(kt+1,jt,it)) * tzx
+        vtzy = 0.5d0 * (v(kt,jt,it) + v(kt+1,jt,it)) * tzy
+        wtzz = 0.5d0 * (w(kt,jt,it) + w(kt+1,jt,it)) * tzz
       end block
     endif
     G(2,i-1,j-1,k) = G(2,i-1,j-1,k) - tzx
@@ -766,101 +646,58 @@ contains
     real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
     real(8), intent(in), device    :: mut(nx,ny,nz), qc2(nx,ny,nz)
     real(8), intent(inout), device :: G(5,nx-2,ny-2,nz-1)
-    integer i, j, k
+    real(8), shared ::  u(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
+    real(8), shared ::  v(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
+    real(8), shared ::  w(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
+    real(8), shared :: wx(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
+    real(8), shared :: wy(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
+    real(8), shared :: ux(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
+    real(8), shared :: vy(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
+    integer i, j, k, it, jt, kt, kk, k_base
     real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz, Hsgs
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z
+    it = threadIdx%x
+    jt = threadIdx%y
+    kt = threadIdx%z
+    i  = (blockIdx%x-1)*blockDim%x + it + 1
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    k_base = (blockIdx%z-1)*blockDim%z
+    do kk = kt-2, threadsGv%z+3, blockDim%z
+      k = k_base + kk
+      if (i <= nx .and. j <= ny .and. 1 <= k .and. k <= nz) then
+        u(kk,jt,it) = Q(2,i,j,k)
+        v(kk,jt,it) = Q(3,i,j,k)
+        w(kk,jt,it) = Q(4,i,j,k)
+      endif
+      if (3 <= i .and. i <= nx-2 .and. j <= ny .and. 1 <= k .and. k <= nz) then
+        ux(kk,jt,it) = (two_third * (-Q(2,i-1,j,k) + Q(2,i+1,j,k)) - one_twelfth * (-Q(2,i-2,j,k) + Q(2,i+2,j,k))) * dx(i)
+        wx(kk,jt,it) = (two_third * (-Q(4,i-1,j,k) + Q(4,i+1,j,k)) - one_twelfth * (-Q(4,i-2,j,k) + Q(4,i+2,j,k))) * dx(i)
+      endif
+      if (i <= nx .and. 3 <= j .and. j <= ny-2 .and. 1 <= k .and. k <= nz) then
+        vy(kk,jt,it) = (two_third * (-Q(3,i,j-1,k) + Q(3,i,j+1,k)) - one_twelfth * (-Q(3,i,j-2,k) + Q(3,i,j+2,k))) * dy(j)
+        wy(kk,jt,it) = (two_third * (-Q(4,i,j-1,k) + Q(4,i,j+1,k)) - one_twelfth * (-Q(4,i,j-2,k) + Q(4,i,j+2,k))) * dy(j)
+      endif
+    enddo
+    call syncthreads()
+    k  = (blockIdx%z-1)*blockDim%z + kt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-3) then
       block
-        real(8), device :: mu3(3)
-        real(8) mutz
-        mutz = 0.0625d0 * (-mut(i,j,k-1) + 9.d0 * (mut(i,j,k) + mut(i,j,k+1)) -mut(i,j,k+2))
+        real(8), device :: mu3(3), mut3(3)
+        mu3(:)  = 0.0625d0 * (9.d0 * ( mu(i,j,k-1:k+1) +  mu(i,j,k:k+2)) - ( mu(i,j,k-2:k) +  mu(i,j,k+1:k+3)))
+        mut3(:) = 0.0625d0 * (9.d0 * (mut(i,j,k-1:k+1) + mut(i,j,k:k+2)) - (mut(i,j,k-2:k) + mut(i,j,k+1:k+3)))
         block ! dQdz
           real(8), device :: kTz3(3)
-          mu3(:)  = 0.0625d0 * (9.d0 * (mu(i,j,k-1:k+1) + mu(i,j,k:k+2)) - (mu(i,j,k-2:k) + mu(i,j,k+1:k+3)))
-          kTz3(:) = Cp_over_Pr * mu3(:) * 0.125d0 * &
-                    (9.d0 * (-T(i,j,k-1:k+1) + T(i,j,k:k+2)) - (-T(i,j,k-2:k) + T(i,j,k+1:k+3)) * one_third) * dz(k)
+          kTz3(:) = Cp_over_Pr * mu3(:) * &
+                    (1.125d0 * (-T(i,j,k-1:k+1) + T(i,j,k:k+2)) - (-T(i,j,k-2:k) + T(i,j,k+1:k+3)) * one_24) * dz(k)
           kTz     = flux4(kTz3(:))
         end block
-        
-
-        block ! tzx
-          real(8), device :: uz3(3), wx3(3)
-          uz3(:) = 0.125d0 * (9.d0 * (-Q(2,i,j,k-1:k+1) + Q(2,i,j,k:k+1)) &
-                                   - (-Q(2,i,j,k-2:k)   + Q(2,i,j,k+1:k+3)) * one_third) * dz(k)
-          block
-            real(8) wx_1, wx_2, wx_3, wx_4, wx_5, wx_6
-            wx_1 = dy5(Q(4,i-2,j,k-2), Q(4,i-1,j,k-2), Q(4,i+1,j,k-2), Q(4,i+2,j,k-2), dx(i))
-            wx_2 = dy5(Q(4,i-2,j,k-1), Q(4,i-1,j,k-1), Q(4,i+1,j,k-1), Q(4,i+2,j,k-1), dx(i))
-            wx_3 = dy5(Q(4,i-2,j,k  ), Q(4,i-1,j,k  ), Q(4,i+1,j,k  ), Q(4,i+2,j,k  ), dx(i))
-            wx_4 = dy5(Q(4,i-2,j,k+1), Q(4,i-1,j,k+1), Q(4,i+1,j,k+1), Q(4,i+2,j,k+1), dx(i))
-            wx_5 = dy5(Q(4,i-2,j,k+2), Q(4,i-1,j,k+2), Q(4,i+1,j,k+2), Q(4,i+2,j,k+2), dx(i))
-            wx_6 = dy5(Q(4,i-2,j,k+3), Q(4,i-1,j,k+3), Q(4,i+1,j,k+3), Q(4,i+2,j,k+3), dx(i))
-            wx3(:) = interpolation6_scalar(wx_1, wx_2, wx_3, wx_4, wx_5, wx_6)
-          end block
-          call tauxy_4(mu3(:), wx3(:), uz3(:), &
-                      Q(2,i,j,k-2), Q(2,i,j,k-1), Q(2,i,j,k), Q(2,i,j,k+1), Q(2,i,j,k+2), Q(2,i,j,k+3), tzx, utzx)
-          tzx  = tzx + mutz * (wx3(2) + uz3(2))
-        end block
-
-
-        block ! tzy
-          real(8), device :: vz3(3), wy3(3)
-          vz3(:) = 0.125d0 * (9.d0 * (-Q(3,i,j,k-1:k+1) + Q(3,i,j,k:k+1)) &
-                                   - (-Q(3,i,j,k-2:k)   + Q(3,i,j,k+1:k+3)) * one_third) * dz(k)
-          block
-            real(8) wy_1, wy_2, wy_3, wy_4, wy_5, wy_6
-            wy_1 = dy5(Q(4,i,j-2,k-2), Q(4,i,j-1,k-2), Q(4,i,j+1,k-2), Q(4,i,j+2,k-2), dy(j))
-            wy_2 = dy5(Q(4,i,j-2,k-1), Q(4,i,j-1,k-1), Q(4,i,j+1,k-1), Q(4,i,j+2,k-1), dy(j))
-            wy_3 = dy5(Q(4,i,j-2,k  ), Q(4,i,j-1,k  ), Q(4,i,j+1,k  ), Q(4,i,j+2,k  ), dy(j))
-            wy_4 = dy5(Q(4,i,j-2,k+1), Q(4,i,j-1,k+1), Q(4,i,j+1,k+1), Q(4,i,j+2,k+1), dy(j))
-            wy_5 = dy5(Q(4,i,j-2,k+2), Q(4,i,j-1,k+2), Q(4,i,j+1,k+2), Q(4,i,j+2,k+2), dy(j))
-            wy_6 = dy5(Q(4,i,j-2,k+3), Q(4,i,j-1,k+3), Q(4,i,j+1,k+3), Q(4,i,j+2,k+3), dy(j))
-            wy3(:) = interpolation6_scalar(wy_1, wy_2, wy_3, wy_4, wy_5, wy_6)
-          end block
-          call tauxy_4(mu3(:), vz3(:), wy3(:), &
-                      Q(3,i,j,k-2), Q(3,i,j,k-1), Q(3,i,j,k), Q(3,i,j,k+1), Q(3,i,j,k+2), Q(3,i,j,k+3), tzy, vtzy)
-          tzy  = tzy + mutz * (vz3(2) + wy3(2))
-        end block
-
-
-        block ! tzz
-          real(8), device :: wz3(3), ux3(3), vy3(3)
-          wz3(:) = 0.125d0 * (9.d0 * (-Q(4,i,j,k-1:k+1) + Q(4,i,j,k:k+1)) &
-                                   - (-Q(4,i,j,k-2:k)   + Q(4,i,j,k+1:k+3)) * one_third) * dz(k)
-          block
-            real(8) ux_1, ux_2, ux_3, ux_4, ux_5, ux_6
-            ux_1 = dy5(Q(2,i-2,j,k-2), Q(2,i-1,j,k-2), Q(2,i+1,j,k-2), Q(2,i+2,j,k-2), dx(i))
-            ux_2 = dy5(Q(2,i-2,j,k-1), Q(2,i-1,j,k-1), Q(2,i+1,j,k-1), Q(2,i+2,j,k-1), dx(i))
-            ux_3 = dy5(Q(2,i-2,j,k  ), Q(2,i-1,j,k  ), Q(2,i+1,j,k  ), Q(2,i+2,j,k  ), dx(i))
-            ux_4 = dy5(Q(2,i-2,j,k+1), Q(2,i-1,j,k+1), Q(2,i+1,j,k+1), Q(2,i+2,j,k+1), dx(i))
-            ux_5 = dy5(Q(2,i-2,j,k+2), Q(2,i-1,j,k+2), Q(2,i+1,j,k+2), Q(2,i+2,j,k+2), dx(i))
-            ux_6 = dy5(Q(2,i-2,j,k+3), Q(2,i-1,j,k+3), Q(2,i+1,j,k+3), Q(2,i+2,j,k+3), dx(i))
-            ux3(:) = interpolation6_scalar(ux_1, ux_2, ux_3, ux_4, ux_5, ux_6)
-          end block
-          block
-            real(8) vy_1, vy_2, vy_3, vy_4, vy_5, vy_6
-            vy_1 = dy5(Q(3,i,j-2,k-2), Q(3,i,j-1,k-2), Q(3,i,j+1,k-2), Q(3,i,j+2,k-2), dy(j))
-            vy_2 = dy5(Q(3,i,j-2,k-1), Q(3,i,j-1,k-1), Q(3,i,j+1,k-1), Q(3,i,j+2,k-1), dy(j))
-            vy_3 = dy5(Q(3,i,j-2,k  ), Q(3,i,j-1,k  ), Q(3,i,j+1,k  ), Q(3,i,j+2,k  ), dy(j))
-            vy_4 = dy5(Q(3,i,j-2,k+1), Q(3,i,j-1,k+1), Q(3,i,j+1,k+1), Q(3,i,j+2,k+1), dy(j))
-            vy_5 = dy5(Q(3,i,j-2,k+2), Q(3,i,j-1,k+2), Q(3,i,j+1,k+2), Q(3,i,j+2,k+2), dy(j))
-            vy_6 = dy5(Q(3,i,j-2,k+3), Q(3,i,j-1,k+3), Q(3,i,j+1,k+3), Q(3,i,j+2,k+3), dy(j))
-            vy3(:) = interpolation6_scalar(vy_1, vy_2, vy_3, vy_4, vy_5, vy_6)
-          end block
-          call tauxx_4(mu3(:), wz3(:), ux3(:), vy3(:), &
-                      Q(4,i,j,k-2), Q(4,i,j,k-1), Q(4,i,j,k), Q(4,i,j,k+1), Q(4,i,j,k+2), Q(4,i,j,k+3), tzz, wtzz)
-          tzz  = tzz + 2.d0 * mutz * (2.d0 * wz3(2) - ux3(2) - vy3(2)) * one_third
-        end block
- 
-
+        call calc_tau_straight_LES(mu3, mut3, w(kt-2:kt+3,jt,it), ux(kt-2:kt+3,jt,it), vy(kt-2:kt+3,jt,it), dz(k), tzz, wtzz)
+        call calc_tau_cross_LES(mu3, mut3, u(kt-2:kt+3,jt,it), wx(kt-2:kt+3,jt,it), dz(k), tzx, utzx)
+        call calc_tau_cross_LES(mu3, mut3, v(kt-2:kt+3,jt,it), wy(kt-2:kt+3,jt,it), dz(k), tzy, vtzy)
         block
           real(8), device :: H(4)
-          H(:) = (gamma * Q(5,i,j,k-1:k+2) / (Q(1,i,j,k-1:k+2) * gamma_1)) &
-                 + 0.5d0 * (Q(2,i,j,k-1:k+2)**2 + Q(3,i,j,k-1:k+2)**2 + Q(4,i,j,k-1:k+2)**2) + qc2(i,j,k-1:k+2)
-          Hsgs = -mutz * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dz(k) / Prt
+          H(:) = Cp * T(i,j,k-1:k+2) + 0.5d0 * (u(kt-1:kt+2,jt,it)**2 + v(kt-1:kt+2,jt,it)**2 + w(kt-1:kt+2,jt,it)**2) + qc2(i,j,k-1:k+2)
+          Hsgs = -flux4(mut) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dz(k) / Prt
         end block
       end block
     else
@@ -875,8 +712,8 @@ contains
                      0.25d0 * (mut(i,j,k) + mut(i,j+1,k) + mut(i,j,k+1) + mut(i,j+1,k+1))/)
         block
           real(8), device :: mx(2)
-          mx(1) = 0.25d0 * (mu(i-1,j,k) + mu(i,  j,k) + mu(i-1,j,k+1) + mu(i,  j,k+1))
-          mx(2) = 0.25d0 * (mu(i,  j,k) + mu(i+1,j,k) + mu(i,  j,k+1) + mu(i+1,j,k+1))
+          mx(1)  = 0.25d0 * (mu(i-1,j,k) + mu(i,  j,k) + mu(i-1,j,k+1) + mu(i,  j,k+1))
+          mx(2)  = 0.25d0 * (mu(i,  j,k) + mu(i+1,j,k) + mu(i,  j,k+1) + mu(i+1,j,k+1))
           mux    = 0.25d0 * (mx(1)    * (-Q(2,i-1,j,k) + Q(2,i,j,k) - Q(2,i-1,j,k+1) + Q(2,i,j,k+1)) &
                            + mx(2)    * (-Q(2,i,j,k) + Q(2,i+1,j,k) - Q(2,i,j,k+1) + Q(2,i+1,j,k+1))) * dx(i)
           muxsgs = 0.25d0 * (mxsgs(1) * (-Q(2,i-1,j,k) + Q(2,i,j,k) - Q(2,i-1,j,k+1) + Q(2,i,j,k+1)) &
@@ -901,25 +738,24 @@ contains
         end block
         mz     = 0.5d0 * (mu(i,j,k) + mu(i,j,k+1))
         kTz    = Cp_over_Pr * mz * (-T(i,j,k) + T(i,j,k+1)) * dz(k)
-        muz    = mz    * (-Q(2,i,j,k) + Q(2,i,j,k+1)) * dz(k)
-        muzsgs = mzsgs * (-Q(2,i,j,k) + Q(2,i,j,k+1)) * dz(k)
-        mvz    = mz    * (-Q(3,i,j,k) + Q(3,i,j,k+1)) * dz(k)
-        mvzsgs = mzsgs * (-Q(3,i,j,k) + Q(3,i,j,k+1)) * dz(k)
-        mwz    = mz    * (-Q(4,i,j,k) + Q(4,i,j,k+1)) * dz(k)
-        mwzsgs = mzsgs * (-Q(4,i,j,k) + Q(4,i,j,k+1)) * dz(k)
+        muz    = mz    * (-u(kt,jt,it) + u(kt+1,jt,it)) * dz(k)
+        muzsgs = mzsgs * (-u(kt,jt,it) + u(kt+1,jt,it)) * dz(k)
+        mvz    = mz    * (-v(kt,jt,it) + v(kt+1,jt,it)) * dz(k)
+        mvzsgs = mzsgs * (-v(kt,jt,it) + v(kt+1,jt,it)) * dz(k)
+        mwz    = mz    * (-w(kt,jt,it) + w(kt+1,jt,it)) * dz(k)
+        mwzsgs = mzsgs * (-w(kt,jt,it) + w(kt+1,jt,it)) * dz(k)
         tzx    = mwx + muz
         tzy    = mvz + mwy
-        tzz    = 2.d0 * (2.d0 * mwz - mux - mvy) * one_third
-        utzx = 0.5d0 * (Q(2,i,j,k) + Q(2,i,j,k+1)) * tzx
-        vtzy = 0.5d0 * (Q(3,i,j,k) + Q(3,i,j,k+1)) * tzy
-        wtzz = 0.5d0 * (Q(4,i,j,k) + Q(4,i,j,k+1)) * tzz
+        tzz    = two_third * (2.d0 * mwz - mux - mvy)
+        utzx   = 0.5d0 * (u(kt,jt,it) + u(kt+1,jt,it)) * tzx
+        vtzy   = 0.5d0 * (v(kt,jt,it) + v(kt+1,jt,it)) * tzy
+        wtzz   = 0.5d0 * (w(kt,jt,it) + w(kt+1,jt,it)) * tzz
         tzx    = tzx + mwx + muz
         tzy    = tzy + mvz + mwy
-        tzz    = tzz + 2.d0 * (2.d0 * mwz - mux - mvy) * one_third
+        tzz    = tzz + two_third * (2.d0 * mwz - mux - mvy)
         block
           real(8), device :: H(2)
-          H(:) = (gamma * Q(5,i,j,k:k+1) / (Q(1,i,j,k:k+1) * gamma_1)) &
-                 + 0.5d0 * (Q(2,i,j,k:k+1)**2 + Q(3,i,j,k:k+1)**2 + Q(4,i,j,k:k+1)**2) + qc2(i,j,k:k+1)
+          H(:) = Cp * T(i,j,k:k+1) + 0.5d0 * (u(k:k+1,jt,it)**2 + v(kt:kt+1,jt,it)**2 + w(kt:kt+1,jt,it)**2) + qc2(i,j,k:k+1)
           Hsgs = -mz * (-H(1) + H(2)) * dz(k) / Prt
         end block
       end block

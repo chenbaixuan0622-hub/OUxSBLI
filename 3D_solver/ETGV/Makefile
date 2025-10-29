@@ -19,15 +19,14 @@ OBJ =	mod_globals.o \
       calc_common_dim.o \
       calc_mat.o \
       calc_physical_quantities.o \
-      calc_sutherland.o \
       calc_rand.o \
       calc_visc_common.o \
-      calc_visc.o \
+      calc_visc2.o \
+      calc_visc4.o \
       calc_les.o \
       calc_common.o \
       calc_hybrid.o \
       calc_slau.o \
-      calc_term.o \
       calc_keep.o \
       calc_muscl.o \
       calc_flux.o \
@@ -39,6 +38,7 @@ OBJ =	mod_globals.o \
       set_init_common.o \
       set.o \
       print.o \
+      preprocess.o \
       calc_time_dev.o \
       main.o
 
@@ -54,20 +54,23 @@ set_init_common.o: mod_globals.mod mod_constant.mod
 set.o: mod_globals.mod mod_constant.mod set_bc_common.mod set_init_common.mod set_coordinate.mod
 calc_physical_quantities.o: mod_globals.mod mod_constant.mod
 calc_common.o: mod_globals.mod
-calc_term.o: calc_common_dim.mod
-calc_keep.o: mod_globals.mod mod_constant.mod calc_common_dim.mod calc_term.mod calc_mat.mod
-calc_sutherland.o: mod_globals.mod mod_constant.mod
-calc_visc.o: mod_globals.mod mod_constant.mod calc_sutherland.mod calc_visc_common.mod calc_rand.mod
+calc_keep.o: mod_globals.mod mod_constant.mod 
+calc_visc2.o: mod_globals.mod mod_constant.mod calc_visc_common.mod calc_rand.mod
+calc_visc4.o: mod_globals.mod mod_constant.mod calc_visc_common.mod calc_rand.mod
 calc_mat.o: mod_globals.mod calc_common_dim.mod
 calc_slau.o: mod_globals.mod mod_constant.mod calc_common.mod calc_hybrid.mod
 calc_roe.o: mod_globals.mod calc_common.mod calc_common_dim.mod calc_physical_quantities.mod calc_mat.mod
 calc_muscl.o: mod_globals.mod
 calc_flux.o: mod_globals.mod mod_constant.mod calc_keep.mod calc_slau.mod calc_roe.mod calc_hybrid.mod calc_muscl.mod
-calc_flux_base.o: mod_globals.mod calc_physical_quantities.mod calc_hybrid.mod calc_flux.mod calc_visc.mod calc_les.mod set.mod
+calc_flux_base.o: mod_globals.mod calc_physical_quantities.mod calc_hybrid.mod calc_flux.mod calc_visc2.mod calc_visc4.mod calc_les.mod set.mod
 calc_hybrid.o: mod_globals.mod
 calc_steps.o: mod_globals.mod
 calc_rescale.o: mod_globals.mod mod_constant.mod
-calc_time_dev.o: mod_globals.mod set.mod calc_flux_base.mod calc_steps.mod calc_rescale.mod calc_para.mod print.mod
+preprocess.o: mod_globals.mod print.mod
+calc_time_dev.o: mod_globals.mod preprocess.mod set.mod calc_flux_base.mod calc_steps.mod calc_rescale.mod calc_para.mod print.mod
 print.o: mod_globals.mod
 main.o: main.f90 mod_globals.mod set_coordinate.mod set.mod calc_time_dev.mod
+
+clean:
+		rm -f *.mod *.o *.out
 

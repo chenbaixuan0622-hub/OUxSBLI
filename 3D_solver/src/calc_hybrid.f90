@@ -18,6 +18,7 @@ contains
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1 
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     dx_tmp = 0.25d0 * (dx(i-1) + dx(i))
     dy_tmp = 0.25d0 * (dy(j-1) + dy(j))
     dz_tmp = 0.25d0 * (dz(k-1) + dz(k))

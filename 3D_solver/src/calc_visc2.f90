@@ -1,7 +1,6 @@
 module calc_visc2
   use mod_globals, only : id_visc, gamma, R, Pr, Prt, dt, threadsEv, threadsFv, threadsGv
-  use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third
-  use calc_visc_common
+  use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third, two_third
   use calc_rand
   implicit none
 contains
@@ -26,7 +25,15 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    call store_shared_x(nx, ny, nz, i, j, k, it, jt, kt, Q, u, v, w)
+    u(it,jt-1:jt+1,kt-1:kt+1) = Q(2,i,j-1:j+1,k-1:k+1)
+    v(it,jt-1:jt+1,kt)        = Q(3,i,j-1:j+1,k)
+    w(it,kt-1:kt+1,jt)        = Q(4,i,j,k-1:k+1)
+    if (it == blockDim%x) then
+      u(it+1,jt-1:jt+1,kt-1:kt+1) = Q(2,i+1,j-1:j+1,k-1:k+1)
+      v(it+1,jt-1:jt+1,kt)        = Q(3,i+1,j-1:j+1,k)
+      w(it+1,kt-1:kt+1,jt)        = Q(4,i+1,j,k-1:k+1)
+    endif 
+    call syncthreads()
 
     mx  = 0.5d0 * (mu(i,j,k) + mu(i+1,j,k))
     kTx = Cp_over_Pr * mx * (-T(i,j,k) + T(i+1,j,k)) * dx(i)
@@ -34,10 +41,6 @@ contains
       real(8) my1, my2
       my1 = 0.25d0 * (mu(i,j-1,k) + mu(i,j,  k) + mu(i+1,j-1,k) + mu(i+1,j,  k))
       my2 = 0.25d0 * (mu(i,j,  k) + mu(i,j+1,k) + mu(i+1,j,  k) + mu(i+1,j+1,k))
-      !muy = 0.25d0 * (my1 * (-u(it,jt-1,kt) + u(it,jt,kt) - u(it+1,jt-1,kt) + u(it+1,jt,kt)) &
-      !              + my2 * (-u(it,jt,kt) + u(it,jt+1,kt) - u(it+1,jt,kt) + u(it+1,jt+1,kt))) * dy(j)
-      !mvy = 0.25d0 * (my1 * (-v(it,jt-1,kt) + v(it,jt,kt) - v(it+1,jt-1,kt) + v(it+1,jt,kt)) &
-      !              + my2 * (-v(it,jt,kt) + v(it,jt+1,kt) - v(it+1,jt,kt) + v(it+1,jt+1,kt))) * dy(j)
       muy = 0.25d0 * (my1 * (-u(it,jt-1,kt) - u(it+1,jt-1,kt)) + (my1 - my2) * (u(it,jt,kt) + u(it+1,jt,kt)) &
                     + my2 * ( u(it,jt+1,kt) + u(it+1,jt+1,kt))) * dy(j)
       mvy = 0.25d0 * (my1 * (-v(it,jt-1,kt) - v(it+1,jt-1,kt)) + (my1 - my2) * (v(it,jt,kt) + v(it+1,jt,kt)) &
@@ -47,10 +50,6 @@ contains
       real(8) mz1, mz2
       mz1 = 0.25d0 * (mu(i,j,k-1) + mu(i,j,k  ) + mu(i+1,j,k-1) + mu(i+1,j,k  ))
       mz2 = 0.25d0 * (mu(i,j,k  ) + mu(i,j,k+1) + mu(i+1,j,k  ) + mu(i+1,j,k+1))
-      !muz = 0.25d0 * (mz1 * (-u(it,jt,kt-1) + u(it,jt,kt) - u(it+1,jt,kt-1) + u(it+1,jt,kt)) &
-      !              + mz2 * (-u(it,jt,kt) + u(it,jt,kt+1) - u(it+1,jt,kt) + u(it+1,jt,kt+1))) * dz(k)
-      !mwz = 0.25d0 * (mz1 * (-w(it,kt-1,jt) + w(it,kt,jt) - w(it+1,kt-1,jt) + w(it+1,kt,jt)) &
-      !              + mz2 * (-w(it,kt,jt) + w(it,kt+1,jt) - w(it+1,kt,jt) + w(it+1,kt+1,jt))) * dz(k)
       muz = 0.25d0 * (mz1 * (-u(it,jt,kt-1) - u(it+1,jt,kt-1)) + (mz1 - mz2) * (u(it,jt,kt) + u(it+1,jt,kt)) &
                     + mz2 * ( u(it,jt,kt+1) + u(it+1,jt,kt+1))) * dz(k)
       mwz = 0.25d0 * (mz1 * (-w(it,kt-1,jt) - w(it+1,kt-1,jt)) + (mz1 - mz2) * (w(it,kt,jt) + w(it+1,kt,jt)) &
@@ -59,7 +58,7 @@ contains
     mux = mx * (-u(it,jt,kt) + u(it+1,jt,kt)) * dx(i)
     mvx = mx * (-v(it,jt,kt) + v(it+1,jt,kt)) * dx(i)
     mwx = mx * (-w(it,kt,jt) + w(it+1,kt,jt)) * dx(i)
-    txx = 2.d0 * (2.d0 * mux - mvy - mwz) * one_third
+    txx = two_third * (2.d0 * mux - mvy - mwz)
     txy = muy + mvx
     txz = mwx + muz
     if (present(seed)) then
@@ -146,19 +145,18 @@ contains
     mvxsgs = mxsgs * (-Q(3,i,j,k) + Q(3,i+1,j,k)) * dx(i)
     mwx    = mx    * (-Q(4,i,j,k) + Q(4,i+1,j,k)) * dx(i)
     mwxsgs = mxsgs * (-Q(4,i,j,k) + Q(4,i+1,j,k)) * dx(i)
-    txx  = 2.d0 * (2.d0 * mux - mvy - mwz) * one_third
-    txy  = muy + mvx
-    txz  = mwx + muz
-    utxx = 0.5d0 * (Q(2,i,j,k) + Q(2,i+1,j,k)) * txx
-    vtxy = 0.5d0 * (Q(3,i,j,k) + Q(3,i+1,j,k)) * txy
-    wtxz = 0.5d0 * (Q(4,i,j,k) + Q(4,i+1,j,k)) * txz
-    txx  = txx + 2.d0 * (2.d0 * muxsgs - mvysgs - mwzsgs) * one_third
-    txy  = txy + muysgs + mvxsgs
-    txz  = txz + mwxsgs + muzsgs
+    txx    = two_third * (2.d0 * mux - mvy - mwz)
+    txy    = muy + mvx
+    txz    = mwx + muz
+    utxx   = 0.5d0 * (Q(2,i,j,k) + Q(2,i+1,j,k)) * txx
+    vtxy   = 0.5d0 * (Q(3,i,j,k) + Q(3,i+1,j,k)) * txy
+    wtxz   = 0.5d0 * (Q(4,i,j,k) + Q(4,i+1,j,k)) * txz
+    txx    = txx + two_third * (2.d0 * muxsgs - mvysgs - mwzsgs)
+    txy    = txy + muysgs + mvxsgs
+    txz    = txz + mwxsgs + muzsgs
     block
       real(8), device :: H(2)
-      H(:) = (gamma * Q(5,i:i+1,j,k) / (Q(1,i:i+1,j,k) * gamma_1)) &
-             + 0.5d0 * (Q(2,i:i+1,j,k)**2 + Q(3,i:i+1,j,k)**2 + Q(4,i:i+1,j,k)**2) + qc2(i:i+1,j,k)
+      H(:) = Cp * T(i:i+1,j,k) + 0.5d0 * (Q(2,i:i+1,j,k)**2 + Q(3,i:i+1,j,k)**2 + Q(4,i:i+1,j,k)**2) + qc2(i:i+1,j,k)
       Hsgs = -mx * (-H(1) + H(2)) * dx(i) / Prt
     end block
     E(2,i,j-1,k-1) = E(2,i,j-1,k-1) - txx
@@ -189,18 +187,20 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    call store_shared_y(nx, ny, nz, i, j, k, it, jt, kt, Q, u, v, w)
+    u(jt,it-1:it+1,kt)        = Q(2,i-1:i+1,j,k)
+    v(jt,it-1:it+1,kt-1:kt+1) = Q(3,i-1:i+1,j,k-1:k+1)
+    w(jt,kt-1:kt+1,it)        = Q(4,i,j,k-1:k+1)
+    if (jt == blockDim%y) then
+      u(jt+1,it-1:it+1,kt)        = Q(2,i-1:i+1,j+1,k)
+      v(jt+1,it-1:it+1,kt-1:kt+1) = Q(3,i-1:i+1,j+1,k-1:k+1)
+      w(jt+1,kt-1:kt+1,it)        = Q(4,i,j+1,k-1:k+1)
+    endif 
+    call syncthreads()
 
-    m1 = mu(T(i,j,k))
-    m2 = mu(T(i,j+1,k))
     block
       real(8) mx1, mx2
       mx1 = 0.25d0 * (mu(i-1,j,k) + mu(i,  j,k) + mu(i-1,j+1,k) + mu(i,  j+1,k))
       mx2 = 0.25d0 * (mu(i,  j,k) + mu(i+1,j,k) + mu(i,  j+1,k) + mu(i+1,j+1,k))
-      !mux = 0.25d0 * (mx1 * (-u(jt,it-1,kt) + u(jt,it,kt) - u(jt+1,it-1,kt) + u(jt+1,it,kt)) &
-      !              + mx2 * (-u(jt,it,kt) + u(jt,it+1,kt) - u(jt+1,it,kt) + u(jt+1,it+1,kt))) * dx(i)
-      !mvx = 0.25d0 * (mx1 * (-v(jt,it-1,kt) + v(jt,it,kt) - v(jt+1,it-1,kt) + v(jt+1,it,kt)) &
-      !              + mx2 * (-v(jt,it,kt) + v(jt,it+1,kt) - v(jt+1,it,kt) + v(jt+1,it+1,kt))) * dx(i)
       mux = 0.25d0 * (mx1 * (-u(jt,it-1,kt) - u(jt+1,it-1,kt)) + (mx1 - mx2) * (u(jt,it,kt) + u(jt+1,it,kt)) &
                     + mx2 * ( u(jt,it+1,kt) + u(jt+1,it+1,kt))) * dx(i)
       mvx = 0.25d0 * (mx1 * (-v(jt,it-1,kt) - v(jt+1,it-1,kt)) + (mx1 - mx2) * (v(jt,it,kt) + v(jt+1,it,kt)) &
@@ -212,10 +212,6 @@ contains
       real(8) mz1, mz2
       mz1 = 0.25d0 * (mu(i,j,k-1) + mu(i,j,k  ) + mu(i,j+1,k-1) + mu(i,j+1,k  ))
       mz2 = 0.25d0 * (mu(i,j,k  ) + mu(i,j,k+1) + mu(i,j+1,k  ) + mu(i,j+1,k+1))
-      !mvz = 0.25d0 * (mz1 * (-v(jt,it,kt-1) + v(jt,it,kt) - v(jt+1,it,kt-1) + v(jt+1,it,kt)) &
-      !              + mz2 * (-v(jt,it,kt) + v(jt,it,kt+1) - v(jt+1,it,kt) + v(jt+1,it,kt+1))) * dz(k)
-      !mwz = 0.25d0 * (mz1 * (-w(jt,kt-1,it) + w(jt,kt,it) - w(jt+1,kt-1,it) + w(jt+1,kt,it)) &
-      !              + mz2 * (-w(jt,kt,it) + w(jt,kt+1,it) - w(jt+1,kt,it) + w(jt+1,kt+1,it))) * dz(k)
       mvz = 0.25d0 * (mz1 * (-v(jt,it,kt-1) - v(jt+1,it,kt-1)) + (mz1 - mz2) * (v(jt,it,kt) + v(jt+1,it,kt)) &
                     + mz2 * ( v(jt,it,kt+1) + v(jt+1,it,kt+1))) * dz(k)
       mwz = 0.25d0 * (mz1 * (-w(jt,kt-1,it) - w(jt+1,kt-1,it)) + (mz1 - mz2) * (w(jt,kt,it) + w(jt+1,kt,it)) &
@@ -225,7 +221,7 @@ contains
     mvy = my * (-v(jt,it,kt) + v(jt+1,it,kt)) * dy(j)
     mwy = my * (-w(jt,kt,it) + w(jt+1,kt,it)) * dy(j)
     tyx = muy + mvx
-    tyy = 2.d0 * (2.d0 * mvy - mwz - mux) * one_third
+    tyy = two_third * (2.d0 * mvy - mwz - mux)
     tyz = mvz + mwy
     if (present(seed)) then
       block
@@ -312,18 +308,17 @@ contains
     mwy    = my    * (-Q(4,i,j,k) + Q(4,i,j+1,k)) * dy(j)
     mwysgs = mysgs * (-Q(4,i,j,k) + Q(4,i,j+1,k)) * dy(j)
     tyx    = muy + mvx
-    tyy    = 2.d0 * (2.d0 * mvy - mwz - mux) * one_third
+    tyy    = two_third * (2.d0 * mvy - mwz - mux)
     tyz    = mvz + mwy
     utyx   = 0.5d0 * (Q(2,i,j,k) + Q(2,i,j+1,k)) * tyx
     vtyy   = 0.5d0 * (Q(3,i,j,k) + Q(3,i,j+1,k)) * tyy
     wtyz   = 0.5d0 * (Q(4,i,j,k) + Q(4,i,j+1,k)) * tyz
     tyx    = tyx + muysgs + mvxsgs
-    tyy    = tyy + 2.d0 * (2.d0 * mvysgs - mwzsgs - muxsgs) * one_third
+    tyy    = tyy + two_third * (2.d0 * mvysgs - mwzsgs - muxsgs)
     tyz    = tyz + mvzsgs + mwysgs
     block
       real(8), device :: H(2)
-      H(:) = (gamma * Q(5,i,j:j+1,k) / (Q(1,i,j:j+1,k) * gamma_1)) &
-             + 0.5d0 * (u2(:)**2 + v2(:)**2 + w2(:)**2) + qc2(i,j:j+1,k)
+      H(:) = Cp * T(i,j:j+1,k) + 0.5d0 * (Q(2,i,j:j+1,k)**2 + Q(3,i,j:j+1,k)**2 + Q(4,i,j:j+1,k)**2) + qc2(i,j:j+1,k)
       Hsgs = -my * (-H(1) + H(2)) * dy(j) / Prt
     end block
     F(2,i-1,j,k-1) = F(2,i-1,j,k-1) - tyx
@@ -354,18 +349,20 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     k  = (blockIdx%z-1)*blockDim%z + kt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    call store_shared_z(nx, ny, nz, i, j, k, it, jt, kt, Q, u, v, w)
+    u(kt,it-1:it+1,jt)        = Q(2,i-1:i+1,j,k)
+    v(kt,jt-1:jt+1,it)        = Q(3,i,j-1:j+1,k)
+    w(kt,it-1:it+1,jt-1:jt+1) = Q(4,i-1:i+1,j-1:j+1,k)
+    if (kt == blockDim%z) then
+      u(kt+1,it-1:it+1,jt)        = Q(2,i-1:i+1,j,k+1)
+      v(kt+1,jt-1:jt+1,it)        = Q(3,i,j-1:j+1,k+1)
+      w(kt+1,it-1:it+1,jt-1:jt+1) = Q(4,i-1:i+1,j-1:j+1,k+1)
+    endif 
+    call syncthreads()
 
-    m1 = mu(T(i,j,k))
-    m2 = mu(T(i,j,k+1))
     block
       real(8) mx1, mx2
       mx1 = 0.25d0 * (mu(i-1,j,k) + mu(i,  j,k) + mu(i-1,j,k+1) + mu(i,  j,k+1))
       mx2 = 0.25d0 * (mu(i,  j,k) + mu(i+1,j,k) + mu(i,  j,k+1) + mu(i+1,j,k+1))
-      !mux = 0.25d0 * (mx1 * (-u(kt,it-1,jt) + u(kt,it,jt) - u(kt+1,it-1,jt) + u(kt+1,it,jt)) &
-      !              + mx2 * (-u(kt,it,jt) + u(kt,it+1,jt) - u(kt+1,it,jt) + u(kt+1,it+1,jt))) * dx(i)
-      !mwx = 0.25d0 * (mx1 * (-w(kt,jt,it-1) + w(kt,jt,it) - w(kt+1,jt,it-1) + w(kt+1,jt,it)) &
-      !              + mx2 * (-w(kt,jt,it) + w(kt,jt,it+1) - w(kt+1,jt,it) + w(kt+1,jt,it+1))) * dx(i)
       mux = 0.25d0 * (mx1 * (-u(kt,it-1,jt) - u(kt+1,it-1,jt)) + (mx1 - mx2) * (u(kt,it,jt) + u(kt+1,it,jt)) &
                     + mx2 * ( u(kt,it+1,jt) + u(kt+1,it+1,jt))) * dx(i)
       mwx = 0.25d0 * (mx1 * (-w(kt,it-1,jt) - w(kt+1,it-1,jt)) + (mx1 - mx2) * (w(kt,it,jt) + w(kt+1,it,jt)) &
@@ -375,10 +372,6 @@ contains
       real(8) my1, my2
       my1 = 0.25d0 * (mu(i,j-1,k) + mu(i,j,  k) + mu(i,j-1,k+1) + mu(i,j,  k+1))
       my2 = 0.25d0 * (mu(i,j,  k) + mu(i,j+1,k) + mu(i,j,  k+1) + mu(i,j+1,k+1))
-      !mvy = 0.25d0 * (my1 * (-v(kt,jt-1,it) + v(kt,jt,it) - v(kt+1,jt-1,it) + v(kt+1,jt,it)) &
-      !              + my2 * (-v(kt,jt,it) + v(kt,jt+1,it) - v(kt+1,jt,it) + v(kt+1,jt+1,it))) * dy(j)
-      !mwy    = 0.25d0 * (my1    * (-Q(4,i,j-1,k) + Q(4,i,j,k) - Q(4,i,j-1,k+1) + Q(4,i,j,k+1)) &
-      !                 + my2    * (-Q(4,i,j,k) + Q(4,i,j+1,k) - Q(4,i,j,k+1) + Q(4,i,j+1,k+1))) * dy(j)
       mvy = 0.25d0 * (my1 * (-v(kt,jt-1,it) - v(kt+1,jt-1,it)) + (my1 - my2) * (v(kt,jt,it) + v(kt+1,jt,it)) &
                     + my2 * ( v(kt,jt+1,it) + v(kt+1,jt+1,it))) * dy(j)
       mwy = 0.25d0 * (my1 * (-w(kt,it,jt-1) - w(kt+1,it,jt-1)) + (my1 - my2) * (w(kt,it,jt) + w(kt+1,it,jt)) &
@@ -391,7 +384,7 @@ contains
     mwz = mz * (-w(kt,it,jt) + w(kt+1,it,jt)) * dz(k)
     tzx = mwx + muz
     tzy = mvz + mwy
-    tzz = 2.d0 * (2.d0 * mwz - mux - mvy) * one_third
+    tzz = two_third * (2.d0 * mwz - mux - mvy)
     if (present(seed)) then
       block
         real(8) std_t, std_q, over_V, Zq
@@ -478,17 +471,16 @@ contains
     mwzsgs = mzsgs * (-Q(4,i,j,k) + Q(4,i,j,k+1)) * dz(k)
     tzx    = mwx + muz
     tzy    = mvz + mwy
-    tzz    = 2.d0 * (2.d0 * mwz - mux - mvy) * one_third
+    tzz    = two_third * (2.d0 * mwz - mux - mvy)
     utzx   = 0.5d0 * (Q(2,i,j,k) + Q(2,i,j,k+1)) * tzx
     vtzy   = 0.5d0 * (Q(3,i,j,k) + Q(3,i,j,k+1)) * tzy
     wtzz   = 0.5d0 * (Q(4,i,j,k) + Q(4,i,j,k+1)) * tzz
     tzx    = tzx + mwx + muz
     tzy    = tzy + mvz + mwy
-    tzz    = tzz + 2.d0 * (2.d0 * mwz - mux - mvy) * one_third
+    tzz    = tzz + two_third * (2.d0 * mwz - mux - mvy)
     block
       real(8), device :: H(2)
-      H(:) = (gamma * Q(5,i,j,k:k+1) / (Q(1,i,j,k:k+1) * gamma_1)) &
-             + 0.5d0 * (Q(2,i,j,k:k+1)**2 + Q(3,i,j,k:k+1)**2 + Q(4,i,j,k:k+1)**2) + qc2(i,j,k:k+1)
+      H(:) = Cp * T(i,j,k:k+1) + 0.5d0 * (Q(2,i,j,k:k+1)**2 + Q(3,i,j,k:k+1)**2 + Q(4,i,j,k:k+1)**2) + qc2(i,j,k:k+1)
       Hsgs = -mz * (-H(1) + H(2)) * dz(k) / Prt
     end block
     G(2,i-1,j-1,k) = G(2,i-1,j-1,k) - tzx

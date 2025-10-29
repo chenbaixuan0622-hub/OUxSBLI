@@ -1,138 +1,91 @@
 module calc_roe
-  use mod_globals, only : dimension, gamma
-  use calc_common_dim
+  use mod_constant, only : gamma_1, over_gamma_1, gamma_over_gamma_1
   implicit none
 contains
-  attributes(device) subroutine calc_A(u, v, w, c, q2, H, b1, b2, lambda, mat)
-    real(8), intent(in)             :: u, v, w, c, q2, H, b1, b2
-    real(8), intent(in), device     :: lambda(5,5)
-    real(8), intent(out), device    :: mat(5,5)
-    real(8), dimension(5,5), device :: R
-    R(:,1) = (/     1.d0,    0.d0,  0.d0,       1.d0,      1.d0/)
-    R(:,2) = (/    u - c,    0.d0,  0.d0,          u,     u + c/)
-    R(:,3) = (/        v,    0.d0,     c,          v,         v/)
-    R(:,4) = (/        w,      -c,  0.d0,          w,         w/)
-    R(:,5) = (/H - c * u, - w * c, v * c, 0.5d0 * q2, H + c * u/)
-    mat = cumatmul(R, lambda)
-    R(:,1) = (/0.5d0 * (b1 + u / c), -0.5d0 * (1.d0 / c + b2 * u), -0.5d0 * b2 * v, -0.5d0 * b2 * w, 0.5d0 * b2/)
-    R(:,2) = (/               w / c,                         0.d0,           0.d0 ,       -1.d0 / c,       0.d0/)
-    R(:,3) = (/              -v / c,                         0.d0,        1.d0 / c,            0.d0,       0.d0/)
-    R(:,4) = (/           1.d0 - b1,                       b2 * u,          b2 * v,          b2 * w,        -b2/)
-    R(:,5) = (/0.5d0 * (b1 - u / c),  0.5d0 * (1.d0 / c - b2 * u), -0.5d0 * b2 * v, -0.5d0 * b2 * w, 0.5d0 * b2/)
-    mat = cumatmul(mat, R)
-  end subroutine calc_A
+  !$dir inline
+  attributes(device) subroutine calc_RARinv_fast(u, v, w, H, c, dQ, F)
+    real(8), intent(in), value :: u, v, w, H, c
+    real(8), intent(in)        :: dQ(5)
+    real(8), intent(inout)     :: F(5)
+    real(8) q2, R1, R2, R3, R4, R5
+    q2 = 0.5d0 * (u*u + v*v + w*w)
+    block
+      real(8) oc, b1, b2, dQ1, dQ2, dQ3, dQ4, dQ5
+      dQ1 = dQ(1); dQ2 = dQ(2); dQ3 = dQ(3); dQ4 = dQ(4); dQ5 = dQ(5)
+      oc = 1.d0 / c
+      b2 = gamma_1 * oc * oc
+      b1 = q2 * b2
+      R1 = 0.5d0*((b1+u*oc)*dQ1-(oc+b2*u)*dQ2-b2*v*dQ3-b2*w*dQ4+b2*dQ5)
+      R2 = oc*( w*dQ1-dQ4)
+      R3 = oc*(-v*dQ1+dQ3)
+      R4 = (1.d0-b1)*dQ1+b2*(u*dQ2+v*dQ3+w*dQ4-dQ5)
+      R5 = 0.5d0*((b1-u*oc)*dQ1+(oc-b2*u)*dQ2-b2*(v*dQ3+w*dQ4-dQ5))
+    end block
+    block
+      real(8) a1, a2, a3, a2c, cu
+      a1   = abs(u-c)
+      a2   = abs(u)
+      a3   = abs(u+c)
+      a2c  = a2 * c
+      cu   = c * u
+      F(1) = F(1) - 0.5d0 * (a1*R1                            +a2*R4      +a3*R5)
+      F(2) = F(2) - 0.5d0 * (a1*(u-c)*R1                    +a2*u*R4+a3*(u+c)*R5)
+      F(3) = F(3) - 0.5d0 * (a1*v*R1                 +a2c*R3+a2*v*R4    +a3*v*R5)
+      F(4) = F(4) - 0.5d0 * (a1*w*R1          -a2c*R2     +a2*w*R4      +a3*w*R5)
+      F(5) = F(5) - 0.5d0 * (a1*(H-cu)*R1+a2*(-w*c*R2+v*c*R3+q2*R4)+a3*(H+cu)*R5)
+    end block
+  end subroutine calc_RARinv_fast
 
 
-  attributes(device) subroutine calc_B(u, v, w, c, q2, H, b1, b2, lambda, mat)
-    real(8), intent(in)             :: u, v, w, c, q2, H, b1, b2
-    real(8), intent(in), device     :: lambda(5,5)
-    real(8), intent(out), device    :: mat(5,5)
-    real(8), dimension(5,5), device :: R
-    R(:,1) = (/     1.d0,       1.d0,   0.d0,  0.d0,      1.d0/)
-    R(:,2) = (/        u,          u,     -c,  0.d0,         u/)
-    R(:,3) = (/    v - c,          v,   0.d0,  0.d0,     v + c/)
-    R(:,4) = (/        w,          w,   0.d0,     c,         w/)
-    R(:,5) = (/H - c * v, 0.5d0 * q2, -u * c, w * c, H + c * v/)
-    mat = cumatmul(R, lambda)
-    R(:,1) = (/0.5d0 * (b1 + v / c), -0.5d0 * b2 * u, -0.5d0 * (1.d0 / c + b2 * v), -0.5d0 * b2 * w, 0.5d0 * b2/)
-    R(:,2) = (/           1.d0 - b1,          b2 * u,                       b2 * v,          b2 * w,        -b2/)
-    R(:,3) = (/               u / c,       -1.d0 / c,                         0.d0,            0.d0,       0.d0/)
-    R(:,4) = (/              -w / c,           0.d0 ,                         0.d0,        1.d0 / c,       0.d0/)
-    R(:,5) = (/0.5d0 * (b1 - v / c), -0.5d0 * b2 * u,  0.5d0 * (1.d0 / c - b2 * v), -0.5d0 * b2 * w, 0.5d0 * b2/)
-    mat = cumatmul(mat, R)
-  end subroutine calc_B
+  !$dir inline
+  attributes(device) subroutine calc_Roe_ave(rho, V, p, uroe, vroe, wroe, Hroe, croe)
+    real(8), intent(in)  :: rho(2), V(2,3), p(2)
+    real(8), intent(out) :: uroe, vroe, wroe, Hroe, croe
+    real(8) rhol, rhor, rhol_rhor, H(2)
+    H(:) = gamma_over_gamma_1 * p(:) / rho(:) + 0.5d0 * (V(:,1)*V(:,1) + V(:,2)*V(:,2) + V(:,3)*V(:,3))
+    rhol = sqrt(rho(1))
+    rhor = sqrt(rho(2))
+    rhol_rhor = 1.d0 / (rhol + rhor)
+    uroe = (rhol * V(1,1) + rhor * V(2,1)) * rhol_rhor
+    vroe = (rhol * V(1,2) + rhor * V(2,2)) * rhol_rhor
+    wroe = (rhol * V(1,3) + rhor * V(2,3)) * rhol_rhor
+    Hroe = (rhol * H(1) + rhor * H(2)) * rhol_rhor
+    croe = sqrt(gamma_1 * (Hroe - 0.5d0 * (uroe*uroe + vroe*vroe + wroe*wroe)))
+  end subroutine calc_Roe_ave
 
+ 
+  !$dir inline
+  attributes(device) subroutine calc_Roe_common(rho, V, p, dQ, F)
+    real(8), intent(in)  :: rho(2), V(2,3), p(2)
+    real(8), intent(out) :: dQ(5), F(5)
+    real(8) e(2)
+    e(:)  = p(:) * over_gamma_1 + 0.5d0 * rho(:) * (V(:,1)*V(:,1) + V(:,2)*V(:,2) + V(:,3)*V(:,3))
+    ! central difference term
+    block
+      real(8) rhou1, rhou2
+      rhou1 = rho(1) * V(1,1)
+      rhou2 = rho(2) * V(2,1)
+      F(1)  = 0.5d0 * (rhou1 + rhou2)
+      F(2)  = 0.5d0 * (rhou1 * V(1,1) + rhou2 * V(2,1) + (p(1) + p(2)))
+      F(3)  = 0.5d0 * (rhou1 * V(1,2) + rhou2 * V(2,2))
+      F(4)  = 0.5d0 * (rhou1 * V(1,3) + rhou2 * V(2,3))
+      F(5)  = 0.5d0 * ((e(1) + p(1)) * V(1,1) + (e(2) + p(2)) * V(2,1))
+    end block
+    dQ(1) = -rho(1) + rho(2)
+    dQ(2) = -rho(1) * V(1,1) + rho(2) * V(2,1)
+    dQ(3) = -rho(1) * V(1,2) + rho(2) * V(2,2)
+    dQ(4) = -rho(1) * V(1,3) + rho(2) * V(2,3)
+    dQ(5) = -e(1) + e(2)
+  end subroutine calc_Roe_common
 
-  attributes(device) subroutine calc_C(u, v, w, c, q2, H, b1, b2, lambda, mat)
-    real(8), intent(in)             :: u, v, w, c, q2, H, b1, b2
-    real(8), intent(in), device     :: lambda(5,5)
-    real(8), intent(out), device    :: mat(5,5)
-    real(8), dimension(5,5), device :: R
-    R(:,1) = (/     1.d0,  0.d0,       1.d0,   0.d0,      1.d0/)
-    R(:,2) = (/        u,     c,          u,   0.d0,         u/)
-    R(:,3) = (/        v,  0.d0,          v,     -c,         v/)
-    R(:,4) = (/    w - c,  0.d0,          w,   0.d0,     w + c/)
-    R(:,5) = (/H - c * w, u * c, 0.5d0 * q2, -v * c, H + c * w/)
-    mat = cumatmul(R, lambda)
-    R(:,1) = (/0.5d0 * (b1 + w / c), -0.5d0 * b2 * u, -0.5d0 * b2 * v, -0.5d0 * (1.d0 / c + b2 * w), 0.5d0 * b2/)
-    R(:,2) = (/              -u / c,        1.d0 / c,            0.d0,                         0.d0,       0.d0/)
-    R(:,3) = (/           1.d0 - b1,          b2 * u,          b2 * v,                       b2 * w,        -b2/)
-    R(:,4) = (/               v / c,            0.d0,       -1.d0 / c,                         0.d0,       0.d0/)
-    R(:,5) = (/0.5d0 * (b1 - w / c), -0.5d0 * b2 * u, -0.5d0 * b2 * v,  0.5d0 * (1.d0 / c - b2 * w), 0.5d0 * b2/)
-    mat = cumatmul(mat, R)
-  end subroutine calc_C
-
-
-  attributes(device) subroutine calc_mat(u, v, w, c, q2, H, b1, b2, lambda, mat)
-    real(8), intent(in)             :: u, v, w, c, q2, H, b1, b2
-    real(8), intent(in), device     :: lambda(5,5)
-    real(8), intent(out), device    :: mat(5,5)
-    real(8), dimension(5,5), device :: R
-    R(:,1) = (/     1.d0, 0.d0, 0.d0,       1.d0,      1.d0/)
-    R(:,2) = (/    u - c, 0.d0, 0.d0,          u,     u + c/)
-    R(:,3) = (/        v, 1.d0, 0.d0,          v,         v/)
-    R(:,4) = (/        w, 0.d0, 1.d0,          w,         w/)
-    R(:,5) = (/H - c * u,    v,    w, 0.5d0 * q2, H + c * u/)
-    mat = cumatmul(R, lambda)
-    R(:,1) = (/0.5d0 * (b1 + u / c), -0.5d0 * (b2 * u + 1.d0 / c), -0.5d0 * b2 * v, -0.5d0 * b2 * w, 0.5d0 * b2/)
-    R(:,2) = (/                  -v,                         0.d0,            1.d0,            0.d0,       0.d0/)
-    R(:,3) = (/                  -w,                         0.d0,            0.d0,            1.d0,       0.d0/)
-    R(:,4) = (/          -b1 + 1.d0,                       b2 * u,          b2 * v,          b2 * w,        -b2/)
-    R(:,5) = (/0.5d0 * (b1 - u / c), -0.5d0 * (b2 * u - 1.d0 / c), -0.5d0 * b2 * v, -0.5d0 * b2 * w, 0.5d0 * b2/)
-    mat = cumatmul(mat, R)
-  end subroutine calc_mat
-
-  ! 3D only
-  attributes(device) function Roe(id, rho, p, V, Normal) result(F)
-    integer, intent(in), value                          :: id
-    real(8), intent(in), dimension(2), device           :: rho, p
-    real(8), intent(in), dimension(2,dimension), device :: V
-    real(8), intent(in), dimension(dimension+2), device :: Normal
-    real(8), dimension(dimension+2), device :: F, Fl, Fr, dQ
-    real(8) el, er, Hl, Hr, q2, rho_ave, H_ave, c, H, b1, b2
-    real(8), dimension(dimension), device               :: V_ave
-    real(8), dimension(dimension+2,dimension+2), device :: lambda, mat
-    el = p(1) / (gamma - 1.d0) + 0.5d0 * rho(1) * (V(1,1)**2 + V(1,2)**2 + V(1,3)**2)
-    er = p(2) / (gamma - 1.d0) + 0.5d0 * rho(2) * (V(2,1)**2 + V(2,2)**2 + V(2,3)**2)
-    Hl = (el + p(1)) / rho(1)
-    Hr = (er + p(2)) / rho(2)
-
-    rho_ave  = sqrt(rho(1) * rho(2))
-    V_ave(:) = (sqrt(rho(1)) * V(1,:) + sqrt(rho(2)) * V(2,:)) / (sqrt(rho(1)) + sqrt(rho(2)))
-    q2       = V_ave(1)**2 + V_ave(2)**2 + V_ave(3)**2
-    H_ave    = (sqrt(rho(1)) * Hl + sqrt(rho(2)) * Hr) / (sqrt(rho(1)) + sqrt(rho(2)))
-    c        = sqrt((gamma - 1.d0) * abs(H_ave - 0.5d0 * q2))
-    H        = c**2 / (gamma - 1.d0) + 0.5d0 * q2
-    b1       = 0.5d0 * q2 * (gamma - 1.d0) / c**2
-    b2       = (gamma - 1.d0) / c**2
-
-    lambda(:,1) = (/abs(V_ave(1) - c), 0.d0, 0.d0, 0.d0,  0.d0/)
-    lambda(:,2) = (/ 0.d0,    abs(V_ave(1)), 0.d0, 0.d0,  0.d0/)
-    lambda(:,3) = (/ 0.d0, 0.d0,    abs(V_ave(1)), 0.d0,  0.d0/)
-    lambda(:,4) = (/ 0.d0, 0.d0, 0.d0,    abs(V_ave(1)),  0.d0/)
-    lambda(:,5) = (/ 0.d0, 0.d0, 0.d0, 0.d0, abs(V_ave(1) + c)/)
-    if (id == 1) then
-      call calc_A(V_ave(1), V_ave(2), V_ave(3), c, q2, H, b1, b2, lambda, mat)
-    elseif (id == 2) then
-      call calc_B(V_ave(1), V_ave(2), V_ave(3), c, q2, H, b1, b2, lambda, mat)
-    elseif (id == 3) then
-      call calc_C(V_ave(1), V_ave(2), V_ave(3), c, q2, H, b1, b2, lambda, mat)
-    endif
-    !call calc_mat(V_ave(1), V_ave(2), V_ave(3), c, q2, H, b1, b2, lambda, mat)
-
-    Fl(1) = rho(1) * V(1,id)
-    Fr(1) = rho(2) * V(2,id)
-    Fl(2:dimension+1) = Fl(1) * V(1,:)
-    Fr(2:dimension+1) = Fr(1) * V(2,:)
-    Fl(dimension+2) = (el + p(1)) * V(1,id)
-    Fr(dimension+2) = (er + p(2)) * V(2,id)
-    Fl(:) = Fl(:) + p(1) * Normal(:)
-    Fr(:) = Fr(:) + p(2) * Normal(:)
-
-    dQ(1)             = -rho(1)          + rho(2)
-    dQ(2:dimension+1) = -rho(1) * V(1,:) + rho(2) * V(2,:)
-    dQ(dimension+2)   = -el              + er
-    F(:) = 0.5d0 * (Fl(:) + Fr(:) - cumatmul(mat(:,:), dQ(:)))
+  
+  attributes(device) function Roe(rho, V, p, Normal) result(E)
+    real(8), intent(in) :: rho(2), V(2,3), p(2)
+    real(8), intent(in) :: Normal(5)
+    real(8) E(5), dQ(5), uroe, vroe, wroe, Hroe, croe
+    call calc_Roe_common(rho, V, p, dQ, E)
+    call calc_Roe_ave(rho, V, p, uroe, vroe, wroe, Hroe, croe)
+    call calc_RARinv_fast(uroe, vroe, wroe, Hroe, croe, dQ, E)
   end function Roe
 end module calc_roe
 
