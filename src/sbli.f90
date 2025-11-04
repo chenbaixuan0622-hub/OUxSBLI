@@ -68,6 +68,7 @@ program main
         read(10) Q
         print *, "myrank is ", myrank, "simulation has been restarted. access is stream"
       endif
+      close(10)
     elseif (kind(id_recal) == 2) then
       print *, "myrank is ", myrank, "set initial condition"
       call set_init(myrank, nx, ny, nz, x, y, z, Q)
@@ -103,9 +104,9 @@ program main
     enddo;enddo;enddo;enddo
     call cpu_time(t_start)
     write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"
-    open(10,file=filename,status="replace",action="write",form="unformatted",access="sequential")
-    header = 'SEQFMT01'
-    write(10) header
+    open(10,file=filename,status="replace",action="write",form="unformatted",access="stream")
+    !header = 'SEQFMT01'
+    !write(10) header
     write(10) Q
     close(10)
     call cpu_time(t_end)
