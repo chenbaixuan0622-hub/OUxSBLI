@@ -32,6 +32,7 @@ contains
     dvdz = (-Q(3,i,j,k-1) + Q(3,i,j,k+1)) * dz_tmp
     dwdz = (-Q(4,i,j,k-1) + Q(4,i,j,k+1)) * dz_tmp
     div = dudx + dvdy + dwdz
+    div = min(div, 0.d0)
     rot(1) = dwdy - dvdz
     rot(2) = dudz - dwdx
     rot(3) = dvdx - dudy
