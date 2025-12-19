@@ -77,10 +77,10 @@ module mod_globals
   real(8), parameter :: Ly2 = 10.d0 * blt
   real(8), parameter :: Lz2 = Lz1
   integer, parameter :: nx2 = 1121
-  integer, parameter :: ny2 = 257
+  integer, parameter :: ny2 = 385!353!321
   integer, parameter :: nz2 = nz1
 
-  integer, parameter :: nre1 = int(0.8 * nx1)
+  integer, parameter :: nre1 = int(0.6 * nx1)
   integer, parameter :: nre2 = int(0.9 * nx1)
   integer, parameter :: rerank = 0
 
@@ -102,18 +102,18 @@ module mod_globals
   !               ! kind4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_RungeKutta = 0
-  integer(kind=4), parameter :: id_recal      = 0
-  integer, parameter         :: step_offset   = 1
+  integer(kind=2), parameter :: id_recal      = 0
+  integer, parameter         :: step_offset   = 0
   integer, parameter         :: start_rescale = 10
-  real(8), parameter :: endT  = 0.09d-3
-  integer, parameter :: np    = 9
+  real(8), parameter :: endT  = 0.2d-3
+  integer, parameter :: np    = 200
   real(8), parameter :: R     = 287.03d0
   real(8), parameter :: gamma = 1.4d0
-  real(8), parameter :: M0    = 2.5d0
+  real(8), parameter :: M0    = 2.2d0
   real(8), parameter :: T0    = 171.31d0
   real(8), parameter :: p0    = 14924.d0
   real(8), parameter :: u0    = M0 * sqrt(gamma * R * T0)
-  real(8), parameter :: dt    = 2.d-9
+  real(8), parameter :: dt    = 3.d-9
   integer, parameter :: nt    = int(endT / (dble(np) * dt))
 
   ! physical properties
@@ -135,8 +135,22 @@ module mod_globals
   real(8), parameter :: a1    = u0 / M0
   real(8), parameter :: u2    = u1 - 2.d0 * a1 * (Ms - 1.d0 / Ms) / (gamma + 1.d0)
   real(8), parameter :: v2    = u0 * dcos(beta)
-  real(8), parameter :: u_magnitude = sqrt(u2**2 + v2**2)
-  real(8), parameter :: ux    = u_magnitude * dcos(theta)
-  real(8), parameter :: uy    = - u_magnitude * dsin(theta)
+  real(8), parameter :: ux    = sqrt(u2**2 + v2**2) * dcos(theta)
+  real(8), parameter :: uy    = - sqrt(u2**2 + v2**2) * dsin(theta)
+  ! reflected shock
+  real(8), parameter :: a2    = sqrt(gamma * R * T2)
+  real(8), parameter :: M2    = sqrt(u2**2 + v2**2) / a2
+  real(8), parameter :: beta_r = dacos(-1.d0) * 40.6d0 / 180.d0
+  real(8), parameter :: Mr    = M2 * dsin(beta_r)
+  real(8), parameter :: Mr2   = Mr**2
+  real(8), parameter :: T3    = T2 * (1.d0 + 2.d0 * (gamma - 1.d0) * (Mr2 - 1.d0) * (1.d0 + gamma * Mr2) / (Mr2 * (gamma + 1.d0)**2))
+  real(8), parameter :: p3    = p2 * (1.d0 + 2.d0 * gamma * (Mr2 - 1.d0) / (gamma + 1.d0))
+  real(8), parameter :: rho3  = p3 / (R * T3)
+  real(8), parameter :: un2   = ux * dsin(beta_r) - uy * dcos(beta_r)
+  real(8), parameter :: ut2   = ux * dcos(beta_r) + uy * dsin(beta_r)
+  real(8), parameter :: un3   = un2 - 2.d0 * a2 * (Mr - 1.d0 / Mr) / (gamma + 1.d0)
+  real(8), parameter :: ut3   = ut2
+  real(8), parameter :: ux3   = un3 * dsin(beta_r) + ut3 * dcos(beta_r)
+  real(8), parameter :: uy3   =-un3 * dcos(beta_r) + ut3 * dsin(beta_r)
 end module mod_globals
 
