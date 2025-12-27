@@ -2,9 +2,9 @@ module mod_globals
   use cudafor
   implicit none
   integer, parameter    :: dimension = 2
-  integer, parameter    :: accuracy  = 2 
-  integer, parameter    :: offset    = accuracy / 2
   integer(2), parameter :: id_visc   = 0
+  integer(2), parameter :: id_LL     = 0
+  integer(2), parameter :: id_igr    = 0
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! kind2 Euler       !
   !               ! kind4 NS          !
@@ -56,16 +56,14 @@ module mod_globals
   integer, parameter :: ny = 130!258!66
   integer, parameter :: nz = 1
 
-  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/1,(ny-accuracy)/32,1)
-  type(dim3) :: blocksF   = dim3((nx-accuracy)/32,(ny-accuracy+1)/1,1)
-  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/1,(ny-accuracy)/32,1)
-  type(dim3) :: blocksFv  = dim3((nx-accuracy)/32,(ny-accuracy+1)/1,1)
-  type(dim3) :: blocks    = dim3((nx-accuracy)/8,(ny-accuracy)/8,1)
-  type(dim3) :: threadsE  = dim3(1,32,1)
-  type(dim3) :: threadsF  = dim3(32,1,1)
-  type(dim3) :: threadsEv = dim3(1,32,1)
-  type(dim3) :: threadsFv = dim3(32,1,1)
-  type(dim3) :: threads   = dim3(8,8,1)
+  type(dim3), parameter :: threadsE  = dim3(32,1,1)
+  type(dim3), parameter :: threadsF  = dim3(32,4,1)
+  type(dim3), parameter :: threadsG  = dim3(1,1,1)
+  type(dim3), parameter :: threadsEv = dim3(32,1,1)
+  type(dim3), parameter :: threadsFv = dim3(32,4,1)
+  type(dim3), parameter :: threadsGv = dim3(1,1,1)
+  type(dim3), parameter :: threads   = dim3(32,4,1)
+  type(dim3) :: blocksE, blocksF, blocksG, blocksEv, blocksFv, blocksGv, blocks
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -95,7 +93,7 @@ module mod_globals
   real(8), parameter :: u0    = M0 * sqrt(gamma * R * T0)
   real(8), parameter :: rho0  = p0 / (R * T0)
   real(8), parameter :: CFL   = 0.05d0
-  real(8), parameter :: dt    = -CFL * Lx / (dble(nx-1) * u0)
+  real(8), parameter :: dt    = CFL * Lx / (dble(nx-1) * u0)
   real(8), parameter :: T     = 1.d0 * Lx / u0
   integer, parameter :: np    = 1
   integer, parameter :: nt    = int(T / (dble(np) * abs(dt)))

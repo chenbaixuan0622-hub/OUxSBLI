@@ -3,12 +3,12 @@ module calc_hybrid
   use mod_globals, only : accuracy, offset, gamma
   implicit none
 contains
-  attributes(global) subroutine calc_Ducros(nx, ny, dx, dy, u, v, fd)
-    integer, intent(in), value                     :: nx, ny
-    real(8), intent(in), dimension(nx-1), device   :: dx ! 1 / dx
-    real(8), intent(in), dimension(ny-1), device   :: dy ! 1 / dy
-    real(8), intent(in), dimension(nx,ny), device  :: u, v
-    real(8), intent(out), dimension(nx,ny), device :: fd
+  attributes(global) subroutine calc_Ducros(nx, ny, dx, dy, Q, fd)
+    integer, intent(in), value                      :: nx, ny
+    real(8), intent(in), dimension(nx-1), device    :: dx ! 1 / dx
+    real(8), intent(in), dimension(ny-1), device    :: dy ! 1 / dy
+    real(8), intent(in), dimension(4,nx,ny), device :: Q
+    real(8), intent(out), dimension(nx,ny), device  :: fd
     integer i, j
     real(8) dudx, dudy, dvdx, dvdy 
     real(8) div, rot
@@ -16,16 +16,17 @@ contains
     real(8) :: eps = 1.d-16
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1 
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
+    if (nx-1 < i .or. ny-1 < j) return
     dx_tmp = 0.25d0 * (dx(i-1) + dx(i))
     dy_tmp = 0.25d0 * (dy(j-1) + dy(j))
-    dudx = (-u(i-1,j) + u(i+1,j)) * dx_tmp
-    dvdx = (-v(i-1,j) + v(i+1,j)) * dx_tmp
-    dudy = (-u(i,j-1) + u(i,j+1)) * dy_tmp
-    dvdy = (-v(i,j-1) + v(i,j+1)) * dy_tmp
-    div  = dudx + dvdy
-    rot  = dvdx - dudy
+    dudx = (-Q(2,i-1,j) + Q(2,i+1,j)) * dx_tmp
+    dvdx = (-Q(3,i-1,j) + Q(3,i+1,j)) * dx_tmp
+    dudy = (-Q(2,i,j-1) + Q(2,i,j+1)) * dy_tmp
+    dvdy = (-Q(3,i,j-1) + Q(3,i,j+1)) * dy_tmp
+    div = dudx + dvdy
+    div = min(div, 0.d0)
+    rot = dvdx - dudy
     fd(i,j) = (div**2) / (div**2 + rot**2 + eps)
-
     fd(i,j) = min(1.d0, fd(i,j))
 
     ! boundary
@@ -43,6 +44,7 @@ contains
     endif
   end subroutine calc_Ducros
 
+
   attributes(device) function Albada(e, rho) result(phi)
     real(8), intent(in), dimension(4), device :: e, rho
     real(8) :: d1, d2, d3, phim, phip, phi, eps = 1.d-16
@@ -54,11 +56,13 @@ contains
     phi  = max(min(1.d0 - min(phim, phip), 1.d0), 0.d0)
   end function Albada
 
+
   attributes(device) function sigmoid(x) result(ans)
     real(8), intent(in), value :: x
     real(8) :: ans
     ans = 0.5d0 * (tanh(10.d0 * (x - 0.5d0)) + 1.d0)
   end function sigmoid
+
 
   attributes(device) function wiggle_detector(phi) result(ans)
     real(8), intent(in), device :: phi(4)

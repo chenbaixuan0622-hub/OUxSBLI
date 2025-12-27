@@ -1,26 +1,57 @@
 module calc_physical_quantities
   use cudafor
-  use mod_globals, only : gamma, R, dim => dimension
+  use mod_globals, only : gamma, R
   use mod_constant, only : gamma_1, mu0_T0_S_over_T0_2_3
   implicit none
 contains
-  subroutine calc_quantities_2D(nx,ny,Jacobian,QJ,rho,u,v,p)
+  subroutine calc_quantities_2D(nx, ny, Jacobian, QJ, Q, T)
     integer, intent(in), value   :: nx, ny
     real(8), intent(in), device  :: Jacobian(nx,ny)
     real(8), intent(in), device  :: QJ(4,nx,ny) ! Q / Jacobian
-    real(8), intent(out), device :: rho(nx,ny), u(nx,ny), v(nx,ny), p(nx,ny)
+    real(8), intent(out), device :: Q(4,nx,ny), T(nx,ny)
     integer i, j
-    real(8) :: over_Q1
-    !$cuf kernel do(2) <<<*,*>>>
+    real(8) :: over_Q1, rho, u, v, p
+    !$cuf kernel do(2) <<<*,(32,4)>>>
     do j = 1, ny
       do i = 1, nx
         over_Q1  = 1.d0 / QJ(1,i,j)
-        rho(i,j) = Jacobian(i,j) * QJ(1,i,j)
-        u(i,j)   = QJ(2,i,j) * over_Q1
-        v(i,j)   = QJ(3,i,j) * over_Q1
-        p(i,j)   = gamma_1 * (Jacobian(i,j) * QJ(4,i,j)- 0.5d0 * rho(i,j) * (u(i,j)*u(i,j) + v(i,j)*v(i,j)))
+        rho      = Jacobian(i,j) * QJ(1,i,j)
+        u        = QJ(2,i,j) * over_Q1
+        v        = QJ(3,i,j) * over_Q1
+        p        = gamma_1 * (Jacobian(i,j) * QJ(4,i,j) - 0.5d0 * rho * (u*u + v*v))
+        Q(1,i,j) = rho
+        Q(2,i,j) = u
+        Q(3,i,j) = v
+        Q(4,i,j) = p
+        T(i,j)   = p / (R * rho)
     enddo;enddo
   end subroutine calc_quantities_2D
+  
+
+  subroutine calc_quantities_T_2D(nx, ny, Jacobian, QJ, Q, T, mu)
+    integer, intent(in), value   :: nx, ny
+    real(8), intent(in), device  :: Jacobian(nx,ny)
+    real(8), intent(in), device  :: QJ(4,nx,ny) ! Q / Jacobian
+    real(8), intent(out), device :: Q(4,nx,ny), T(nx,ny), mu(nx,ny)
+    integer i, j
+    real(8) :: over_Q1, rho, u, v, p, temp
+    !$cuf kernel do(2) <<<*,(32,4)>>>
+    do j = 1, ny
+      do i = 1, nx
+        over_Q1  = 1.d0 / QJ(1,i,j)
+        rho      = Jacobian(i,j) * QJ(1,i,j)
+        u        = QJ(2,i,j) * over_Q1
+        v        = QJ(3,i,j) * over_Q1
+        p        = gamma_1 * (Jacobian(i,j) * QJ(4,i,j) - 0.5d0 * rho * (u*u + v*v))
+        Q(1,i,j) = rho
+        Q(2,i,j) = u
+        Q(3,i,j) = v
+        Q(4,i,j) = p
+        temp     = p / (R * rho)
+        T(i,j)   = temp
+        mu(i,j)  = mu0_T0_S_over_T0_2_3 / (temp + 111.d0) * temp**1.5d0
+    enddo;enddo
+  end subroutine calc_quantities_T_2D
 
 
   subroutine calc_quantities_3D(nx, ny, nz, Jacobian, QJ, Q, T)
