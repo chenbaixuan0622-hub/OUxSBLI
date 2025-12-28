@@ -77,7 +77,7 @@ contains
           call calc_step1(nx, ny, 1.d0, dx, dy, E, F, QJ, QJ2)
           !print *, "myrank is ", myrank, " calc step"
           call nvtxEndRange
-          call set_bc(myrank, nx, ny, Jacobian, QJ2)
+          call set_bc(myrank, nx, ny, x, y, Jacobian, QJ2)
           !print *, "myrank is ", myrank, " set bc"
           call nvtxEndRange
         endif
@@ -89,7 +89,7 @@ contains
             call calc_EF(id_visc, nx, ny, xix, etay, Jacobian, QJ2, ruvp, T, mu, E, F, sigma)
           endif
           call calc_step2_3(nx, ny, 0.75d0, 0.25d0, 0.25d0, 1.d0, dx, dy, E, F, QJ, QJ2)
-          call set_bc(myrank, nx, ny, Jacobian, QJ2)
+          call set_bc(myrank, nx, ny, x, y, Jacobian, QJ2)
         endif
 
         if (mod(myrank,2) == 0) then
@@ -99,7 +99,7 @@ contains
             call calc_EF(id_visc, nx, ny, xix, etay, Jacobian, QJ2, ruvp, T, mu, E, F, sigma)
           endif
           call calc_step2_3(nx, ny, 2.d0, 1.d0, 2.d0, 3.d0, dx, dy, E, F, QJ2, QJ)
-          call set_bc(myrank, nx, ny, Jacobian, QJ)
+          call set_bc(myrank, nx, ny, x, y, Jacobian, QJ)
         endif
       enddo
       if (mod(myrank, 2) == 0) then
@@ -174,7 +174,7 @@ contains
             call calc_EF(id_visc, nx, ny, xix, etay, Jacobian, QJ, ruvp, T, mu, E, F, sigma)
           endif
           call calc_step(nx, ny, 0.5d0, 1.d0, dx, dy, E, F, QJ, QJs, Rs) ! QJs = Q2
-          call set_bc(myrank, nx, ny, Jacobian, QJs)
+          call set_bc(myrank, nx, ny, x, y, Jacobian, QJs)
         endif
 
         if (mod(myrank,2) == 0) then
@@ -184,7 +184,7 @@ contains
             call calc_EF(id_visc, nx, ny, xix, etay, Jacobian, QJs, ruvp, T, mu, E, F, sigma)
           endif
           call calc_step(nx, ny, 0.5d0, 2.d0, dx, dy, E, F, QJ, QJs, Rs) ! QJs = Q3
-          call set_bc(myrank, nx, ny, Jacobian, QJs)
+          call set_bc(myrank, nx, ny, x, y, Jacobian, QJs)
         endif
 
         if (mod(myrank,2) == 0) then
@@ -194,7 +194,7 @@ contains
             call calc_EF(id_visc, nx, ny, xix, etay, Jacobian, QJs, ruvp, T, mu, E, F, sigma)
           endif
           call calc_step(nx, ny, 1.0d0, 2.d0, dx, dy, E, F, QJ, QJs, Rs) ! QJs = Q4
-          call set_bc(myrank, nx, ny, Jacobian, QJs)
+          call set_bc(myrank, nx, ny, x, y, Jacobian, QJs)
         endif
 
         if (mod(myrank,2) == 0) then
@@ -204,7 +204,7 @@ contains
             call calc_EF(id_visc, nx, ny, xix, etay, Jacobian, QJs, ruvp, T, mu, E, F, sigma)
           endif
           call calc_step4(nx, ny, dx, dy, E, F, Rs, QJ)
-          call set_bc(myrank, nx, ny, Jacobian, QJ)
+          call set_bc(myrank, nx, ny, x, y, Jacobian, QJ)
         endif
       enddo
       if (mod(myrank, 2) == 0) then
@@ -290,24 +290,24 @@ contains
           ! calc R1
           call calc_EF(id_visc, nx, ny, xix, etay, Jacobian, QJ, ruvp, T, mu, E, F, sigma)
           call calc_step1(nx, ny, c1, dx, dy, E, F, QJ, QJs)
-          call set_bc(myrank, nx, ny, Jacobian, QJs)
+          call set_bc(myrank, nx, ny, x, y, Jacobian, QJs)
           call calc_EF(id_visc, nx, ny, xix, etay, Jacobian, QJs, ruvp, T, mu, E, F, sigma)
           call calc_R(nx, ny, dx, dy, E, F, R1)
           ! calc R2
           call calc_EF(id_visc, nx, ny, xix, etay, Jacobian, QJ, ruvp, T, mu, E, F, sigma)
           call calc_step1(nx, ny, c2, dx, dy, E, F, QJ, QJs)
-          call set_bc(myrank, nx, ny, Jacobian, QJs)
+          call set_bc(myrank, nx, ny, x, y, Jacobian, QJs)
           call calc_EF(id_visc, nx, ny, xix, etay, Jacobian, QJs, ruvp, T, mu, E, F, sigma)
           call calc_R(nx, ny, dx, dy, E, F, R2)
           do itr = 1, max_itr
             ! calc R1
             call calc_Gauss_step(nx, ny, a11, a12, dx, dy, R1, R2, QJ, QJs)
-            call set_bc(myrank, nx, ny, Jacobian, QJs)
+            call set_bc(myrank, nx, ny, x, y, Jacobian, QJs)
             call calc_EF(id_visc, nx, ny, xix, etay, Jacobian, QJs, ruvp, T, mu, E, F, sigma)
             call calc_R(nx, ny, dx, dy, E, F, R1_new)
             ! calc R2
             call calc_Gauss_step(nx, ny, a21, a22, dx, dy, R1, R2, QJ, QJs)
-            call set_bc(myrank, nx, ny, Jacobian, QJs)
+            call set_bc(myrank, nx, ny, x, y, Jacobian, QJs)
             call calc_EF(id_visc, nx, ny, xix, etay, Jacobian, QJs, ruvp, T, mu, E, F, sigma)
             call calc_R(nx, ny, dx, dy, E, F, R2_new)
             call calc_error(nx, ny, R1, R2, R1_new, R2_new, err)
@@ -321,7 +321,7 @@ contains
             print *, "Didn't Converged error=", err
           endif
           call calc_Gauss_step_Q(nx, ny, b1, b2, xix, etay, R1, R2, QJ)
-          call set_bc(myrank, nx, ny, Jacobian, QJ)
+          call set_bc(myrank, nx, ny, x, y, Jacobian, QJ)
         endif
       enddo
       if (mod(myrank, 2) == 0) then

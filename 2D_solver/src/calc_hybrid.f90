@@ -24,7 +24,7 @@ contains
     dudy = (-Q(2,i,j-1) + Q(2,i,j+1)) * dy_tmp
     dvdy = (-Q(3,i,j-1) + Q(3,i,j+1)) * dy_tmp
     div = dudx + dvdy
-    div = min(div, 0.d0)
+    !div = min(div, 0.d0)
     rot = dvdx - dudy
     fd(i,j) = (div**2) / (div**2 + rot**2 + eps)
     fd(i,j) = min(1.d0, fd(i,j))

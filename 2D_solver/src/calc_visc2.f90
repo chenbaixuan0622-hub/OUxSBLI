@@ -47,7 +47,7 @@ contains
     if (kind(id_LL) == 4) then
       block
         real(8) std_t, std_q, over_V, Zq
-        real(8), device    :: rand(4), Z(6), Zx(6)
+        real(8), device    :: rand(4), Z(3), Zx(3)
         real(8), parameter :: kb_over_dt = 1.380649d-23 / dt
         over_V = dx(i) * dy(j)
         std_t  = sqrt(kb_over_dt * over_V * mx * (T(i,j) + T(i+1,j)))
@@ -56,7 +56,7 @@ contains
         Zx  = Z_tilde(seed(i+1,j))
         Z   = 0.5d0 * (Z + Zx)
         Zq  = Zq_x(seed(i,j))
-        txx = txx + std_t * (2.d0 * Z(1) - Z(4) - Z(6)) * one_third
+        txx = txx + std_t * (2.d0 * Z(1) - Z(3)) * one_third
         txy = txy + std_t * Z(2)
         kTx = kTx + std_q * Zq
       end block
@@ -112,7 +112,7 @@ contains
     if (kind(id_LL) == 4) then
       block
         real(8) std_t, std_q, over_V, Zq
-        real(8), device    :: rand(4), Z(6), Zy(6)
+        real(8), device    :: rand(4), Z(3), Zy(3)
         real(8), parameter :: kb_over_dt = 1.380649d-23 / dt
         over_V = dx(i) * dy(j)
         std_t  = sqrt(kb_over_dt * over_V * my * (T(i,j) + T(i,j+1)))
@@ -122,7 +122,7 @@ contains
         Z   = 0.5d0 * (Z + Zy)
         Zq  = Zq_y(seed(i,j))
         tyx = tyx + std_t * Z(2)
-        tyy = tyy + std_t * (2.d0 * Z(4) - Z(6) - Z(1)) * one_third
+        tyy = tyy + std_t * (2.d0 * Z(3) - Z(1)) * one_third
         kTy = kTy + std_q * Zq
       end block
     endif
