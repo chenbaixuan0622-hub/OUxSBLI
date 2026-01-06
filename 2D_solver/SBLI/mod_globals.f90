@@ -5,6 +5,7 @@ module mod_globals
   integer(4), parameter :: id_visc   = 1
   integer(2), parameter :: id_LL     = 0
   integer(2), parameter :: id_igr    = 0
+  integer(2), parameter :: id_force  = 0
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! kind2 Euler       !
   !               ! kind4 NS          !
@@ -58,11 +59,11 @@ module mod_globals
   real(8), parameter         :: blt         = 1.d-3
 
   ! shock + boundary layer
-  real(8), parameter :: Lx = 100.d0 * blt
+  real(8), parameter :: Lx = 80.d0 * blt
   real(8), parameter :: Ly = 10.d0 * blt
   real(8), parameter :: Lz = 0.d0
-  integer, parameter :: nx = 2241!1121
-  integer, parameter :: ny = 577!321
+  integer, parameter :: nx = 1793!2241!4481!2241
+  integer, parameter :: ny = 481!577!1153!577
   integer, parameter :: nz = 1
 
   type(dim3), parameter :: threadsE  = dim3(32,1,1)
@@ -86,15 +87,15 @@ module mod_globals
   integer(kind=2), parameter :: id_recal      = 0
   integer, parameter         :: step_offset   = 0
   integer, parameter         :: start_rescale = 10
-  real(8), parameter :: endT  = 1.d-3
-  integer, parameter :: np    = 20!200
+  real(8), parameter :: endT  = 0.3d-3
+  integer, parameter :: np    = 30!200
   real(8), parameter :: R     = 287.03d0
   real(8), parameter :: gamma = 1.4d0
-  real(8), parameter :: M0    = 2.2d0
+  real(8), parameter :: M0    = 2.1d0
   real(8), parameter :: T0    = 171.31d0
   real(8), parameter :: p0    = 14924.d0
   real(8), parameter :: u0    = M0 * sqrt(gamma * R * T0)
-  real(8), parameter :: dt    = 2.d-9
+  real(8), parameter :: dt    = 3.d-9
   integer, parameter :: nt    = int(endT / (dble(np) * dt))
 
   ! physical properties
@@ -104,7 +105,7 @@ module mod_globals
   real(8), parameter :: rf    = 0.89d0
   real(8), parameter :: Taw   = T0 * (1.d0 + rf * 0.5d0 * (gamma - 1.d0) * M0**2)
   ! oblique shock
-  real(8), parameter :: beta  = dacos(-1.d0) * 37.2d0 / 180.d0
+  real(8), parameter :: beta  = dacos(-1.d0) * 37.7d0 / 180.d0
   real(8), parameter :: Ms    = M0 * dsin(beta)
   real(8), parameter :: Ms2   = Ms**2
   real(8), parameter :: theta = datan(2.d0 * (1.d0 / dtan(beta)) * (Ms2 - 1.d0) / (M0**2 * (gamma + dcos(2.d0 * beta)) + 2.d0))
@@ -121,7 +122,7 @@ module mod_globals
   ! reflected shock
   real(8), parameter :: a2    = sqrt(gamma * R * T2)
   real(8), parameter :: M2    = sqrt(u2**2 + v2**2) / a2
-  real(8), parameter :: beta_r = dacos(-1.d0) * 40.6d0 / 180.d0
+  real(8), parameter :: beta_r = dacos(-1.d0) * 34.7d0 / 180.d0
   real(8), parameter :: Mr    = M2 * dsin(beta_r)
   real(8), parameter :: Mr2   = Mr**2
   real(8), parameter :: T3    = T2 * (1.d0 + 2.d0 * (gamma - 1.d0) * (Mr2 - 1.d0) * (1.d0 + gamma * Mr2) / (Mr2 * (gamma + 1.d0)**2))

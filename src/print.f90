@@ -338,7 +338,7 @@ contains
     real(4), intent(in) :: rho1d(nx*ny), p1d(nx*ny), v1d(nx*ny*3)
     real(8) :: z(1) = 0.d0
     character(len=40) filename
-    write(filename, "(a, i5.5,a)") "data/Q",int(step),".vtr"
+    write(filename, "(a, i5.5,a)") "data/Q",int(step+step_offset),".vtr"
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream",convert="Little_ENDIAN")
     call print_xml(nx, ny, 1, 3, real(x), real(y), real(z), rho1d, p1d, v1d)
     close(10)

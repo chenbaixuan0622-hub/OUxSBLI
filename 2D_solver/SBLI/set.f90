@@ -16,7 +16,7 @@ contains
     real(8) dx1, dy1, ximp, Lx_s
     dx1  = Lx / dble(nx-1)
     dy1  = dx1
-    ximp = 80.d0 * blt
+    ximp = 60.d0 * blt
 
     x(1) = 0.d0
     do i = 1, nx-1
@@ -75,7 +75,7 @@ contains
 
   subroutine set_bc(myrank, nx, ny, x, y, Jacobian, QJ)
     integer, intent(in), value     :: myrank, nx, ny
-    real(8), intent(in)            :: x(nx), y(ny)
+    real(8), intent(in), device    :: x(nx), y(ny)
     real(8), intent(in), device    :: Jacobian(nx,ny)
     real(8), intent(inout), device :: QJ(4,nx,ny) ! Q / Jacobian
     integer i, j, l
@@ -91,12 +91,10 @@ contains
     real(8), parameter :: rho0 = p0 / (R * Ttop)
     real(8), parameter :: c0   = sqrt(gamma * p0 / rho0)
     real(8), parameter :: c3   = sqrt(gamma * p3 / rho3)
-    real(8), device :: y_gpu(ny)
-    y_gpu = y
     !$cuf kernel do(1)<<<*,*>>>
     do j = 2, ny-1
       ! inlet
-      eta = 5.d0 * y_gpu(j) / blt
+      eta = 5.d0 * y(j) / blt
       u   = min(u0, u0 * (0.0015d0 * eta**4 - 0.0181d0 * eta**3 + 0.029d0 * eta**2 + 0.3192 * eta + 0.0003d0))
       v   = 0.d0
       Tw  = Taw
@@ -174,5 +172,13 @@ contains
       QJ(4,i,1) = p_wall * over_gamma_1
     enddo
   end subroutine set_bc
+
+
+  attributes(global) subroutine calc_force(nx, ny, x, y, dx, dy, Q, Fout)
+    integer, intent(in), value   :: nx, ny
+    real(8), intent(in), device  :: x(nx), y(ny), dx(nx-1), dy(ny-1)
+    real(8), intent(in), device  :: Q(4,nx,ny)
+    real(8), intent(out), device :: Fout(3,nx-2,ny-2)
+  end subroutine calc_force
 end module set
 

@@ -5,6 +5,7 @@ module mod_globals
   integer(4), parameter :: id_visc   = 2
   integer(2), parameter :: id_LL     = 0
   integer(2), parameter :: id_igr    = 0
+  integer(2), parameter :: id_force  = 0
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc     ! kind2 Euler         !
   !             ! kind4 NS            !

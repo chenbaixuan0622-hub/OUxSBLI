@@ -1,4 +1,6 @@
 module calc_visc4
+  use curand
+  use curand_device
   use mod_globals, only : id_visc, gamma, R, Pr, Prt, dt, threadsEv, threadsFv
   use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third, two_third, one_twelfth
   use calc_rand
@@ -47,13 +49,13 @@ contains
   end subroutine calc_tau_cross
 
 
-  attributes(global) subroutine calc_Ev4(nx, ny, dx, dy, Q, T, mu, E, seed)
+  attributes(global) subroutine calc_Ev4(nx, ny, dx, dy, Q, T, mu, E, state)
     integer, intent(in), value     :: nx, ny
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device    :: Q(4,nx,ny), T(nx,ny), mu(nx,ny)
     real(8), intent(inout), device :: E(4,nx-1,ny-2)
-    integer(8), intent(inout), device, optional :: seed(nx,ny)
+    type(curandStateXORWOW), intent(inout), device, optional :: state(nx*ny)
     real(8), shared ::  u(-2:threadsEv%x+3,threadsEv%y)
     real(8), shared ::  v(-2:threadsEv%x+3,threadsEv%y)
     real(8), shared :: uy(-2:threadsEv%x+3,threadsEv%y)
@@ -119,13 +121,13 @@ contains
   end subroutine calc_Ev4
  
 
-  attributes(global) subroutine calc_Fv4(nx, ny, dy, dx, Q, T, mu, F, seed)
+  attributes(global) subroutine calc_Fv4(nx, ny, dy, dx, Q, T, mu, F, state)
     integer, intent(in), value     :: nx, ny
     real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device    :: Q(4,nx,ny), T(nx,ny), mu(nx,ny)
     real(8), intent(inout), device :: F(4,nx-2,ny-1)
-    integer(8), intent(inout), device, optional :: seed(nx,ny)
+    type(curandStateXORWOW), intent(inout), device, optional :: state(nx*ny)
     real(8), shared ::  u(-2:threadsFv%y+3,threadsFv%x)
     real(8), shared ::  v(-2:threadsFv%y+3,threadsFv%x)
     real(8), shared :: ux(-2:threadsFv%y+3,threadsFv%x)

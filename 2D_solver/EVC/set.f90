@@ -41,11 +41,20 @@ contains
   end subroutine set_init
 
 
-  subroutine set_bc(myrank, nx, ny, Jacobian, Q)
+  subroutine set_bc(myrank, nx, ny, x, y, Jacobian, Q)
     integer, intent(in), value     :: myrank, nx, ny
-    real(8), intent(in), device    :: Jacobian(ny)
+    real(8), intent(in), device    :: x(nx), y(ny)
+    real(8), intent(in), device    :: Jacobian(nx,ny)
     real(8), intent(inout), device :: Q(4,nx,ny)
     call set_bc_cyclic(id_accuracy, nx, ny, Q)
   end subroutine set_bc
+
+
+  attributes(global) subroutine calc_force(nx, ny, x, y, dx, dy, Q, Fout)
+    integer, intent(in), value   :: nx, ny
+    real(8), intent(in), device  :: x(nx), y(ny), dx(nx-1), dy(ny-1)
+    real(8), intent(in), device  :: Q(4,nx,ny)
+    real(8), intent(out), device :: Fout(3,nx-2,ny-2)
+  end subroutine calc_force
 end module set
 

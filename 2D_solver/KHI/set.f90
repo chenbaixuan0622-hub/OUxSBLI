@@ -14,24 +14,25 @@ contains
 
 
   subroutine set_init(myrank, nx, ny, nz, x, y, z, Q)
-    use mod_globals, only : pi, M0, rho0, u0, d1, d2
+    use mod_globals, only : pi, Lx, amp, rho1, u1, rho2, u2, pd
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
     real(8), intent(out) :: Q(4,nx,ny)
+    real(8) v
     integer i, j
-    real(8) :: p = rho0 * u0**2 / (gamma * M0**2)
     do j = 1, ny
       do i = 1, nx
-        if (y(j) <= pi) then
-          Q(1,i,j) = rho0
-          Q(2,i,j) = rho0 * u0 * tanh((y(j) - 0.5d0 * pi) / d1)
-          Q(3,i,j) = rho0 * u0 * d2 * sin(x(i))
-          Q(4,i,j) = p / (gamma - 1.d0) + 0.5d0 * (Q(2,i,j)**2 + Q(3,i,j)**2) / Q(1,i,j)
+        v = amp * sin(2.d0 * pi * x(i) / Lx)
+        if (y(j) > 0.75d0 * Lx .or. y(j) < 0.25d0 * Lx) then
+          Q(1,i,j) = rho1
+          Q(2,i,j) = rho1 * u1
+          Q(3,i,j) = rho1 * v
+          Q(4,i,j) = pd / (gamma - 1.d0) + 0.5d0 * rho1 * (u1**2 + v**2)
         else
-          Q(1,i,j) = rho0
-          Q(2,i,j) = rho0 * u0 * tanh((1.5d0 * pi - y(j)) / d1)
-          Q(3,i,j) = rho0 * u0 * d2 * sin(x(i))
-          Q(4,i,j) = p / (gamma - 1.d0) + 0.5d0 * (Q(2,i,j)**2 + Q(3,i,j)**2) / Q(1,i,j)
+          Q(1,i,j) = rho2
+          Q(2,i,j) = rho2 * u2
+          Q(3,i,j) = rho2 * v
+          Q(4,i,j) = pd / (gamma - 1.d0) + 0.5d0 * rho2 * (u2**2 + v**2)
         endif
     enddo;enddo
   end subroutine set_init
