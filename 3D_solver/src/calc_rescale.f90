@@ -196,6 +196,8 @@ contains
     real(8) uin, vin, win, rhoin, Tin, pin
     ! cache
     real(8) :: u_tmp, v_tmp, p_tmp, T_tmp, weight_tmp, Jacobian_tmp, over_rhore
+    ! for exception
+    real(8) :: blt_min = 0.5d0 * blt, blt_max = 2.d0 * blt
     do k = 1, nz
       k_offset = ny * 5 * (k-1)
       do j = 1, ny
@@ -227,14 +229,16 @@ contains
     enddo
 
     ! check boundary layer thickness at rescaling plane
-    bltre = 0.d0
-    do j = 2, ny
-      if (Um(j) >= 0.99d0 * u0) then
-        dudy  = (Um(j) - 0.99d0 * u0) / (-Um(j-1) + Um(j))
-        bltre =   y(j) - (-y(j-1) + y(j)) * dudy
+    bltre = blt
+    do j = ny, 2, -1
+      if (Um(j) < 0.99d0 * u0) then
+        dudy  = (0.99d0 * u0 - Um(j-1)) / (-Um(j-1) + Um(j) + 1.d-15)
+        bltre = y(j-1) + (-y(j-1) + y(j)) * dudy
         exit
       endif
     enddo
+    if (bltre < blt_min) bltre = blt_min
+    if (bltre > blt_max) bltre = blt_max
 
     if (bltre > blt) then
       flag_re = flag_re + 1
