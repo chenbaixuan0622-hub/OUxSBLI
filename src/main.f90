@@ -49,6 +49,7 @@ program main
       open(10, file=filename, action="read", form="unformatted", access="sequential", status="old", iostat=ios)
       if (ios /= 0) then
         print *, "Error opening file."
+        call MPI_FINALIZE(ierr)
         stop
       endif
       read(10, iostat=ios) header
