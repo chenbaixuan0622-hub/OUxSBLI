@@ -1,6 +1,14 @@
 module set_coordinate
   use cudafor
   implicit none
+  interface set_block
+    module procedure set_block2, set_block3
+  end interface set_block
+
+  interface set_Jacobian_xy
+    module procedure set_Jacobian_xy2, set_Jacobian_xy3
+  end interface set_Jacobian_xy
+
   interface set_grid_cyclic
     module procedure set_grid_cyclic2_2D, set_grid_cyclic2_3D, set_grid_cyclic4_2D, &
                      set_grid_cyclic4_3D, set_grid_cyclic6_2D, set_grid_cyclic6_3D

@@ -33,6 +33,7 @@ OBJ =	mod_globals.o \
       calc_steps.o \
       calc_rescale.o \
       calc_para.o \
+      calc_igr.o \
       set_bc_common.o \
       set_bc_tbl_sbli.o \
       set_init_common.o \
@@ -63,8 +64,9 @@ calc_mat.o: mod_globals.mod calc_common_dim.mod
 calc_slau.o: mod_globals.mod mod_constant.mod calc_common.mod calc_hybrid.mod
 calc_roe.o: mod_globals.mod calc_common.mod calc_common_dim.mod calc_physical_quantities.mod calc_mat.mod
 calc_muscl.o: mod_globals.mod
+calc_igr.o: mod_globals.mod
 calc_flux.o: mod_globals.mod mod_constant.mod calc_keep.mod calc_slau.mod calc_roe.mod calc_hybrid.mod calc_muscl.mod
-calc_flux_base.o: mod_globals.mod calc_physical_quantities.mod calc_hybrid.mod calc_flux.mod calc_visc2.mod calc_visc4.mod calc_les.mod set.mod
+calc_flux_base.o: mod_globals.mod calc_physical_quantities.mod calc_hybrid.mod calc_flux.mod calc_visc2.mod calc_visc4.mod calc_les.mod set.mod calc_igr.mod
 calc_hybrid.o: mod_globals.mod
 calc_steps.o: mod_globals.mod
 calc_rescale.o: mod_globals.mod mod_constant.mod
