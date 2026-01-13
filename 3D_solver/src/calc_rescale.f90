@@ -194,7 +194,7 @@ contains
     real(8), intent(in)    :: y(ny), Jacobian(nx,ny), Qm(ny*5)
     real(8), intent(out)   :: bltre
     real(8), intent(inout) :: Qre(ny*nz*5) ! Q / J
-    integer i, j, jj, k, kh, l, j_offset, k_offset, ierr
+    integer i, j, jj, k, kh, l, j_offset, k_offset, ierr, errorcode, flag
     integer, dimension(ny) :: jj_y, jj_e
     real(8) t, dudy, taure, utre, utin, beta, mu, nu, ady, ade 
     ! mean properties at rescaling plane
@@ -249,15 +249,21 @@ contains
 
     ! check boundary layer thickness at rescaling plane
     bltre = blt
+    flag  = 0
     do j = ny, 2, -1
       if (Um(j) < 0.99d0 * u0) then
         dudy  = (0.99d0 * u0 - Um(j-1)) / (-Um(j-1) + Um(j) + 1.d-15)
         bltre = y(j-1) + (-y(j-1) + y(j)) * dudy
+        flag  = 1
         exit
       endif
     enddo
     if (bltre < blt_min) bltre = blt_min
     if (bltre > blt_max) bltre = blt_max
+    if (flag == 0) then
+      print *, "Invalid 99% boundary layer thickness"
+      call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
+    endif
 
     if (bltre > blt) then
       flag_re = flag_re + 1
