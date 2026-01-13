@@ -107,7 +107,8 @@ contains
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    alpha = real(sensor(i,j,k)) * (1.e0 / over_dx(i))**2
+    !alpha = real(sensor(i,j,k)) * (1.e0 / over_dx(i))**2
+    alpha = (1.e0 / over_dx(i))**2
     dudx = 0.5e0 * real(-ruvwp(2,i-1,j,k) + ruvwp(2,i+1,j,k)) * over_dx(i)
     dvdy = 0.5e0 * real(-ruvwp(3,i,j-1,k) + ruvwp(3,i,j+1,k)) * over_dy(j)
     dwdz = 0.5e0 * real(-ruvwp(4,i,j,k-1) + ruvwp(4,i,j,k+1)) * over_dz(k)
@@ -254,7 +255,7 @@ contains
   subroutine calc_sigma(nx, ny, nz, dx, dy, dz, sensor, ruvwp, sigma)
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: dx(nx-1), dy(ny-1), dz(nz-1), sensor(nx,ny,nz)
-    real(8), intent(inout), device :: ruvwp(5,nx,ny,nz)
+    real(8), intent(in), device    :: ruvwp(5,nx,ny,nz)
     real(4), intent(inout), device :: sigma(nx,ny,nz)
     real(4), allocatable, device :: Ab(:,:,:,:)
     integer :: i, j, k, maxitr = 100
@@ -264,12 +265,6 @@ contains
     call RB_SOR(nx, ny, nz, maxitr, Ab, sigma)
     !call MG_RBSOR(nx, ny, nz, maxitr1, maxitr2, Ab, sigma)
     deallocate(Ab)
-    !$cuf kernel do(3)<<<*,*>>>
-    do k = 1, nz
-      do j = 1, ny
-        do i = 1, nx
-          ruvwp(5,i,j,k) = ruvwp(5,i,j,k) + dble(sigma(i,j,k))
-    enddo;enddo;enddo
   end subroutine calc_sigma
 end module calc_igr
 

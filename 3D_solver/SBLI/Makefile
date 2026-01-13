@@ -15,6 +15,7 @@ vpath %f90 ../src:../../src
 
 OBJ =	mod_globals.o \
       mod_constant.o \
+      cpu_gpu_mpi.o \
       set_coordinate.o \
       calc_common_dim.o \
       calc_mat.o \
@@ -36,6 +37,7 @@ OBJ =	mod_globals.o \
       calc_igr.o \
       set_bc_common.o \
       set_bc_tbl_sbli.o \
+      set_compressible_bl.o \
       set_init_common.o \
       set.o \
       print.o \
@@ -52,7 +54,8 @@ $(TARGET): $(OBJ)
 mod_constant.o: mod_globals.mod
 set_bc_common.o: mod_globals.mod
 set_bc_tbl_sbli.o: mod_globals.mod mod_constant.mod
-set_init_common.o: mod_globals.mod mod_constant.mod
+set_compressible_bl.o: mod_globals.mod mod_constant.mod
+set_init_common.o: mod_globals.mod mod_constant.mod set_compressible_bl.mod
 set.o: mod_globals.mod mod_constant.mod calc_para.mod set_bc_common.mod set_bc_tbl_sbli.mod set_init_common.mod set_coordinate.mod
 calc_physical_quantities.o: mod_globals.mod mod_constant.mod
 calc_common.o: mod_globals.mod

@@ -180,6 +180,7 @@ contains
       if (myrank == 0 .or. myrank == rerank) then
         deallocate(Qre, Qm)
       elseif (myrank == rerank+1) then
+        call write_Qm(ny, y, Qm_cpu)
         deallocate(Qm_cpu)
       endif
     endif
@@ -356,6 +357,7 @@ contains
       if (myrank == 0 .or. myrank == rerank) then
         deallocate(Qre, Qm)
       elseif (myrank == rerank+1) then
+        call write_Qm(ny, y, Qm_cpu)
         deallocate(Qm_cpu)
       endif
     endif

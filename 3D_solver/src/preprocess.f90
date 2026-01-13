@@ -86,14 +86,17 @@ contains
 
 
   subroutine pre_rescale(myrank, ny, nz, Qre, Qm, Qm_cpu)
-    use mod_globals, only : rerank
+    use mod_globals, only : rerank, id_recal, id_rescale
     integer, intent(in)                         :: myrank, ny, nz
     real(8), intent(inout), allocatable, device :: Qre(:), Qm(:)
     real(8), intent(inout), allocatable         :: Qm_cpu(:)
-    integer stat, ilen, ierr
+    character(len=40) filename
+    logical exists
+    integer j, stat, ilen, ierr, errorcode
     type(cudaDeviceProp) prop
     if (mod(myrank,2) == 0) then
       allocate(Qre(ny*(nz-6)*5), Qm(ny*5), stat=ierr)
+      Qm(:) = 0.d0
       if (ierr /= 0) then
         print *, "myrank is ", myrank, " memory allocation failed (Qm)", ierr
       else
@@ -105,6 +108,33 @@ contains
       ilen = verify(prop%name, ' ', .true.)
       print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", 0, ") calculates rescaling"
       allocate(Qm_cpu(ny*5))
+      if (kind(id_recal) == 4) then
+        write(filename, "(a)") "recal/Qm.dat"
+        inquire(file=filename, exist=exists)
+        if (exists) then
+          if (id_rescale == 0) then
+            print *, "Qm exists (not fixed value)"
+          else
+            print *, "Qm exists (fixed value)"
+          endif
+          open(10, file=filename, action="read", form="unformatted", access="stream", status="old")
+          read(10) Qm_cpu
+          close(10)
+          do j = 1, 5*ny
+            if (Qm_cpu(j) /= Qm_cpu(j)) then
+              print *, "Qm is NaN"
+              call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
+            endif
+          enddo
+        else
+          if (id_rescale /= 0) then
+            print *, "Qm is required but doesn't exist"
+            call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
+          endif
+          Qm_cpu(:) = 0.d0
+          print *, "Qm doesn't exist"
+        endif
+      endif
     endif
   end subroutine pre_rescale
 end module preprocess

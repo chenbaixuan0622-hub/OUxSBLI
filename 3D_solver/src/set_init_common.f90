@@ -1,6 +1,7 @@
 module set_init_common
   use mod_globals, only : gamma, R, Taw, rf
   use mod_constant, only : Cp, gamma_1, over_gamma_1
+  use set_compressible_bl
   implicit none
 contains
   subroutine calc_Gaussian_filter_x(nx, ny, nz, n, x, phi)
@@ -185,21 +186,22 @@ contains
   end subroutine calc_rms
 
 
-  subroutine set_init_tbl(nx, ny, nz, xs, ys, zs, rand, blt0, blt, u0, p0, T0, M0, Q)
+  subroutine set_init_tbl(nx, ny, nz, x, y, z, rand, blt0, blt, u0, p0, T0, M0, Q)
     integer, intent(in)  :: nx, ny, nz
-    real(8), intent(in)  :: xs(nx), ys(ny), zs(nz)
+    real(8), intent(in)  :: x(nx), y(ny), z(nz)
     real(8), intent(in)  :: rand, blt0, blt, u0, p0, T0, M0
     real(8), intent(out) :: Q(5,nx,ny,nz)
     integer i, j, k
-    real(8) :: eta, rho, u, v, w, T, Tw, p_wall
+    real(8) :: p_wall
     real(8) :: fd, pi = acos(-1.d0)
     ! random
-    real(8), allocatable :: randum(:,:,:,:), ustd(:,:,:), vstd(:,:,:), wstd(:,:,:), Tstd(:,:,:)
+    real(8), allocatable :: rho(:), u(:), v(:), T(:), randum(:,:,:,:), ustd(:,:,:), vstd(:,:,:), wstd(:,:,:), Tstd(:,:,:)
     integer ir, jr, kr, nxr, nyr, nzr, n
     ! generate randum
     nxr = (nx+9) / 10
     nyr = (ny+1) / 2
     nzr = (nz+1) / 2
+    allocate(rho(ny), u(ny), v(ny), T(ny))
     allocate(randum(4,nxr,nyr,nzr), ustd(nx,ny,nz), vstd(nx,ny,nz), wstd(nx,ny,nz), Tstd(nx,ny,nz))
     ! generate random number
     do k = 1, nzr
@@ -218,7 +220,7 @@ contains
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
-          if (ys(j) <= blt) then
+          if (y(j) <= blt) then
             ir = i / 10 + 1
             jr = j / 2  + 1
             kr = k / 2  + 1
@@ -237,7 +239,7 @@ contains
     do k = 1, nz
       do j = 1, ny
         if (j >= 10) then
-          fd = sin(pi * ys(j) / (2.d0 * blt))
+          fd = sin(pi * y(j) / (2.d0 * blt))
         else
           fd = 0.d0
         endif
@@ -247,41 +249,32 @@ contains
           wstd(i,j,k) = fd * wstd(i,j,k)
           Tstd(i,j,k) = fd * Tstd(i,j,k)
     enddo;enddo;enddo
-    call calc_Gaussian_filter_x(nx, ny, nz, 3, xs, ustd)
-    call calc_Gaussian_filter_y(nx, ny, nz, 3, ys, ustd)
-    call calc_Gaussian_filter_z(nx, ny, nz, 3, zs, ustd)
-    call calc_Gaussian_filter_x(nx, ny, nz, 3, xs, vstd)
-    call calc_Gaussian_filter_y(nx, ny, nz, 3, ys, vstd)
-    call calc_Gaussian_filter_z(nx, ny, nz, 3, zs, vstd)
-    call calc_Gaussian_filter_x(nx, ny, nz, 3, xs, wstd)
-    call calc_Gaussian_filter_y(nx, ny, nz, 3, ys, wstd)
-    call calc_Gaussian_filter_z(nx, ny, nz, 3, zs, wstd)
-    call calc_Gaussian_filter_x(nx, ny, nz, 3, xs, Tstd)
-    call calc_Gaussian_filter_y(nx, ny, nz, 3, ys, Tstd)
-    call calc_Gaussian_filter_z(nx, ny, nz, 3, zs, Tstd)
+    call calc_Gaussian_filter_x(nx, ny, nz, 3, x, ustd)
+    call calc_Gaussian_filter_y(nx, ny, nz, 3, y, ustd)
+    call calc_Gaussian_filter_z(nx, ny, nz, 3, z, ustd)
+    call calc_Gaussian_filter_x(nx, ny, nz, 3, x, vstd)
+    call calc_Gaussian_filter_y(nx, ny, nz, 3, y, vstd)
+    call calc_Gaussian_filter_z(nx, ny, nz, 3, z, vstd)
+    call calc_Gaussian_filter_x(nx, ny, nz, 3, x, wstd)
+    call calc_Gaussian_filter_y(nx, ny, nz, 3, y, wstd)
+    call calc_Gaussian_filter_z(nx, ny, nz, 3, z, wstd)
+    call calc_Gaussian_filter_x(nx, ny, nz, 3, x, Tstd)
+    call calc_Gaussian_filter_y(nx, ny, nz, 3, y, Tstd)
+    call calc_Gaussian_filter_z(nx, ny, nz, 3, z, Tstd)
     call set_bc_cyclic_x_cpu(nx, ny, nz, ustd, vstd, wstd, Tstd)
     call set_bc_cyclic_z_cpu(nx, ny, nz, ustd, vstd, wstd, Tstd)
+    call calc_HD_Blasius(ny, y, blt0, u0, T0, p0, M0, rho, u, v, T)
     ! add fluctuation
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
-          eta = 5.d0 * ys(j) / blt0
-          u   = min(u0, u0 * (0.0015d0 * eta**4 - 0.0181d0 * eta**3 + 0.029d0 * eta**2 + 0.3192 * eta + 0.0003d0))
-          v   = 0.d0
-          Tw  = Taw
-          T   = Tw + (Taw - Tw) * u / u0 - rf * u**2 / (2.d0 * gamma * R / (gamma - 1.d0))
-          u   = u + ustd(i,j,k)
-          v   = v + vstd(i,j,k)
-          w   = wstd(i,j,k)
-          T   = T + Tstd(i,j,k)
-          rho = p0 / (R * T)
-          Q(1,i,j,k) = rho
-          Q(2,i,j,k) = Q(1,i,j,k) * u
-          Q(3,i,j,k) = Q(1,i,j,k) * v
-          Q(4,i,j,k) = Q(1,i,j,k) * w
+          Q(1,i,j,k) = p0 / (R * (T(j) + Tstd(i,j,k)))!rho(j)
+          Q(2,i,j,k) = Q(1,i,j,k) * (u(j) + ustd(i,j,k))
+          Q(3,i,j,k) = Q(1,i,j,k) * (v(j) + vstd(i,j,k))
+          Q(4,i,j,k) = Q(1,i,j,k) * wstd(i,j,k)
           Q(5,i,j,k) = p0 * over_gamma_1 + 0.5d0 * (Q(2,i,j,k)**2 + Q(3,i,j,k)**2 + Q(4,i,j,k)**2) / Q(1,i,j,k)
     enddo;enddo;enddo
-    deallocate(randum, ustd, vstd, wstd, Tstd)
+    deallocate(rho, u, v, T, randum, ustd, vstd, wstd, Tstd)
     ! bottom
     Q(1,:,1,:) = Q(1,:,2,:)
     Q(2,:,1,:) = 0.d0
