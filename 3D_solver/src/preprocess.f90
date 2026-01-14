@@ -95,7 +95,7 @@ contains
     integer j, stat, ilen, ierr, errorcode
     type(cudaDeviceProp) prop
     if (mod(myrank,2) == 0) then
-      allocate(Qre(ny*(nz-6)*5), Qm(ny*4), stat=ierr)
+      allocate(Qre(ny*(nz-6)*5), Qm(ny*2), stat=ierr)
       Qm(:) = 0.d0
       if (ierr /= 0) then
         print *, "myrank is ", myrank, " memory allocation failed (Qm)", ierr
@@ -107,7 +107,7 @@ contains
       stat = cudaGetDeviceProperties(prop, 0)
       ilen = verify(prop%name, ' ', .true.)
       print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", 0, ") calculates rescaling"
-      allocate(Qm_cpu(ny*4))
+      allocate(Qm_cpu(ny*2))
       if (kind(id_recal) == 4) then
         write(filename, "(a)") "recal/Qm.dat"
         inquire(file=filename, exist=exists)
@@ -120,7 +120,7 @@ contains
           open(10, file=filename, action="read", form="unformatted", access="stream", status="old")
           read(10) Qm_cpu
           close(10)
-          do j = 1, 4*ny
+          do j = 1, 2*ny
             if (Qm_cpu(j) /= Qm_cpu(j)) then
               print *, "Qm is NaN"
               call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
