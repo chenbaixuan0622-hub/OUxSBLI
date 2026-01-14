@@ -42,7 +42,6 @@ OBJ =	mod_globals.o \
       set.o \
       print.o \
       preprocess.o \
-      calc_entropy.o \
       calc_time_dev.o \
       main.o
 
@@ -75,7 +74,7 @@ calc_hybrid.o: mod_globals.mod
 calc_steps.o: mod_globals.mod
 calc_rescale.o: mod_globals.mod mod_constant.mod cpu_gpu_mpi.mod
 preprocess.o: mod_globals.mod print.mod
-calc_time_dev.o: mod_globals.mod preprocess.mod set.mod calc_flux_base.mod calc_steps.mod calc_rescale.mod calc_para.mod calc_entropy.mod print.mod
+calc_time_dev.o: mod_globals.mod preprocess.mod set.mod calc_flux_base.mod calc_steps.mod calc_rescale.mod calc_para.mod print.mod
 print.o: mod_globals.mod
 main.o: main.f90 mod_globals.mod set_coordinate.mod set.mod calc_time_dev.mod
 
