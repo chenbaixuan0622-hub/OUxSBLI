@@ -262,6 +262,11 @@ contains
     if (flag_re >= 1 .and. step >= start_rescale) then
       if (abs(jup - jdown) > 1) then
         print *, "jup=", jup, ", jdown=", jdown, ", bltup=", bltup, ", bltdown=", bltdown
+        if (abs(bltdown - 1.3d0 * blt) > abs(bltup - 1.3d0 * blt)) then
+          bltre = bltup
+        else
+          bltre = bltdowm
+        endif
       endif
       if (bltre < blt_min) bltre = blt_min
       if (bltre > blt_max) bltre = blt_max
