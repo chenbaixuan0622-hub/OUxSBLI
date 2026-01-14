@@ -1,8 +1,8 @@
 module set
   use cudafor
   use mpi
-  use mod_globals, only : id_rescale, ny1, nre2, gamma, R, Cp, Pr, u0, p0, T0, M0, blt, rho2, p2, ux, uy
-  use mod_constant, only : Cp, gamma_1, over_gamma_1
+  use mod_globals, only : id_rescale, ny1, nre2, gamma, R, Cp, Pr, u0, p0, T0, M0, blt, rho2, p2, ux, uy, rf, Taw
+  use mod_constant, only : Cp, gamma_1, over_gamma, over_gamma_1
   use set_bc_common
   use set_init_common
   use calc_para
@@ -12,7 +12,7 @@ contains
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: Lx, Ly, Lz
     real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
-    integer i, j, k
+    integer i, j, k, ny_b
     real(8) dx1, dy1, dz1
     dx1 = Lx / dble(nx-1)
     dy1 = dx1
@@ -28,10 +28,9 @@ contains
     do j = 1, ny-1
       if (y(j) <= 3.d0 * blt) then
         dy(j) = min(1.d0, max(0.07d0, dble(j)/dble(128))) * dy1
-      elseif (3.d0 * blt <= y(j) .and. y(j) <= 8.d0 * blt) then
-        dy(j) = 1.5d0 * dy1
+        ny_b  = j
       else
-        dy(j) = 1.75d0 * dy1
+        dy(j) = dy1 * (1.d0 + 0.75d0 * dble(j-ny_b) / dble(ny-ny_b))
       endif
       y(j+1) = y(j) + dy(j)
     enddo
@@ -41,43 +40,35 @@ contains
       dz(k) = dz1
       z(k+1) = z(k) + dz(k)
     enddo
+    z(:) = z(:) - 0.5d0 * Lz
   end subroutine set_grid
+
 
   subroutine set_init(myrank, nx, ny, nz, xs, ys, zs, Q)
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: xs(nx), ys(ny), zs(nz)
     real(8), intent(out) :: Q(5,nx,ny,nz)
-    real(8) :: rf = 0.89d0
-    call set_init_tbl(nx, ny, nz, xs, ys, zs, 0.75d0*blt, blt, rf, u0, p0, T0, M0, Q)
+    call set_init_tbl(nx, ny, nz, xs, ys, zs, 0.1d0, 0.75d0*blt, blt, u0, p0, T0, M0, Q)
   end subroutine set_init
-  
+
+
   subroutine set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
     integer, intent(in), value     :: myrank, nx, ny, nz
     real(8), intent(in), device    :: Jacobian(nx,ny)
     real(8), intent(inout), device :: QJ(5,nx,ny,nz) ! Q / Jacobian
     real(8), intent(in), device, optional :: Qre(ny*(nz-6)*5)
-    integer i, j, k, l, No, ireq, ierr, istat(MPI_STATUS_SIZE)
-    real(8) :: p_wall, rf = 0.89d0
+    integer i, j, k, l, ireq, ierr, istat(MPI_STATUS_SIZE)
+    real(8) :: p_wall
     ! Riemann invariants
-    real(8) :: rhoin, pin, cin, vin, Rp, Rm, rhob, ub, vb, cb, pb
-    real(8) :: rho0, c0, v0 = 0.d0, Taw, T
+    real(8) :: rhoin, pin, cin, vin, Rp, Rm, rhob, ub, vb, cb, pb, v0 = 0.d0
     ! cache
     real(8) Jacobian_tmp
     ! temperature and density at top
-    Taw  = T0 * (1.d0 + rf * 0.5d0 * gamma_1 * M0**2)
-    T    = Taw - rf * u0**2 / (2.d0 * (gamma * R * over_gamma_1))
-    rho0 = p0 / (R * T)
-    c0   = sqrt(gamma * p0 / rho0)
+    real(8), parameter :: T       = Taw - rf * u0**2 / (2.d0 * Cp)
+    real(8), parameter :: rho0    = p0 / (R * T)
+    real(8), parameter :: c0      = sqrt(gamma * p0 / rho0)
+    real(8), parameter :: over_c0 = 1.d0 / c0
     if (kind(id_rescale) == 4 .and. present(Qre)) then
-      !block
-      !  real(8) Qre_cpu(ny*(nz-6)*5)
-      !  Qre_cpu = Qre
-      !  do k = 1, nz-6
-      !    do j = 2, ny-1
-      !      do l = 1, 5
-      !        print *, Qre_cpu(ny*5*(k-1)+5*(j-1)+l)
-      !  enddo;enddo;enddo
-      !end block
       !$cuf kernel do(2)<<<*,*>>>
       do k = 1, nz-6
         do j = 2, ny-1
@@ -118,8 +109,8 @@ contains
         Rm   = v0  - 2.d0 * c0  * over_gamma_1
         vb   = 0.5d0 * (Rp + Rm)
         cb   = 0.25d0 * gamma_1 * (Rp - Rm)
-        rhob = (cb / c0)**(2.d0 * over_gamma_1) * rho0
-        pb   = (rhob * cb**2) / gamma
+        rhob = (cb * over_c0)**(2.d0 * over_gamma_1) * rho0
+        pb   = (rhob * cb**2) * over_gamma
         QJ(1,i,ny,k) = rhob * Jacobian_tmp
         QJ(2,i,ny,k) = rhob * u0 * Jacobian_tmp
         QJ(3,i,ny,k) = rhob * vb * Jacobian_tmp

@@ -9,7 +9,6 @@ module set
   use set_init_common
   use calc_para
   implicit none
-  integer No
 contains
   subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, Lx1, x, y, z, dx, dy, dz)
     integer, intent(in)  :: myrank, nx, ny, nz
@@ -17,64 +16,37 @@ contains
     real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     integer i, j, k, nx1, ny_b
     real(8) dx1, dy1, dz1, ximp, Lx_s
-    dx1  = 20.d0 * blt / dble(512)
-    dy1  = dx1
-    dz1  = Lz / dble(nz-1)
-    ximp = 0.9d0 * Lx1 + 30.d0 * blt
+    dx1 = Lx / dble(nx-1)
+    dy1 = dx1
+    dz1 = Lz / dble(nz-1)
 
     if (myrank == 0) then
       x(1) = 0.d0
-      do i = 1, nx-1
-        dx(i) = dx1
-        x(i+1) = x(i) + dx(i)
-      enddo
     else
-      x(1) = 0.9d0 * Lx1
-      nx1  = int(0.9d0 * dble(nx-1))
-      ! computational region
-      do i = 1, nx1
-        dx(i)  = dx1
-        x(i+1) = x(i) + dx(i)
-      enddo
-      ! buffer region
-      do i = nx1 + 1, nx-1
-        dx(i)  = dx1 * (1.d0 + 3.d0 * dble(i-nx1) / dble(nx-nx1))
-        x(i+1) = x(i) + dx(i)
-      enddo
+      x(1) = Lx1
     endif
-    x(:) = x(:) - ximp
+    do i = 1, nx-1
+      dx(i) = dx1
+      x(i+1) = x(i) + dx(i)
+    enddo
 
     y(1) = 0.d0
     do j = 1, ny-1
       if (y(j) <= 3.d0 * blt) then
         dy(j) = min(1.d0, max(0.07d0, dble(j)/dble(128))) * dy1
-        ny_b  = j
+      elseif (3.d0 * blt <= y(j) .and. y(j) <= 8.d0 * blt) then
+        dy(j) = 1.5d0 * dy1
       else
-        dy(j) = dy1 * (1.d0 + 0.75d0 * dble(j-ny_b) / dble(ny2-ny_b))
+        dy(j) = 1.75d0 * dy1
       endif
       y(j+1) = y(j) + dy(j)
     enddo
-
-    if (myrank == 2) then
-      Lx_s = y(ny) / dble(beta) / blt
-      do i = 1, nx
-        if (x(i) / blt + Lx_s >= 0.d0) then
-          No = i
-          exit
-        endif
-      enddo
-      print *, "tan(beta)=", tan(beta)
-      print *, "length of shock=", Lx_s
-      print *, "height of shock=", y(ny) / blt
-      print *, "x(No)=", x(No) / blt
-    endif
 
     z(1) = 0.d0
     do k = 1, nz-1
       dz(k) = dz1
       z(k+1) = z(k) + dz(k)
     enddo
-    z(:) = z(:) - 0.5d0 * Lz
   end subroutine set_grid
 
 
@@ -116,7 +88,7 @@ contains
     real(8), intent(in), device    :: Jacobian(nx,ny)
     real(8), intent(inout), device :: QJ(5,nx,ny,nz) ! Q / Jacobian
     real(8), intent(in), device, optional :: Qre(ny*(nz-6)*5)
-    integer i, j, k, l, ireq, ierr, istat(MPI_STATUS_SIZE)
+    integer i, j, k, l, No, ireq, ierr, istat(MPI_STATUS_SIZE)
     real(8) :: p_wall
     ! Riemann invariants
     real(8) :: rhoin, pin, cin, vin, Rp, Rm, rhob, ub, vb, cb, pb, v0 = 0.d0
@@ -218,6 +190,7 @@ contains
     !call set_bc_Neumann_tbl_top_down(nx, ny, nz, 3, 1, nx, Jacobian, QJ)
 
     if (myrank == 2) then
+      No = int(dble(nx) * 0.1d0)
       !$cuf kernel do(2)<<<*,*>>>
       do k = 1, nz
         do i = No, nx
