@@ -1,5 +1,5 @@
 module calc_visc2
-  use mod_globals, only : id_visc, gamma, R, Pr, Prt, dt, threadsEv, threadsFv, threadsGv
+  use mod_globals, only : id_LL, gamma, R, Pr, Prt, dt, threadsEv, threadsFv, threadsGv
   use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third, two_third
   use calc_rand
   implicit none
@@ -61,7 +61,7 @@ contains
     txx = two_third * (2.d0 * mux - mvy - mwz)
     txy = muy + mvx
     txz = mwx + muz
-    if (present(seed)) then
+    if (kind(id_LL) == 4) then
       block
         real(8) std_t, std_q, over_V, Zq
         real(8), device    :: rand(4), Z(6), Zx(6)
@@ -223,7 +223,7 @@ contains
     tyx = muy + mvx
     tyy = two_third * (2.d0 * mvy - mwz - mux)
     tyz = mvz + mwy
-    if (present(seed)) then
+    if (kind(id_LL) == 4) then
       block
         real(8) std_t, std_q, over_V, Zq
         real(8), device    :: rand(4), Z(6), Zy(6)
@@ -385,7 +385,7 @@ contains
     tzx = mwx + muz
     tzy = mvz + mwy
     tzz = two_third * (2.d0 * mwz - mux - mvy)
-    if (present(seed)) then
+    if (kind(id_LL) == 4) then
       block
         real(8) std_t, std_q, over_V, Zq
         real(8), device    :: rand(4), Z(6), Zz(6)

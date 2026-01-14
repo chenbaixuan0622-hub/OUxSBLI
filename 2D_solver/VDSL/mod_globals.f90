@@ -1,10 +1,11 @@
 module mod_globals
   use cudafor
   implicit none
-  integer, parameter :: dimension = 2
-  integer, parameter :: accuracy  = 2 
-  integer, parameter :: offset    = accuracy / 2
-  integer(4), parameter :: id_visc   = 1
+  integer, parameter    :: dimension = 2
+  integer(4), parameter :: id_visc   = 2
+  integer(2), parameter :: id_LL     = 0
+  integer(2), parameter :: id_igr    = 0
+  integer(2), parameter :: id_force  = 0
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc     ! kind2 Euler         !
   !             ! kind4 NS            !
@@ -42,13 +43,10 @@ module mod_globals
   integer(2), parameter      :: id_scheme   = 0
   integer, parameter         :: id_sensor   = 1
   real(8), parameter         :: threshold   = 0.4d0
-  integer(kind=2), parameter :: id_accuracy = 0
+  integer(kind=8), parameter :: id_accuracy = 0
   integer(kind=2), parameter :: id_tvd      = 0
-  integer(kind=2), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
-  integer(kind=2), parameter :: slau_wall   = 0
 
-  integer(kind=2), parameter :: id_forcing  = 0
   ! mesh
   real(8), parameter :: pi = acos(-1.d0)
   real(8), parameter :: Lx = 2.d0 * pi
@@ -58,16 +56,14 @@ module mod_globals
   integer, parameter :: ny = 129!257!513
   integer, parameter :: nz = 1
 
-  type(dim3) :: blocksE   = dim3((nx-accuracy+1)/64,(ny-accuracy)/1,1)
-  type(dim3) :: blocksF   = dim3((nx-accuracy)/1,(ny-accuracy+1)/64,1)
-  type(dim3) :: blocksEv  = dim3((nx-accuracy+1)/64,(ny-accuracy)/1,1)
-  type(dim3) :: blocksFv  = dim3((nx-accuracy)/1,(ny-accuracy+1)/64,1)
-  type(dim3) :: blocks    = dim3((nx-accuracy)/73,(ny-accuracy)/1,1)
-  type(dim3) :: threadsE  = dim3(64,1,1)
-  type(dim3) :: threadsF  = dim3(1,64,1)
-  type(dim3) :: threadsEv = dim3(64,1,1)
-  type(dim3) :: threadsFv = dim3(1,64,1)
-  type(dim3) :: threads   = dim3(73,1,1)
+  type(dim3), parameter :: threadsE  = dim3(32,1,1)
+  type(dim3), parameter :: threadsF  = dim3(32,4,1)
+  type(dim3), parameter :: threadsG  = dim3(1,1,1)
+  type(dim3), parameter :: threadsEv = dim3(32,1,1)
+  type(dim3), parameter :: threadsFv = dim3(32,4,1)
+  type(dim3), parameter :: threadsGv = dim3(1,1,1)
+  type(dim3), parameter :: threads   = dim3(32,4,1)
+  type(dim3) :: blocksE, blocksF, blocksG, blocksEv, blocksFv, blocksGv, blocks
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

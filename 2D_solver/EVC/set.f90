@@ -1,45 +1,17 @@
 module set
-  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, gamma, R, dtn, theta
+  use mod_globals, only : id_accuracy, nx, ny, Lx, Ly, gamma, R, dtn, theta
   use set_bc_common
+  use set_coordinate
   implicit none
 contains
   subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, xc, yc, zc, dx, dy, dz)
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: Lx, Ly, Lz
-    real(8), intent(out) :: xc(nx), yc(ny), zc(nz), dx(nx-1), dy(ny-1), dz(nz-1)
-    real(8) x(nx+1), y(ny+1)
-    integer i, j
-    dx(:) = Lx / dble(nx-6)
-    dy(:) = Ly / dble(ny-6)
-    ! x direction
-    do i = 4, nx-2
-      x(i) = dx(1) * dble(i-4)
-    enddo
-    x(1)    = x(4)    - 3.d0 * dx(1)
-    x(2)    = x(4)    - 2.d0 * dx(1)
-    x(3)    = x(4)    - dx(1)
-    x(nx-1) = x(nx-2) + dx(1)
-    x(nx)   = x(nx-2) + 2.d0 * dx(1)
-    x(nx+1) = x(nx-2) + 3.d0 * dx(1)
-    ! y direction
-    do j = 4, ny-2
-      y(j) = dy(1) * dble(j-4)
-    enddo
-    y(1)    = y(4)    - 3.d0 * dy(1)
-    y(2)    = y(4)    - 2.d0 * dy(1)
-    y(3)    = y(4)    - dy(1)
-    y(ny-1) = y(ny-2) + dy(1)
-    y(ny)   = y(ny-2) + 2.d0 * dy(1)
-    y(ny+1) = y(ny-2) + 3.d0 * dy(1)
-    ! cell centered
-    do i = 1, nx
-      xc(i) = 0.5d0 * (x(i) + x(i+1))
-    enddo
-    do j = 1, ny
-      yc(j) = 0.5d0 * (y(j) + y(j+1))
-    enddo
+    real(8), intent(out) :: xc(nx), yc(ny), zc(nz), dx(nx-1), dy(ny-1), dz(1)
+    call set_grid_cyclic(id_accuracy, nx, ny, Lx, Ly, xc, yc, dx, dy)
   end subroutine set_grid
- 
+
+
   subroutine set_init(myrank, nx, ny, nz, x, y, z, Q)
     use mod_globals, only : M0, rho0, p0, T0, u0, Rc, beta
     integer, intent(in)  :: myrank, nx, ny, nz
@@ -67,21 +39,22 @@ contains
         Q(4,i,j) = p / (gamma - 1.d0) + 0.5d0 * rho * (u**2 + v**2)
     enddo;enddo
   end subroutine set_init
-  
-  subroutine set_bc(myrank, nx, ny, Jacobian, Q)
-    use mod_globals, only : id_accuracy
+
+
+  subroutine set_bc(myrank, nx, ny, x, y, Jacobian, Q)
     integer, intent(in), value     :: myrank, nx, ny
-    real(8), intent(in), device    :: Jacobian(ny)
+    real(8), intent(in), device    :: x(nx), y(ny)
+    real(8), intent(in), device    :: Jacobian(nx,ny)
     real(8), intent(inout), device :: Q(4,nx,ny)
     call set_bc_cyclic(id_accuracy, nx, ny, Q)
   end subroutine set_bc
 
-  subroutine calc_forcing(nx, ny, dx, dy, rho, u, v, p, fx, fy)
+
+  attributes(global) subroutine calc_force(nx, ny, x, y, dx, dy, Q, Fout)
     integer, intent(in), value   :: nx, ny
-    real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
-    real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
-    real(8), intent(in), device  :: rho(nx,ny), u(nx,ny), v(nx,ny), p(nx,ny)
-    real(8), intent(out), device :: fx(nx-2,ny-2), fy(nx-2,ny-2)
-  end subroutine calc_forcing
+    real(8), intent(in), device  :: x(nx), y(ny), dx(nx-1), dy(ny-1)
+    real(8), intent(in), device  :: Q(4,nx,ny)
+    real(8), intent(out), device :: Fout(3,nx-2,ny-2)
+  end subroutine calc_force
 end module set
 

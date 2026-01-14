@@ -8,7 +8,7 @@ program main
   use set_coordinate
   use calc_time_dev
   implicit none
-  integer i, j, l, mygpu, m, s, nx, ny, nz, ios
+  integer i, j, l, mygpu, m, s, nx, ny, nz, ios, errorcode
   real(8) Lx, Ly, Lz, t_start, t_end
   real(8), allocatable :: x(:), dx(:), y(:), dy(:), z(:), dz(:), Jacobian(:,:), Q(:,:,:,:)
   character(len=8) header
@@ -52,6 +52,7 @@ program main
       open(10, file=filename, action="read", form="unformatted", access="sequential", status="old", iostat=ios)
       if (ios /= 0) then
         print *, "Error opening file."
+        call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
         stop
       endif
       read(10, iostat=ios) header

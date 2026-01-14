@@ -8,7 +8,7 @@ program main
   use set_coordinate
   use calc_time_dev
   implicit none
-  integer i, j, l, m, s, mygpu, ios
+  integer i, j, l, m, s, mygpu, ios, errorcode
   real(8) t_start, t_end
   real(8), allocatable :: x(:), dx(:), y(:), dy(:), z(:), dz(:), Jacobian(:,:), Q(:,:,:,:)
   character(len=8) header
@@ -24,20 +24,32 @@ program main
 
   print *, "my rank is", myrank
   if (mod(myrank,2) == 0) then
-    call set_block(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, threadsG, threadsGv, &
-                   blocks, blocksE, blocksEv, blocksF, blocksFv, blocksG, blocksGv)
+    if (dimension == 3) then
+      call set_block3(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, threadsG, threadsGv, &
+                      blocks, blocksE, blocksEv, blocksF, blocksFv, blocksG, blocksGv)
+    else
+      call set_block2(nx, ny, threads, threadsE, threadsEv, threadsF, threadsFv, &
+                      blocks, blocksE, blocksEv, blocksF, blocksFv)
+    endif
   endif
-  allocate(Q(dimension+2,nx,ny,nz), x(nx), dx(nx-1), y(ny), dy(ny-1), z(nz), dz(nz-1), Jacobian(nx,ny))
+  if (dimension == 3) then
+    allocate(Q(dimension+2,nx,ny,nz), x(nx), dx(nx-1), y(ny), dy(ny-1), z(nz), dz(nz-1), Jacobian(nx,ny))
+    call set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
+    call set_Jacobian_xy3(nx, ny, nz, dx, dy, dz, Jacobian)
+  else
+    allocate(Q(dimension+2,nx,ny, 1), x(nx), dx(nx-1), y(ny), dy(ny-1), z(1),  dz(1), Jacobian(nx,ny))
+    z(1) = 0.d0; dz(1) = 1.d0
+    call set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
+    call set_Jacobian_xy2(nx, ny, dx, dy, Jacobian)
+  endif
 
-  ! set grid information
-  call set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
-  call set_Jacobian_xy(nx, ny, nz, dx, dy, dz, Jacobian)
   if (mod(myrank,2) == 0) then
     if (kind(id_recal) == 4) then
       write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"
       open(10, file=filename, action="read", form="unformatted", access="sequential", status="old", iostat=ios)
       if (ios /= 0) then
         print *, "Error opening file."
+        call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
         stop
       endif
       read(10, iostat=ios) header

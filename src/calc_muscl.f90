@@ -13,6 +13,13 @@ module calc_muscl
     module procedure MUSCL4thnonTVD, MUSCL4thTVD, MUSCL4thThreshold
   end interface
 
+  interface calc_4points
+    module procedure calc_4points_2d, calc_4points_3d
+  end interface
+  
+  interface calc_6points
+    module procedure calc_6points_2d, calc_6points_3d
+  end interface
 contains
   !dir$ inline
   attributes(device) function minmod2(x, y) result(ans)
@@ -156,7 +163,7 @@ contains
     alr  = MUSCL4th(id_tvd, sensor, a(3), a(4), d)
   end function delta6
 
-  attributes(device) subroutine calc_4points(sensor, rho, u, v, w, p, rho2, p2, V2)
+  attributes(device) subroutine calc_4points_3d(sensor, rho, u, v, w, p, rho2, p2, V2)
     real(8), intent(in), value   :: sensor
     real(8), intent(in)          :: rho(4), u(4), v(4), w(4), p(4)
     real(8), intent(out), device :: rho2(2), p2(2), V2(2,3)
@@ -165,9 +172,19 @@ contains
     V2(:,2) = delta4(sensor, v)
     V2(:,3) = delta4(sensor, w)
     p2(:)   = delta4(sensor, p)
-  end subroutine calc_4points
+  end subroutine calc_4points_3d
 
-  attributes(device) subroutine calc_6points(sensor, rho, u, v, w, p, rho2, p2, V2)
+  attributes(device) subroutine calc_4points_2d(sensor, rho, u, v, p, rho2, p2, V2)
+    real(8), intent(in), value   :: sensor
+    real(8), intent(in)          :: rho(4), u(4), v(4), p(4)
+    real(8), intent(out), device :: rho2(2), p2(2), V2(2,2)
+    rho2(:) = delta4(sensor, rho)
+    V2(:,1) = delta4(sensor, u)
+    V2(:,2) = delta4(sensor, v)
+    p2(:)   = delta4(sensor, p)
+  end subroutine calc_4points_2d
+ 
+  attributes(device) subroutine calc_6points_3d(sensor, rho, u, v, w, p, rho2, p2, V2)
     real(8), intent(in), value   :: sensor
     real(8), intent(in)          :: rho(6), u(6), v(6), w(6), p(6)
     real(8), intent(out), device :: rho2(2), p2(2), V2(2,3)
@@ -176,6 +193,16 @@ contains
     V2(:,2) = delta6(sensor, v)
     V2(:,3) = delta6(sensor, w)
     p2(:)   = delta6(sensor, p)
-  end subroutine calc_6points
+  end subroutine calc_6points_3d
+ 
+  attributes(device) subroutine calc_6points_2d(sensor, rho, u, v, p, rho2, p2, V2)
+    real(8), intent(in), value   :: sensor
+    real(8), intent(in)          :: rho(6), u(6), v(6), p(6)
+    real(8), intent(out), device :: rho2(2), p2(2), V2(2,2)
+    rho2(:) = delta6(sensor, rho)
+    V2(:,1) = delta6(sensor, u)
+    V2(:,2) = delta6(sensor, v)
+    p2(:)   = delta6(sensor, p)
+  end subroutine calc_6points_2d
 end module calc_muscl
 

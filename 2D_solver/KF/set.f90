@@ -14,32 +14,24 @@ contains
 
 
   subroutine set_init(myrank, nx, ny, nz, x, y, z, Q)
-    use mod_globals, only : pi, M0, rho0, u0, d1, d2
+    use mod_globals, only : rho0, p0
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
     real(8), intent(out) :: Q(4,nx,ny)
     integer i, j
-    real(8) :: p = rho0 * u0**2 / (gamma * M0**2)
     do j = 1, ny
       do i = 1, nx
-        if (y(j) <= pi) then
-          Q(1,i,j) = rho0
-          Q(2,i,j) = rho0 * u0 * tanh((y(j) - 0.5d0 * pi) / d1)
-          Q(3,i,j) = rho0 * u0 * d2 * sin(x(i))
-          Q(4,i,j) = p / (gamma - 1.d0) + 0.5d0 * (Q(2,i,j)**2 + Q(3,i,j)**2) / Q(1,i,j)
-        else
-          Q(1,i,j) = rho0
-          Q(2,i,j) = rho0 * u0 * tanh((1.5d0 * pi - y(j)) / d1)
-          Q(3,i,j) = rho0 * u0 * d2 * sin(x(i))
-          Q(4,i,j) = p / (gamma - 1.d0) + 0.5d0 * (Q(2,i,j)**2 + Q(3,i,j)**2) / Q(1,i,j)
-        endif
+        Q(1,i,j) = rho0
+        Q(2,i,j) = 0.d0
+        Q(3,i,j) = 0.d0
+        Q(4,i,j) = p0 / (gamma - 1.d0)
     enddo;enddo
   end subroutine set_init
 
 
   subroutine set_bc(myrank, nx, ny, x, y, Jacobian, Q)
     integer, intent(in), value     :: myrank, nx, ny
-    real(8), intent(in), device    :: x(nx), y(ny)
+    real(8), intent(in)            :: x(nx), y(ny)
     real(8), intent(in), device    :: Jacobian(nx,ny)
     real(8), intent(inout), device :: Q(4,nx,ny)
     call set_bc_cyclic(id_accuracy, nx, ny, Q)
@@ -51,6 +43,14 @@ contains
     real(8), intent(in), device  :: x(nx), y(ny), dx(nx-1), dy(ny-1)
     real(8), intent(in), device  :: Q(4,nx,ny)
     real(8), intent(out), device :: Fout(3,nx-2,ny-2)
+    real(8) y
+    integer i, j
+    i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1 
+    j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
+    if (nx-1 < i .or. ny-1 < j) return
+    Fout(1,i-1,j-1) = U0 * sin(y(j))
+    Fout(2,i-1,j-1) = 0.d0
+    Fout(3,i-1,j-1) = Q(2,i,j) * Fout(1,i-1,j-1)! + Q(3,i,j) * Fout(2,i-1,j-1)
   end subroutine calc_force
 end module set
 

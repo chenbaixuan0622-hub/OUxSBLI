@@ -1,8 +1,9 @@
 module set
   use cudafor
   use mpi
-  use mod_globals, only : id_rescale, ny1, nre2, gamma, R, Cp, Pr, u0, p0, T0, M0, blt, beta, ny2, rho2, p2, ux, uy, rf, Taw
-  use mod_constant, only : Cp, gamma_1, over_gamma_1
+  use mod_globals, only : id_rescale, ny1, nre2, gamma, R, Cp, Pr, u0, p0, T0, M0, blt, beta, &
+                          ny2, rho2, p2, ux, uy, rf, Taw, rho3, p3, ux3, uy3
+  use mod_constant, only : Cp, gamma_1, over_gamma, over_gamma_1
   use set_bc_common
   use set_bc_tbl_sbli
   use set_init_common
@@ -85,6 +86,31 @@ contains
   end subroutine set_init
 
 
+  subroutine set_bc_Gaussian(nx, ny, nz, nxg, Jacobian, QJ)
+    integer, intent(in), value     :: nx, ny, nz, nxg
+    real(8), intent(in), device    :: Jacobian(nx,ny)
+    real(8), intent(inout), device :: QJ(5,nx,ny,nz)
+    real(8), device :: tmp(4)
+    integer i, k, l
+    ! y direction one-sided
+    !$cuf kernel do(2)<<<*,*>>>
+    do k = 1, nz
+      do i = nxg, nx
+        do l = 1, 5
+          tmp(:) = QJ(l,i,ny-3:ny,k) * Jacobian(i,ny-3:ny)
+          QJ(l,i,ny,k) = (0.05d0 * tmp(1) + 0.15d0 * tmp(2) + 0.3d0 * tmp(3) + 0.5d0 * tmp(4)) / Jacobian(i,ny)
+    enddo;enddo;enddo
+    ! x direction one-sided
+    !$cuf kernel do(2)<<<*,*>>>
+    do k = 1, nz
+      do i = nxg, nx
+        do l = 1, 5
+          tmp(:) = QJ(l,i-3:i,ny,k) * Jacobian(i-3:i,ny)
+          QJ(l,i,ny,k) = (0.05d0 * tmp(1) + 0.15d0 * tmp(2) + 0.3d0 * tmp(3) + 0.5d0 * tmp(4)) / Jacobian(i,ny)
+    enddo;enddo;enddo
+  end subroutine set_bc_Gaussian
+
+
   subroutine set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
     integer, intent(in), value     :: myrank, nx, ny, nz
     real(8), intent(in), device    :: Jacobian(nx,ny)
@@ -102,7 +128,7 @@ contains
     real(8), parameter :: T    = Taw - rf * u0**2 / (2.d0 * Cp)
     real(8), parameter :: rho0 = p0 / (R * T)
     real(8), parameter :: c0   = sqrt(gamma * p0 / rho0)
-    real(8), parameter :: c2   = sqrt(gamma * p2 / rho2)
+    real(8), parameter :: c3   = sqrt(gamma * p3 / rho3)
     if (myrank == 0) then
       if (kind(id_rescale) == 4) then
         !$cuf kernel do(2)<<<*,*>>>
@@ -209,12 +235,12 @@ contains
             rhoin = QJ(1,i,ny-1,k) * Jacobian(i,ny-1)
             cin   = sqrt(gamma * pin / rhoin)
             Rp    = vin + 2.d0 * cin * over_gamma_1
-            Rm    = v0  - 2.d0 * c2  * over_gamma_1
+            Rm    = uy3 - 2.d0 * c3  * over_gamma_1
             vb    = 0.5d0 * (Rp + Rm)
             cb    = 0.25d0 * gamma_1 * (Rp - Rm)
             rhob  = cin * rhoin / cb
-            pb    = (rhob * cb**2) / gamma
-            ub    = sqrt(2.d0 * gamma * (p2 / rho2 - pb / rhob) * over_gamma_1 + ux**2 + uy**2 - vb**2)
+            pb    = (rhob * cb**2) * over_gamma
+            ub    = sqrt(2.d0 * gamma * (p3 / rho3 - pb / rhob) * over_gamma_1 + ux3**2 + uy3**2 - vb**2)
             QJ(1,i,ny,k) = rhob * Jacobian_tmp
             QJ(2,i,ny,k) = rhob * ub * Jacobian_tmp
             QJ(3,i,ny,k) = rhob * vb * Jacobian_tmp
@@ -225,6 +251,7 @@ contains
     endif
 
     call set_bc_cyclic_z(nx, ny, nz, QJ)
+    call set_bc_Gaussian(nx, ny, nz, int(0.5d0 * nx), Jacobian, QJ)
 
     if (myrank == 0) then
       call MPI_WAIT(ireq, istat, ierr)

@@ -1,6 +1,10 @@
 module set_bc_common
   use mod_globals, only : nx, ny, nz
   implicit none
+  interface set_bc_cyclic_init
+    module procedure set_bc_cyclic2_init, set_bc_cyclic4_init, set_bc_cyclic6_init
+  end interface set_bc_cyclic_init
+  
   interface set_bc_cyclic
     module procedure set_bc_cyclic2, set_bc_cyclic4, set_bc_cyclic6
   end interface set_bc_cyclic
@@ -24,6 +28,7 @@ contains
     Q(:,nx,ny) = Q(:,2,2)
   end subroutine set_bc_cyclic2_init 
 
+
   subroutine set_bc_cyclic4_init(id_accuracy, nx, ny, Q)
     integer(kind=4), intent(in), value :: id_accuracy
     integer, intent(in), value         :: nx, ny
@@ -42,7 +47,8 @@ contains
     Q(:,1:2,ny-1:ny) = Q(:,nx-3:nx-2,3:4)
     Q(:,nx-1:nx,ny-1:ny) = Q(:,3:4,3:4)
   end subroutine set_bc_cyclic4_init
-  
+
+
   subroutine set_bc_cyclic6_init(id_accuracy, nx, ny, Q)
     integer(kind=8), intent(in), value :: id_accuracy
     integer, intent(in), value         :: nx, ny
@@ -61,7 +67,8 @@ contains
     Q(:,1:3,ny-2:ny) = Q(:,nx-5:nx-3,4:6)
     Q(:,nx-2:nx,ny-2:ny) = Q(:,4:6,4:6)
   end subroutine set_bc_cyclic6_init
-  
+
+
   subroutine set_bc_cyclic2(id_accuracy, nx, ny, Q)
     integer(kind=2), intent(in), value :: id_accuracy
     integer, intent(in), value         :: nx, ny
@@ -87,6 +94,7 @@ contains
       Q(l,nx,ny) = Q(l,2,2)
     enddo
   end subroutine set_bc_cyclic2
+
 
   subroutine set_bc_cyclic4(id_accuracy, nx, ny, Q)
     integer(kind=4), intent(in), value :: id_accuracy
@@ -129,6 +137,7 @@ contains
         Q(l,nx,ny)     = Q(l,4,4)
     enddo
   end subroutine set_bc_cyclic4
+
 
   subroutine set_bc_cyclic6(id_accuracy, nx, ny, Q)
     integer(kind=8), intent(in), value :: id_accuracy

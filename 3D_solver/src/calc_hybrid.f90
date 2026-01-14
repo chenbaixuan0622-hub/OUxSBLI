@@ -32,6 +32,7 @@ contains
     dvdz = (-Q(3,i,j,k-1) + Q(3,i,j,k+1)) * dz_tmp
     dwdz = (-Q(4,i,j,k-1) + Q(4,i,j,k+1)) * dz_tmp
     div = dudx + dvdy + dwdz
+    div = min(div, 0.d0)
     rot(1) = dwdy - dvdz
     rot(2) = dudz - dwdx
     rot(3) = dvdx - dudy
@@ -60,6 +61,7 @@ contains
     endif
   end subroutine calc_Ducros
 
+
   attributes(device) function Albada(e, rho) result(phi)
     real(8), intent(in), dimension(4), device :: e, rho
     real(8) :: d1, d2, d3, phim, phip, phi, eps = 1.d-16
@@ -71,11 +73,13 @@ contains
     phi  = max(min(1.d0 - min(phim, phip), 1.d0), 0.d0)
   end function Albada
 
+
   attributes(device) function sigmoid(x) result(ans)
     real(8), intent(in), value :: x
     real(8) :: ans
     ans = 0.5d0 * (tanh(10.d0 * (x - 0.5d0)) + 1.d0)
   end function sigmoid
+
 
   attributes(device) function wiggle_detector(phi) result(ans)
     real(8), intent(in), device :: phi(4)

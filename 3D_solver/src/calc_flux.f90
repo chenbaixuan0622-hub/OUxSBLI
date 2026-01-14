@@ -1,5 +1,5 @@
 module calc_flux
-  use mod_globals, only : id_scheme, id_sensor, id_muscl, gamma, threshold, threadsE, threadsF, threadsG
+  use mod_globals, only : id_scheme, id_sensor, id_muscl, id_igr, gamma, threshold, threadsE, threadsF, threadsG
   use calc_keep
   use calc_slau
   use calc_roe
@@ -61,6 +61,36 @@ contains
     real(8), intent(out), contiguous   :: F(5)
     F = KEEP2(rho, u, v, w, uu, p, T, Normal)
   end subroutine flux_KEEP2
+
+
+  attributes(device) subroutine flux_KEEP_IGR6(id, rho, u, v, w, uu, p, T, sigma, Normal, sensor, F)
+    integer, intent(in), value       :: id
+    real(8), intent(in), contiguous  :: rho(6), u(6), v(6), w(6), uu(6), p(6), T(6), sigma(6)
+    real(8), intent(in), contiguous  :: Normal(5)
+    real(8), intent(in), value       :: sensor
+    real(8), intent(out), contiguous :: F(5)
+    F = KEEP_IGR6(rho, u, v, w, uu, p, T, sigma, Normal)
+  end subroutine flux_KEEP_IGR6
+
+
+  attributes(device) subroutine flux_KEEP_IGR4(id, rho, u, v, w, uu, p, T, sigma, Normal, sensor, F)
+    integer, intent(in), value       :: id
+    real(8), intent(in), contiguous  :: rho(4), u(4), v(4), w(4), uu(4), p(4), T(4), sigma(4)
+    real(8), intent(in), contiguous  :: Normal(5)
+    real(8), intent(in), value       :: sensor
+    real(8), intent(out), contiguous :: F(5)
+    F = KEEP_IGR4(rho, u, v, w, uu, p, T, sigma, Normal)
+  end subroutine flux_KEEP_IGR4
+
+
+  attributes(device) subroutine flux_KEEP_IGR2(id, rho, u, v, w, uu, p, T, sigma, Normal, sensor, F)
+    integer, intent(in), value       :: id
+    real(8), intent(in), contiguous  :: rho(2), u(2), v(2), w(2), uu(2), p(2), T(2), sigma(2)
+    real(8), intent(in), contiguous  :: Normal(5)
+    real(8), intent(in), value       :: sensor
+    real(8), intent(out), contiguous :: F(5)
+    F = KEEP_IGR2(rho, u, v, w, uu, p, T, sigma, Normal)
+  end subroutine flux_KEEP_IGR2
 
 
   attributes(device) subroutine flux_SLAU6(id_scheme, id, rho, u, v, w, uu, p, T, Normal, sensor, F)
@@ -329,14 +359,15 @@ contains
   end subroutine flux_Threshold2
 
 
-  attributes(global) subroutine calc_E6(id_accuracy, nx, ny, nz, Q, T, sensor, E)
+  attributes(global) subroutine calc_E6(id_accuracy, nx, ny, nz, Q, T, sensor, E, sigma)
     use mod_globals, only  : id_scheme
     use mod_constant, only : Normal_x
     integer(kind=8), intent(in), value                 :: id_accuracy
     integer, intent(in), value                         :: nx, ny, nz
     real(8), intent(in), dimension(5,nx,ny,nz), device :: Q
     real(8), intent(in), dimension(nx,ny,nz), device   :: T, sensor
-    real(8), intent(out), device :: E(5,nx-1,ny-2,nz-2)
+    real(8), intent(out), device                       :: E(5,nx-1,ny-2,nz-2)
+    real(4), intent(in), device, optional              :: sigma(nx,ny,nz)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(-1:threadsE%x+3,threadsE%y,threadsE%z), shared :: rho, u, v, w, p
     real(8) fdx, tmp(6)
@@ -363,29 +394,57 @@ contains
     associate(uu => u)
     if (3 <= i .and. i <= nx-3 .and. 8 <= kind(id_accuracy)) then
       tmp(:) = T(i-2:i+3,j,k)
-      call flux6(id_scheme,1,rho(it-2:it+3,jt,kt),u(it-2:it+3,jt,kt),v(it-2:it+3,jt,kt),w(it-2:it+3,jt,kt),&
-                 uu(it-2:it+3,jt,kt),p(it-2:it+3,jt,kt),tmp,Normal_x,fdx,E(:,i,j-1,k-1))
+      if (kind(id_igr) == 4) then
+        block
+          real(8), device :: sig(6)
+          sig = dble(sigma(i-2:i+3,j,k))
+          call flux_KEEP_IGR6(1,rho(it-2:it+3,jt,kt),u(it-2:it+3,jt,kt),v(it-2:it+3,jt,kt),w(it-2:it+3,jt,kt),&
+                              uu(it-2:it+3,jt,kt),p(it-2:it+3,jt,kt),tmp,sig,Normal_x,fdx,E(:,i,j-1,k-1))
+        end block
+      else
+        call flux6(id_scheme,1,rho(it-2:it+3,jt,kt),u(it-2:it+3,jt,kt),v(it-2:it+3,jt,kt),w(it-2:it+3,jt,kt),&
+                   uu(it-2:it+3,jt,kt),p(it-2:it+3,jt,kt),tmp,Normal_x,fdx,E(:,i,j-1,k-1))
+      endif
     elseif (2 <= i .and. i <= nx-2) then
       tmp(2:5) = T(i-1:i+2,j,k)
-      call flux4(id_scheme,1,rho(it-1:it+2,jt,kt),u(it-1:it+2,jt,kt),v(it-1:it+2,jt,kt),w(it-1:it+2,jt,kt),&
-                 uu(it-1:it+2,jt,kt),p(it-1:it+2,jt,kt),tmp(2:5),Normal_x,fdx,E(:,i,j-1,k-1))
+      if (kind(id_igr) == 4) then
+        block
+          real(8), device :: sig(4)
+          sig = dble(sigma(i-1:i+2,j,k))
+          call flux_KEEP_IGR4(1,rho(it-1:it+2,jt,kt),u(it-1:it+2,jt,kt),v(it-1:it+2,jt,kt),w(it-1:it+2,jt,kt),&
+                              uu(it-1:it+2,jt,kt),p(it-1:it+2,jt,kt),tmp(2:5),sig,Normal_x,fdx,E(:,i,j-1,k-1))
+        end block
+      else
+        call flux4(id_scheme,1,rho(it-1:it+2,jt,kt),u(it-1:it+2,jt,kt),v(it-1:it+2,jt,kt),w(it-1:it+2,jt,kt),&
+                   uu(it-1:it+2,jt,kt),p(it-1:it+2,jt,kt),tmp(2:5),Normal_x,fdx,E(:,i,j-1,k-1))
+      endif
     else
       tmp(3:4) = T(i:i+1,j,k)
-      call flux2(id_scheme,1,rho(it:it+1,jt,kt),u(it:it+1,jt,kt),v(it:it+1,jt,kt),w(it:it+1,jt,kt),&
-                 uu(it:it+1,jt,kt),p(it:it+1,jt,kt),tmp(3:4),Normal_x,fdx,E(:,i,j-1,k-1))
+      if (kind(id_igr) == 4) then
+        block
+          real(8), device :: sig(2)
+          sig = dble(sigma(i:i+1,j,k))
+          call flux_KEEP_IGR2(1,rho(it:it+1,jt,kt),u(it:it+1,jt,kt),v(it:it+1,jt,kt),w(it:it+1,jt,kt),&
+                              uu(it:it+1,jt,kt),p(it:it+1,jt,kt),tmp(3:4),sig,Normal_x,fdx,E(:,i,j-1,k-1))
+        end block
+      else
+        call flux2(id_scheme,1,rho(it:it+1,jt,kt),u(it:it+1,jt,kt),v(it:it+1,jt,kt),w(it:it+1,jt,kt),&
+                   uu(it:it+1,jt,kt),p(it:it+1,jt,kt),tmp(3:4),Normal_x,fdx,E(:,i,j-1,k-1))
+      endif
     endif
     end associate
   end subroutine calc_E6
 
 
-  attributes(global) subroutine calc_F6(id_accuracy, nx, ny, nz, Q, T, sensor, F)
+  attributes(global) subroutine calc_F6(id_accuracy, nx, ny, nz, Q, T, sensor, F, sigma)
     use mod_globals, only  : id_scheme
     use mod_constant, only : Normal_y
     integer(kind=8), intent(in), value                 :: id_accuracy
     integer, intent(in), value                         :: nx, ny, nz
     real(8), intent(in), dimension(5,nx,ny,nz), device :: Q
     real(8), intent(in), dimension(nx,ny,nz), device   :: T, sensor
-    real(8), intent(out), device :: F(5,nx-2,ny-1,nz-2)
+    real(8), intent(out), device                       :: F(5,nx-2,ny-1,nz-2)
+    real(4), intent(in), device, optional              :: sigma(nx,ny,nz)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(-1:threadsF%y+3,threadsF%x,threadsF%z), shared :: rho, u, v, w, p
     real(8) fdy, tmp(6)
@@ -412,29 +471,57 @@ contains
     associate(vv => v)
     if (3 <= j .and. j <= ny-3 .and. 8 <= kind(id_accuracy)) then
       tmp(:) = T(i,j-2:j+3,k)
-      call flux6(id_scheme,2,rho(jt-2:jt+3,it,kt),u(jt-2:jt+3,it,kt),v(jt-2:jt+3,it,kt),w(jt-2:jt+3,it,kt),&
-                 vv(jt-2:jt+3,it,kt),p(jt-2:jt+3,it,kt),tmp,Normal_y,fdy,F(:,i-1,j,k-1))
+      if (kind(id_igr) == 4) then
+        block
+          real(8), device :: sig(6)
+          sig = dble(sigma(i,j-2:j+3,k))
+          call flux_KEEP_IGR6(2,rho(jt-2:jt+3,it,kt),u(jt-2:jt+3,it,kt),v(jt-2:jt+3,it,kt),w(jt-2:jt+3,it,kt),&
+                              vv(jt-2:jt+3,it,kt),p(jt-2:jt+3,it,kt),tmp,sig,Normal_y,fdy,F(:,i-1,j,k-1))
+        end block
+      else
+        call flux6(id_scheme,2,rho(jt-2:jt+3,it,kt),u(jt-2:jt+3,it,kt),v(jt-2:jt+3,it,kt),w(jt-2:jt+3,it,kt),&
+                   vv(jt-2:jt+3,it,kt),p(jt-2:jt+3,it,kt),tmp,Normal_y,fdy,F(:,i-1,j,k-1))
+      endif
     elseif (2 <= j .and. j <= ny-2) then
       tmp(2:5) = T(i,j-1:j+2,k)
-      call flux4(id_scheme,2,rho(jt-1:jt+2,it,kt),u(jt-1:jt+2,it,kt),v(jt-1:jt+2,it,kt),w(jt-1:jt+2,it,kt),&
-                 vv(jt-1:jt+2,it,kt),p(jt-1:jt+2,it,kt),tmp(2:5),Normal_y,fdy,F(:,i-1,j,k-1))
+      if (kind(id_igr) == 4) then
+        block
+          real(8), device :: sig(4)
+          sig = dble(sigma(i,j-1:j+2,k))
+          call flux_KEEP_IGR4(2,rho(jt-1:jt+2,it,kt),u(jt-1:jt+2,it,kt),v(jt-1:jt+2,it,kt),w(jt-1:jt+2,it,kt),&
+                              vv(jt-1:jt+2,it,kt),p(jt-1:jt+2,it,kt),tmp(2:5),sig,Normal_y,fdy,F(:,i-1,j,k-1))
+        end block
+      else
+        call flux4(id_scheme,2,rho(jt-1:jt+2,it,kt),u(jt-1:jt+2,it,kt),v(jt-1:jt+2,it,kt),w(jt-1:jt+2,it,kt),&
+                   vv(jt-1:jt+2,it,kt),p(jt-1:jt+2,it,kt),tmp(2:5),Normal_y,fdy,F(:,i-1,j,k-1))
+      endif
     else
       tmp(3:4) = T(i,j:j+1,k)
-      call flux2(id_scheme,2,rho(jt:jt+1,it,kt),u(jt:jt+1,it,kt),v(jt:jt+1,it,kt),w(jt:jt+1,it,kt),&
-                 vv(jt:jt+1,it,kt),p(jt:jt+1,it,kt),tmp(3:4),Normal_y,fdy,F(:,i-1,j,k-1))
+      if (kind(id_igr) == 4) then
+        block
+          real(8), device :: sig(2)
+          sig = dble(sigma(i,j:j+1,k))
+          call flux_KEEP_IGR2(2,rho(jt:jt+1,it,kt),u(jt:jt+1,it,kt),v(jt:jt+1,it,kt),w(jt:jt+1,it,kt),&
+                              vv(jt:jt+1,it,kt),p(jt:jt+1,it,kt),tmp(3:4),sig,Normal_y,fdy,F(:,i-1,j,k-1))
+        end block
+      else
+        call flux2(id_scheme,2,rho(jt:jt+1,it,kt),u(jt:jt+1,it,kt),v(jt:jt+1,it,kt),w(jt:jt+1,it,kt),&
+                   vv(jt:jt+1,it,kt),p(jt:jt+1,it,kt),tmp(3:4),Normal_y,fdy,F(:,i-1,j,k-1))
+      endif
     endif
     end associate
   end subroutine calc_F6
 
 
-  attributes(global) subroutine calc_G6(id_accuracy, nx, ny, nz, Q, T, sensor, G)
+  attributes(global) subroutine calc_G6(id_accuracy, nx, ny, nz, Q, T, sensor, G, sigma)
     use mod_globals, only  : id_scheme
     use mod_constant, only : Normal_z
     integer(kind=8), intent(in), value                 :: id_accuracy
     integer, intent(in), value                         :: nx, ny, nz
     real(8), intent(in), dimension(5,nx,ny,nz), device :: Q
     real(8), intent(in), dimension(nx,ny,nz), device   :: T, sensor
-    real(8), intent(out), device :: G(5,nx-2,ny-2,nz-1)
+    real(8), intent(out), device                       :: G(5,nx-2,ny-2,nz-1)
+    real(4), intent(in), device, optional              :: sigma(nx,ny,nz)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(-1:threadsG%z+3,threadsG%y,threadsG%x), shared :: rho, u, v, w, p
     real(8) :: fdz, tmp(6)
@@ -461,29 +548,57 @@ contains
     associate(ww => w)
     if (3 <= k .and. k <= nz-3 .and. 8 <= kind(id_accuracy)) then
       tmp(:) = T(i,j,k-2:k+3)
-      call flux6(id_scheme,3,rho(kt-2:kt+3,jt,it),u(kt-2:kt+3,jt,it),v(kt-2:kt+3,jt,it),w(kt-2:kt+3,jt,it),&
-                 ww(kt-2:kt+3,jt,it),p(kt-2:kt+3,jt,it),tmp,Normal_z,fdz,G(:,i-1,j-1,k))
+      if (kind(id_igr) == 4) then
+        block
+          real(8), device :: sig(6)
+          sig = dble(sigma(i,j,k-2:k+3))
+          call flux_KEEP_IGR6(3,rho(kt-2:kt+3,jt,it),u(kt-2:kt+3,jt,it),v(kt-2:kt+3,jt,it),w(kt-2:kt+3,jt,it),&
+                              ww(kt-2:kt+3,jt,it),p(kt-2:kt+3,jt,it),tmp,sig,Normal_z,fdz,G(:,i-1,j-1,k))
+        end block
+      else
+        call flux6(id_scheme,3,rho(kt-2:kt+3,jt,it),u(kt-2:kt+3,jt,it),v(kt-2:kt+3,jt,it),w(kt-2:kt+3,jt,it),&
+                   ww(kt-2:kt+3,jt,it),p(kt-2:kt+3,jt,it),tmp,Normal_z,fdz,G(:,i-1,j-1,k))
+      endif
     elseif (2 <= k .and. k <= nz-2) then
       tmp(2:5) = T(i,j,k-1:k+2)
-      call flux4(id_scheme,3,rho(kt-1:kt+2,jt,it),u(kt-1:kt+2,jt,it),v(kt-1:kt+2,jt,it),w(kt-1:kt+2,jt,it),&
-                 ww(kt-1:kt+2,jt,it),p(kt-1:kt+2,jt,it),tmp(2:5),Normal_z,fdz,G(:,i-1,j-1,k))
+      if (kind(id_igr) == 4) then
+        block
+          real(8), device :: sig(4)
+          sig = dble(sigma(i,j,k-1:k+2))
+          call flux_KEEP_IGR4(3,rho(kt-1:kt+2,jt,it),u(kt-1:kt+2,jt,it),v(kt-1:kt+2,jt,it),w(kt-1:kt+2,jt,it),&
+                              ww(kt-1:kt+2,jt,it),p(kt-1:kt+2,jt,it),tmp(2:5),sig,Normal_z,fdz,G(:,i-1,j-1,k))
+        end block
+      else
+        call flux4(id_scheme,3,rho(kt-1:kt+2,jt,it),u(kt-1:kt+2,jt,it),v(kt-1:kt+2,jt,it),w(kt-1:kt+2,jt,it),&
+                   ww(kt-1:kt+2,jt,it),p(kt-1:kt+2,jt,it),tmp(2:5),Normal_z,fdz,G(:,i-1,j-1,k))
+      endif
     else
       tmp(3:4) = T(i,j,k:k+1)
-      call flux2(id_scheme,3,rho(kt:kt+1,jt,it),u(kt:kt+1,jt,it),v(kt:kt+1,jt,it),w(kt:kt+1,jt,it),&
-                 ww(kt:kt+1,jt,it),p(kt:kt+1,jt,it),tmp(3:4),Normal_z,fdz,G(:,i-1,j-1,k))
+      if (kind(id_igr) == 4) then
+        block
+          real(8), device :: sig(2)
+          sig = dble(sigma(i,j,k:k+1))
+          call flux_KEEP_IGR2(3,rho(kt:kt+1,jt,it),u(kt:kt+1,jt,it),v(kt:kt+1,jt,it),w(kt:kt+1,jt,it),&
+                              ww(kt:kt+1,jt,it),p(kt:kt+1,jt,it),tmp(3:4),sig,Normal_z,fdz,G(:,i-1,j-1,k))
+        end block
+      else
+        call flux2(id_scheme,3,rho(kt:kt+1,jt,it),u(kt:kt+1,jt,it),v(kt:kt+1,jt,it),w(kt:kt+1,jt,it),&
+                   ww(kt:kt+1,jt,it),p(kt:kt+1,jt,it),tmp(3:4),Normal_z,fdz,G(:,i-1,j-1,k))
+      endif
     endif
     end associate
   end subroutine calc_G6
 
 
-  attributes(global) subroutine calc_E4(id_accuracy, nx, ny, nz, Q, T, sensor, E)
+  attributes(global) subroutine calc_E4(id_accuracy, nx, ny, nz, Q, T, sensor, E, sigma)
     use mod_globals, only  : id_scheme
     use mod_constant, only : Normal_x
     integer(kind=4), intent(in), value                 :: id_accuracy
     integer, intent(in), value                         :: nx, ny, nz
     real(8), intent(in), dimension(5,nx,ny,nz), device :: Q
     real(8), intent(in), dimension(nx,ny,nz), device   :: T, sensor
-    real(8), intent(out), device :: E(5,nx-1,ny-2,nz-2)
+    real(8), intent(out), device                       :: E(5,nx-1,ny-2,nz-2)
+    real(4), intent(in), device, optional              :: sigma(nx,ny,nz)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(0:threadsE%x+2,threadsE%y,threadsE%z), shared :: rho, u, v, w, p
     real(8) fdx, tmp(4)
@@ -510,25 +625,44 @@ contains
     associate(uu => u)
     if (2 <= i .and. i <= nx-2) then
       tmp(:) = T(i-1:i+2,j,k)
-      call flux4(id_scheme,1,rho(it-1:it+2,jt,kt),u(it-1:it+2,jt,kt),v(it-1:it+2,jt,kt),w(it-1:it+2,jt,kt),&
-                 uu(it-1:it+2,jt,kt),p(it-1:it+2,jt,kt),tmp,Normal_x,fdx,E(:,i,j-1,k-1))
+      if (kind(id_igr) == 4) then
+        block
+          real(8), device :: sig(4)
+          sig = dble(sigma(i-1:i+2,j,k))
+          call flux_KEEP_IGR4(1,rho(it-1:it+2,jt,kt),u(it-1:it+2,jt,kt),v(it-1:it+2,jt,kt),w(it-1:it+2,jt,kt),&
+                              uu(it-1:it+2,jt,kt),p(it-1:it+2,jt,kt),tmp,sig,Normal_x,fdx,E(:,i,j-1,k-1))
+        end block
+      else
+        call flux4(id_scheme,1,rho(it-1:it+2,jt,kt),u(it-1:it+2,jt,kt),v(it-1:it+2,jt,kt),w(it-1:it+2,jt,kt),&
+                   uu(it-1:it+2,jt,kt),p(it-1:it+2,jt,kt),tmp,Normal_x,fdx,E(:,i,j-1,k-1))
+      endif
     else
       tmp(2:3) = T(i:i+1,j,k)
-      call flux2(id_scheme,1,rho(it:it+1,jt,kt),u(it:it+1,jt,kt),v(it:it+1,jt,kt),w(it:it+1,jt,kt),&
-                 uu(it:it+1,jt,kt),p(it:it+1,jt,kt),tmp(2:3),Normal_x,fdx,E(:,i,j-1,k-1))
+      if (kind(id_igr) == 4) then
+        block
+          real(8), device :: sig(2)
+          sig = dble(sigma(i:i+1,j,k))
+          call flux_KEEP_IGR2(1,rho(it:it+1,jt,kt),u(it:it+1,jt,kt),v(it:it+1,jt,kt),w(it:it+1,jt,kt),&
+                              uu(it:it+1,jt,kt),p(it:it+1,jt,kt),tmp(2:3),sig,Normal_x,fdx,E(:,i,j-1,k-1))
+        end block
+      else
+        call flux2(id_scheme,1,rho(it:it+1,jt,kt),u(it:it+1,jt,kt),v(it:it+1,jt,kt),w(it:it+1,jt,kt),&
+                   uu(it:it+1,jt,kt),p(it:it+1,jt,kt),tmp(2:3),Normal_x,fdx,E(:,i,j-1,k-1))
+      endif
     endif
     end associate
   end subroutine calc_E4
 
 
-  attributes(global) subroutine calc_F4(id_accuracy, nx, ny, nz, Q, T, sensor, F)
+  attributes(global) subroutine calc_F4(id_accuracy, nx, ny, nz, Q, T, sensor, F, sigma)
     use mod_globals, only  : id_scheme
     use mod_constant, only : Normal_y
     integer(kind=4), intent(in), value                 :: id_accuracy
     integer, intent(in), value                         :: nx, ny, nz
     real(8), intent(in), dimension(5,nx,ny,nz), device :: Q
     real(8), intent(in), dimension(nx,ny,nz), device   :: T, sensor
-    real(8), intent(out), device :: F(5,nx-2,ny-1,nz-2)
+    real(8), intent(out), device                       :: F(5,nx-2,ny-1,nz-2)
+    real(4), intent(in), device, optional              :: sigma(nx,ny,nz)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(0:threadsF%y+2,threadsF%x,threadsF%z), shared :: rho, u, v, w, p
     real(8) fdy, tmp(4)
@@ -555,25 +689,44 @@ contains
     associate(vv => v)
     if (2 <= j .and. j <= ny-2) then
       tmp(:) = T(i,j-1:j+2,k)
-      call flux4(id_scheme,2,rho(jt-1:jt+2,it,kt),u(jt-1:jt+2,it,kt),v(jt-1:jt+2,it,kt),w(jt-1:jt+2,it,kt),&
-                 vv(jt-1:jt+2,it,kt),p(jt-1:jt+2,it,kt),tmp,Normal_y,fdy,F(:,i-1,j,k-1))
+      if (kind(id_igr) == 4) then
+        block
+          real(8), device :: sig(4)
+          sig = dble(sigma(i,j-1:j+2,k))
+          call flux_KEEP_IGR4(2,rho(jt-1:jt+2,it,kt),u(jt-1:jt+2,it,kt),v(jt-1:jt+2,it,kt),w(jt-1:jt+2,it,kt),&
+                              vv(jt-1:jt+2,it,kt),p(jt-1:jt+2,it,kt),tmp,sig,Normal_y,fdy,F(:,i-1,j,k-1))
+        end block
+      else
+        call flux4(id_scheme,2,rho(jt-1:jt+2,it,kt),u(jt-1:jt+2,it,kt),v(jt-1:jt+2,it,kt),w(jt-1:jt+2,it,kt),&
+                   vv(jt-1:jt+2,it,kt),p(jt-1:jt+2,it,kt),tmp,Normal_y,fdy,F(:,i-1,j,k-1))
+      endif
     else
       tmp(2:3) = T(i,j:j+1,k)
-      call flux2(id_scheme,2,rho(jt:jt+1,it,kt),u(jt:jt+1,it,kt),v(jt:jt+1,it,kt),w(jt:jt+1,it,kt),&
-                 vv(jt:jt+1,it,kt),p(jt:jt+1,it,kt),tmp(2:3),Normal_y,fdy,F(:,i-1,j,k-1))
+      if (kind(id_igr) == 4) then
+        block
+          real(8), device :: sig(2)
+          sig = dble(sigma(i,j:j+1,k))
+          call flux_KEEP_IGR2(2,rho(jt:jt+1,it,kt),u(jt:jt+1,it,kt),v(jt:jt+1,it,kt),w(jt:jt+1,it,kt),&
+                              vv(jt:jt+1,it,kt),p(jt:jt+1,it,kt),tmp(2:3),sig,Normal_y,fdy,F(:,i-1,j,k-1))
+        end block
+      else
+        call flux2(id_scheme,2,rho(jt:jt+1,it,kt),u(jt:jt+1,it,kt),v(jt:jt+1,it,kt),w(jt:jt+1,it,kt),&
+                   vv(jt:jt+1,it,kt),p(jt:jt+1,it,kt),tmp(2:3),Normal_y,fdy,F(:,i-1,j,k-1))
+      endif
     endif
     end associate
   end subroutine calc_F4
 
 
-  attributes(global) subroutine calc_G4(id_accuracy, nx, ny, nz, Q, T, sensor, G)
+  attributes(global) subroutine calc_G4(id_accuracy, nx, ny, nz, Q, T, sensor, G, sigma)
     use mod_globals, only  : id_scheme
     use mod_constant, only : Normal_z
     integer(kind=4), intent(in), value                 :: id_accuracy
     integer, intent(in), value                         :: nx, ny, nz
     real(8), intent(in), dimension(5,nx,ny,nz), device :: Q
     real(8), intent(in), dimension(nx,ny,nz), device   :: T, sensor
-    real(8), intent(out), device :: G(5,nx-2,ny-2,nz-1)
+    real(8), intent(out), device                       :: G(5,nx-2,ny-2,nz-1)
+    real(4), intent(in), device, optional              :: sigma(nx,ny,nz)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(0:threadsG%z+2,threadsG%y,threadsG%x), shared :: rho, u, v, w, p
     real(8) :: fdz, tmp(4)
@@ -600,25 +753,44 @@ contains
     associate(ww => w)
     if (2 <= k .and. k <= nz-2) then
       tmp(:) = T(i,j,k-1:k+2)
-      call flux4(id_scheme,3,rho(kt-1:kt+2,jt,it),u(kt-1:kt+2,jt,it),v(kt-1:kt+2,jt,it),w(kt-1:kt+2,jt,it),&
-                 ww(kt-1:kt+2,jt,it),p(kt-1:kt+2,jt,it),tmp,Normal_z,fdz,G(:,i-1,j-1,k))
+      if (kind(id_igr) == 4) then
+        block
+          real(8), device :: sig(4)
+          sig = dble(sigma(i,j,k-1:k+2))
+          call flux_KEEP_IGR4(3,rho(kt-1:kt+2,jt,it),u(kt-1:kt+2,jt,it),v(kt-1:kt+2,jt,it),w(kt-1:kt+2,jt,it),&
+                              ww(kt-1:kt+2,jt,it),p(kt-1:kt+2,jt,it),tmp,sig,Normal_z,fdz,G(:,i-1,j-1,k))
+        end block
+      else
+        call flux4(id_scheme,3,rho(kt-1:kt+2,jt,it),u(kt-1:kt+2,jt,it),v(kt-1:kt+2,jt,it),w(kt-1:kt+2,jt,it),&
+                   ww(kt-1:kt+2,jt,it),p(kt-1:kt+2,jt,it),tmp,Normal_z,fdz,G(:,i-1,j-1,k))
+      endif
     else
       tmp(2:3) = T(i,j,k:k+1)
-      call flux2(id_scheme,3,rho(kt:kt+1,jt,it),u(kt:kt+1,jt,it),v(kt:kt+1,jt,it),w(kt:kt+1,jt,it),&
-                 ww(kt:kt+1,jt,it),p(kt:kt+1,jt,it),tmp(2:3),Normal_z,fdz,G(:,i-1,j-1,k))
+      if (kind(id_igr) == 4) then
+        block
+          real(8), device :: sig(2)
+          sig = dble(sigma(i,j,k:k+1))
+          call flux_KEEP_IGR2(3,rho(kt:kt+1,jt,it),u(kt:kt+1,jt,it),v(kt:kt+1,jt,it),w(kt:kt+1,jt,it),&
+                              ww(kt:kt+1,jt,it),p(kt:kt+1,jt,it),tmp(2:3),sig,Normal_z,fdz,G(:,i-1,j-1,k))
+        end block
+      else
+        call flux2(id_scheme,3,rho(kt:kt+1,jt,it),u(kt:kt+1,jt,it),v(kt:kt+1,jt,it),w(kt:kt+1,jt,it),&
+                   ww(kt:kt+1,jt,it),p(kt:kt+1,jt,it),tmp(2:3),Normal_z,fdz,G(:,i-1,j-1,k))
+      endif
     endif
     end associate
   end subroutine calc_G4
 
 
-  attributes(global) subroutine calc_E2(id_accuracy, nx, ny, nz, Q, T, sensor, E)
+  attributes(global) subroutine calc_E2(id_accuracy, nx, ny, nz, Q, T, sensor, E, sigma)
     use mod_globals, only  : id_scheme
     use mod_constant, only : Normal_x
     integer(kind=2), intent(in), value                 :: id_accuracy
     integer, intent(in), value                         :: nx, ny, nz
     real(8), intent(in), dimension(5,nx,ny,nz), device :: Q
     real(8), intent(in), dimension(nx,ny,nz), device   :: T, sensor
-    real(8), intent(out), device :: E(5,nx-1,ny-2,nz-2)
+    real(8), intent(out), device                       :: E(5,nx-1,ny-2,nz-2)
+    real(4), intent(in), device, optional              :: sigma(nx,ny,nz)
     integer i, j, k, it, jt, kt
     real(8), dimension(2), device :: rho, u, v, w, p, tmp
     real(8) fdx
@@ -636,18 +808,28 @@ contains
     w   = Q(4,i:i+1,j,k)
     p   = Q(5,i:i+1,j,k)
     tmp = T(i:i+1,j,k)
-    call flux2(id_scheme, 1, rho, u, v, w, u, p, tmp, Normal_x, fdx, E(:,i,j-1,k-1))
+    if (kind(id_igr) == 4) then
+      block
+        real(8), device :: sig(2)
+        sig = dble(sigma(i:i+1,j,k))
+        sig = sig * sensor(i:i+1,j,k)
+        call flux_KEEP_IGR2(1, rho, u, v, w, u, p, tmp, sig, Normal_x, fdx, E(:,i,j-1,k-1))
+      end block
+    else
+      call flux2(id_scheme, 1, rho, u, v, w, u, p, tmp, Normal_x, fdx, E(:,i,j-1,k-1))
+    endif
   end subroutine calc_E2
 
 
-  attributes(global) subroutine calc_F2(id_accuracy, nx, ny, nz, Q, T, sensor, F)
+  attributes(global) subroutine calc_F2(id_accuracy, nx, ny, nz, Q, T, sensor, F, sigma)
     use mod_globals, only  : id_scheme
     use mod_constant, only : Normal_y
     integer(kind=2), intent(in), value                 :: id_accuracy
     integer, intent(in), value                         :: nx, ny, nz
     real(8), intent(in), dimension(5,nx,ny,nz), device :: Q
     real(8), intent(in), dimension(nx,ny,nz), device   :: T, sensor
-    real(8), intent(out), device :: F(5,nx-2,ny-1,nz-2)
+    real(8), intent(out), device                       :: F(5,nx-2,ny-1,nz-2)
+    real(4), intent(in), device, optional              :: sigma(nx,ny,nz)
     integer i, j, k, it, jt, kt
     real(8), dimension(2), device :: rho, u, v, w, p, tmp
     real(8) fdy
@@ -665,18 +847,28 @@ contains
     w   = Q(4,i,j:j+1,k)
     p   = Q(5,i,j:j+1,k)
     tmp = T(i,j:j+1,k)
-    call flux2(id_scheme, 2, rho, u, v, w, v, p, tmp, Normal_y, fdy, F(:,i-1,j,k-1))
+    if (kind(id_igr) == 4) then
+      block
+        real(8), device :: sig(2)
+        sig = dble(sigma(i,j:j+1,k))
+        sig = sig * sensor(i,j:j+1,k)
+        call flux_KEEP_IGR2(2, rho, u, v, w, v, p, tmp, sig, Normal_y, fdy, F(:,i-1,j,k-1))
+      end block
+    else
+      call flux2(id_scheme, 2, rho, u, v, w, v, p, tmp, Normal_y, fdy, F(:,i-1,j,k-1))
+    endif
   end subroutine calc_F2
 
 
-  attributes(global) subroutine calc_G2(id_accuracy, nx, ny, nz, Q, T, sensor, G)
+  attributes(global) subroutine calc_G2(id_accuracy, nx, ny, nz, Q, T, sensor, G, sigma)
     use mod_globals, only  : id_scheme
     use mod_constant, only : Normal_z
     integer(kind=2), intent(in), value                 :: id_accuracy
     integer, intent(in), value                         :: nx, ny, nz
     real(8), intent(in), dimension(5,nx,ny,nz), device :: Q
     real(8), intent(in), dimension(nx,ny,nz), device   :: T, sensor
-    real(8), intent(out), device :: G(5,nx-2,ny-2,nz-1)
+    real(8), intent(out), device                       :: G(5,nx-2,ny-2,nz-1)
+    real(4), intent(in), device, optional              :: sigma(nx,ny,nz)
     integer i, j, k, it, jt, kt
     real(8), dimension(2), device :: rho, u, v, w, p, tmp
     real(8) :: fdz
@@ -694,7 +886,16 @@ contains
     w   = Q(4,i,j,k:k+1)
     p   = Q(5,i,j,k:k+1)
     tmp = T(i,j,k:k+1)
-    call flux2(id_scheme, 3, rho, u, v, w, w, p, tmp, Normal_z, fdz, G(:,i-1,j-1,k))
+    if (kind(id_igr) == 4) then
+      block
+        real(8), device :: sig(2)
+        sig = dble(sigma(i,j,k:k+1))
+        sig = sig * sensor(i,j,k:k+1)
+        call flux_KEEP_IGR2(3, rho, u, v, w, w, p, tmp, sig, Normal_z, fdz, G(:,i-1,j-1,k))
+      end block
+    else
+      call flux2(id_scheme, 3, rho, u, v, w, w, p, tmp, Normal_z, fdz, G(:,i-1,j-1,k))
+    endif
   end subroutine calc_G2
 end module calc_flux
 
