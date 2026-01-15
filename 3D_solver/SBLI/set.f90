@@ -89,7 +89,7 @@ contains
     real(8), intent(inout), device :: QJ(5,nx,ny,nz) ! Q / Jacobian
     real(8), intent(in), device, optional :: Qre(ny*(nz-6)*5)
     integer i, j, k, l, No, ireq, ierr, istat(MPI_STATUS_SIZE)
-    real(8) :: p_wall
+    real(8) :: p_wall, pre, rho, rhou, rhov, rhow, p, e
     ! Riemann invariants
     real(8) :: rhoin, pin, cin, vin, Rp, Rm, rhob, ub, vb, cb, pb, v0 = 0.d0
     ! parallel
@@ -106,12 +106,23 @@ contains
         !$cuf kernel do(2)<<<*,*>>>
         do k = 1, nz-6
           do j = 2, ny-1
+            ! inlet + damping
+            l   = ny*5*(k-1)+5*(j-1)
+            rho = Qre(l+1); rhou = Qre(l+2); rhov = Qre(l+3); rhow = Qre(l+4); e = Qre(l+5)
+            QJ(1,1,j,k+3) = rho
+            QJ(2,1,j,k+3) = rhou
+            QJ(3,1,j,k+3) = rhov
+            QJ(4,1,j,k+3) = rhow
+            pre = gamma_1 * (e - 0.5d0 * (rhou**2 + rhov**2 + rhow**2) / rho)
+            pin = gamma_1 * (QJ(5,2,j,k+3) - 0.5d0 * &
+                  (QJ(2,2,j,k+3)**2 + QJ(3,2,j,k+3)**2 + QJ(4,2,j,k+3)**2) / QJ(1,2,j,k+3))
+            p   = pre - 0.5d0 * (pre - pin)
+            QJ(5,1,j,k+3) = p * over_gamma_1 + 0.5d0 * (rhou**2 + rhov**2 + rhow**2) / rho
+            ! outlet
             do l = 1, 5
-              ! inlet
-              QJ(l,1,j,k+3)  = Qre(ny*5*(k-1)+5*(j-1)+l)
-              ! outlet
               QJ(l,nx,j,k+3) = QJ(l,nx-1,j,k+3)
-        enddo;enddo;enddo
+            enddo
+        enddo;enddo
       else
         !$cuf kernel do(2)<<<*,*>>>
         do k = 4, nz-3
@@ -156,38 +167,38 @@ contains
       enddo;enddo;enddo
     endif
 
-    !$cuf kernel do(2)<<<*,*>>>
-    do k = 4, nz-3
-      do i = 1, nx
-        ! top
-        ! Riemann invariants
-        Jacobian_tmp = 1.d0 / Jacobian(i,ny)
-        pin   = gamma_1 * (QJ(5,i,ny-1,k) - 0.5d0 * (QJ(2,i,ny-1,k)**2 + QJ(3,i,ny-1,k)**2 + QJ(4,i,ny-1,k)**2) &
-                / QJ(1,i,ny-1,k)) * Jacobian(i,ny-1)
-        rhoin = QJ(1,i,ny-1,k) * Jacobian(i,ny-1)
-        cin   = sqrt(gamma * pin / rhoin)
-        vin   = QJ(3,i,ny-1,k) / QJ(1,i,ny-1,k)
-        Rp   = vin + 2.d0 * cin * over_gamma_1
-        Rm   = v0  - 2.d0 * c0  * over_gamma_1
-        vb   = 0.5d0 * (Rp + Rm)
-        cb   = 0.25d0 * gamma_1 * (Rp - Rm)
-        rhob = (cb / c0)**(2.d0 * over_gamma_1) * rho0
-        pb   = (rhob * cb**2) / gamma
-        QJ(1,i,ny,k) = rhob * Jacobian_tmp
-        QJ(2,i,ny,k) = rhob * u0 * Jacobian_tmp
-        QJ(3,i,ny,k) = rhob * vb * Jacobian_tmp
-        QJ(4,i,ny,k) = 0.d0
-        QJ(5,i,ny,k) = (pb * over_gamma_1 + 0.5d0 * rhob * (u0**2 + vb**2)) * Jacobian_tmp
-        ! NoSlip
-        QJ(1,i,1,k) = QJ(1,i,2,k)
-        QJ(2,i,1,k) = 0.d0
-        QJ(3,i,1,k) = 0.d0
-        QJ(4,i,1,k) = 0.d0
-        p_wall = gamma_1 * (QJ(5,i,2,k) - 0.5d0 * (QJ(2,i,2,k)**2 + QJ(3,i,2,k)**2 + QJ(4,i,2,k)**2) / QJ(1,i,2,k))
-        QJ(5,i,1,k) = p_wall * over_gamma_1
-    enddo;enddo
+    !!$cuf kernel do(2)<<<*,*>>>
+    !do k = 4, nz-3
+    !  do i = 1, nx
+    !    ! top
+    !    ! Riemann invariants
+    !    Jacobian_tmp = 1.d0 / Jacobian(i,ny)
+    !    pin   = gamma_1 * (QJ(5,i,ny-1,k) - 0.5d0 * (QJ(2,i,ny-1,k)**2 + QJ(3,i,ny-1,k)**2 + QJ(4,i,ny-1,k)**2) &
+    !            / QJ(1,i,ny-1,k)) * Jacobian(i,ny-1)
+    !    rhoin = QJ(1,i,ny-1,k) * Jacobian(i,ny-1)
+    !    cin   = sqrt(gamma * pin / rhoin)
+    !    vin   = QJ(3,i,ny-1,k) / QJ(1,i,ny-1,k)
+    !    Rp   = vin + 2.d0 * cin * over_gamma_1
+    !    Rm   = v0  - 2.d0 * c0  * over_gamma_1
+    !    vb   = 0.5d0 * (Rp + Rm)
+    !    cb   = 0.25d0 * gamma_1 * (Rp - Rm)
+    !    rhob = (cb / c0)**(2.d0 * over_gamma_1) * rho0
+    !    pb   = (rhob * cb**2) / gamma
+    !    QJ(1,i,ny,k) = rhob * Jacobian_tmp
+    !    QJ(2,i,ny,k) = rhob * u0 * Jacobian_tmp
+    !    QJ(3,i,ny,k) = rhob * vb * Jacobian_tmp
+    !    QJ(4,i,ny,k) = 0.d0
+    !    QJ(5,i,ny,k) = (pb * over_gamma_1 + 0.5d0 * rhob * (u0**2 + vb**2)) * Jacobian_tmp
+    !    ! NoSlip
+    !    QJ(1,i,1,k) = QJ(1,i,2,k)
+    !    QJ(2,i,1,k) = 0.d0
+    !    QJ(3,i,1,k) = 0.d0
+    !    QJ(4,i,1,k) = 0.d0
+    !    p_wall = gamma_1 * (QJ(5,i,2,k) - 0.5d0 * (QJ(2,i,2,k)**2 + QJ(3,i,2,k)**2 + QJ(4,i,2,k)**2) / QJ(1,i,2,k))
+    !    QJ(5,i,1,k) = p_wall * over_gamma_1
+    !enddo;enddo
     !call set_bc_Riemann_tbl_top_down(nx, ny, nz, 3, 1, nx, Jacobian, QJ)
-    !call set_bc_Neumann_tbl_top_down(nx, ny, nz, 3, 1, nx, Jacobian, QJ)
+    call set_bc_Neumann_tbl_top_down(nx, ny, nz, 3, 1, nx, Jacobian, QJ)
 
     if (myrank == 2) then
       No = int(dble(nx) * 0.1d0)

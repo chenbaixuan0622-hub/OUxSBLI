@@ -181,7 +181,7 @@ contains
     real(8), intent(in)    :: y(ny), Jacobian(nx,ny), Qm(ny*2)
     real(8), intent(out)   :: bltre
     real(8), intent(inout) :: Qre(ny*nz*5) ! Q / J
-    integer i, j, jup, jdown, jj, k, kh, l, j_offset, k_offset, ierr, errorcode
+    integer i, j, jup, jdown, jj, k, kh, l, j_offset, k_offset, ierr, errorcode, flag
     integer, dimension(ny) :: jj_y, jj_e
     real(8) t, dudy, bltup, bltdown, taure, utre, utin, utre_nu, utin_nu, beta, mu, nu, ady, ade, one_ady, one_ade 
     ! mean properties at rescaling plane
@@ -191,7 +191,7 @@ contains
     real(8), dimension(ny)    :: ypre, ypin, etre, etin
     ! fluctuating properties at both inner and outer region
     real(8), dimension(ny,nz) :: ufin, vfin, wfin, Tfin, pfin
-    real(8), dimension(ny,nz) :: ufout, vfout, wfout, Tfout, pfout
+    real(8), dimension(ny,nz) :: ufout, vfout, wfout, Tfout
     ! mean properties at both inner and outer region
     real(8), dimension(ny)    :: Umin, Vmin, Tmin, Umout, Vmout, Tmout
     ! weighting function
@@ -216,18 +216,12 @@ contains
     enddo;enddo;enddo
 
     do j = 1, ny
-      u_tmp    = Qm(2*(j-1)+1)
-      v_tmp    = Qm(2*(j-1)+2)
-      T_tmp    = Taw - rf * u_tmp**2 * 0.5d0 * over_Cp
-      Um(j)    = u_tmp
-      Umin(j)  = u_tmp
-      Umout(j) = u_tmp
-      Vm(j)    = v_tmp
-      Vmin(j)  = v_tmp
-      Vmout(j) = v_tmp
-      Tm(j)    = T_tmp
-      Tmin(j)  = T_tmp
-      Tmout(j) = T_tmp
+      u_tmp = Qm(2*(j-1)+1)
+      v_tmp = Qm(2*(j-1)+2)
+      T_tmp = Taw - rf * u_tmp**2 * 0.5d0 * over_Cp
+      Um(j) = u_tmp; Umin(j) = u_tmp; Umout(j) = u_tmp
+      Vm(j) = v_tmp; Vmin(j) = v_tmp; Vmout(j) = v_tmp
+      Tm(j) = T_tmp; Tmin(j) = T_tmp; Tmout(j) = T_tmp
     enddo
 
     ! blt up
@@ -255,6 +249,7 @@ contains
     enddo
     bltre = 0.5d0 * (bltup + bltdown)
 
+    flag = 1
     if (jup < 0 .or. jdown < 0) then
       print *, "No 99% doundary layer thickness: bltup=", bltup, ", bltdown=", bltdown
       call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
@@ -268,35 +263,26 @@ contains
           bltre = bltdowm
         endif
       endif
-      if (bltre < blt_min) bltre = blt_min
-      if (bltre > blt_max) bltre = blt_max
+      if (bltre < blt_min .or. bltre > blt_max) flag = 0
     endif
 
     if (bltre > blt) then
       flag_re = flag_re + 1
     endif
 
-    if (flag_re >= 1 .and. step >= start_rescale) then
-      ufin(:,:)  = 0.d0
-      vfin(:,:)  = 0.d0
-      wfin(:,:)  = 0.d0
-      Tfin(:,:)  = 0.d0
-      pfin(:,:)  = 0.d0
-      ufout(:,:) = 0.d0
-      vfout(:,:) = 0.d0
-      wfout(:,:) = 0.d0
-      Tfout(:,:) = 0.d0
-      pfout(:,:) = 0.d0
+    if (flag_re >= 1 .and. step >= start_rescale .and. flag == 1) then
+      ufin(:,:)  = 0.d0; vfin(:,:)  = 0.d0; wfin(:,:)  = 0.d0; Tfin(:,:)  = 0.d0; pfin(:,:)  = 0.d0
+      ufout(:,:) = 0.d0; vfout(:,:) = 0.d0; wfout(:,:) = 0.d0; Tfout(:,:) = 0.d0!; pfout(:,:) = 0.d0
       do k = 1, nz
         k_offset = ny * 5 * (k-1)
         do j = 1, ny
-          j_offset = 5 * (j-1)
-          rhore = Qre(k_offset+j_offset+1)
+          i     = 5 * (j-1) + k_offset
+          rhore = Qre(i+1)
           over_rho = 1.d0 / rhore
-          ure   = Qre(k_offset+j_offset+2) * over_rho
-          vre   = Qre(k_offset+j_offset+3) * over_rho
-          wre   = Qre(k_offset+j_offset+4) * over_rho
-          pre   = gamma_1 * (Qre(k_offset+j_offset+5) - 0.5d0 * rhore * (ure**2 + vre**2 + wre**2)) 
+          ure   = Qre(i+2) * over_rho
+          vre   = Qre(i+3) * over_rho
+          wre   = Qre(i+4) * over_rho
+          pre   = gamma_1 * (Qre(i+5) - 0.5d0 * rhore * (ure**2 + vre**2 + wre**2)) 
           Tre   = pre / (rhore * R)
           ufre(j,k) = ure - Um(j)
           vfre(j,k) = vre - Vm(j)
@@ -372,7 +358,6 @@ contains
             vfout(j,k) = beta * (one_ade * vfre(jj-1,k) + ade * vfre(jj,k))!vfre(jj-1,k) + ade * (-vfre(jj-1,k) + vfre(jj,k))
             wfout(j,k) = beta * (one_ade * wfre(jj-1,k) + ade * wfre(jj,k))!wfre(jj-1,k) + ade * (-wfre(jj-1,k) + wfre(jj,k))
             Tfout(j,k) =         one_ade * Tfre(jj-1,k) + ade * Tfre(jj,k) !Tfre(jj-1,k) + ade * (-Tfre(jj-1,k) + Tfre(jj,k))
-            pfout(j,k) =         one_ade * pfre(jj-1,k) + ade * pfre(jj,k) !pfre(jj-1,k) + ade * (-pfre(jj-1,k) + pfre(jj,k))
           endif
       enddo;enddo
   
@@ -381,7 +366,7 @@ contains
         kh = mod(k+nz/2,nz) + 1
         k_offset = ny * 5 * (k-1)
         do j = 1, ny
-          j_offset     = 5 * (j-1)
+          i   = 5 * (j-1) + k_offset
           weight_tmp   = weight(j)
           one_weight   = 1.d0 - weight_tmp
           Jacobian_tmp = 1.d0 / Jacobian(nre2,j)
@@ -389,23 +374,23 @@ contains
           vin = (Vmin(j) + vfin(j,kh)) * one_weight + (Vmout(j) + vfout(j,kh)) * weight_tmp
           win =            wfin(j,kh)  * one_weight +             wfout(j,kh)  * weight_tmp
           Tin = (Tmin(j) + Tfin(j,kh)) * one_weight + (Tmout(j) + Tfout(j,kh)) * weight_tmp
-          pin = (p0      + pfin(j,kh)) * one_weight + (p0       + pfout(j,kh)) * weight_tmp
+          pin = p0       + pfin(j,kh)
           rhoin = pin / (R * Tin)
-          Qre(k_offset+j_offset+1) = rhoin * Jacobian_tmp
-          Qre(k_offset+j_offset+2) = rhoin * uin * Jacobian_tmp
-          Qre(k_offset+j_offset+3) = rhoin * vin * Jacobian_tmp
-          Qre(k_offset+j_offset+4) = rhoin * win * Jacobian_tmp
-          Qre(k_offset+j_offset+5) = (pin * over_gamma_1 + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) * Jacobian_tmp
+          Qre(i+1) = rhoin * Jacobian_tmp
+          Qre(i+2) = rhoin * uin * Jacobian_tmp
+          Qre(i+3) = rhoin * vin * Jacobian_tmp
+          Qre(i+4) = rhoin * win * Jacobian_tmp
+          Qre(i+5) = (pin * over_gamma_1 + 0.5d0 * rhoin * (uin**2 + vin**2 + win**2)) * Jacobian_tmp
       enddo;enddo
     else
       ! cyclic boundary condition !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       do k = 1, nz
         k_offset = ny * 5 * (k-1)
         do j = 1, ny
-          j_offset = 5 * (j-1)
+          i = 5 * (j-1) + k_offset
           Jacobian_tmp = 1.d0 / Jacobian(nre2,j)
           do l = 1, 5
-            Qre(k_offset+j_offset+l) = Qre(k_offset+j_offset+l) * Jacobian_tmp
+            Qre(i+l) = Qre(i+l) * Jacobian_tmp
       enddo;enddo;enddo
     endif
   end subroutine set_rescale
