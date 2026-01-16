@@ -152,11 +152,16 @@ contains
         do j = ny1-1, ny-1
           ! inlet free stream flow
           Jacobian_tmp = 1.d0 / Jacobian(1,j)
-          QJ(1,1,j,k) = rho0 * Jacobian_tmp
-          QJ(2,1,j,k) = rho0 * u0 * Jacobian_tmp
-          QJ(3,1,j,k) = 0.d0
-          QJ(4,1,j,k) = 0.d0
-          QJ(5,1,j,k) = (p0 * over_gamma_1 + 0.5d0 * rho0 * u0**2) * Jacobian_tmp
+          !rho  = QJ(1,1,ny1-2,k) * Jacobian(1,ny1-2)
+          !rhou = QJ(2,1,ny1-2,k) * Jacobian(1,ny1-2)
+          !rhov = QJ(3,1,ny1-2,k) * Jacobian(1,ny1-2)
+          !rhow = QJ(4,1,ny1-2,k) * Jacobian(1,ny1-2)
+          !e    = QJ(5,1,ny1-2,k) * Jacobian(1,ny1-2)
+          QJ(1,1,j,k) = rho0 * Jacobian_tmp     !rho  * Jacobian_tmp
+          QJ(2,1,j,k) = rho0 * u0 * Jacobian_tmp!rhou * Jacobian_tmp
+          QJ(3,1,j,k) = 0.d0                    !rhov * Jacobian_tmp
+          QJ(4,1,j,k) = 0.d0                    !rhow * Jacobian_tmp
+          QJ(5,1,j,k) = (p0 * over_gamma_1 + 0.5d0 * rho0 * u0**2) * Jacobian_tmp!e    * Jacobian_tmp
       enddo;enddo
       !$cuf kernel do(2)<<<*,*>>>
       do k = 4, nz-3
@@ -167,38 +172,38 @@ contains
       enddo;enddo;enddo
     endif
 
-    !!$cuf kernel do(2)<<<*,*>>>
-    !do k = 4, nz-3
-    !  do i = 1, nx
-    !    ! top
-    !    ! Riemann invariants
-    !    Jacobian_tmp = 1.d0 / Jacobian(i,ny)
-    !    pin   = gamma_1 * (QJ(5,i,ny-1,k) - 0.5d0 * (QJ(2,i,ny-1,k)**2 + QJ(3,i,ny-1,k)**2 + QJ(4,i,ny-1,k)**2) &
-    !            / QJ(1,i,ny-1,k)) * Jacobian(i,ny-1)
-    !    rhoin = QJ(1,i,ny-1,k) * Jacobian(i,ny-1)
-    !    cin   = sqrt(gamma * pin / rhoin)
-    !    vin   = QJ(3,i,ny-1,k) / QJ(1,i,ny-1,k)
-    !    Rp   = vin + 2.d0 * cin * over_gamma_1
-    !    Rm   = v0  - 2.d0 * c0  * over_gamma_1
-    !    vb   = 0.5d0 * (Rp + Rm)
-    !    cb   = 0.25d0 * gamma_1 * (Rp - Rm)
-    !    rhob = (cb / c0)**(2.d0 * over_gamma_1) * rho0
-    !    pb   = (rhob * cb**2) / gamma
-    !    QJ(1,i,ny,k) = rhob * Jacobian_tmp
-    !    QJ(2,i,ny,k) = rhob * u0 * Jacobian_tmp
-    !    QJ(3,i,ny,k) = rhob * vb * Jacobian_tmp
-    !    QJ(4,i,ny,k) = 0.d0
-    !    QJ(5,i,ny,k) = (pb * over_gamma_1 + 0.5d0 * rhob * (u0**2 + vb**2)) * Jacobian_tmp
-    !    ! NoSlip
-    !    QJ(1,i,1,k) = QJ(1,i,2,k)
-    !    QJ(2,i,1,k) = 0.d0
-    !    QJ(3,i,1,k) = 0.d0
-    !    QJ(4,i,1,k) = 0.d0
-    !    p_wall = gamma_1 * (QJ(5,i,2,k) - 0.5d0 * (QJ(2,i,2,k)**2 + QJ(3,i,2,k)**2 + QJ(4,i,2,k)**2) / QJ(1,i,2,k))
-    !    QJ(5,i,1,k) = p_wall * over_gamma_1
-    !enddo;enddo
+    !$cuf kernel do(2)<<<*,*>>>
+    do k = 4, nz-3
+      do i = 1, nx
+        ! top
+        ! Riemann invariants
+        Jacobian_tmp = 1.d0 / Jacobian(i,ny)
+        pin   = gamma_1 * (QJ(5,i,ny-1,k) - 0.5d0 * (QJ(2,i,ny-1,k)**2 + QJ(3,i,ny-1,k)**2 + QJ(4,i,ny-1,k)**2) &
+                / QJ(1,i,ny-1,k)) * Jacobian(i,ny-1)
+        rhoin = QJ(1,i,ny-1,k) * Jacobian(i,ny-1)
+        cin   = sqrt(gamma * pin / rhoin)
+        vin   = QJ(3,i,ny-1,k) / QJ(1,i,ny-1,k)
+        Rp   = vin + 2.d0 * cin * over_gamma_1
+        Rm   = v0  - 2.d0 * c0  * over_gamma_1
+        vb   = 0.5d0 * (Rp + Rm)
+        cb   = 0.25d0 * gamma_1 * (Rp - Rm)
+        rhob = (cb / c0)**(2.d0 * over_gamma_1) * rho0
+        pb   = (rhob * cb**2) / gamma
+        QJ(1,i,ny,k) = rhob * Jacobian_tmp
+        QJ(2,i,ny,k) = rhob * u0 * Jacobian_tmp
+        QJ(3,i,ny,k) = rhob * vb * Jacobian_tmp
+        QJ(4,i,ny,k) = 0.d0
+        QJ(5,i,ny,k) = (pb * over_gamma_1 + 0.5d0 * rhob * (u0**2 + vb**2)) * Jacobian_tmp
+        ! NoSlip
+        QJ(1,i,1,k) = QJ(1,i,2,k)
+        QJ(2,i,1,k) = 0.d0
+        QJ(3,i,1,k) = 0.d0
+        QJ(4,i,1,k) = 0.d0
+        p_wall = gamma_1 * (QJ(5,i,2,k) - 0.5d0 * (QJ(2,i,2,k)**2 + QJ(3,i,2,k)**2 + QJ(4,i,2,k)**2) / QJ(1,i,2,k))
+        QJ(5,i,1,k) = p_wall * over_gamma_1
+    enddo;enddo
     !call set_bc_Riemann_tbl_top_down(nx, ny, nz, 3, 1, nx, Jacobian, QJ)
-    call set_bc_Neumann_tbl_top_down(nx, ny, nz, 3, 1, nx, Jacobian, QJ)
+    !call set_bc_Neumann_tbl_top_down(nx, ny, nz, 3, 1, nx, Jacobian, QJ)
 
     if (myrank == 2) then
       No = int(dble(nx) * 0.1d0)
