@@ -331,6 +331,25 @@ contains
     call print_vtk(step, nx, ny, nz, myrank, nranks, x, y, z, rho1d, p1d, v1d, ke0, entropy0)
   end subroutine send_recv_for_print_odd3
 
+  
+  subroutine print_1D(step, nx, x, Q)
+    integer, intent(in) :: step, nx
+    real(4), intent(in) :: x(nx)
+    real(4), intent(in) :: Q(3,nx)
+    real(4) rho, u, p
+    integer i
+    character(len=40) filename
+    write(filename, "(a, i5.5, a)") "data/Q", int(step), ".d"
+    open(10,file=filename)
+    do i = 1, nx
+      rho = Q(1,i)
+      u   = Q(2,i) / rho
+      p   = (real(gamma) - 1.e0) * (Q(3,i) - 0.5e0 * rho * u**2)
+      write(10,"(4e12.4)") x(i), rho, u, p
+    enddo
+    close(10)
+  end subroutine print_1D
+
 
   subroutine print_vtk_2D(step, nx, ny, x, y, rho1d, p1d, v1d)
     integer, intent(in) :: step, nx, ny
