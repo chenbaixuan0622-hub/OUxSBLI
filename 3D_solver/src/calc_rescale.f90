@@ -196,7 +196,7 @@ contains
     real(8), intent(inout) :: Qre(ny*nz*5) ! Q / J
     integer i, j, jup, jdown, jj, k, kh, l, j_offset, k_offset, ierr, errorcode, flag
     integer, dimension(ny) :: jj_y, jj_e
-    real(8) t, bltup, bltdown, dudy, taure, utre, utin, beta, mu, nu, ady, ade, one_ady, one_ade, one_weight
+    real(8) t, u99, dudy, taure, utre, utin, beta, mu, nu, ady, ade, one_ady, one_ade, one_weight
     ! mean properties at rescaling plane
     real(8), dimension(ny)    :: Um, Vm, Wm, rhom, Tm, pm
     ! fluctuating properties at rescaling plane
@@ -248,47 +248,41 @@ contains
       Tmout(j) = T_tmp
     enddo
 
+    ! free stream
+    jup = -1
+    do j = 1, ny
+      if (y(j) >= 2.d0 * blt) then
+        jup = j
+      endif
+    enddo
+    if (jup < 0) then
+      print *, "Ly is not enough"
+      call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
+    endif
+    u99 = 0.99d0 * sum(Um(jup:ny)) / size(Um(jup:ny))
+    if (abs(u99 - 0.99d0 * u0) > 0.01d0 * u0) then
+      print *, "Free stream streamwise velocity is not constant"
+      call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
+    endif
+
     ! blt up
     jup   = -1
-    bltup = 0.d0
+    bltre = 0.d0
     do j = 2, ny
-      if (Um(j) >= 0.99d0 * u0) then
-        dudy  = (0.99d0 * u0 - Um(j-1)) / (-Um(j-1) + Um(j) + 1.d-15)
-        bltup = y(j-1) + (-y(j-1) + y(j)) * dudy
+      if (Um(j) >= u99) then
+        dudy  = (u99 - Um(j-1)) / (-Um(j-1) + Um(j) + 1.d-15)
+        bltre = y(j-1) + (-y(j-1) + y(j)) * dudy
         jup   = j
         exit
       endif
     enddo
 
-    ! blt down
-    jdown   = -1
-    bltdown = 0.d0
-    do j = ny-1, 1, -1
-      if (Um(j) <= 0.99d0 * u0) then
-        dudy    = (Um(j+1) - 0.99d0 * u0) / (-Um(j) + Um(j+1) + 1.d-15)
-        bltdown = y(j+1) - (-y(j) + y(j+1)) * dudy
-        jdown   = j
-        exit
-      endif
-    enddo
-    bltre = 0.5d0 * (bltup + bltdown)
-
     flag = 1
-    if (jup < 0 .or. jdown < 0) then
-      print *, "No 99% doundary layer thickness: bltup=", bltup, ", bltdown=", bltdown
+    if (jup < 0) then
+      print *, "No 99% doundary layer thickness"
       call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
     endif
-    if (flag_re >= 1 .and. step >= start_rescale) then
-      if (abs(jup - jdown) > 1) then
-        print *, "jup=", jup, ", jdown=", jdown, ", bltup=", bltup, ", bltdown=", bltdown
-        if (abs(bltdown - 1.3d0 * blt) > abs(bltup - 1.3d0 * blt)) then
-          bltre = bltup
-        else
-          bltre = bltdown
-        endif
-      endif
-      if (bltre < blt_min .or. bltre > blt_max) flag = 0
-    endif
+    if (bltre < blt_min .or. bltre > blt_max) flag = 0
 
     if (bltre > blt) then
       flag_re = flag_re + 1
