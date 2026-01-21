@@ -1,4 +1,4 @@
-program main
+program main1d
   use, intrinsic :: iso_fortran_env
   use mpi
   use mod_globals, only : nx
@@ -29,5 +29,5 @@ program main
 
   deallocate(Q, x)
   call MPI_FINALIZE(ierr)
-end program main
+end program main1d
 

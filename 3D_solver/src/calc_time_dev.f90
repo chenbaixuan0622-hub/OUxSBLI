@@ -28,7 +28,7 @@ contains
     integer i, j, k, l, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireq2(2)
     integer istat(MPI_STATUS_SIZE), istat2(MPI_STATUS_SIZE,2)
     ! rescal_cpu!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    integer :: step, flag_re = 0
+    integer :: step = 1, flag_re = 0, flag_req
     real(8), allocatable, device :: Qre(:), Qm(:)
     real(8), allocatable, pinned :: Qm_cpu(:)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -70,17 +70,16 @@ contains
       call MPI_RECV(entropy0, 1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
     endif
     if (kind(id_rescale) == 4) then
-      call pre_rescale(myrank, ny, nz, Qre, Qm, Qm_cpu)
+      call pre_rescale(myrank, flag_re, flag_req, ny, nz, Qre, Qm, Qm_cpu)
     endif
 
     call MPI_BARRIER(MPI_COMM_WORLD, ierr)
     print *, "myrank is ", myrank, " start Runge-Kutta"
     do t2 = 1, np
       do t1 = 1, nt
-        step = np * (t2-1) + t1
         if (mod(myrank,2) == 0) then
           if (kind(id_rescale) == 4) then
-            call step_rescale(1, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ, Qm, Qre)
+            call step_rescale(1, myrank, nx, ny, nz, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJ, Qm, Qre)
           endif
           call nvtxStartRange("calc flux", 1)
           if (kind(id_LL) == 4) then
@@ -110,13 +109,13 @@ contains
           call nvtxEndRange
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call nvtxStartRange("calc rescale", 5)
-          call rescale_recv_send(1, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
+          call rescale_recv_send(1, flag_re, nx, ny, nz, t1, y, Jacobian_cpu, Qm_cpu)
           call nvtxEndRange
         endif
 
         if (mod(myrank,2) == 0) then
           if (kind(id_rescale) == 4) then
-            call step_rescale(2, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ2, Qm, Qre)
+            call step_rescale(2, myrank, nx, ny, nz, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJ2, Qm, Qre)
           endif
           if (kind(id_LL) == 4) then
             call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, ruvwp, T, mu, mut, qc2, E, F, G, sigma, seed)
@@ -134,12 +133,12 @@ contains
             call set_bc(myrank, nx, ny, nz, Jacobian, QJ2)
           endif
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(2, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
+          call rescale_recv_send(2, flag_re, nx, ny, nz, t1, y, Jacobian_cpu, Qm_cpu)
         endif
 
         if (mod(myrank,2) == 0) then
           if (kind(id_rescale) == 4) then
-            call step_rescale(3, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ2, Qm, Qre)
+            call step_rescale(3, myrank, nx, ny, nz, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJ2, Qm, Qre)
           endif
           if (kind(id_LL) == 4) then
             call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, ruvwp, T, mu, mut, qc2, E, F, G, sigma, seed)
@@ -157,13 +156,14 @@ contains
             call set_bc(myrank, nx, ny, nz, Jacobian, QJ)
           endif
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(3, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
+          call rescale_recv_send(3, flag_re, nx, ny, nz, t1, y, Jacobian_cpu, Qm_cpu)
         endif
       enddo
       if (mod(myrank, 2) == 0) then
         call send_recv_for_print_even(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
       else
         call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
+        call write_Qm(ny, t2, y, Qm_cpu)
       endif
     enddo
 
@@ -180,7 +180,7 @@ contains
       if (myrank == 0 .or. myrank == rerank) then
         deallocate(Qre, Qm)
       elseif (myrank == rerank+1) then
-        call write_Qm(ny, y, Qm_cpu)
+        call write_Qm(ny, np, y, Qm_cpu)
         deallocate(Qm_cpu)
       endif
     endif
@@ -198,7 +198,7 @@ contains
     integer i, j, k, l, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireq2(2)
     integer istat(MPI_STATUS_SIZE), istat2(MPI_STATUS_SIZE,2)
     ! rescale !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    integer :: step, flag_re = 0
+    integer :: step = 1, flag_re = 0, flag_req
     real(8), allocatable, device :: Qre(:), Qm(:)
     real(8), allocatable, pinned :: Qm_cpu(:)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -239,15 +239,14 @@ contains
       call MPI_RECV(entropy0, 1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
     endif
     if (kind(id_rescale) == 4) then
-      call pre_rescale(myrank, ny, nz, Qre, Qm, Qm_cpu)
+      call pre_rescale(myrank, flag_re, flag_req, ny, nz, Qre, Qm, Qm_cpu)
     endif
     
     do t2 = 1, np
       do t1 = 1, nt
-        step = np * (t2-1) + t1
         if (mod(myrank,2) == 0) then
           if (kind(id_rescale) == 4) then
-            call step_rescale(1, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ, Qm, Qre)
+            call step_rescale(1, myrank, nx, ny, nz, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJ, Qm, Qre)
           endif
           if (kind(id_LL) == 4) then
             call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, ruvwp, T, mu, mut, qc2, E, F, G, sigma, seed)
@@ -265,12 +264,12 @@ contains
             call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
           endif
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(1, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
+          call rescale_recv_send(1, flag_re, nx, ny, nz, t1, y, Jacobian_cpu, Qm_cpu)
         endif
 
         if (mod(myrank,2) == 0) then
           if (kind(id_rescale) == 4) then
-            call step_rescale(2, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJs, Qm, Qre)
+            call step_rescale(2, myrank, nx, ny, nz, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJs, Qm, Qre)
           endif
           if (kind(id_LL) == 4) then
             call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, ruvwp, T, mu, mut, qc2, E, F, G, sigma, seed)
@@ -288,12 +287,12 @@ contains
             call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
           endif
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(2, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
+          call rescale_recv_send(2, flag_re, nx, ny, nz, t1, y, Jacobian_cpu, Qm_cpu)
         endif
 
         if (mod(myrank,2) == 0) then
           if (kind(id_rescale) == 4) then
-            call step_rescale(3, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJs, Qm, Qre)
+            call step_rescale(3, myrank, nx, ny, nz, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJs, Qm, Qre)
           endif
           if (kind(id_LL) == 4) then
             call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, ruvwp, T, mu, mut, qc2, E, F, G, sigma, seed)
@@ -311,12 +310,12 @@ contains
             call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
           endif
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(3, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
+          call rescale_recv_send(3, flag_re, nx, ny, nz, t1, y, Jacobian_cpu, Qm_cpu)
         endif
 
         if (mod(myrank,2) == 0) then
           if (kind(id_rescale) == 4) then
-            call step_rescale(4, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJs, Qm, Qre)
+            call step_rescale(4, myrank, nx, ny, nz, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJs, Qm, Qre)
           endif
           if (kind(id_LL) == 4) then
             call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, ruvwp, T, mu, mut, qc2, E, F, G, sigma, seed)
@@ -334,13 +333,14 @@ contains
             call set_bc(myrank, nx, ny, nz, Jacobian, QJ)
           endif
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(4, flag_re, nx, ny, nz, step, y, Jacobian_cpu, Qm_cpu)
+          call rescale_recv_send(4, flag_re, nx, ny, nz, t1, y, Jacobian_cpu, Qm_cpu)
         endif
       enddo
       if (mod(myrank, 2) == 0) then
         call send_recv_for_print_even(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
       else
         call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
+        call write_Qm(ny, t2, y, Qm_cpu)
       endif
     enddo
 
@@ -357,7 +357,7 @@ contains
       if (myrank == 0 .or. myrank == rerank) then
         deallocate(Qre, Qm)
       elseif (myrank == rerank+1) then
-        call write_Qm(ny, y, Qm_cpu)
+        call write_Qm(ny, np, y, Qm_cpu)
         deallocate(Qm_cpu)
       endif
     endif
@@ -375,7 +375,7 @@ contains
     integer i, j, k, itr, max_itr, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireqs(2)
     integer istat(MPI_STATUS_SIZE), istats(MPI_STATUS_SIZE,2)
     ! rescale !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    integer :: step, flag_re = 0
+    integer :: step, flag_re = 0, flag_req
     real(8) :: c1, c2, a11, a12, a21, a22, b1, b2, err, tol = 1.d-16
     real(8), allocatable, device :: Qre(:), Qm(:)
     real(8), allocatable, pinned :: Qm_cpu(:)
@@ -418,7 +418,7 @@ contains
       call MPI_RECV(entropy0, 1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
     endif
     if (kind(id_rescale) == 4) then
-      call pre_rescale(myrank, ny, nz, Qre, Qm, Qm_cpu)
+      call pre_rescale(myrank, flag_re, flag_req, ny, nz, Qre, Qm, Qm_cpu)
     endif
 
     call MPI_BARRIER(MPI_COMM_WORLD, ierr)
