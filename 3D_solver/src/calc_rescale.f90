@@ -1,17 +1,20 @@
 module calc_rescale
   use cudafor
   use mpi
-  use mod_globals, only : id_gpumpi, id_recal, nre1, nre2, rerank, nt, dt, gamma , R, Pr, u0, rho0, p0, M0, blt, start_rescale
+  use mod_globals, only : id_gpumpi, id_recal, nre1, nre2, rerank, nt, np, dt, gamma , R, Pr, u0, rho0, p0, M0, blt, start_rescale
   use mod_constant, only : Cp, gamma_1, over_gamma_1, mu0_T0_S, over_T0
   use cpu_gpu_mpi
 contains
-  subroutine calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJ, Qm)
-    integer, intent(in)            :: step, flag_re, nx, ny, nz
+  subroutine calc_mean(step, ireq, flag_re, nx, ny, nz, Jacobian, QJ, Qm)
+    integer, intent(inout)         :: step, ireq
+    integer, intent(in)            :: flag_re, nx, ny, nz
     real(8), intent(in), device    :: Jacobian(nx,ny), QJ(5,nx,ny,nz)
     real(8), intent(inout), device :: Qm(ny*5)
     real(8) Q1, Q2, Q3, Q4, Q5, rhoinv, Jacobian_tmp, volinv, step1, step2
-    integer i, k, istat
+    logical arrived
+    integer i, k, istat, ierr
     volinv = 1.d0 / dble((nre2 - nre1 + 1) * (nz - 6))
+    call MPI_TEST(ireq, arrived, MPI_STATUS_IGNORE, ierr)
     if (flag_re == 0) then
       !$cuf kernel do <<<*,*>>>
       do j = 1, ny
@@ -55,6 +58,7 @@ contains
         Qm(5*(j-1)+4) = (step1 * Qm(5*(j-1)+4) + Q4 * volinv) * step2
         Qm(5*(j-1)+5) = (step1 * Qm(5*(j-1)+5) + Q5 * volinv) * step2
       enddo
+      step = step + 1
     endif
     istat = cudaDeviceSynchronize() ! This line is necessary for next MPI_SEND
   end subroutine calc_mean
@@ -76,9 +80,9 @@ contains
   end subroutine copy
 
 
-  subroutine step_rescale(num, myrank, step, nx, ny, nz, flag_re, ireq, ireq2, Jacobian, QJ, Qm, Qre)
-    integer, intent(in)            :: num, myrank, step, nx, ny, nz
-    integer, intent(inout)         :: flag_re, ireq, ireq2(2)
+  subroutine step_rescale(num, myrank, nx, ny, nz, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJ, Qm, Qre)
+    integer, intent(in)            :: num, myrank, nx, ny, nz
+    integer, intent(inout)         :: step, flag_re, flag_req, ireq, ireq2(2)
     real(8), intent(in), device    :: Jacobian(nx,ny), QJ(5,nx,ny,nz)
     real(8), intent(inout), device :: Qm(ny*5), Qre(ny*(nz-6)*5)
     integer ierr, istat, j
@@ -86,7 +90,7 @@ contains
       call copy(nx, ny, nz, QJ, Qre)
       call CPUGPU_MPI_SEND(id_gpumpi, Qre, 5*ny*(nz-6), rerank+1, 0, MPI_COMM_WORLD, ireq2(1), ierr)
       if (num == 1 .and. id_recal == 0) then
-        call calc_mean(step, flag_re, nx, ny, nz, Jacobian, QJ, Qm)
+        call calc_mean(step, flag_req, flag_re, nx, ny, nz, Jacobian, QJ, Qm)
         call CPUGPU_MPI_SEND(id_gpumpi, Qm, 5*ny, rerank+1, 1, MPI_COMM_WORLD, ireq2(2), ierr)
       endif
     endif
@@ -117,7 +121,8 @@ contains
     real(8), intent(inout) :: Qm_cpu(ny*5)
     real(8)         :: Qre_cpu(ny*(nz-6)*5), bltre
     real(8), device ::     Qre(ny*(nz-6)*5), Qm(ny*5)
-    integer stat, errorcode, ierr, ireq, ireqs(2), istat(MPI_STATUS_SIZE), istats(MPI_STATUS_SIZE,2), j
+    integer stat, errorcode, ierr, ireq, ireqs(2), flag_req
+    integer istat(MPI_STATUS_SIZE), istats(MPI_STATUS_SIZE,2), j
     real(8) t
     character(len=40) filename
     write(filename, "(a)") "data/rescaling.d"
@@ -145,7 +150,9 @@ contains
     stat = cudaMemcpy(Qre, Qre_cpu, 5*ny*(nz-6), cudaMemcpyHostToDevice)
     call CPUGPU_MPI_SEND(id_gpumpi, Qre, 5*ny*(nz-6), 0, 0, MPI_COMM_WORLD, ireq, ierr)
     if (flag_re == 1) then
-      call MPI_BCAST(flag_re, 1, MPI_INTEGER, rerank+1, MPI_COMM_WORLD, ierr)
+      call MPI_ISEND(flag_re, 1, MPI_INTEGER, rerank, 1001, MPI_COMM_WORLD, flag_req, ierr)
+      call MPI_WAIT(flag_req, istat, ierr)
+      print *, "Start calculating time average for rescale" 
     endif
     if (num == 1) then
       if (bltre == 0.d0) then
@@ -155,24 +162,24 @@ contains
       t = nt * step * dt
       if (flag_re >= 1 .and. step >= start_rescale) then
         open(10, file=filename, position="append")
-        write(10, "(2e12.4, a)") t, bltre, "rescale"
+        write(10, "(2e12.4, a)") t, bltre/blt, " rescale"
         close(10)
       else
         open(10, file=filename, position="append")
-        write(10, "(2e12.4, a)") t, bltre, "cyclic"
+        write(10, "(2e12.4, a)") t, bltre/blt, " cyclic"
         close(10)
       endif
     endif
   end subroutine rescale_recv_send
 
 
-  subroutine write_Qm(ny, y, Qm)
-    integer, intent(in) :: ny
+  subroutine write_Qm(ny, step, y, Qm)
+    integer, intent(in) :: ny, step
     real(8), intent(in) :: y(ny), Qm(ny*5)
     real(8) rho, u, v, w, p
     character(len=40) filename
     integer j, jj
-    write(filename, "(a)") "recal/Qm.d"
+    write(filename, "(a, i5.5, a)") "recal/Qm", int(step), ".d"
     open(10, file=filename, status="replace", action="write")
     write(10, "(a)") "y    rho   u     v     w     p"
     do j = 1, ny
@@ -181,10 +188,12 @@ contains
       write(10, "(6e12.4)") y(j), rho, u, v, w, p
     enddo
     close(10)
-    write(filename, "(a)") "recal/Qm.dat"
-    open(10, file=filename, status="replace", action="write", form="unformatted", access="stream")
-    write(10) Qm
-    close(10)
+    if (step == np) then
+      write(filename, "(a)") "recal/Qm.dat"
+      open(10, file=filename, status="replace", action="write", form="unformatted", access="stream")
+      write(10) Qm
+      close(10)
+    endif
   end subroutine write_Qm
 
 
@@ -288,7 +297,7 @@ contains
       flag_re = flag_re + 1
     endif
 
-    if (flag_re >= 1 .and. step >= start_rescale .and. flag == 1) then
+    if (bltre > blt .and. flag_re >= 1 .and. step >= start_rescale .and. flag == 1) then
       ufin(:,:)  = 0.d0; vfin(:,:)  = 0.d0; wfin(:,:)  = 0.d0; Tfin(:,:)  = 0.d0; pfin(:,:)  = 0.d0
       ufout(:,:) = 0.d0; vfout(:,:) = 0.d0; wfout(:,:) = 0.d0; Tfout(:,:) = 0.d0; pfout(:,:) = 0.d0
       do k = 1, nz

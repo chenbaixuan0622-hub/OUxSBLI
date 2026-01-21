@@ -3,7 +3,7 @@ module mod_globals
   implicit none
   integer, parameter    :: dimension     = 1
   integer(2), parameter :: id_LL         = 0
-  integer(2), parameter :: id_igr        = 0
+  integer(4), parameter :: id_igr        = 0
   integer(4), parameter :: id_visc       = 0
   integer(2), parameter :: id_scheme     = 0
   integer(8), parameter :: id_accuracy   = 0
@@ -48,8 +48,8 @@ module mod_globals
                                       (gamma - 1.d0 + (gamma + 1.d0) * pd / pu)
   real(8), parameter :: rhod = rhou * uu_s / ud_s
   ! Galilean
-  real(8), parameter :: uu   = uu_s + 0.25d0 * uu_s
-  real(8), parameter :: ud   = ud_s + 0.25d0 * uu_s
+  real(8), parameter :: uu   = uu_s !+ 0.25d0 * uu_s
+  real(8), parameter :: ud   = ud_s !+ 0.25d0 * uu_s
 
   real(8), parameter :: CFL  = 0.01d0
   real(8), parameter :: dt   = CFL * Lx / (dble(nx-1) * ud)

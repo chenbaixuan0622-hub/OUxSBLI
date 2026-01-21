@@ -85,15 +85,19 @@ contains
   end subroutine pre_calc
 
 
-  subroutine pre_rescale(myrank, ny, nz, Qre, Qm, Qm_cpu)
+  subroutine pre_rescale(myrank, flag_re, flag_req, ny, nz, Qre, Qm, Qm_cpu)
     use mod_globals, only : rerank, id_recal, id_rescale
     integer, intent(in)                         :: myrank, ny, nz
+    integer, intent(inout)                      :: flag_re, flag_req
     real(8), intent(inout), allocatable, device :: Qre(:), Qm(:)
     real(8), intent(inout), allocatable         :: Qm_cpu(:)
     character(len=40) filename
     logical exists
-    integer j, stat, ilen, ierr, errorcode
+    integer j, stat, ilen, ireq, ierr, errorcode
     type(cudaDeviceProp) prop
+    if (myrank == rerank) then
+      call MPI_IRECV(flag_re, 1, MPI_INTEGER, rerank+1, 1001, MPI_COMM_WORLD, flag_req, ierr)
+    endif
     if (mod(myrank,2) == 0) then
       allocate(Qre(ny*(nz-6)*5), Qm(ny*5), stat=ierr)
       Qm(:) = 0.d0
