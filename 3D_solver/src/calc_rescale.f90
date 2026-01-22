@@ -2,7 +2,7 @@ module calc_rescale
   use cudafor
   use mpi
   use mod_globals, only : id_gpumpi, id_recal, nre1, nre2, rerank, nt, np, dt, gamma , R, Pr, u0, rho0, p0, M0, blt, start_rescale
-  use mod_constant, only : Cp, gamma_1, over_gamma_1, mu0_T0_S, over_T0
+  use mod_constant, only : Cp, gamma_1, over_gamma_1, mu0_T0_S_over_T0_2_3, over_T0
   use cpu_gpu_mpi
 contains
   subroutine calc_mean(step, ireq, flag_re, nx, ny, nz, Jacobian, QJ, Qm)
@@ -319,7 +319,7 @@ contains
       enddo;enddo
 
       ! friction velocity
-      mu    = mu0_T0_S / (Tm(1) + 111.d0) * (Tm(1) * over_T0)**1.5
+      mu    = mu0_T0_S_over_T0_2_3 / (Tm(1) + 111.d0) * Tm(1)**1.5
       nu    = mu / rhom(1)
       taure = mu * abs(-Um(1) + Um(2)) / (-y(1) + y(2))
       utre  = sqrt(taure / rhom(1))
@@ -336,14 +336,14 @@ contains
         weight(j) = min(1.d0, 0.5d0 * (1.d0 + tanh(4.d0 * (etin(j) - 0.2d0) / (0.6d0 * etin(j) + 0.2d0)) / tanh(4.d0)))
       enddo
 
-      jj_y(:) = -1
+      jj_y(:) = 0
       do j = 1, ny
         do jj = 2, ny
-          if (ypre(jj) > ypin(j)) then
+          if (ypre(jj) >= ypin(j)) then
             ady     = (-ypre(jj-1) + ypin(j)) / (-ypre(jj-1) + ypre(jj))
             one_ady = 1.d0 - ady
             ! mean
-            Umin(j) = beta * (one_ady * Um(jj-1) + ady * Um(jj))!(Um(jj-1) + ady * (-Um(jj-1) + Um(jj)))
+            Umin(j) = beta * (one_ady * Um(jj-1) + ady * Um(jj))!Um(jj-1) + ady * (-Um(jj-1) + Um(jj))
             Vmin(j) =         one_ady * Vm(jj-1) + ady * Vm(jj) !Vm(jj-1) + ady * (-Vm(jj-1) + Vm(jj))
             Tmin(j) =         one_ady * Tm(jj-1) + ady * Tm(jj) !Tm(jj-1) + ady * (-Tm(jj-1) + Tm(jj))
             pmin(j) =         one_ady * pm(jj-1) + ady * pm(jj) !pm(jj-1) + ady * (-pm(jj-1) + pm(jj))
@@ -352,10 +352,10 @@ contains
           endif
       enddo;enddo
 
-      jj_e(:) = -1
+      jj_e(:) = 0
       do j = 1, ny
         do jj = 2, ny
-          if (etre(jj) > etin(j)) then
+          if (etre(jj) >= etin(j)) then
             ade     = (-etre(jj-1) + etin(j)) / (-etre(jj-1) + etre(jj))
             one_ade = 1.d0 - ade
             ! mean
@@ -369,28 +369,30 @@ contains
       enddo;enddo
       
       do k = 1, nz
-        do j = 1, ny
+        do j = 2, ny
           jj = jj_y(j)
-          if (jj > 0) then
+          if (jj > 1) then
             ady     = (-ypre(jj-1) + ypin(j)) / (-ypre(jj-1) + ypre(jj))
             one_ady = 1.d0 - ady
-            ufin(j,k) = beta * (one_ady * ufre(jj-1,k) + ady * ufre(jj,k))!(ufre(jj-1,k) + ady * (-ufre(jj-1,k) + ufre(jj,k)))
-            vfin(j,k) = beta * (one_ady * vfre(jj-1,k) + ady * vfre(jj,k))!(vfre(jj-1,k) + ady * (-vfre(jj-1,k) + vfre(jj,k)))
-            wfin(j,k) = beta * (one_ady * wfre(jj-1,k) + ady * wfre(jj,k))!(wfre(jj-1,k) + ady * (-wfre(jj-1,k) + wfre(jj,k)))
+            ufin(j,k) = beta * (one_ady * ufre(jj-1,k) + ady * ufre(jj,k))!ufre(jj-1,k) + ady * (-ufre(jj-1,k) + ufre(jj,k))
+            vfin(j,k) = beta * (one_ady * vfre(jj-1,k) + ady * vfre(jj,k))!vfre(jj-1,k) + ady * (-vfre(jj-1,k) + vfre(jj,k))
+            wfin(j,k) = beta * (one_ady * wfre(jj-1,k) + ady * wfre(jj,k))!wfre(jj-1,k) + ady * (-wfre(jj-1,k) + wfre(jj,k))
             Tfin(j,k) =         one_ady * Tfre(jj-1,k) + ady * Tfre(jj,k) !Tfre(jj-1,k) + ady * (-Tfre(jj-1,k) + Tfre(jj,k))
             pfin(j,k) =         one_ady * pfre(jj-1,k) + ady * pfre(jj,k) !pfre(jj-1,k) + ady * (-pfre(jj-1,k) + pfre(jj,k))
           endif
           jj = jj_e(j)
-          if (jj > 0) then
+          if (jj > 1) then
             ade     = (-etre(jj-1) + etin(j)) / (-etre(jj-1) + etre(jj))
             one_ade = 1.d0 - ade
-            ufout(j,k) = beta * (one_ade * ufre(jj-1,k) + ade * ufre(jj,k))!(ufre(jj-1,k) + ade * (-ufre(jj-1,k) + ufre(jj,k)))
-            vfout(j,k) = beta * (one_ade * vfre(jj-1,k) + ade * vfre(jj,k))!(vfre(jj-1,k) + ade * (-vfre(jj-1,k) + vfre(jj,k)))
-            wfout(j,k) = beta * (one_ade * wfre(jj-1,k) + ade * wfre(jj,k))!(wfre(jj-1,k) + ade * (-wfre(jj-1,k) + wfre(jj,k)))
+            ufout(j,k) = beta * (one_ade * ufre(jj-1,k) + ade * ufre(jj,k))!ufre(jj-1,k) + ade * (-ufre(jj-1,k) + ufre(jj,k))
+            vfout(j,k) = beta * (one_ade * vfre(jj-1,k) + ade * vfre(jj,k))!vfre(jj-1,k) + ade * (-vfre(jj-1,k) + vfre(jj,k))
+            wfout(j,k) = beta * (one_ade * wfre(jj-1,k) + ade * wfre(jj,k))!wfre(jj-1,k) + ade * (-wfre(jj-1,k) + wfre(jj,k))
             Tfout(j,k) =         one_ade * Tfre(jj-1,k) + ade * Tfre(jj,k) !Tfre(jj-1,k) + ade * (-Tfre(jj-1,k) + Tfre(jj,k))
             pfout(j,k) =         one_ade * pfre(jj-1,k) + ade * pfre(jj,k) !pfre(jj-1,k) + ade * (-pfre(jj-1,k) + pfre(jj,k))
           endif
       enddo;enddo
+
+      ! j = 1
   
       ! re-introducing
       do k = 1, nz
