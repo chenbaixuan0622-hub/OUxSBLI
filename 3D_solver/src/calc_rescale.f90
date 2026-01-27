@@ -392,8 +392,6 @@ contains
           endif
       enddo;enddo
 
-      ! j = 1
-  
       ! re-introducing
       do k = 1, nz
         kh = mod(k+nz/2,nz) + 1
