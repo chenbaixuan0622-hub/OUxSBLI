@@ -109,7 +109,7 @@ contains
           call nvtxEndRange
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
           call nvtxStartRange("calc rescale", 5)
-          call rescale_recv_send(1, flag_re, nx, ny, nz, t1, y, Jacobian_cpu, Qm_cpu)
+          call rescale_recv_send(1, flag_re, nx, ny, nz, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
           call nvtxEndRange
         endif
 
@@ -133,7 +133,7 @@ contains
             call set_bc(myrank, nx, ny, nz, Jacobian, QJ2)
           endif
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(2, flag_re, nx, ny, nz, t1, y, Jacobian_cpu, Qm_cpu)
+          call rescale_recv_send(2, flag_re, nx, ny, nz, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
         endif
 
         if (mod(myrank,2) == 0) then
@@ -156,14 +156,16 @@ contains
             call set_bc(myrank, nx, ny, nz, Jacobian, QJ)
           endif
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(3, flag_re, nx, ny, nz, t1, y, Jacobian_cpu, Qm_cpu)
+          call rescale_recv_send(3, flag_re, nx, ny, nz, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
         endif
       enddo
       if (mod(myrank, 2) == 0) then
         call send_recv_for_print_even(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
       else
         call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
-        call write_Qm(ny, t2, y, Qm_cpu)
+        if (myrank == rerank + 1) then
+          call write_Qm(ny, t2, y, Qm_cpu)
+        endif
       endif
     enddo
 
@@ -264,7 +266,7 @@ contains
             call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
           endif
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(1, flag_re, nx, ny, nz, t1, y, Jacobian_cpu, Qm_cpu)
+          call rescale_recv_send(1, flag_re, nx, ny, nz, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
         endif
 
         if (mod(myrank,2) == 0) then
@@ -287,7 +289,7 @@ contains
             call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
           endif
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(2, flag_re, nx, ny, nz, t1, y, Jacobian_cpu, Qm_cpu)
+          call rescale_recv_send(2, flag_re, nx, ny, nz, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
         endif
 
         if (mod(myrank,2) == 0) then
@@ -310,7 +312,7 @@ contains
             call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
           endif
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(3, flag_re, nx, ny, nz, t1, y, Jacobian_cpu, Qm_cpu)
+          call rescale_recv_send(3, flag_re, nx, ny, nz, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
         endif
 
         if (mod(myrank,2) == 0) then
@@ -333,14 +335,16 @@ contains
             call set_bc(myrank, nx, ny, nz, Jacobian, QJ)
           endif
         elseif (myrank == rerank+1 .and. kind(id_rescale) == 4) then
-          call rescale_recv_send(4, flag_re, nx, ny, nz, t1, y, Jacobian_cpu, Qm_cpu)
+          call rescale_recv_send(4, flag_re, nx, ny, nz, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
         endif
       enddo
       if (mod(myrank, 2) == 0) then
         call send_recv_for_print_even(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
       else
         call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
-        call write_Qm(ny, t2, y, Qm_cpu)
+        if (myrank == rerank + 1) then
+          call write_Qm(ny, t2, y, Qm_cpu)
+        endif
       endif
     enddo
 

@@ -106,23 +106,11 @@ contains
         !$cuf kernel do(2)<<<*,*>>>
         do k = 1, nz-6
           do j = 2, ny-1
-            ! inlet + damping
-            l   = ny*5*(k-1)+5*(j-1)
-            rho = Qre(l+1); rhou = Qre(l+2); rhov = Qre(l+3); rhow = Qre(l+4); e = Qre(l+5)
-            QJ(1,1,j,k+3) = rho
-            QJ(2,1,j,k+3) = rhou
-            QJ(3,1,j,k+3) = rhov
-            QJ(4,1,j,k+3) = rhow
-            pre = gamma_1 * (e - 0.5d0 * (rhou**2 + rhov**2 + rhow**2) / rho)
-            pin = gamma_1 * (QJ(5,2,j,k+3) - 0.5d0 * &
-                  (QJ(2,2,j,k+3)**2 + QJ(3,2,j,k+3)**2 + QJ(4,2,j,k+3)**2) / QJ(1,2,j,k+3))
-            p   = pre - 0.5d0 * (pre - pin)
-            QJ(5,1,j,k+3) = p * over_gamma_1 + 0.5d0 * (rhou**2 + rhov**2 + rhow**2) / rho
-            ! outlet
+            i = ny*5*(k-1)+5*(j-1)
             do l = 1, 5
+              QJ(l,1,j,k+3)  = Qre(i+l)
               QJ(l,nx,j,k+3) = QJ(l,nx-1,j,k+3)
-            enddo
-        enddo;enddo
+        enddo;enddo;enddo
       else
         !$cuf kernel do(2)<<<*,*>>>
         do k = 4, nz-3
