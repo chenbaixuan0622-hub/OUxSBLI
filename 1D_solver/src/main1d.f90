@@ -18,8 +18,8 @@ program main1d
 
   allocate(Q(nx,3), x(nx))
 
-  call set_init(nx, x, Q)
   call set_grid(nx, x)
+  call set_init(nx, x, Q)
 
   call cpu_time(t_start)
   call RungeKutta(myrank, nx, x, Q)

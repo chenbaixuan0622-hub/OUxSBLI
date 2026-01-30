@@ -1,7 +1,7 @@
 module calc_time_dev
   use cudafor
   use mpi
-  use mod_globals, only : id_visc, id_LL, nt, np, dt, dx, over_dx, dtdx, blocks, threads
+  use mod_globals, only : id_visc, id_LL, id_igr, nt, np, dt, dx, over_dx, dtdx, blocks, threads
   use mod_constant, only : gamma_1, mu0_T0_S_over_T0_2_3
   use calc_flux
   use calc_visc
@@ -73,6 +73,7 @@ contains
 
       allocate(Q(3,nx), Q2(3,nx), Z(2,nx), sigma(nx), R(3,nx-2))
 
+      sigma     = 0.e0
       sigma_cpu = 0.e0
       call print_1d(0, nx, real(x), real(Q_cpu), sigma_cpu)
       Q = Q_cpu

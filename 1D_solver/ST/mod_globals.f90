@@ -14,7 +14,7 @@ module mod_globals
   integer(2), parameter :: id_recal      = 0
 
   ! mesh
-  integer, parameter :: nx = 4097
+  integer, parameter :: nx = 1025!4097
   
   ! GPU
   type(dim3), parameter :: threads = dim3(128,1,1)
@@ -46,5 +46,6 @@ module mod_globals
   real(8), parameter :: dx   = Lx / dble(nx-1)
   real(8), parameter :: over_dx = 1.d0 / dx
   real(8), parameter :: dtdx = dt / dx
+  real(8), parameter :: alpha = 10.d0 * dx**2
 end module mod_globals
 

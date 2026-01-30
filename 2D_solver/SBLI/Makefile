@@ -1,6 +1,6 @@
 FC = mpif90
 
-OUTPUT_OPTIN = -cuda -acc -fast -Minfo=accel -gpu=ptxinfo, -lnvhpcwrapnvtx
+OUTPUT_OPTIN = -cuda -acc -fast -Minfo=accel -cudalib=curand,cufft -gpu=ptxinfo -lnvhpcwrapnvtx
 
 .SUFFIXES : .f90
 
@@ -31,7 +31,9 @@ OBJ =	mod_globals.o \
       calc_flux.o \
       calc_flux_base.o \
       calc_steps.o \
+      calc_forcing.o \
       set_bc_common.o \
+      set_compressible_bl.o \
       set.o \
       print.o \
       preprocess.o \
@@ -39,7 +41,7 @@ OBJ =	mod_globals.o \
       main.o
 
 a.out: $(OBJ)
-		$(FC) -cuda -acc -fast -Minfo -lnvhpcwrapnvtx -I./ $^
+		$(FC) -cuda -acc -fast -Minfo -cudalib=curand,cufft -lnvhpcwrapnvtx -I./ $^
 
 $(TARGET): $(OBJ)
 		$(LINK.f) $^ $(LOADLIBES) $(LDLIBS) -o $@
@@ -47,7 +49,8 @@ $(TARGET): $(OBJ)
 mod_constant.o: mod_globals.mod
 set_bc_common.o: mod_globals.mod
 set_init_common.o: mod_globals.mod mod_constant.mod
-set.o: mod_globals.mod mod_constant.mod set_bc_common.mod set_coordinate.mod
+set_compressible_bl.o: mod_globals.mod mod_constant.mod
+set.o: mod_globals.mod mod_constant.mod set_bc_common.mod set_coordinate.mod set_compressible_bl.mod calc_forcing.mod
 calc_physical_quantities.o: mod_globals.mod mod_constant.mod
 calc_common.o: mod_globals.mod
 calc_keep.o: mod_globals.mod mod_constant.mod 
@@ -62,6 +65,7 @@ calc_flux.o: mod_globals.mod mod_constant.mod calc_keep.mod calc_slau.mod calc_r
 calc_flux_base.o: mod_globals.mod calc_physical_quantities.mod calc_hybrid.mod calc_flux.mod calc_visc2.mod calc_visc4.mod set.mod calc_igr.mod
 calc_hybrid.o: mod_globals.mod
 calc_steps.o: mod_globals.mod
+calc_forcing.o: mod_globals.mod
 preprocess.o: mod_globals.mod print.mod
 calc_time_dev.o: mod_globals.mod preprocess.mod set.mod calc_flux_base.mod calc_steps.mod print.mod
 print.o: mod_globals.mod

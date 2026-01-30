@@ -5,6 +5,7 @@ module set
                           ny2, rho2, p2, ux, uy, rf, Taw, rho3, p3, ux3, uy3
   use mod_constant, only : Cp, gamma_1, over_gamma, over_gamma_1
   use set_bc_common
+  use set_compressible_bl
   implicit none
   integer No
 contains
@@ -12,26 +13,39 @@ contains
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: Lx, Ly, Lz
     real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(1)
-    integer i, j, ny_b
+    integer i, j, ny_b, nx1, nx2
     real(8) dx1, dy1, ximp, Lx_s
-    dx1  = Lx / dble(nx-1)
+    dx1  = 20.d0 * blt / dble(512)
     dy1  = dx1
-    ximp = 60.d0 * blt
+    ximp = 100.d0 * blt
 
     x(1) = 0.d0
-    do i = 1, nx-1
+    ! buffer region
+    nx1 = 512
+    nx2 = nx - 256
+    do i = 1, nx1
+      dx(i) = dx1 * (1.d0 + 3.d0 * dble(nx1-i) / dble(nx1))
+      x(i+1) = x(i) + dx(i)
+    enddo
+    ! computational region
+    do i = nx1, nx2-1
       dx(i) = dx1
+      x(i+1) = x(i) + dx(i)
+    enddo
+    ! buffer region
+    do i = nx2, nx-1
+      dx(i) = dx1 * (1.d0 + 3.d0 * dble(i-nx2) / dble(nx-nx2))
       x(i+1) = x(i) + dx(i)
     enddo
     x(:) = x(:) - ximp
 
     y(1) = 0.d0
     do j = 1, ny-1
-      if (y(j) <= 3.d0 * blt) then
+      if (y(j) <= 5.d0 * blt) then
         dy(j) = min(1.d0, max(0.14d0, dble(j)/dble(128))) * dy1
         ny_b  = j
       else
-        dy(j) = dy1 * (1.d0 + 0.75d0 * dble(j-ny_b) / dble(ny-ny_b))
+        dy(j) = dy1 * (1.d0 + 1.5d0 * dble(j-ny_b) / dble(ny-ny_b))
       endif
       y(j+1) = y(j) + dy(j)
     enddo
@@ -55,21 +69,18 @@ contains
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
     real(8), intent(out) :: Q(4,nx,ny)
+    real(8), allocatable :: rho(:), u(:), v(:), T(:)
     integer i, j
-    real(8) :: eta, rho, u, v, w, T, Tw, p_wall
+    allocate(rho(ny), u(ny), v(ny), T(ny))
+    call calc_HD_Blasius(ny, y, blt, u0, T0, p0, M0, rho, u, v, T)
     do j = 1, ny
       do i = 1, nx
-        eta = 5.d0 * y(j) / blt
-        u   = min(u0, u0 * (0.0015d0 * eta**4 - 0.0181d0 * eta**3 + 0.029d0 * eta**2 + 0.3192 * eta + 0.0003d0))
-        v   = 0.d0
-        Tw  = Taw
-        T   = Tw + (Taw - Tw) * u / u0 - rf * u**2 / (2.d0 * Cp)
-        rho = p0 / (R * T)
-        Q(1,i,j) = rho
-        Q(2,i,j) = Q(1,i,j) * u
-        Q(3,i,j) = Q(1,i,j) * v
-        Q(4,i,j) = p0 * over_gamma_1 + 0.5d0 * (Q(2,i,j)**2 + Q(3,i,j)**2) / Q(1,i,j)
+        Q(1,i,j) = rho(j)
+        Q(2,i,j) = rho(j) * u(j)
+        Q(3,i,j) = rho(j) * v(j)
+        Q(4,i,j) = p0 * over_gamma_1 + 0.5d0 * rho(j) * (u(j)**2 + v(j)**2)
     enddo;enddo
+    deallocate(rho, u, v, T)
   end subroutine set_init
 
 
@@ -93,18 +104,6 @@ contains
     real(8), parameter :: c3   = sqrt(gamma * p3 / rho3)
     !$cuf kernel do(1)<<<*,*>>>
     do j = 2, ny-1
-      ! inlet
-      eta = 5.d0 * y(j) / blt
-      u   = min(u0, u0 * (0.0015d0 * eta**4 - 0.0181d0 * eta**3 + 0.029d0 * eta**2 + 0.3192 * eta + 0.0003d0))
-      v   = 0.d0
-      Tw  = Taw
-      T   = Tw + (Taw - Tw) * u / u0 - rf * u**2 / (2.d0 * Cp)
-      rho = p0 / (R * T)
-      Jacobian_tmp = 1.d0 / Jacobian(1,j)
-      QJ(1,1,j) = rho * Jacobian_tmp
-      QJ(2,1,j) = QJ(1,1,j) * u
-      QJ(3,1,j) = QJ(1,1,j) * v
-      QJ(4,1,j) = (p0 * over_gamma_1 * Jacobian_tmp + 0.5d0 * (QJ(2,1,j)**2 + QJ(3,1,j)**2) / QJ(1,1,j))
       do l = 1, 4
         ! outlet
         QJ(l,nx,j)   = QJ(l,nx-1,j)
@@ -174,7 +173,7 @@ contains
   end subroutine set_bc
 
 
-  attributes(global) subroutine calc_force(nx, ny, x, y, dx, dy, Q, Fout)
+  subroutine calc_force(nx, ny, x, y, dx, dy, Q, Fout)
     integer, intent(in), value   :: nx, ny
     real(8), intent(in), device  :: x(nx), y(ny), dx(nx-1), dy(ny-1)
     real(8), intent(in), device  :: Q(4,nx,ny)

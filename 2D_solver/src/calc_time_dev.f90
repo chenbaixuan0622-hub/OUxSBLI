@@ -56,6 +56,7 @@ contains
       endif
       call pre_calc(nx, ny, myrank, nranks, x_cpu, dx_cpu, y_cpu, dy_cpu, Jacobian_cpu, Q(:,:,:,1), overlap, &
                     x, y, dx, dy, xix, etay, Jacobian, QJ)
+      QJ2 = QJ
       if (kind(id_LL) == 4) then
         call init_state(nx, ny, state)
       endif
@@ -164,7 +165,8 @@ contains
       print *, "myrank is ", myrank, " memory allocation has completed"
       call pre_calc(nx, ny, myrank, nranks, x_cpu, dx_cpu, y_cpu, dy_cpu, Jacobian_cpu, Q(:,:,:,1), overlap, &
                     x, y, dx, dy, xix, etay, Jacobian, QJ)
-      Rs = 0.d0
+      QJs = QJ
+      Rs  = 0.d0
       if (kind(id_LL) == 4) then
         call init_state(nx, ny, state)
       endif
