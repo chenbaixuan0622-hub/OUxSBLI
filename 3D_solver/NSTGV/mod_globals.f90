@@ -2,9 +2,9 @@ module mod_globals
   use cudafor
   implicit none
   integer, parameter    :: dimension = 3
-  integer, parameter    :: accuracy  = 2 
-  integer, parameter    :: offset    = accuracy / 2
   integer(4), parameter :: id_visc   = 2
+  integer(2), parameter :: id_LL     = 0
+  integer(2), parameter :: id_igr    = 0
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc       ! kind2 Euler       !
   !               ! kind4 NS          !
@@ -55,6 +55,8 @@ module mod_globals
   integer(kind=4), parameter :: id_slau     = 0
   integer(kind=2), parameter :: slau_wall   = 0
   integer(kind=2), parameter :: id_rescale  = 0
+  integer(kind=2), parameter :: id_gpumpi   = 0
+  real(8), parameter         :: blt         = 0.d0
 
   ! mesh
   real(8), parameter :: L0 = 1.524d-3

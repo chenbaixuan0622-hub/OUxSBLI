@@ -163,7 +163,7 @@ contains
         call send_recv_for_print_even(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
       else
         call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
-        if (myrank == rerank + 1) then
+        if (myrank == rerank + 1 .and. kind(id_rescale) == 4) then
           call write_Qm(ny, t2, y, Qm_cpu)
         endif
       endif
@@ -342,7 +342,7 @@ contains
         call send_recv_for_print_even(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
       else
         call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
-        if (myrank == rerank + 1) then
+        if (myrank == rerank + 1 .and. kind(id_rescale) == 4) then
           call write_Qm(ny, t2, y, Qm_cpu)
         endif
       endif

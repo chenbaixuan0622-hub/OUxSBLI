@@ -1,6 +1,8 @@
 module calc_muscl
   use mod_constant, only : one_third, one_sixth, one_twelfth
   implicit none
+  private
+  public delta4, delta6
   interface minmod
     module procedure minmod2, minmod3
   end interface
@@ -12,33 +14,24 @@ module calc_muscl
   interface MUSCL4th
     module procedure MUSCL4thnonTVD, MUSCL4thTVD, MUSCL4thThreshold
   end interface
-
-  interface calc_4points
-    module procedure calc_4points_2d, calc_4points_3d
-  end interface
-  
-  interface calc_6points
-    module procedure calc_6points_2d, calc_6points_3d
-  end interface
 contains
-  !dir$ inline
-  attributes(device) function minmod2(x, y) result(ans)
+  pure attributes(device) function minmod2(x, y) result(ans)
     real(8), intent(in), value :: x, y
     real(8) :: ans, sgn
     sgn = sign(1.d0, x)
     ans = sgn * max(min(abs(x), sgn * y), 0.d0)
   end function minmod2
 
-  !dir$ inline
-  attributes(device) function minmod3(x, y, z) result(ans)
+
+  pure attributes(device) function minmod3(x, y, z) result(ans)
     real(8), intent(in), value :: x, y, z
     real(8) :: ans, sgn
     sgn = sign(1.d0, x)
     ans = sgn * max(min(abs(x), sgn * y, sgn * z), 0.d0)
   end function minmod3
 
-  !dir$ inline
-  attributes(device) function d33(d1, d2, d3) result(ans)
+
+  pure attributes(device) function d33(d1, d2, d3) result(ans)
     real(8), intent(in), value :: d1, d2, d3 
     real(8) :: ans
     ans =          minmod(d1, 2.d0 * d2, 2.d0 * d3) &
@@ -46,163 +39,124 @@ contains
                  + minmod(d3, 2.d0 * d1, 2.d0 * d2)
   end function d33
 
-  !dir$ inline
-  attributes(device) function MUSCL3rdnonTVD(id_tvd, sensor, a2, a3, d) result(alr)
-    integer(kind=2), intent(in), value :: id_tvd
-    real(8), intent(in), value         :: sensor, a2, a3
-    real(8), intent(in), device        :: d(3)
-    real(8), constant :: b = (3.d0 - one_third) / (1.d0 - one_third)
-    real(8) :: alr(2)
-    alr(1) = a2 + 0.5d0 * (d(1) + 2.d0 * d(2)) * one_third
-    alr(2) = a3 - 0.5d0 * (d(3) + 2.d0 * d(2)) * one_third
-  end function MUSCL3rdnonTVD
 
-  attributes(device) function MUSCL3rdMinmod(id_tvd, sensor, a2, a3, d) result(alr)
-    integer(kind=4), intent(in), value :: id_tvd
-    real(8), intent(in), value         :: sensor, a2, a3
-    real(8), intent(in), device        :: d(3)
+  pure attributes(device) subroutine MUSCL3rdnonTVD(id_tvd, sensor, a2, a3, d1, d2, d3, al, ar)
+    integer(kind=2), intent(in) :: id_tvd
+    real(8), intent(in)         :: sensor, a2, a3, d1, d2, d3
+    real(8), intent(out)        :: al, ar
+    al = a2 + 0.5d0 * (d1 + 2.d0 * d2) * one_third
+    ar = a3 - 0.5d0 * (d3 + 2.d0 * d2) * one_third
+  end subroutine MUSCL3rdnonTVD
+
+
+  pure attributes(device) subroutine MUSCL3rdMinmod(id_tvd, sensor, a2, a3, d1, d2, d3, al, ar)
+    integer(kind=4), intent(in) :: id_tvd
+    real(8), intent(in)         :: sensor, a2, a3, d1, d2, d3
+    real(8), intent(out)        :: al, ar
     real(8), constant :: b = (3.d0 - one_third) / (1.d0 - one_third)
-    real(8) :: alr(2)
     block
       real(8) dt1, dt2
-      dt1 = minmod(d(1), b * d(2))
-      dt2 = minmod(d(2), b * d(1))
-      alr(1) = a2 + 0.5d0 * (dt1 + 2.d0 * dt2) * one_third
+      dt1 = minmod(d1, b * d2)
+      dt2 = minmod(d2, b * d1)
+      al  = a2 + 0.5d0 * (dt1 + 2.d0 * dt2) * one_third
     end block
     block
       real(8) dt3, dt4
-      dt3 = minmod(d(3), b * d(2))
-      dt4 = minmod(d(2), b * d(3))
-      alr(2) = a3 - 0.5d0 * (dt3 + 2.d0 * dt4) * one_third
+      dt3 = minmod(d3, b * d2)
+      dt4 = minmod(d2, b * d3)
+      ar  = a3 - 0.5d0 * (dt3 + 2.d0 * dt4) * one_third
     end block
-  end function MUSCL3rdMinmod
+  end subroutine MUSCL3rdMinmod
 
-  attributes(device) function MUSCL3rdThreshold(id_tvd, sensor, a2, a3, d) result(alr)
+
+  pure attributes(device) subroutine MUSCL3rdThreshold(id_tvd, sensor, a2, a3, d1, d2, d3, al, ar)
     use mod_globals, only : threshold
-    integer(kind=8), intent(in), value :: id_tvd
-    real(8), intent(in), value         :: sensor, a2, a3
-    real(8), intent(in), device        :: d(3)
-    real(8) alr(2)
+    integer(kind=8), intent(in) :: id_tvd
+    real(8), intent(in)         :: sensor, a2, a3, d1, d2, d3
+    real(8), intent(out)        :: al, ar
     integer(kind=2) :: id2
     integer(kind=4) :: id4
     if (sensor < threshold) then
-      alr = MUSCL3rdnonTVD(id2,sensor,a2,a3,d)
+      call MUSCL3rdnonTVD(id2, sensor, a2, a3, d1, d2, d3, al, ar)
     else
-      alr = MUSCL3rdMinmod(id4,sensor,a2,a3,d)
+      call MUSCL3rdMinmod(id4, sensor, a2, a3, d1, d2, d3, al, ar)
     endif
-  end function MUSCL3rdThreshold
+  end subroutine MUSCL3rdThreshold
 
-  !dir$ inline
-  attributes(device) function MUSCL4thnonTVD(id_tvd, sensor, a2, a3, d) result(alr)
-    integer(kind=2), intent(in), value :: id_tvd
-    real(8), intent(in), value         :: sensor, a2, a3
-    real(8), intent(in), device        :: d(5)
-    real(8), constant :: phi = 1.d0 / 30.d0
-    real(8) d3(3), alr(2)
-    d3(:)  = d(1:3) - 2.d0 * d(2:4) + d(3:5)
-    alr(1) = a2 + (2.d0 * d(2) - 12.d0 * phi * d3(1) &
-                  + 4.d0 * d(3) - (1.d0 - 12.d0 * phi) * d3(2)) * one_twelfth
-    alr(2) = a3 - (4.d0 * d(3) - (1.d0 - 12.d0 * phi) * d3(2) &
-                  + 2.d0 * d(4) - 12.d0 * phi * d3(3)) * one_twelfth
-  end function MUSCL4thnonTVD
 
-  attributes(device) function MUSCL4thTVD(id_tvd, sensor, a2, a3, d) result(alr)
-    integer(kind=4), intent(in), value :: id_tvd
-    real(8), intent(in), value         :: sensor,a2, a3
-    real(8), intent(in), device        :: d(5)
-    real(8) delta2, alr(2)
-    delta2 = d(3) - d33(d(2), d(3), d(4)) * one_sixth
+  pure attributes(device) subroutine MUSCL4thnonTVD(id_tvd, sensor, a2, a3, d1, d2, d3, d4, d5, al, ar)
+    integer(kind=2), intent(in) :: id_tvd
+    real(8), intent(in)         :: sensor, a2, a3, d1, d2, d3, d4, d5
+    real(8), intent(out)        :: al, ar
+    al = a2 + (-0.4d0 * d1 + 2.2d0 * d2 + 4.8d0 * d3 - 0.6d0 * d4) * one_twelfth
+    ar = a3 - (-0.6d0 * d2 + 4.8d0 * d3 + 2.2d0 * d4 - 0.4d0 * d5) * one_twelfth
+  end subroutine MUSCL4thnonTVD
+
+
+  pure attributes(device) subroutine MUSCL4thTVD(id_tvd, sensor, a2, a3, d1, d2, d3, d4, d5, al, ar)
+    integer(kind=4), intent(in) :: id_tvd
+    real(8), intent(in)         :: sensor,a2, a3, d1, d2, d3, d4, d5
+    real(8), intent(out)        :: al, ar
+    real(8) delta2
+    delta2 = d3 - d33(d2, d3, d4) * one_sixth
     block
       real(8) delta1, dl, dr
-      delta1 = d(2) - d33(d(1), d(2), d(3)) * one_sixth
+      delta1 = d2 - d33(d1, d2, d3) * one_sixth
       dl = minmod(delta1, 4.d0 * delta2)
       dr = minmod(delta2, 4.d0 * delta1)
-      alr(1) = a2 + (dl + 2.d0 * dr) * one_sixth
+      al = a2 + (dl + 2.d0 * dr) * one_sixth
     end block
     block
       real(8) delta3, dl, dr
-      delta3 = d(4) - d33(d(3), d(4), d(5)) * one_sixth
+      delta3 = d4 - d33(d3, d4, d5) * one_sixth
       dl = minmod(delta2, 4.d0 * delta3)
       dr = minmod(delta3, 4.d0 * delta2)
-      alr(2) = a3 - (dr + 2.d0 * dl) * one_sixth
+      ar = a3 - (dr + 2.d0 * dl) * one_sixth
     end block
-  end function MUSCL4thTVD
+  end subroutine MUSCL4thTVD
 
-  attributes(device) function MUSCL4thThreshold(id_tvd, sensor, a2, a3, d) result(alr)
+
+  pure attributes(device) subroutine MUSCL4thThreshold(id_tvd, sensor, a2, a3, d1, d2, d3, d4, d5, al, ar)
     use mod_globals, only : threshold
-    integer(kind=8), intent(in), value :: id_tvd
-    real(8), intent(in), value         :: sensor, a2, a3
-    real(8), intent(in), device        :: d(5)
+    integer(kind=8), intent(in) :: id_tvd
+    real(8), intent(in)         :: sensor, a2, a3, d1, d2, d3, d4, d5
+    real(8), intent(out)        :: al, ar
     real(8) alr(2)
     integer(kind=2) :: id2
     integer(kind=4) :: id4
     if (sensor < threshold) then
-      alr = MUSCL4thnonTVD(id2,sensor,a2,a3,d)
+      call MUSCL4thnonTVD(id2, sensor, a2, a3, d1, d2, d3, d4, d5, al, ar)
     else
-      alr = MUSCL4thTVD(id4,sensor,a2,a3,d)
+      call MUSCL4thTVD(id4, sensor, a2, a3, d1, d2, d3, d4, d5, al, ar)
     endif
-  end function MUSCL4thThreshold
+  end subroutine MUSCL4thThreshold
 
-  !dir$ inline
-  attributes(device) function delta4(sensor, a) result(alr)
+
+  pure attributes(device) subroutine delta4(sensor, a, al, ar)
     use mod_globals, only : id_tvd
-    real(8), intent(in), value :: sensor
-    real(8), intent(in)        :: a(4)
-    real(8) :: alr(2), d(3)
-    d(:) = -a(1:3) + a(2:4)
-    alr  = MUSCL3rd(id_tvd, sensor, a(2), a(3), d)
-  end function delta4
+    real(8), intent(in), value      :: sensor
+    real(8), intent(in), contiguous :: a(4)
+    real(8), intent(out)            :: al, ar
+    real(8) d1, d2, d3
+    d1 = -a(1) + a(2)
+    d2 = -a(2) + a(3)
+    d3 = -a(3) + a(4)
+    call MUSCL3rd(id_tvd, sensor, a(2), a(3), d1, d2, d3, al, ar)
+  end subroutine delta4
 
-  !dir$ inline
-  attributes(device) function delta6(sensor, a) result(alr)
+
+  pure attributes(device) subroutine delta6(sensor, a, al, ar)
     use mod_globals, only : id_tvd
-    real(8), intent(in), value :: sensor
-    real(8), intent(in)        :: a(6)
-    real(8) :: alr(2), d(5)
-    d(:) = -a(1:5) + a(2:6)
-    alr  = MUSCL4th(id_tvd, sensor, a(3), a(4), d)
-  end function delta6
-
-  attributes(device) subroutine calc_4points_3d(sensor, rho, u, v, w, p, rho2, p2, V2)
-    real(8), intent(in), value   :: sensor
-    real(8), intent(in)          :: rho(4), u(4), v(4), w(4), p(4)
-    real(8), intent(out), device :: rho2(2), p2(2), V2(2,3)
-    rho2(:) = delta4(sensor, rho)
-    V2(:,1) = delta4(sensor, u)
-    V2(:,2) = delta4(sensor, v)
-    V2(:,3) = delta4(sensor, w)
-    p2(:)   = delta4(sensor, p)
-  end subroutine calc_4points_3d
-
-  attributes(device) subroutine calc_4points_2d(sensor, rho, u, v, p, rho2, p2, V2)
-    real(8), intent(in), value   :: sensor
-    real(8), intent(in)          :: rho(4), u(4), v(4), p(4)
-    real(8), intent(out), device :: rho2(2), p2(2), V2(2,2)
-    rho2(:) = delta4(sensor, rho)
-    V2(:,1) = delta4(sensor, u)
-    V2(:,2) = delta4(sensor, v)
-    p2(:)   = delta4(sensor, p)
-  end subroutine calc_4points_2d
- 
-  attributes(device) subroutine calc_6points_3d(sensor, rho, u, v, w, p, rho2, p2, V2)
-    real(8), intent(in), value   :: sensor
-    real(8), intent(in)          :: rho(6), u(6), v(6), w(6), p(6)
-    real(8), intent(out), device :: rho2(2), p2(2), V2(2,3)
-    rho2(:) = delta6(sensor, rho)
-    V2(:,1) = delta6(sensor, u)
-    V2(:,2) = delta6(sensor, v)
-    V2(:,3) = delta6(sensor, w)
-    p2(:)   = delta6(sensor, p)
-  end subroutine calc_6points_3d
- 
-  attributes(device) subroutine calc_6points_2d(sensor, rho, u, v, p, rho2, p2, V2)
-    real(8), intent(in), value   :: sensor
-    real(8), intent(in)          :: rho(6), u(6), v(6), p(6)
-    real(8), intent(out), device :: rho2(2), p2(2), V2(2,2)
-    rho2(:) = delta6(sensor, rho)
-    V2(:,1) = delta6(sensor, u)
-    V2(:,2) = delta6(sensor, v)
-    p2(:)   = delta6(sensor, p)
-  end subroutine calc_6points_2d
+    real(8), intent(in), value      :: sensor
+    real(8), intent(in), contiguous :: a(6)
+    real(8), intent(out)            :: al, ar
+    real(8) d1, d2, d3, d4, d5
+    d1 = -a(1) + a(2)
+    d2 = -a(2) + a(3)
+    d3 = -a(3) + a(4)
+    d4 = -a(4) + a(5)
+    d5 = -a(5) + a(6)
+    call MUSCL4th(id_tvd, sensor, a(3), a(4), d1, d2, d3, d4, d5, al, ar)
+  end subroutine delta6
 end module calc_muscl
 
