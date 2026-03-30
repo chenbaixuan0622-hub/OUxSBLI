@@ -3,7 +3,7 @@ module calc_hybrid
   use mod_globals, only : accuracy, offset, gamma
   implicit none
 contains
-  attributes(global) subroutine calc_Ducros(nx, ny, nz, dx, dy, dz, Q, fd)
+  pure attributes(global) subroutine calc_Ducros(nx, ny, nz, dx, dy, dz, Q, fd)
     integer, intent(in), value                         :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device       :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device       :: dy ! 1 / dy
@@ -62,7 +62,7 @@ contains
   end subroutine calc_Ducros
 
 
-  attributes(device) function Albada(e, rho) result(phi)
+  pure attributes(device) function Albada(e, rho) result(phi)
     real(8), intent(in), dimension(4), device :: e, rho
     real(8) :: d1, d2, d3, phim, phip, phi, eps = 1.d-16
     d1   = -e(1) / rho(1) + e(2) / rho(2)
@@ -74,15 +74,15 @@ contains
   end function Albada
 
 
-  attributes(device) function sigmoid(x) result(ans)
+  pure attributes(device) function sigmoid(x) result(ans)
     real(8), intent(in), value :: x
     real(8) :: ans
     ans = 0.5d0 * (tanh(10.d0 * (x - 0.5d0)) + 1.d0)
   end function sigmoid
 
 
-  attributes(device) function wiggle_detector(phi) result(ans)
-    real(8), intent(in), device :: phi(4)
+  pure attributes(device) function wiggle_detector(phi) result(ans)
+    real(8), intent(in) :: phi(4)
     real(8) ans, phi1, phi2
     phi1 = (-phi(1) + phi(2)) * (-phi(2) + phi(3))
     phi2 = (-phi(3) + phi(4)) * (-phi(2) + phi(3))

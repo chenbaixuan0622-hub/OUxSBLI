@@ -3,39 +3,43 @@ module calc_visc4
   use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third, two_third, one_twelfth
   use calc_rand
   implicit none
+  private
+  public calc_Ev4, calc_Ev_LES4, calc_Fv4, calc_Fv_LES4, calc_Gv4, calc_Gv_LES4
   real(8), parameter :: one_24 = 1.d0 / 24.d0
 contains
-  !dir$ inline
-  attributes(device) function flux4(a) result(ans)
+  pure attributes(device) function flux4(a) result(ans)
     real(8), intent(in), device :: a(3)
     real(8) ans
     ans = (-a(1) + 26.d0 * a(2) - a(3)) * one_24
   end function flux4
 
 
-  !$dir inline
-  attributes(device) subroutine calc_tau_straight(mu, u, vy, wz, d, t11, ut11)
-    real(8), intent(in)        :: mu(3), u(6), vy(6), wz(6)
-    real(8), intent(in), value :: d
-    real(8), intent(out)       :: t11, ut11
-    real(8) tmp(3)
-    tmp(:) = (2.25d0 * (-u(2:4) + u(3:5)) - (-u(1:3) + u(4:6)) * one_twelfth) * d
-    tmp(:) = tmp(:) - 0.0625d0 * (-vy(1:3) + 9.d0 * (vy(2:4) + vy(3:5)) - vy(4:6))
-    tmp(:) = tmp(:) - 0.0625d0 * (-wz(1:3) + 9.d0 * (wz(2:4) + wz(3:5)) - wz(4:6))
-    tmp(:) = two_third * mu(:) * tmp(:)
-    t11    = (-tmp(1) + 26.d0 * tmp(2) - tmp(3)) * one_24
-    tmp(1) = 0.0625d0 * (-u(1) + 9.d0 * (u(2) + u(3)) - u(4)) * tmp(1)
-    tmp(2) = 0.0625d0 * (-u(2) + 9.d0 * (u(3) + u(4)) - u(5)) * tmp(2)
-    tmp(3) = 0.0625d0 * (-u(3) + 9.d0 * (u(4) + u(5)) - u(6)) * tmp(3)
-    ut11   = (-tmp(1) + 26.d0 * tmp(2) - tmp(3)) * one_24
+  pure attributes(device) subroutine calc_tau_straight(mu, u, vy, wz, d, t11, ut11)
+    real(8), intent(in), contiguous :: mu(3), u(6), vy(6), wz(6)
+    real(8), intent(in)             :: d
+    real(8), intent(out)            :: t11, ut11
+    real(8) tmp1, tmp2, tmp3
+    tmp1 = two_third * mu(1) * ((2.25d0 * (-u(2) + u(3)) - (-u(1) + u(4)) * one_twelfth) * d &
+           - 0.0625d0 * (-vy(1) + 9.d0 * (vy(2) + vy(3)) - vy(4)) &
+           - 0.0625d0 * (-wz(1) + 9.d0 * (wz(2) + wz(3)) - wz(4)))
+    tmp2 = two_third * mu(2) * ((2.25d0 * (-u(3) + u(4)) - (-u(2) + u(5)) * one_twelfth) * d &
+           - 0.0625d0 * (-vy(2) + 9.d0 * (vy(3) + vy(4)) - vy(5)) &
+           - 0.0625d0 * (-wz(2) + 9.d0 * (wz(3) + wz(4)) - wz(5)))
+    tmp3 = two_third * mu(3) * ((2.25d0 * (-u(4) + u(5)) - (-u(3) + u(6)) * one_twelfth) * d &
+           - 0.0625d0 * (-vy(3) + 9.d0 * (vy(4) + vy(5)) - vy(6)) &
+           - 0.0625d0 * (-wz(3) + 9.d0 * (wz(4) + wz(5)) - wz(6)))
+    t11  = (-tmp1 + 26.d0 * tmp2 - tmp3) * one_24
+    tmp1 = 0.0625d0 * (-u(1) + 9.d0 * (u(2) + u(3)) - u(4)) * tmp1
+    tmp2 = 0.0625d0 * (-u(2) + 9.d0 * (u(3) + u(4)) - u(5)) * tmp2
+    tmp3 = 0.0625d0 * (-u(3) + 9.d0 * (u(4) + u(5)) - u(6)) * tmp3
+    ut11 = (-tmp1 + 26.d0 * tmp2 - tmp3) * one_24
   end subroutine calc_tau_straight
 
 
-  !$dir inline
-  attributes(device) subroutine calc_tau_straight_LES(mu, mut, u, vy, wz, d, t11, ut11)
-    real(8), intent(in)        :: mu(3), mut(3), u(6), vy(6), wz(6)
-    real(8), intent(in), value :: d
-    real(8), intent(out)       :: t11, ut11
+  pure attributes(device) subroutine calc_tau_straight_LES(mu, mut, u, vy, wz, d, t11, ut11)
+    real(8), intent(in), contiguous :: mu(3), mut(3), u(6), vy(6), wz(6)
+    real(8), intent(in)             :: d
+    real(8), intent(out)            :: t11, ut11
     real(8) tmp1(3), tmp2(3)
     tmp1(:) = (2.25d0 * (-u(2:4) + u(3:5)) - (-u(1:3) + u(4:6)) * one_twelfth) * d
     tmp1(:) = tmp1(:) - 0.0625d0 * (-vy(1:3) + 9.d0 * (vy(2:4) + vy(3:5)) - vy(4:6))
@@ -50,28 +54,29 @@ contains
   end subroutine calc_tau_straight_LES
 
 
-  !$dir inline
-  attributes(device) subroutine calc_tau_cross(mu, v, uy, d, t12, vt12)
-    real(8), intent(in)        :: mu(3), v(6), uy(6)
-    real(8), intent(in), value :: d
-    real(8), intent(out)       :: t12, vt12
-    real(8) tmp(3)
-    tmp(:) = (1.125d0 * (-v(2:4) + v(3:5)) - (-v(1:3) + v(4:6)) * one_24) * d
-    tmp(:) = tmp(:) + 0.0625d0 * (-uy(1:3) + 9.d0 * (uy(2:4) + uy(3:5)) - uy(4:6))
-    tmp(:) = mu(:) * tmp(:)
-    t12    = (-tmp(1) + 26.d0 * tmp(2) - tmp(3)) * one_24
-    tmp(1) = 0.0625d0 * (-v(1) + 9.d0 * (v(2) + v(3)) - v(4)) * tmp(1)
-    tmp(2) = 0.0625d0 * (-v(2) + 9.d0 * (v(3) + v(4)) - v(5)) * tmp(2)
-    tmp(3) = 0.0625d0 * (-v(3) + 9.d0 * (v(4) + v(5)) - v(6)) * tmp(3)
-    vt12   = (-tmp(1) + 26.d0 * tmp(2) - tmp(3)) * one_24
+  pure attributes(device) subroutine calc_tau_cross(mu, v, uy, d, t12, vt12)
+    real(8), intent(in), contiguous :: mu(3), v(6), uy(6)
+    real(8), intent(in)             :: d
+    real(8), intent(out)            :: t12, vt12
+    real(8) tmp1, tmp2, tmp3
+    tmp1 = mu(1) * ((1.125d0 * (-v(2) + v(3)) - (-v(1) + v(4)) * one_24) * d &
+                    + 0.0625d0 * (-uy(1) + 9.d0 * (uy(2) + uy(3)) - uy(4)))
+    tmp2 = mu(2) * ((1.125d0 * (-v(3) + v(4)) - (-v(2) + v(5)) * one_24) * d &
+                    + 0.0625d0 * (-uy(2) + 9.d0 * (uy(3) + uy(4)) - uy(5)))
+    tmp3 = mu(3) * ((1.125d0 * (-v(4) + v(5)) - (-v(3) + v(6)) * one_24) * d &
+                    + 0.0625d0 * (-uy(3) + 9.d0 * (uy(4) + uy(5)) - uy(6)))
+    t12  = (-tmp1 + 26.d0 * tmp2 - tmp3) * one_24
+    tmp1 = 0.0625d0 * (-v(1) + 9.d0 * (v(2) + v(3)) - v(4)) * tmp1
+    tmp2 = 0.0625d0 * (-v(2) + 9.d0 * (v(3) + v(4)) - v(5)) * tmp2
+    tmp3 = 0.0625d0 * (-v(3) + 9.d0 * (v(4) + v(5)) - v(6)) * tmp3
+    vt12 = (-tmp1 + 26.d0 * tmp2 - tmp3) * one_24
   end subroutine calc_tau_cross
 
 
-  !$dir inline
-  attributes(device) subroutine calc_tau_cross_LES(mu, mut, v, uy, d, t12, vt12)
-    real(8), intent(in)        :: mu(3), mut(3), v(6), uy(6)
-    real(8), intent(in), value :: d
-    real(8), intent(out)       :: t12, vt12
+  pure attributes(device) subroutine calc_tau_cross_LES(mu, mut, v, uy, d, t12, vt12)
+    real(8), intent(in), contiguous :: mu(3), mut(3), v(6), uy(6)
+    real(8), intent(in)             :: d
+    real(8), intent(out)            :: t12, vt12
     real(8) tmp1(3), tmp2(3)
     tmp1(:) = (1.125d0 * (-v(2:4) + v(3:5)) - (-v(1:3) + v(4:6)) * one_24) * d
     tmp1(:) = tmp1(:) + 0.0625d0 * (-uy(1:3) + 9.d0 * (uy(2:4) + uy(3:5)) - uy(4:6))

@@ -1,15 +1,4 @@
-module calc_keep
-  use mod_constant, only : R_over_gamma_1, one_third, one_sixth, one_twelfth, two_third
-  implicit none
-  real(8), parameter :: one_24        = 1.d0 / 24.d0
-  real(8), parameter :: one_48        = 1.d0 / 48.d0
-  real(8), parameter :: one_60        = 1.d0 / 60.d0
-  real(8), parameter :: one_120       = 1.d0 / 120.d0
-  real(8), parameter :: one_240       = 1.d0 / 240.d0
-  real(8), parameter :: seven_twelfth = 7.d0 / 12.d0
-contains
-  !$dir inline
-  attributes(device) function KEEP2(rho, u, v, w, uu, p, T, Normal) result(F)
+  pure attributes(device) function KEEP2(rho, u, v, w, uu, p, T, Normal) result(F)
     real(8), intent(in), dimension(2) :: rho, u, v, w, uu, p, T
     real(8), intent(in), dimension(5) :: Normal
     real(8) F(5)
@@ -23,8 +12,7 @@ contains
   end function KEEP2
 
 
-  !$dir inline
-  attributes(device) function KEEP_IGR2(rho, u, v, w, uu, p, T, sigma, Normal) result(F)
+  pure attributes(device) function KEEP_IGR2(rho, u, v, w, uu, p, T, sigma, Normal) result(F)
     real(8), intent(in), dimension(2) :: rho, u, v, w, uu, p, T, sigma
     real(8), intent(in), dimension(5) :: Normal
     real(8) F(5)
@@ -40,8 +28,7 @@ contains
   end function KEEP_IGR2
 
 
-  !$dir inline
-  attributes(device) function KEEP4(rho, u, v, w, uu, p, T, Normal) result(F)
+  pure attributes(device) function KEEP4(rho, u, v, w, uu, p, T, Normal) result(F)
     real(8), intent(in), dimension(4) :: rho, u, v, w, uu, p, T
     real(8), intent(in), dimension(5) :: Normal
     real(8) F(5), RV1, RV2, RV3, RV1_RV2, RV1_RV3 
@@ -81,8 +68,7 @@ contains
   end function KEEP4
 
 
-  !$dir inline
-  attributes(device) function KEEP_IGR4(rho, u, v, w, uu, p, T, sigma, Normal) result(F)
+  pure attributes(device) function KEEP_IGR4(rho, u, v, w, uu, p, T, sigma, Normal) result(F)
     real(8), intent(in), dimension(4) :: rho, u, v, w, uu, p, T, sigma
     real(8), intent(in), dimension(5) :: Normal
     real(8) F(5), RV1, RV2, RV3, RV1_RV2, RV1_RV3 
@@ -122,8 +108,7 @@ contains
   end function KEEP_IGR4
 
 
-  !$dir inline
-  attributes(device) function KEEP6(rho, u, v, w, uu, p, T, Normal) result(F)
+  pure attributes(device) function KEEP6(rho, u, v, w, uu, p, T, Normal) result(F)
     real(8), intent(in), dimension(6) :: rho, u, v, w, uu, p, T
     real(8), intent(in), dimension(5) :: Normal
     real(8) F(5), RV1, RV2, RV3, RV4, RV5, RV6, RV3_RV5, RV2_RV5, RV1_RV2_RV4, RV1_RV3_RV6
@@ -179,8 +164,7 @@ contains
   end function KEEP6
 
 
-  !$dir inline
-  attributes(device) function KEEP_IGR6(rho, u, v, w, uu, p, T, sigma, Normal) result(F)
+  pure attributes(device) function KEEP_IGR6(rho, u, v, w, uu, p, T, sigma, Normal) result(F)
     real(8), intent(in), dimension(6) :: rho, u, v, w, uu, p, T, sigma
     real(8), intent(in), dimension(5) :: Normal
     real(8) F(5), RV1, RV2, RV3, RV4, RV5, RV6, RV3_RV5, RV2_RV5, RV1_RV2_RV4, RV1_RV3_RV6
@@ -234,5 +218,4 @@ contains
                             + uu(1)*(p(4) + sigma(4)) + uu(4)*(p(1) + sigma(1))) * one_60)
     end block
   end function KEEP_IGR6
-end module calc_keep
 

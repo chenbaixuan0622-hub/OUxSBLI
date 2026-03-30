@@ -1,7 +1,9 @@
 module calc_les
   implicit none
+  private
+  public calc_mut
 contains
-  attributes(device) subroutine calc_differential(u,v,w,dx,dy,dz,dudx,dudy,dudz,dvdx,dvdy,dvdz,dwdx,dwdy,dwdz)
+  pure attributes(device) subroutine calc_differential(u,v,w,dx,dy,dz,dudx,dudy,dudz,dvdx,dvdy,dvdz,dwdx,dwdy,dwdz)
     real(8), intent(in), dimension(3,3,3), device :: u, v, w
     real(8), intent(in), value                    :: dx, dy, dz ! 1 /dx, 1 / dy, 1 / dz
     real(8), intent(out) :: dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz
@@ -16,7 +18,8 @@ contains
     dwdz = 0.5d0 * (-w(2,2,1) + w(2,2,3)) * dz
   end subroutine calc_differential
 
-  attributes(device) function SMS(u,v,w,uh,vh,wh,dx,dy,dz,qc2) result(nut)
+
+  pure attributes(device) function SMS(u,v,w,uh,vh,wh,dx,dy,dz,qc2) result(nut)
     real(8), intent(in), dimension(3,3,3), device :: u, v, w, uh, vh, wh
     real(8), intent(in), value                    :: dx, dy, dz, qc2 ! 1 / dx, 1 / dy, 1 / dz
     real(8) dudx,  dudy,  dudz,  dvdx,  dvdy,  dvdz,  dwdx,  dwdy,  dwdz
@@ -59,7 +62,8 @@ contains
     nut   = ftheta * Cm * (S2**(0.5d0 * alpha)) * (qc2**(0.5d0 * (1.d0 - alpha))) * (delta**(1.d0 + alpha))
   end function SMS
 
-  attributes(device) function test_filter(x) result(xh)
+
+  pure attributes(device) function test_filter(x) result(xh)
     real(8), intent(in), dimension(3,3,3), device :: x
     real(8) xh
     xh = x(2,2,2) + 0.25d0 * (x(1,2,2) - 2.d0 * x(2,2,2) + x(3,2,2) &
@@ -67,7 +71,8 @@ contains
                             + x(2,2,1) - 2.d0 * x(2,2,2) + x(2,2,3))
   end function test_filter
 
-  attributes(device) function stride_filter(x) result(xh)
+
+  pure attributes(device) function stride_filter(x) result(xh)
     real(8), intent(in), dimension(5,5,5), device   :: x
     integer i, j, k
     real(8), dimension(3,3,3) :: xh, xs
@@ -79,7 +84,8 @@ contains
     enddo;enddo;enddo
   end function stride_filter
 
-  attributes(global) subroutine calc_mut(nx, ny, nz, dx, dy, dz, Q, mut, qc2)
+
+  pure attributes(global) subroutine calc_mut(nx, ny, nz, dx, dy, dz, Q, mut, qc2)
     integer, intent(in), value   :: nx, ny, nz
     real(8), intent(in), device  :: dx(nx-1), dy(ny-1), dz(nz-1)
     real(8), intent(in), device  :: Q(5,nx,ny,nz)
