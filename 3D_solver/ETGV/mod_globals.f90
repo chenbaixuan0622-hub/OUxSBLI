@@ -1,58 +1,39 @@
 module mod_globals
   use cudafor
   implicit none
-  integer, parameter    :: dimension = 3
-  integer(2), parameter :: id_visc   = 2
-  integer(2), parameter :: id_LL     = 0
-  integer(2), parameter :: id_igr    = 0
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_visc       ! kind2 Euler       !
-  !               ! kind4 NS          !
-  !               ! kind8 LES         !
-  !               ! 1 2nd             !
-  !               ! 2 4th             !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_av         ! 0 no              !
-  !               ! 1 Neumann         !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_scheme   ! integer(2)  KEEP    !
-  !             ! real(2)     SLAU    !
-  !             ! real(4)   Weighted  !
-  !             ! real(8)   Threshold !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_sensor   ! 1 Ducros            !
-  !             ! 2 Albada            !
-  !             ! 3 Ducros + Albada   !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_accuracy ! kind2 2nd           !
-  !             ! kind4 4th           !
-  !             ! kind8 6th           !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_tvd      ! kind2 non TVD       !
-  !             ! kind4 minmod        !
-  !             ! kind8 MUSCL4th      !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_keep     ! kind2 KEEP          !
-  !             ! kind4 KEEPPE        !
-  !             ! kind8 KEP           !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_slau     ! kind2 SLAU          !
-  !             ! kind4 HR-SLAU2      !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! slau_wall   ! kind2 off           !
-  !             ! kind4 on            !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_rescale  ! kind2 off           !
-  !             ! kind4 on            !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_visc     ! kind2 Euler       !
+  !             ! kind4 NS          !
+  !             ! kind8 LES         !
+  !             ! 1 2nd             !
+  !             ! 2 4th             !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_scheme   ! integer(2) KEEP   !
+  !             ! real(2)    SLAU   !
+  !             ! real(4)    Roe    !
+  !             ! real(8)    Hybrid !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_accuracy ! kind2 2nd         !
+  !             ! kind4 4th         !
+  !             ! kind8 6th         !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_tvd      ! kind2 non TVD     !
+  !             ! kind4 minmod      !
+  !             ! kind8 Hybrid      !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_slau     ! kind2 SLAU        !
+  !             ! kind4 HR-SLAU2    !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_rescale  ! kind2 off         !
+  !             ! kind4 on          !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  integer, parameter         :: dimension = 3
+  integer(2), parameter      :: id_visc   = 2
   integer(2), parameter      :: id_scheme   = 0
-  integer, parameter         :: id_sensor   = 1
   real(8), parameter         :: threshold   = 0.4d0
-  integer(kind=8), parameter :: id_accuracy = 0
+  integer(kind=2), parameter :: id_accuracy = 0
   integer(kind=8), parameter :: id_tvd      = 0
-  integer(kind=2), parameter :: id_keep     = 0
   integer(kind=4), parameter :: id_slau     = 0
-  integer(kind=2), parameter :: slau_wall   = 0
   integer(kind=2), parameter :: id_rescale  = 0
   integer(kind=2), parameter :: id_gpumpi   = 0
   real(8), parameter         :: blt         = 0.d0
@@ -63,15 +44,14 @@ module mod_globals
   !             ! kind4 on  !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_exchange = 0
-  integer(kind=2), parameter :: id_forcing  = 0
   ! mesh
   real(8), parameter :: pi = acos(-1.d0)
   real(8), parameter :: Lx = 2.d0 * pi
   real(8), parameter :: Ly = 2.d0 * pi
   real(8), parameter :: Lz = 2.d0 * pi
-  integer, parameter :: nx = 66!258!130
-  integer, parameter :: ny = 66!258!130
-  integer, parameter :: nz = 66!258!1306
+  integer, parameter :: nx = 66
+  integer, parameter :: ny = 66
+  integer, parameter :: nz = 66
 
   integer, parameter :: nre1 = 1
   integer, parameter :: nre2 = nx
@@ -101,18 +81,17 @@ module mod_globals
   integer(kind=4), parameter  :: id_RungeKutta = 0
   integer, parameter          :: step_offset = 0
   integer, parameter          :: start_rescale = 0
-  integer, parameter          :: nt = 200!1
+  integer, parameter          :: nt = 200
   integer, parameter          :: np = 100
-  real(8), parameter          :: dt = 0.01d0!0.02d0
+  real(8), parameter          :: dt = 0.01d0
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
-  real(8), parameter :: Pr = 0.71d0
-  real(8), parameter :: Prt = 0.9d0
-  real(8), parameter :: R = 287.03d0
-
+  real(8), parameter :: Pr    = 0.71d0
+  real(8), parameter :: Prt   = 0.9d0
+  real(8), parameter :: R     = 287.03d0
   ! initial condition
-  real(8), parameter :: M0 = 0.4d0
-  real(8), parameter :: RHO0 = 1.d0
+  real(8), parameter :: M0    = 0.4d0
+  real(8), parameter :: RHO0  = 1.d0
 end module mod_globals
 

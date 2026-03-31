@@ -1,7 +1,7 @@
 module mod_constant
   use cudafor
   use mod_globals, only : R, gamma, Pr
-  use mod_globals, only : dimension, id_visc, id_LL, id_igr, &
+  use mod_globals, only : dimension, id_visc, &
                           id_scheme, id_accuracy, id_tvd, id_slau, &
                           id_rescale, id_gpumpi, id_RungeKutta, id_recal
   implicit none
@@ -24,7 +24,7 @@ module mod_constant
   real(8), constant  :: Normal_z(5) = (/0.d0, 0.d0, 0.d0, 1.d0, 0.d0/)
 contains
   subroutine check() ! This subroutine is used to find the lack of necessary parameters
-    integer :: hoge = dimension + id_visc + id_LL + id_igr &
+    integer :: hoge = dimension + id_visc &
                       + id_scheme + id_accuracy + id_tvd + id_slau &
                       + id_rescale + id_gpumpi + id_RungeKutta + id_recal
   end subroutine check

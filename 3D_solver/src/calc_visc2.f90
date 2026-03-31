@@ -1,17 +1,15 @@
 module calc_visc2
-  use mod_globals, only : id_LL, gamma, R, Pr, Prt, dt, threadsEv, threadsFv, threadsGv
+  use mod_globals, only : gamma, R, Pr, Prt, dt, threadsEv, threadsFv, threadsGv
   use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third, two_third
-  use calc_rand
   implicit none
 contains
-  attributes(global) subroutine calc_Ev2(nx, ny, nz, dx, dy, dz, Q, T, mu, E, seed)
+  attributes(global) subroutine calc_Ev2(nx, ny, nz, dx, dy, dz, Q, T, mu, E)
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
     real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2)
-    integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
     real(8), shared :: u(threadsEv%x+1,0:threadsEv%y+1,0:threadsEv%z+1)
     real(8), shared :: v(threadsEv%x+1,0:threadsEv%y+1,threadsEv%z)
     real(8), shared :: w(threadsEv%x+1,0:threadsEv%z+1,threadsEv%y)
@@ -61,24 +59,6 @@ contains
     txx = two_third * (2.d0 * mux - mvy - mwz)
     txy = muy + mvx
     txz = mwx + muz
-    if (kind(id_LL) == 4) then
-      block
-        real(8) std_t, std_q, over_V, Zq
-        real(8), device    :: rand(4), Z(6), Zx(6)
-        real(8), parameter :: kb_over_dt = 1.380649d-23 / dt
-        over_V = dx(i) * dy(j) * dz(k)
-        std_t  = sqrt(kb_over_dt * over_V * mx * (T(i,j,k) + T(i+1,j,k)))
-        std_q  = sqrt(kb_over_dt * over_V * mx * Cp_over_Pr * (T(i,j,k)*T(i,j,k) + T(i+1,j,k)*T(i+1,j,k)))
-        Z   = Z_tilde(seed(i,j,k))
-        Zx  = Z_tilde(seed(i+1,j,k))
-        Z   = 0.5d0 * (Z + Zx)
-        Zq  = Zq_x(seed(i,j,k))
-        txx = txx + std_t * (2.d0 * Z(1) - Z(4) - Z(6)) * one_third
-        txy = txy + std_t * Z(2)
-        txz = txz + std_t * Z(3)
-        kTx = kTx + std_q * Zq
-      end block
-    endif
     utxx = 0.5d0 * (u(it,jt,kt) + u(it+1,jt,kt)) * txx
     vtxy = 0.5d0 * (v(it,jt,kt) + v(it+1,jt,kt)) * txy
     wtxz = 0.5d0 * (w(it,kt,jt) + w(it+1,kt,jt)) * txz
@@ -166,14 +146,13 @@ contains
   end subroutine calc_Ev_LES2
  
 
-  attributes(global) subroutine calc_Fv2(nx, ny, nz, dy, dx, dz, Q, T, mu, F, seed)
+  attributes(global) subroutine calc_Fv2(nx, ny, nz, dy, dx, dz, Q, T, mu, F)
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
     real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2)
-    integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
     real(8), shared :: u(threadsFv%y+1,0:threadsFv%x+1,threadsFv%z)
     real(8), shared :: v(threadsFv%y+1,0:threadsFv%x+1,0:threadsFv%z+1)
     real(8), shared :: w(threadsFv%y+1,0:threadsFv%z+1,threadsFv%x)
@@ -223,24 +202,6 @@ contains
     tyx = muy + mvx
     tyy = two_third * (2.d0 * mvy - mwz - mux)
     tyz = mvz + mwy
-    if (kind(id_LL) == 4) then
-      block
-        real(8) std_t, std_q, over_V, Zq
-        real(8), device    :: rand(4), Z(6), Zy(6)
-        real(8), parameter :: kb_over_dt = 1.380649d-23 / dt
-        over_V = dx(i) * dy(j) * dz(k)
-        std_t  = sqrt(kb_over_dt * over_V * my * (T(i,j,k) + T(i,j+1,k)))
-        std_q  = sqrt(kb_over_dt * over_V * my * Cp_over_Pr * (T(i,j,k)*T(i,j,k) + T(i,j+1,k)*T(i,j+1,k)))
-        Z   = Z_tilde(seed(i,j,k))
-        Zy  = Z_tilde(seed(i,j+1,k))
-        Z   = 0.5d0 * (Z + Zy)
-        Zq  = Zq_y(seed(i,j,k))
-        tyx = tyx + std_t * Z(2)
-        tyy = tyy + std_t * (2.d0 * Z(4) - Z(6) - Z(1)) * one_third
-        tyz = tyz + std_t * Z(5)
-        kTy = kTy + std_q * Zq
-      end block
-    endif
     utyx = 0.5d0 * (u(jt,it,kt) + u(jt+1,it,kt)) * tyx
     vtyy = 0.5d0 * (v(jt,it,kt) + v(jt+1,it,kt)) * tyy
     wtyz = 0.5d0 * (w(jt,kt,it) + w(jt+1,kt,it)) * tyz
@@ -328,14 +289,13 @@ contains
   end subroutine calc_Fv_LES2
  
 
-  attributes(global) subroutine calc_Gv2(nx, ny, nz, dx, dy, dz, Q, T, mu, G, seed)
+  attributes(global) subroutine calc_Gv2(nx, ny, nz, dx, dy, dz, Q, T, mu, G)
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
     real(8), intent(inout), device :: G(5,nx-2,ny-2,nz-1)
-    integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
     real(8), shared :: u(threadsGv%z+1,0:threadsGv%x+1,threadsGv%y)
     real(8), shared :: v(threadsGv%z+1,0:threadsGv%y+1,threadsGv%x)
     real(8), shared :: w(threadsGv%z+1,0:threadsGv%x+1,0:threadsGv%y+1)
@@ -385,24 +345,6 @@ contains
     tzx = mwx + muz
     tzy = mvz + mwy
     tzz = two_third * (2.d0 * mwz - mux - mvy)
-    if (kind(id_LL) == 4) then
-      block
-        real(8) std_t, std_q, over_V, Zq
-        real(8), device    :: rand(4), Z(6), Zz(6)
-        real(8), parameter :: kb_over_dt = 1.380649d-23 / dt
-        over_V = dx(i) * dy(j) * dz(k)
-        std_t  = sqrt(kb_over_dt * over_V * mz * (T(i,j,k) + T(i,j,k+1)))
-        std_q  = sqrt(kb_over_dt * over_V * mz * Cp_over_Pr * (T(i,j,k)*T(i,j,k) + T(i,j,k+1)*T(i,j,k+1)))
-        Z   = Z_tilde(seed(i,j,k))
-        Zz  = Z_tilde(seed(i,j,k+1))
-        Z   = 0.5d0 * (Z + Zz)
-        Zq  = Zq_y(seed(i,j,k))
-        tzx = tzx + std_t * Z(3)
-        tzy = tzy + std_t * Z(5)
-        tzz = tzz + std_t * (2.d0 * Z(6) - Z(1) - Z(4)) * one_third
-        kTz = kTz + std_q * Zq
-      end block
-    endif
     utzx = 0.5d0 * (u(kt,it,jt) + u(kt+1,it,jt)) * tzx
     vtzy = 0.5d0 * (v(kt,jt,it) + v(kt+1,jt,it)) * tzy
     wtzz = 0.5d0 * (w(kt,it,jt) + w(kt+1,it,jt)) * tzz

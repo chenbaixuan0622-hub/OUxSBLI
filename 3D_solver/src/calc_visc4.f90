@@ -1,7 +1,6 @@
 module calc_visc4
   use mod_globals, only : id_visc, gamma, R, Pr, Prt, dt, threadsEv, threadsFv, threadsGv
   use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third, two_third, one_twelfth
-  use calc_rand
   implicit none
   private
   public calc_Ev4, calc_Ev_LES4, calc_Fv4, calc_Fv_LES4, calc_Gv4, calc_Gv_LES4
@@ -90,14 +89,13 @@ contains
   end subroutine calc_tau_cross_LES
 
 
-  attributes(global) subroutine calc_Ev4(nx, ny, nz, dx, dy, dz, Q, T, mu, E, seed)
+  attributes(global) subroutine calc_Ev4(nx, ny, nz, dx, dy, dz, Q, T, mu, E)
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
     real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2)
-    integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
     real(8), shared ::  u(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
     real(8), shared ::  v(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
     real(8), shared ::  w(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
@@ -316,14 +314,13 @@ contains
   end subroutine calc_Ev_LES4
  
 
-  attributes(global) subroutine calc_Fv4(nx, ny, nz, dy, dx, dz, Q, T, mu, F, seed)
+  attributes(global) subroutine calc_Fv4(nx, ny, nz, dy, dx, dz, Q, T, mu, F)
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
     real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2)
-    integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
     real(8), shared ::  u(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
     real(8), shared ::  v(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
     real(8), shared ::  w(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
@@ -544,14 +541,13 @@ contains
   end subroutine calc_Fv_LES4
  
 
-  attributes(global) subroutine calc_Gv4(nx, ny, nz, dx, dy, dz, Q, T, mu, G, seed)
+  attributes(global) subroutine calc_Gv4(nx, ny, nz, dx, dy, dz, Q, T, mu, G)
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
     real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
     real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
     real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
     real(8), intent(inout), device :: G(5,nx-2,ny-2,nz-1)
-    integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
     real(8), shared ::  u(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
     real(8), shared ::  v(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
     real(8), shared ::  w(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)

@@ -1,7 +1,7 @@
 program main
   use, intrinsic :: iso_fortran_env
   use mpi
-  use mod_globals, only : id_RungeKutta, id_recal, dimension, nx, ny, nz, Lx, Ly, Lz, &
+  use mod_globals, only : id_RungeKutta, id_rescale, id_recal, dimension, nx, ny, nz, Lx, Ly, Lz, &
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
   & blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv
   use set
@@ -76,7 +76,7 @@ program main
   endif
 
   call cpu_time(t_start)
-  call RungeKutta(id_RungeKutta, myrank, mygpu, nx, ny, nz, x, dx, y, dy, z, dz, Jacobian, Q)
+  call RungeKutta(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, nz, x, dx, y, dy, z, dz, Jacobian, Q)
   call cpu_time(t_end)
 
   if (mod(myrank,2) == 0) then
