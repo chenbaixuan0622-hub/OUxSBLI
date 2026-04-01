@@ -65,30 +65,30 @@ contains
   !> Divides computational domain across MPI ranks
   subroutine pre_calc(nx, ny, nz, myrank, nranks, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q, overlap, &
                       dx, dy, dz, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0)
-    integer, intent(in)    :: nx                         !< x grid dimension
-    integer, intent(in)    :: ny                         !< y grid dimension
-    integer, intent(in)    :: nz                         !< z grid dimension
-    integer, intent(in)    :: myrank                     !< MPI rank of this process
-    integer, intent(in)    :: nranks                     !< total number of MPI ranks
-    real(8), intent(in)    :: x(nx)                      !< x coordinate array (host)
-    real(8), intent(in)    :: dx_cpu(nx-1)               !< inverse x spacing (host)
-    real(8), intent(in)    :: y(ny)                      !< y coordinate array (host)
-    real(8), intent(in)    :: dy_cpu(ny-1)               !< inverse y spacing (host)
-    real(8), intent(in)    :: z(nz)                      !< z coordinate array (host)
-    real(8), intent(in)    :: dz_cpu(nz-1)               !< inverse z spacing (host)
-    real(8), intent(in)    :: Jacobian_cpu(nx,ny)        !< Jacobian determinant (host)
-    real(8), intent(inout) :: Q(5,nx,ny,nz)              !< conservative variables on host
-    integer, intent(out)   :: overlap                    !< ghost cell width for MPI halo exchange
-    real(8), intent(out), device :: dx(nx-1)              !< inverse x spacing (device)
-    real(8), intent(out), device :: dy(ny-1)              !< inverse y spacing (device)
-    real(8), intent(out), device :: dz(nz-1)              !< inverse z spacing (device)
-    real(8), intent(out), device :: xix(nx-1)             !< x coordinate metric (device)
-    real(8), intent(out), device :: etay(ny-1)            !< y coordinate metric (device)
-    real(8), intent(out), device :: zetaz(nz-1)           !< z coordinate metric (device)
-    real(8), intent(out), device :: Jacobian(nx,ny)       !< Jacobian determinant (device)
-    real(8), intent(out), device :: QJ(5,nx,ny,nz)        !< Q divided by Jacobian (device)
-    real(4), intent(inout)       :: ke0                   !< reference kinetic energy
-    real(4), intent(inout)       :: entropy0              !< reference entropy
+    integer, intent(in)                      :: nx                  !< x grid dimension
+    integer, intent(in)                      :: ny                  !< y grid dimension
+    integer, intent(in)                      :: nz                  !< z grid dimension
+    integer, intent(in)                      :: myrank              !< MPI rank of this process
+    integer, intent(in)                      :: nranks              !< total number of MPI ranks
+    real(8), intent(in)                      :: x(nx)               !< x coordinate array (host)
+    real(8), intent(in)                      :: dx_cpu(nx-1)        !< inverse x spacing (host)
+    real(8), intent(in)                      :: y(ny)               !< y coordinate array (host)
+    real(8), intent(in)                      :: dy_cpu(ny-1)        !< inverse y spacing (host)
+    real(8), intent(in)                      :: z(nz)               !< z coordinate array (host)
+    real(8), intent(in)                      :: dz_cpu(nz-1)        !< inverse z spacing (host)
+    real(8), intent(in)                      :: Jacobian_cpu(nx,ny) !< Jacobian determinant (host)
+    real(8), intent(inout)                   :: Q(5,nx,ny,nz)       !< conservative variables on host
+    integer, intent(out)                     :: overlap             !< ghost cell width for MPI halo exchange
+    real(8), intent(out), device, contiguous :: dx(nx-1)            !< inverse x spacing (device)
+    real(8), intent(out), device, contiguous :: dy(ny-1)            !< inverse y spacing (device)
+    real(8), intent(out), device, contiguous :: dz(nz-1)            !< inverse z spacing (device)
+    real(8), intent(out), device, contiguous :: xix(nx-1)           !< x coordinate metric (device)
+    real(8), intent(out), device, contiguous :: etay(ny-1)          !< y coordinate metric (device)
+    real(8), intent(out), device, contiguous :: zetaz(nz-1)         !< z coordinate metric (device)
+    real(8), intent(out), device, contiguous :: Jacobian(nx,ny)     !< Jacobian determinant (device)
+    real(8), intent(out), device, contiguous :: QJ(5,nx,ny,nz)      !< Q divided by Jacobian (device)
+    real(4), intent(inout)                   :: ke0                 !< reference kinetic energy
+    real(4), intent(inout)                   :: entropy0            !< reference entropy
     real(8) xix_cpu(nx-1), etay_cpu(ny-1), zetaz_cpu(nz-1)
     real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
     integer i, j, k, l, ierr
