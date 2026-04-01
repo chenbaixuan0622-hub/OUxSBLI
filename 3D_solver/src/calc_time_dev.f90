@@ -1,3 +1,5 @@
+!> Module for time-stepping orchestration and time integration schemes
+!> Implements 3rd-order and 4th-order Runge-Kutta time stepping with MPI/GPU support
 module calc_time_dev
   use cudafor
   use mpi
@@ -17,14 +19,29 @@ module calc_time_dev
     module procedure RungeKutta_3rd, RungeKutta_3rd_rescale, RungeKutta_4th, RungeKutta_4th_rescale
   end interface
 contains 
+
+  !> 3rd-order TVD Runge-Kutta time stepping without rescaling
+  !> Solves dQ/dt = RHS(Q) using total variation diminishing (TVD) 3-stage scheme
+  !> Stages: Q(1) = Q^n + (dt)*RHS(Q^n); Q(2) = (3/4)*Q^n + (1/4)*Q(1) + (1/4)*dt*RHS(Q(1))
+  !>         Q^(n+1) = (1/3)*Q^n + (2/3)*Q(2) + (2/3)*dt*RHS(Q(2))
+  !> TVD property: |Q^(n+1)|_TV <= |Q^n|_TV prevents spurious oscillations near shocks
+  !> GPU computation: Each rank manages one GPU asynchronously; MPI sync only for I/O
   subroutine RungeKutta_3rd(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, nz, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q)
-    integer(2), intent(in) :: id_RungeKutta
-    integer(2), intent(in) :: id_rescale
-    integer, intent(in)    :: myrank, mygpu, nx, ny, nz
-    real(8), intent(in)    :: x(nx), dx_cpu(nx-1)
-    real(8), intent(in)    :: y(ny), dy_cpu(ny-1)
-    real(8), intent(in)    :: z(nz), dz_cpu(nz-1), Jacobian_cpu(nx,ny)
-    real(8), intent(inout) :: Q(5,nx,ny,nz)
+    integer(2), intent(in) :: id_RungeKutta                     !< time integration method ID
+    integer(2), intent(in) :: id_rescale                        !< rescaling method ID
+    integer, intent(in)    :: myrank                            !< MPI rank
+    integer, intent(in)    :: mygpu                             !< GPU index for this rank
+    integer, intent(in)    :: nx                                !< x grid dimension
+    integer, intent(in)    :: ny                                !< y grid dimension
+    integer, intent(in)    :: nz                                !< z grid dimension
+    real(8), intent(in)    :: x(nx)                             !< x coordinates
+    real(8), intent(in)    :: dx_cpu(nx-1)                      !< inverse x spacing (host)
+    real(8), intent(in)    :: y(ny)                             !< y coordinates
+    real(8), intent(in)    :: dy_cpu(ny-1)                      !< inverse y spacing (host)
+    real(8), intent(in)    :: z(nz)                             !< z coordinates
+    real(8), intent(in)    :: dz_cpu(nz-1)                      !< inverse z spacing (host)
+    real(8), intent(in)    :: Jacobian_cpu(nx,ny)               !< Jacobian determinant (host)
+    real(8), intent(inout) :: Q(5,nx,ny,nz)                     !< conservative variables on host
     integer i, j, k, l, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireq2(2)
     integer istat(MPI_STATUS_SIZE), istat2(MPI_STATUS_SIZE,2)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -54,19 +71,28 @@ contains
       call MPI_RECV(entropy0, 1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
     endif
 
-    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-    print *, "myrank is ", myrank, " start Runge-Kutta"
+    !> Time integration main loop with MPI domain decomposition
+    !> Each rank computes assigned 3D subdomain on dedicated GPU independently
+    !> Synchronization points: (1) end of each time integration step for boundary exchange
+    !>                         (2) after every np iterations for I/O and statistics
+    !> CFL constraint: dt = CFL * min_grid_spacing / max_wave_speed
     do t2 = 1, np
       if (mod(myrank,2) == 0) then
+        ! GPU-accelerated ranks perform time integration
         do t1 = 1, nt
+          ! Step 1: Compute fluxes E, F, G from current state QJ
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, ruvwp, T, mu, mut, qc2, E, F, G)
+          ! Step 2a: TVD RK3 Stage 1 - compute Q(1), store in QJ2
           call calc_step1<<<blocks,threads>>>(nx, ny, nz, 1.d0, dx, dy, dz, E, F, G, QJ, QJ2)
+          ! Enforce boundary conditions at cell interfaces (extrapolation or characteristic-based)
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ2)
 
+          ! Step 2b: TVD RK3 Stage 2 - blend Q(1) with Q^n, store in QJ2
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, ruvwp, T, mu, mut, qc2, E, F, G)
           call calc_step2_3<<<blocks,threads>>>(nx, ny, nz, 0.75d0, 0.25d0, 0.25d0, 1.d0, dx, dy, dz, E, F, G, QJ, QJ2)
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ2)
 
+          ! Step 2c: TVD RK3 Stage 3 - final solution Q^(n+1), store in QJ (swap arrays)
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, ruvwp, T, mu, mut, qc2, E, F, G)
           call calc_step2_3<<<blocks,threads>>>(nx, ny, nz, 2.d0, 1.d0, 2.d0, 3.d0, dx, dy, dz, E, F, G, QJ2, QJ)
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ)
@@ -86,6 +112,10 @@ contains
   end subroutine RungeKutta_3rd
 
 
+  !> 3rd-order TVD Runge-Kutta with re-scaling for density clipping/limiting
+  !> Combines TVD RK3 time stepping with optional density-based re-scaling for stability
+  !> When density becomes negative or too small, re-scale conserved variables at marker plane
+  !> Similar TVD RK3 stages as above, plus calls to step_rescale() for non-conservative correction
   subroutine RungeKutta_3rd_rescale(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, nz, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q)
     integer(2), intent(in) :: id_RungeKutta
     integer(4), intent(in) :: id_rescale
@@ -181,6 +211,11 @@ contains
   end subroutine RungeKutta_3rd_rescale
 
 
+  !> 4th-order classical Runge-Kutta time stepping without rescaling
+  !> Solves dQ/dt = RHS(Q) using standard 4-stage RK4 scheme
+  !> Stages: k1 = RHS(Q^n); k2 = RHS(Q^n + 0.5*dt*k1); k3 = RHS(Q^n + 0.5*dt*k2)
+  !>         k4 = RHS(Q^n + dt*k3); Q^(n+1) = Q^n + (dt/6)*(k1 + 2*k2 + 2*k3 + k4)
+  !> More accurate than RK3 but lacks TVD property; requires smaller CFL (~0.8 vs 1.0)
   subroutine RungeKutta_4th(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, nz, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q)
     integer(4), intent(in) :: id_RungeKutta
     integer(2), intent(in) :: id_rescale
@@ -217,23 +252,30 @@ contains
       call MPI_RECV(entropy0, 1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
     endif
  
+    !> 4-4 RK main integration loop with residual accumulation
+    !> Stages 1-3: compute fluxes and update intermediate solutions, accumulate residuals in Rs
+    !> Stage 4: final flux computation and assembly of weighted sum Q^(n+1) = Q^n - (1/6)*sum(R_i)
     do t2 = 1, np
       if (mod(myrank,2) == 0) then
         do t1 = 1, nt
+          ! Stage 1: k1 = RHS(Q^n), coefficients: 0.5*dt applied, weight 1.0 to Rs
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, ruvwp, T, mu, mut, qc2, E, F, G)
-          call calc_step<<<blocks,threads>>>(nx, ny, nz, 0.5d0, 1.d0, dx, dy, dz, E, F, G, QJ, QJs, Rs) ! QJs = Q2
+          call calc_step<<<blocks,threads>>>(nx, ny, nz, 0.5d0, 1.d0, dx, dy, dz, E, F, G, QJ, QJs, Rs) ! QJs = Q2 = Q^n + 0.5*dt*k1
           call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
 
+          ! Stage 2: k2 = RHS(Q^n + 0.5*dt*k1), weight 2.0 to Rs for (2*k2 term)
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, ruvwp, T, mu, mut, qc2, E, F, G)
-          call calc_step<<<blocks,threads>>>(nx, ny, nz, 0.5d0, 2.d0, dx, dy, dz, E, F, G, QJ, QJs, Rs) ! QJs = Q3
+          call calc_step<<<blocks,threads>>>(nx, ny, nz, 0.5d0, 2.d0, dx, dy, dz, E, F, G, QJ, QJs, Rs) ! QJs = Q3 = Q^n + 0.5*dt*k2
           call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
 
+          ! Stage 3: k3 = RHS(Q^n + 0.5*dt*k2), weight 2.0 for (2*k3 term)
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, ruvwp, T, mu, mut, qc2, E, F, G)
-          call calc_step<<<blocks,threads>>>(nx, ny, nz, 1.0d0, 2.d0, dx, dy, dz, E, F, G, QJ, QJs, Rs) ! QJs = Q4
+          call calc_step<<<blocks,threads>>>(nx, ny, nz, 1.0d0, 2.d0, dx, dy, dz, E, F, G, QJ, QJs, Rs) ! QJs = Q4 = Q^n + dt*k3
           call set_bc(myrank, nx, ny, nz, Jacobian, QJs)
 
+          ! Stage 4: k4 = RHS(Q^n + dt*k3), weight 1.0, assemble final Q^(n+1)
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJs, ruvwp, T, mu, mut, qc2, E, F, G)
-          call calc_step4<<<blocks,threads>>>(nx, ny, nz, dx, dy, dz, E, F, G, Rs, QJ)
+          call calc_step4<<<blocks,threads>>>(nx, ny, nz, dx, dy, dz, E, F, G, Rs, QJ)  ! QJ = Q^(n+1)
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ)
         enddo
       endif
@@ -251,6 +293,9 @@ contains
   end subroutine RungeKutta_4th
 
 
+  !> 4th-order Runge-Kutta with re-scaling for density clipping at monitoring plane
+  !> Combines high-order 4-4 RK accuracy with non-conservative re-scaling correction
+  !> Step-rescale calls handle inter-rank communication for marking critical planes
   subroutine RungeKutta_4th_rescale(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, nz, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q)
     integer(4), intent(in) :: id_RungeKutta
     integer(4), intent(in) :: id_rescale

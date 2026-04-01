@@ -1,3 +1,5 @@
+!> Module for parallel MPI communication and domain decomposition
+!> Handles halo exchange, data flattening, and ghost cell synchronization
 module calc_para
   use mpi
   use cudafor
@@ -6,11 +8,17 @@ module calc_para
     module procedure exchange_cyclic, exchange_rescale
   end interface exchange
 contains
+
+  !> Flatten 3D Q data into 1D arrays for left and right boundaries
+  !> Used for MPI halo exchange preparation
   subroutine flatten(nx, ny, nz, overlap, Q, Q1d_left, Q1d_right)
-    integer, intent(in), value   :: nx, ny, nz, overlap
-    real(8), intent(in), device  :: Q(5,nx,ny,nz)
-    real(8), intent(out), device :: Q1d_left(overlap*(ny-2)*(nz-6)*5)
-    real(8), intent(out), device :: Q1d_right(overlap*(ny-2)*(nz-6)*5)
+    integer, intent(in), value   :: nx                                      !< x dimension
+    integer, intent(in), value   :: ny                                      !< y dimension
+    integer, intent(in), value   :: nz                                      !< z dimension
+    integer, intent(in), value   :: overlap                                 !< ghost cell width
+    real(8), intent(in), device  :: Q(5,nx,ny,nz)                           !< 3D conservative variables
+    real(8), intent(out), device :: Q1d_left(overlap*(ny-2)*(nz-6)*5)       !< left boundary 1D array
+    real(8), intent(out), device :: Q1d_right(overlap*(ny-2)*(nz-6)*5)      !< right boundary 1D array
     integer i, j, k, l, ni, nj, nk
     ni = overlap
     nj = ny-2
@@ -26,10 +34,14 @@ contains
   end subroutine flatten
 
 
+  !> Flatten 3D Q data into 1D array for left boundary only
   subroutine flatten_left(nx, ny, nz, overlap, Q, Q1d_left)
-    integer, intent(in), value   :: nx, ny, nz, overlap
-    real(8), intent(in), device  :: Q(5,nx,ny,nz)
-    real(8), intent(out), device :: Q1d_left(overlap*(ny-2)*(nz-6)*5)
+    integer, intent(in), value   :: nx                                 !< x dimension
+    integer, intent(in), value   :: ny                                 !< y dimension
+    integer, intent(in), value   :: nz                                 !< z dimension
+    integer, intent(in), value   :: overlap                            !< ghost cell width
+    real(8), intent(in), device  :: Q(5,nx,ny,nz)                      !< 3D conservative variables
+    real(8), intent(out), device :: Q1d_left(overlap*(ny-2)*(nz-6)*5) !< left boundary 1D array
     integer i, j, k, l, ni, nj, nk
     ni = overlap
     nj = ny-2
@@ -44,10 +56,14 @@ contains
   end subroutine flatten_left
 
 
+  !> Flatten 3D Q data into 1D array for right boundary only
   subroutine flatten_right(nx, ny, nz, overlap, Q, Q1d_right)
-    integer, intent(in), value   :: nx, ny, nz, overlap
-    real(8), intent(in), device  :: Q(5,nx,ny,nz)
-    real(8), intent(out), device :: Q1d_right(overlap*(ny-2)*(nz-6)*5)
+    integer, intent(in), value   :: nx                                  !< x dimension
+    integer, intent(in), value   :: ny                                  !< y dimension
+    integer, intent(in), value   :: nz                                  !< z dimension
+    integer, intent(in), value   :: overlap                             !< ghost cell width
+    real(8), intent(in), device  :: Q(5,nx,ny,nz)                       !< 3D conservative variables
+    real(8), intent(out), device :: Q1d_right(overlap*(ny-2)*(nz-6)*5) !< right boundary 1D array
     integer i, j, k, l, ni, nj, nk
     ni = overlap
     nj = ny-2

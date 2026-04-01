@@ -1,15 +1,25 @@
+!> Module containing 2nd-order viscous flux computation kernels
+!> Computes viscous stresses and heat flux for compressible Navier-Stokes equations
 module calc_visc2
   use mod_globals, only : gamma, R, Pr, Prt, dt, threadsEv, threadsFv, threadsGv
   use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third, two_third
   implicit none
 contains
+
+  !> CUDA Fortran kernel for 2nd-order viscous flux in x direction
+  !> Computes stress tensor components and heat flux at cell faces
+  !> Accounts for molecular viscosity and thermal conductivity
   attributes(global) subroutine calc_Ev2(nx, ny, nz, dx, dy, dz, Q, T, mu, E)
-    integer, intent(in), value     :: nx, ny, nz
-    real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
-    real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
-    real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
-    real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2)
+    integer, intent(in), value     :: nx                  !< number of grid points in x direction
+    integer, intent(in), value     :: ny                  !< number of grid points in y direction
+    integer, intent(in), value     :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
+    real(8), intent(in), device    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
+    real(8), intent(in), device    :: Q(5,nx,ny,nz)       !< conservative variables: rho, rho*u, rho*v, rho*w, E
+    real(8), intent(in), device    :: T(nx,ny,nz)         !< temperature at grid points
+    real(8), intent(in), device    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2) !< viscous flux components in x direction
     real(8), shared :: u(threadsEv%x+1,0:threadsEv%y+1,0:threadsEv%z+1)
     real(8), shared :: v(threadsEv%x+1,0:threadsEv%y+1,threadsEv%z)
     real(8), shared :: w(threadsEv%x+1,0:threadsEv%z+1,threadsEv%y)
@@ -33,12 +43,22 @@ contains
     endif 
     call syncthreads()
 
-    mx  = 0.5d0 * (mu(i,j,k) + mu(i+1,j,k))
+    ! Compute viscous stress tensor components using 2nd-order finite differences
+    ! Algorithm: tau_ij = mu * (du_i/dx_j + du_j/dx_i) - (2/3)*mu*delta_ij*(div u)
+    ! Viscosity is averaged at cell faces, velocities at grid points in local shared memory
+    mx  = 0.5d0 * (mu(i,j,k) + mu(i+1,j,k))        ! Face-centered viscosity in x
+    
+    ! Heat flux from Fourier's law: q_x = -k * dT/dx where k = density * Cp / Pr * mu
     kTx = Cp_over_Pr * mx * (-T(i,j,k) + T(i+1,j,k)) * dx(i)
+    
+    ! Compute du/dy and dv/dy with viscosity weighted at cell edges (y-direction)
+    ! Using centered differences: du/dy ≈ 0.5 * (u(j+1) - u(j-1)) * dy
+    ! Two viscosities at y-edges averaged for interpolation to face centers
     block
       real(8) my1, my2
       my1 = 0.25d0 * (mu(i,j-1,k) + mu(i,j,  k) + mu(i+1,j-1,k) + mu(i+1,j,  k))
       my2 = 0.25d0 * (mu(i,j,  k) + mu(i,j+1,k) + mu(i+1,j,  k) + mu(i+1,j+1,k))
+      ! du/dy with linear interpolation of mu between two y-faces
       muy = 0.25d0 * (my1 * (-u(it,jt-1,kt) - u(it+1,jt-1,kt)) + (my1 - my2) * (u(it,jt,kt) + u(it+1,jt,kt)) &
                     + my2 * ( u(it,jt+1,kt) + u(it+1,jt+1,kt))) * dy(j)
       mvy = 0.25d0 * (my1 * (-v(it,jt-1,kt) - v(it+1,jt-1,kt)) + (my1 - my2) * (v(it,jt,kt) + v(it+1,jt,kt)) &
@@ -53,30 +73,46 @@ contains
       mwz = 0.25d0 * (mz1 * (-w(it,kt-1,jt) - w(it+1,kt-1,jt)) + (mz1 - mz2) * (w(it,kt,jt) + w(it+1,kt,jt)) &
                     + mz2 * ( w(it,kt+1,jt) + w(it+1,kt+1,jt))) * dz(k)
     end block
-    mux = mx * (-u(it,jt,kt) + u(it+1,jt,kt)) * dx(i)
-    mvx = mx * (-v(it,jt,kt) + v(it+1,jt,kt)) * dx(i)
-    mwx = mx * (-w(it,kt,jt) + w(it+1,kt,jt)) * dx(i)
-    txx = two_third * (2.d0 * mux - mvy - mwz)
-    txy = muy + mvx
-    txz = mwx + muz
-    utxx = 0.5d0 * (u(it,jt,kt) + u(it+1,jt,kt)) * txx
+    ! Compute individual strain rate components: dv_j/dx_i
+    mux = mx * (-u(it,jt,kt) + u(it+1,jt,kt)) * dx(i)  ! du/dx
+    mvx = mx * (-v(it,jt,kt) + v(it+1,jt,kt)) * dx(i)  ! dv/dx
+    mwx = mx * (-w(it,kt,jt) + w(it+1,kt,jt)) * dx(i)  ! dw/dx (note: from different shared array index)
+    
+    ! Assemble stress tensor: tau_ij = mu * S_ij where S is strain rate
+    ! Diagonal: tau_ii = (2/3)*mu*(2*du_i/dx_i - du_j/dx_j - du_k/dx_k)
+    ! Off-diagonal: tau_ij = mu*(du_i/dx_j + du_j/dx_i)
+    txx = two_third * (2.d0 * mux - mvy - mwz)  ! tau_xx with bulk viscosity correction
+    txy = muy + mvx                              ! tau_xy = tau_yx (symmetric)
+    txz = mwx + muz                              ! tau_xz = tau_zx (symmetric)
+    
+    ! Compute work terms u*tau for energy equation: (u_i * tau_ij)
+    utxx = 0.5d0 * (u(it,jt,kt) + u(it+1,jt,kt)) * txx  ! Average u at cell face × stress
     vtxy = 0.5d0 * (v(it,jt,kt) + v(it+1,jt,kt)) * txy
     wtxz = 0.5d0 * (w(it,kt,jt) + w(it+1,kt,jt)) * txz
-    E(2,i,j-1,k-1) = E(2,i,j-1,k-1) - txx
-    E(3,i,j-1,k-1) = E(3,i,j-1,k-1) - txy
-    E(4,i,j-1,k-1) = E(4,i,j-1,k-1) - txz
-    E(5,i,j-1,k-1) = E(5,i,j-1,k-1) - (utxx + vtxy + wtxz + kTx)
+    
+    ! Accumulate viscous flux components (note subtraction: fluxes point outward)
+    E(2,i,j-1,k-1) = E(2,i,j-1,k-1) - txx            ! Momentum: -tau_xx in x-flux
+    E(3,i,j-1,k-1) = E(3,i,j-1,k-1) - txy            ! Momentum: -tau_xy in x-flux  
+    E(4,i,j-1,k-1) = E(4,i,j-1,k-1) - txz            ! Momentum: -tau_xz in x-flux
+    E(5,i,j-1,k-1) = E(5,i,j-1,k-1) - (utxx + vtxy + wtxz + kTx)  ! Energy: -(u*tau + q)
   end subroutine calc_Ev2
  
 
+  !> CUDA Fortran kernel for 2nd-order viscous flux with LES SGS model in x direction
+  !> Computes molecular + subgrid-scale viscous stresses and heat flux
   attributes(global) subroutine calc_Ev_LES2(nx, ny, nz, dx, dy, dz, Q, T, mu, mut, qc2, E)
-    integer, intent(in), value     :: nx, ny, nz
-    real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
-    real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
-    real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
-    real(8), intent(in), device    :: mut(nx,ny,nz), qc2(nx,ny,nz)
-    real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2)
+    integer, intent(in), value     :: nx                  !< number of grid points in x direction
+    integer, intent(in), value     :: ny                  !< number of grid points in y direction
+    integer, intent(in), value     :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
+    real(8), intent(in), device    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
+    real(8), intent(in), device    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device    :: T(nx,ny,nz)         !< temperature at grid points
+    real(8), intent(in), device    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    real(8), intent(in), device    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
+    real(8), intent(in), device    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
+    real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2) !< viscous + SGS flux in x direction
     integer i, j, k
     real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx, Hsgs
     real(8), dimension(2), device :: my, mysgs, mz, mzsgs
@@ -146,13 +182,19 @@ contains
   end subroutine calc_Ev_LES2
  
 
+  !> CUDA Fortran kernel for 2nd-order viscous flux in y direction
+  !> Computes stress tensor components and heat flux at cell faces
   attributes(global) subroutine calc_Fv2(nx, ny, nz, dy, dx, dz, Q, T, mu, F)
-    integer, intent(in), value     :: nx, ny, nz
-    real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
-    real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
-    real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
-    real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2)
+    integer, intent(in), value     :: nx                  !< number of grid points in x direction
+    integer, intent(in), value     :: ny                  !< number of grid points in y direction
+    integer, intent(in), value     :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
+    real(8), intent(in), device    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
+    real(8), intent(in), device    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device    :: T(nx,ny,nz)         !< temperature at grid points
+    real(8), intent(in), device    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2) !< viscous flux components in y direction
     real(8), shared :: u(threadsFv%y+1,0:threadsFv%x+1,threadsFv%z)
     real(8), shared :: v(threadsFv%y+1,0:threadsFv%x+1,0:threadsFv%z+1)
     real(8), shared :: w(threadsFv%y+1,0:threadsFv%z+1,threadsFv%x)
@@ -212,14 +254,21 @@ contains
   end subroutine calc_Fv2
  
 
+  !> CUDA Fortran kernel for 2nd-order viscous flux with LES SGS model in y direction
+  !> Computes molecular + subgrid-scale viscous stresses and heat flux
   attributes(global) subroutine calc_Fv_LES2(nx, ny, nz, dy, dx, dz, Q, T, mu, mut, qc2, F)
-    integer, intent(in), value     :: nx, ny, nz
-    real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
-    real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
-    real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
-    real(8), intent(in), device    :: mut(nx,ny,nz), qc2(nx,ny,nz)
-    real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2)
+    integer, intent(in), value     :: nx                  !< number of grid points in x direction
+    integer, intent(in), value     :: ny                  !< number of grid points in y direction
+    integer, intent(in), value     :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
+    real(8), intent(in), device    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
+    real(8), intent(in), device    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device    :: T(nx,ny,nz)         !< temperature at grid points
+    real(8), intent(in), device    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    real(8), intent(in), device    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
+    real(8), intent(in), device    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
+    real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2) !< viscous + SGS flux in y direction
     integer i, j, k
     real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy, Hsgs
     real(8), dimension(2), device :: u2, v2, w2, mz, mzsgs, mx, mxsgs
@@ -289,13 +338,19 @@ contains
   end subroutine calc_Fv_LES2
  
 
+  !> CUDA Fortran kernel for 2nd-order viscous flux in z direction
+  !> Computes stress tensor components and heat flux at cell faces
   attributes(global) subroutine calc_Gv2(nx, ny, nz, dx, dy, dz, Q, T, mu, G)
-    integer, intent(in), value     :: nx, ny, nz
-    real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
-    real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
-    real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
-    real(8), intent(inout), device :: G(5,nx-2,ny-2,nz-1)
+    integer, intent(in), value     :: nx                  !< number of grid points in x direction
+    integer, intent(in), value     :: ny                  !< number of grid points in y direction
+    integer, intent(in), value     :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
+    real(8), intent(in), device    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
+    real(8), intent(in), device    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device    :: T(nx,ny,nz)         !< temperature at grid points
+    real(8), intent(in), device    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    real(8), intent(inout), device :: G(5,nx-2,ny-2,nz-1) !< viscous flux components in z direction
     real(8), shared :: u(threadsGv%z+1,0:threadsGv%x+1,threadsGv%y)
     real(8), shared :: v(threadsGv%z+1,0:threadsGv%y+1,threadsGv%x)
     real(8), shared :: w(threadsGv%z+1,0:threadsGv%x+1,0:threadsGv%y+1)
