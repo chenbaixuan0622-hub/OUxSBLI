@@ -1,56 +1,35 @@
 module mod_globals
   use cudafor
   implicit none
-  integer, parameter    :: dimension = 3
-  integer(4), parameter :: id_visc   = 2
-  integer(2), parameter :: id_LL     = 0
-  integer(2), parameter :: id_igr    = 0
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_visc       ! kind2 Euler       !
-  !               ! kind4 NS          !
-  !               ! kind8 LES         !
-  !               ! 1 2nd             !
-  !               ! 2 4th             !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_turbulence ! 0 laminar         !
-  !               ! 1 SMS             !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_av         ! 0 no              !
-  !               ! 1 Neumann         !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_scheme   ! integer(2)  KEEP    !
-  !             ! real(2)     SLAU    !
-  !             ! real(4)   Weighted  !
-  !             ! real(8)   Threshold !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_sensor   ! 1 Ducros            !
-  !             ! 2 Albada            !
-  !             ! 3 Ducros + Albada   !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_accuracy ! kind2 2nd           !
-  !             ! kind4 4th           !
-  !             ! kind8 6th           !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_tvd      ! kind2 non TVD       !
-  !             ! kind4 minmod        !
-  !             ! kind8 MUSCL4th      !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_keep     ! kind2 KEEP          !
-  !             ! kind4 KEEPPE        !
-  !             ! kind8 KEP           !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_slau     ! kind2 SLAU          !
-  !             ! kind4 HR-SLAU2      !
-  !             ! kind8 VHR-SLAU2     !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! slau_wall   ! kind2 off           !
-  !             ! kind4 on            !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_rescale  ! kind2 off           !
-  !             ! kind4 on            !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_visc       ! kind2 Euler     !
+  !               ! kind4 NS        !
+  !               ! kind8 LES       !
+  !               ! 1 2nd           !
+  !               ! 2 4th           !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_scheme   ! integer(2) KEEP   !
+  !             ! real(2)    SLAU   !
+  !             ! real(4)    Roe    !
+  !             ! real(8)    Hybrid !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_accuracy ! kind2 2nd         !
+  !             ! kind4 4th         !
+  !             ! kind8 6th         !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_tvd      ! kind2 non TVD     !
+  !             ! kind4 minmod      !
+  !             ! kind8 MUSCL4th    !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_slau     ! kind2 SLAU        !
+  !             ! kind4 HR-SLAU2    !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! id_rescale  ! kind2 off         !
+  !             ! kind4 on          !
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  integer, parameter         :: dimension   = 3
+  integer(4), parameter      :: id_visc     = 2
   real(2), parameter         :: id_scheme   = 0
-  integer, parameter         :: id_sensor   = 1
   real(8), parameter         :: threshold   = 0.4d0
   integer(kind=8), parameter :: id_accuracy = 0
   integer(kind=8), parameter :: id_tvd      = 0
@@ -59,12 +38,6 @@ module mod_globals
   integer(kind=2), parameter :: id_gpumpi   = 0
   real(8), parameter         :: blt         = 1.d-3
 
-  ! exchange
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_exchange ! kind2 off !
-  !             ! kind4 on  !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=2), parameter :: id_exchange = 0
   integer, parameter :: mygpu1 = 0
   integer, parameter :: mygpu2 = 0!1
   ! boundary layer
@@ -105,17 +78,17 @@ module mod_globals
   !               ! kind4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_RungeKutta = 0
-  integer(kind=4), parameter :: id_recal      = 0
+  integer(kind=2), parameter :: id_recal      = 0
   integer, parameter         :: step_offset   = 0
   integer, parameter         :: start_rescale = 10
-  real(8), parameter :: endT  = 0.4d-3
-  integer, parameter :: np    = 40
+  real(8), parameter :: endT  = 0.1d-3
+  integer, parameter :: np    = 10
   real(8), parameter :: R     = 287.03d0
   real(8), parameter :: gamma = 1.4d0
-  real(8), parameter :: M0    = 1.9d0
+  real(8), parameter :: M0    = 2.d0
   real(8), parameter :: T0    = 171.31d0
   real(8), parameter :: p0    = 14924.d0
-  real(8), parameter :: u0    = 506.8d0!M0 * sqrt(gamma * R * T0)
+  real(8), parameter :: u0    = M0 * sqrt(gamma * R * T0)
   real(8), parameter :: dt    = 4.d-9
   integer, parameter :: nt    = int(endT / (dble(np) * dt))
 

@@ -28,7 +28,8 @@ contains
       z(k+1) = z(k) + dz(k)
     enddo
   end subroutine set_grid
-  
+
+
   subroutine set_init(myrank, nx, ny, nz, x, y, z, Q)
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
@@ -50,15 +51,15 @@ contains
       endif
     enddo
   end subroutine set_init
-  
+
+
   subroutine set_bc(myrank, nx, ny, nz, Jacobian, Q, Qre)
-    integer, intent(in), value     :: myrank, nx, ny, nz
-    real(8), intent(in), device    :: Jacobian(ny)
-    real(8), intent(inout), device :: Q(5,nx,ny,nz) ! Q / J
-    real(8), intent(in), device    :: Qre(ny*(nz-6)*5)
+    integer, intent(in), value            :: myrank, nx, ny, nz
+    real(8), intent(in), device           :: Jacobian(ny)
+    real(8), intent(inout), device        :: Q(5,nx,ny,nz) ! Q / J
+    real(8), intent(in), device, optional :: Qre(ny*(nz-6)*5)
     integer :: i, j, k, l, jc = 4, kc = 4
     real(8), device :: Qc(5,nx)
-  
     ! inlet and outlet
     !$cuf kernel do(2) <<<*,*>>>
     do k = 4, 4
@@ -94,13 +95,11 @@ contains
         Q(4,nx,j,k)   = 0.d0
         Q(5,nx,j,k)   = pr / (gamma - 1.d0) / Jacobian(j)
     enddo;enddo
-
     !$cuf kernel do(2)<<<*,*>>>
     do i = 1, nx
       do l = 1, 5
         Qc(l,i) = Q(l,i,jc,kc)
     enddo;enddo
-
     !$cuf kernel do(4)<<<*,*>>>
     do k = 1, nz
       do j = 1, ny
@@ -110,19 +109,11 @@ contains
     enddo;enddo;enddo;enddo
   end subroutine set_bc
 
+
   subroutine set_bc_mut(nx,ny,nz,mut,qc2)
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(inout), device :: mut(nx,ny,nz), qc2(nx,ny,nz)
     call set_bc_mut_common(nx, ny, nz, mut, qc2)
   end subroutine set_bc_mut
-
-  subroutine calc_forcing(nx, ny, nz, dx, dy, dz, rho, u, v, w, p, fx, fy, fz)
-    integer, intent(in), value   :: nx, ny, nz
-    real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
-    real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
-    real(8), intent(in), device  :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device  :: rho(nx,ny,nz), u(nx,ny,nz), v(nx,ny,nz), w(nx,ny,nz), p(nx,ny,nz)
-    real(8), intent(out), device :: fx(nx-2,ny-2,nz-2), fy(nx-2,ny-2,nz-2), fz(nx-2,ny-2,nz-2)
-  end subroutine calc_forcing
 end module set
 

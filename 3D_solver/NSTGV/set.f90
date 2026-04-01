@@ -11,7 +11,8 @@ contains
     real(8), intent(out) :: xc(nx), yc(ny), zc(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     call set_grid_cyclic(id_accuracy, nx, ny, nz, Lx, Ly, Lz, xc, yc, zc, dx, dy, dz)
   end subroutine set_grid
-  
+
+
   subroutine set_init(myrank, nx, ny, nz, x, y, z, Q)
     use mod_globals, only : id_accuracy
     integer, intent(in)  :: myrank, nx, ny, nz
@@ -44,7 +45,8 @@ contains
     enddo;enddo;enddo
     call set_bc_cyclic(id_accuracy, nx, ny, nz, Q)
   end subroutine set_init
-  
+
+
   subroutine set_bc(myrank, nx, ny, nz, Jacobian, Q, Qre)
     use mod_globals, only : id_accuracy
     integer, intent(in), value     :: myrank, nx, ny, nz
@@ -54,19 +56,11 @@ contains
     call set_bc_cyclic(id_accuracy, nx, ny, nz, Q)
   end subroutine set_bc
 
+
   subroutine set_bc_mut(nx,ny,nz,mut,qc2)
     integer, intent(in), value     :: nx, ny, nz
     real(8), intent(inout), device :: mut(nx,ny,nz), qc2(nx,ny,nz)
     call set_bc_mut_common(nx,ny,nz,mut,qc2)
   end subroutine set_bc_mut
-
-  subroutine calc_forcing(nx, ny, nz, dx, dy, dz, Q, fx, fy, fz)
-    integer, intent(in), value   :: nx, ny, nz
-    real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
-    real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
-    real(8), intent(in), device  :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device  :: Q(5,nx,ny,nz)
-    real(8), intent(out), device :: fx(nx-2,ny-2,nz-2), fy(nx-2,ny-2,nz-2), fz(nx-2,ny-2,nz-2)
-  end subroutine calc_forcing
 end module set
 
