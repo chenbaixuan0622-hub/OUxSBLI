@@ -126,5 +126,5 @@ def generate_markdown_api(target_dir=".", output_file="api.md"):
 
 if __name__ == "__main__":
     # カレントディレクトリ以下の全ファイルを走査して api.md を作成
-    generate_markdown_api(target_dir="../3D_solver/src", output_file="./docs/api.md")
+    generate_markdown_api(target_dir="../3D_solver/src", output_file="./api.md")
 
