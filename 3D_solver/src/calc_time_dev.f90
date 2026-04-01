@@ -76,6 +76,8 @@ contains
     !> Synchronization points: (1) end of each time integration step for boundary exchange
     !>                         (2) after every np iterations for I/O and statistics
     !> CFL constraint: dt = CFL * min_grid_spacing / max_wave_speed
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+    print *, "myrank is ", myrank, " start Runge-Kutta"
     do t2 = 1, np
       if (mod(myrank,2) == 0) then
         ! GPU-accelerated ranks perform time integration
@@ -255,6 +257,8 @@ contains
     !> 4-4 RK main integration loop with residual accumulation
     !> Stages 1-3: compute fluxes and update intermediate solutions, accumulate residuals in Rs
     !> Stage 4: final flux computation and assembly of weighted sum Q^(n+1) = Q^n - (1/6)*sum(R_i)
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+    print *, "myrank is ", myrank, " start Runge-Kutta"
     do t2 = 1, np
       if (mod(myrank,2) == 0) then
         do t1 = 1, nt
@@ -339,6 +343,8 @@ contains
       call pre_rescale(myrank, flag_re, flag_req, ny, nz, Qre, Qm, Qm_cpu)
     endif
     
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+    print *, "myrank is ", myrank, " start Runge-Kutta"
     do t2 = 1, np
       do t1 = 1, nt
         if (mod(myrank,2) == 0) then

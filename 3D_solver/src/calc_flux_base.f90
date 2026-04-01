@@ -32,18 +32,18 @@ contains
   !> Provides 4th-5th order accuracy by minimizing dispersive errors in smooth regions
   subroutine calc_conv_keep(id_scheme, nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, E, F, G)
     use mod_globals, only : id_accuracy
-    integer(2), intent(in), value :: id_scheme           !< ID for scheme: int 2 means KEEP
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: inv_dx(nx-1)        !< inverse grid spacing x (1/dx)
-    real(8), intent(in), device   :: inv_dy(ny-1)        !< inverse grid spacing y (1/dy)
-    real(8), intent(in), device   :: inv_dz(nz-1)        !< inverse grid spacing z (1/dz)
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< conservative variables Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< temperature field
-    real(8), intent(out), device  :: E(5,nx-1,ny-2,nz-2) !< convective flux in x direction
-    real(8), intent(out), device  :: F(5,nx-2,ny-1,nz-2) !< convective flux in y direction
-    real(8), intent(out), device  :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
+    integer(2), intent(in), value            :: id_scheme           !< ID for scheme: int 2 means KEEP
+    integer, intent(in), value               :: nx                  !< number of grid points in x direction
+    integer, intent(in), value               :: ny                  !< number of grid points in y direction
+    integer, intent(in), value               :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous  :: inv_dx(nx-1)        !< inverse grid spacing x (1/dx)
+    real(8), intent(in), device, contiguous  :: inv_dy(ny-1)        !< inverse grid spacing y (1/dy)
+    real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !< inverse grid spacing z (1/dz)
+    real(8), intent(in), device, contiguous  :: Q(5,nx,ny,nz)       !< conservative variables Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous  :: T(nx,ny,nz)         !< temperature field
+    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< convective flux in x direction
+    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< convective flux in y direction
+    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
     call calc_keep_x<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, T, E)
     call calc_keep_y<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, Q, T, F)
     call calc_keep_z<<<blocksG,threadsG,3>>>(id_accuracy, nx, ny, nz, Q, T, G)
@@ -56,18 +56,18 @@ contains
   !> Dissipation modulated by Ducros sensor: f_d controls blend ratio
   subroutine calc_conv_slau(id_scheme, nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, E, F, G)
     use mod_globals, only : id_accuracy
-    real(2), intent(in), value   :: id_scheme           !< ID for scheme: real 2 means SLAU
-    integer, intent(in), value   :: nx                  !< number of grid points in x direction
-    integer, intent(in), value   :: ny                  !< number of grid points in y direction
-    integer, intent(in), value   :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device  :: inv_dx(nx-1)        !< inverse grid spacing x (1/dx)
-    real(8), intent(in), device  :: inv_dy(ny-1)        !< inverse grid spacing y (1/dy)
-    real(8), intent(in), device  :: inv_dz(nz-1)        !< inverse grid spacing z (1/dz)
-    real(8), intent(in), device  :: Q(5,nx,ny,nz)       !< conservative variables
-    real(8), intent(in), device  :: T(nx,ny,nz)         !< temperature field
-    real(8), intent(out), device :: E(5,nx-1,ny-2,nz-2) !< convective flux in x direction
-    real(8), intent(out), device :: F(5,nx-2,ny-1,nz-2) !< convective flux in y direction
-    real(8), intent(out), device :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
+    real(2), intent(in), value               :: id_scheme           !< ID for scheme: real 2 means SLAU
+    integer, intent(in), value               :: nx                  !< number of grid points in x direction
+    integer, intent(in), value               :: ny                  !< number of grid points in y direction
+    integer, intent(in), value               :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous  :: inv_dx(nx-1)        !< inverse grid spacing x (1/dx)
+    real(8), intent(in), device, contiguous  :: inv_dy(ny-1)        !< inverse grid spacing y (1/dy)
+    real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !< inverse grid spacing z (1/dz)
+    real(8), intent(in), device, contiguous  :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous  :: T(nx,ny,nz)         !< temperature field
+    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< convective flux in x direction
+    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< convective flux in y direction
+    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
     real(8), device :: sensor(nx,ny,nz)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
     call calc_slau_x<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
@@ -83,18 +83,18 @@ contains
   !> Entropy fix via sensor prevents expansion shocks at sonic points
   subroutine calc_conv_roe(id_scheme, nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, E, F, G)
     use mod_globals, only : id_accuracy
-    real(4), intent(in), value   :: id_scheme           !< ID for scheme: real 4 means Roe
-    integer, intent(in), value   :: nx                  !< number of grid points in x direction
-    integer, intent(in), value   :: ny                  !< number of grid points in y direction
-    integer, intent(in), value   :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device  :: inv_dx(nx-1)        !< inverse grid spacing x (1/dx)
-    real(8), intent(in), device  :: inv_dy(ny-1)        !< inverse grid spacing y (1/dy)
-    real(8), intent(in), device  :: inv_dz(nz-1)        !< inverse grid spacing z (1/dz)
-    real(8), intent(in), device  :: Q(5,nx,ny,nz)       !< conservative variables
-    real(8), intent(in), device  :: T(nx,ny,nz)         !< temperature field
-    real(8), intent(out), device :: E(5,nx-1,ny-2,nz-2) !< convective flux in x direction
-    real(8), intent(out), device :: F(5,nx-2,ny-1,nz-2) !< convective flux in y direction
-    real(8), intent(out), device :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
+    real(4), intent(in), value               :: id_scheme           !< ID for scheme: real 4 means Roe
+    integer, intent(in), value               :: nx                  !< number of grid points in x direction
+    integer, intent(in), value               :: ny                  !< number of grid points in y direction
+    integer, intent(in), value               :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous  :: inv_dx(nx-1)        !< inverse grid spacing x (1/dx)
+    real(8), intent(in), device, contiguous  :: inv_dy(ny-1)        !< inverse grid spacing y (1/dy)
+    real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !< inverse grid spacing z (1/dz)
+    real(8), intent(in), device, contiguous  :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous  :: T(nx,ny,nz)         !< temperature field
+    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< convective flux in x direction
+    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< convective flux in y direction
+    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
     real(8), device :: sensor(nx,ny,nz)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
     call calc_roe_x<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
@@ -110,18 +110,18 @@ contains
   !> Ducros shock sensor: f_d = (∇·u)²/[(∇·u)² + (∇×u)² + ε]
   subroutine calc_conv_hybrid(id_scheme, nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, E, F, G)
     use mod_globals, only : id_accuracy
-    real(8), intent(in), value   :: id_scheme           !< ID for scheme: real 8 means Hybrid
-    integer, intent(in), value   :: nx                  !< number of grid points in x direction
-    integer, intent(in), value   :: ny                  !< number of grid points in y direction
-    integer, intent(in), value   :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device  :: inv_dx(nx-1)        !< inverse grid spacing x (1/dx)
-    real(8), intent(in), device  :: inv_dy(ny-1)        !> 1 / dy
-    real(8), intent(in), device  :: inv_dz(nz-1)        !> 1 / dz
-    real(8), intent(in), device  :: Q(5,nx,ny,nz)       !> Q(rho, u, v, w, p)
-    real(8), intent(in), device  :: T(nx,ny,nz)         !> temperature
-    real(8), intent(out), device :: E(5,nx-1,ny-2,nz-2) !> Flux in x direction
-    real(8), intent(out), device :: F(5,nx-2,ny-1,nz-2) !> Flux in y direction
-    real(8), intent(out), device :: G(5,nx-2,ny-2,nz-1) !> Flux in z direction
+    real(8), intent(in), value               :: id_scheme           !< ID for scheme: real 8 means Hybrid
+    integer, intent(in), value               :: nx                  !< number of grid points in x direction
+    integer, intent(in), value               :: ny                  !< number of grid points in y direction
+    integer, intent(in), value               :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous  :: inv_dx(nx-1)        !< inverse grid spacing x (1/dx)
+    real(8), intent(in), device, contiguous  :: inv_dy(ny-1)        !> 1 / dy
+    real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !> 1 / dz
+    real(8), intent(in), device, contiguous  :: Q(5,nx,ny,nz)       !> Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous  :: T(nx,ny,nz)         !> temperature
+    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !> Flux in x direction
+    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !> Flux in y direction
+    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> Flux in z direction
     real(8), device :: sensor(nx,ny,nz)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
     call calc_hybrid_x<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, T, sensor, E)
@@ -133,23 +133,23 @@ contains
   !< calc Flux of Euler equation
   subroutine calc_EFG_Euler(id_visc, nx, ny, nz, inv_dx, inv_dy, inv_dz, Jacobian, QJ, Q, T, mu, mut, qc2, E, F, G)
     use mod_globals, only : id_scheme
-    integer(2), intent(in), value :: id_visc             !> ID for equation, int 2 means Euler
-    integer, intent(in), value    :: nx                  !> number of grid points in x direction
-    integer, intent(in), value    :: ny                  !> number of grid points in y direction
-    integer, intent(in), value    :: nz                  !> number of grid points in z direction
-    real(8), intent(in), device   :: inv_dx(nx-1)        !> 1 / dx
-    real(8), intent(in), device   :: inv_dy(ny-1)        !> 1 / dy
-    real(8), intent(in), device   :: inv_dz(nz-1)        !> 1 / dz
-    real(8), intent(in), device   :: Jacobian(nx,ny)     !> Jacobian
-    real(8), intent(in), device   :: QJ(5,nx,ny,nz)      !> Q(rho, rhou, rhov, rhow, E) / Jacobian
-    real(8), intent(out), device  :: Q(5,nx,ny,nz)       !> Q(rho, u, v, w, p)
-    real(8), intent(out), device  :: T(nx,ny,nz)         !> temperature
-    real(8), intent(out), device  :: mu(1,1,1)           !> viscosity, size is (1,1,1) in case of Euler
-    real(8), intent(out), device  :: mut(1,1,1)          !> SGS viscosity, size is (1,1,1) in case of Euler
-    real(8), intent(out), device  :: qc2(1,1,1)          !> SGS kinetic energy, size is (1,1,1) in case of Euler
-    real(8), intent(out), device  :: E(5,nx-1,ny-2,nz-2) !> Flux in x direction
-    real(8), intent(out), device  :: F(5,nx-2,ny-1,nz-2) !> Flux in y direction
-    real(8), intent(out), device  :: G(5,nx-2,ny-2,nz-1) !> Flux in z direction
+    integer(2), intent(in), value            :: id_visc             !> ID for equation, int 2 means Euler
+    integer, intent(in), value               :: nx                  !> number of grid points in x direction
+    integer, intent(in), value               :: ny                  !> number of grid points in y direction
+    integer, intent(in), value               :: nz                  !> number of grid points in z direction
+    real(8), intent(in), device, contiguous  :: inv_dx(nx-1)        !> 1 / dx
+    real(8), intent(in), device, contiguous  :: inv_dy(ny-1)        !> 1 / dy
+    real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !> 1 / dz
+    real(8), intent(in), device, contiguous  :: Jacobian(nx,ny)     !> Jacobian
+    real(8), intent(in), device, contiguous  :: QJ(5,nx,ny,nz)      !> Q(rho, rhou, rhov, rhow, E) / Jacobian
+    real(8), intent(out), device, contiguous :: Q(5,nx,ny,nz)       !> Q(rho, u, v, w, p)
+    real(8), intent(out), device, contiguous :: T(nx,ny,nz)         !> temperature
+    real(8), intent(out), device, contiguous :: mu(1,1,1)           !> viscosity, size is (1,1,1) in case of Euler
+    real(8), intent(out), device, contiguous :: mut(1,1,1)          !> SGS viscosity, size is (1,1,1) in case of Euler
+    real(8), intent(out), device, contiguous :: qc2(1,1,1)          !> SGS kinetic energy, size is (1,1,1) in case of Euler
+    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !> Flux in x direction
+    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !> Flux in y direction
+    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> Flux in z direction
     integer stat, i, j, k
     call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, Q, T)
     call calc_conv(id_scheme, nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, E, F, G)
@@ -161,23 +161,23 @@ contains
   !> and heat flux via Fourier's law: q = -k*dT/dx where k depends on Prandtl number
   subroutine calc_EFG_visc(id_visc, nx, ny, nz, inv_dx, inv_dy, inv_dz, Jacobian, QJ, Q, T, mu, mut, qc2, E, F, G)
     use mod_globals, only : id_scheme
-    integer(4), intent(in), value :: id_visc             !> ID for equation, int 4 means NS
-    integer, intent(in), value    :: nx                  !> number of grid points in x direction
-    integer, intent(in), value    :: ny                  !> number of grid points in y direction
-    integer, intent(in), value    :: nz                  !> number of grid points in z direction
-    real(8), intent(in), device   :: inv_dx(nx-1)        !> 1 / dx (for finite differences)
-    real(8), intent(in), device   :: inv_dy(ny-1)        !> 1 / dy
-    real(8), intent(in), device   :: inv_dz(nz-1)        !> 1 / dz
-    real(8), intent(in), device   :: Jacobian(nx,ny)     !> Jacobian determinant for scaling
-    real(8), intent(in), device   :: QJ(5,nx,ny,nz)      !> Q/Jacobian (scaled conserved variables)
-    real(8), intent(out), device  :: Q(5,nx,ny,nz)       !> Q(rho, u, v, w, p) primitive variables
-    real(8), intent(out), device  :: T(nx,ny,nz)         !> temperature field (for viscosity & heat flux)
-    real(8), intent(out), device  :: mu(nx,ny,nz)        !> molecular viscosity via Sutherland's law
-    real(8), intent(out), device  :: mut(1,1,1)          !> SGS turbulent viscosity (unused for NS)
-    real(8), intent(out), device  :: qc2(1,1,1)          !> SGS kinetic energy (unused for NS)
-    real(8), intent(out), device  :: E(5,nx-1,ny-2,nz-2) !> x-direction flux (convective + viscous)
-    real(8), intent(out), device  :: F(5,nx-2,ny-1,nz-2) !> y-direction flux (convective + viscous)
-    real(8), intent(out), device  :: G(5,nx-2,ny-2,nz-1) !> z-direction flux (convective + viscous)
+    integer(4), intent(in), value            :: id_visc             !> ID for equation, int 4 means NS
+    integer, intent(in), value               :: nx                  !> number of grid points in x direction
+    integer, intent(in), value               :: ny                  !> number of grid points in y direction
+    integer, intent(in), value               :: nz                  !> number of grid points in z direction
+    real(8), intent(in), device, contiguous  :: inv_dx(nx-1)        !> 1 / dx (for finite differences)
+    real(8), intent(in), device, contiguous  :: inv_dy(ny-1)        !> 1 / dy
+    real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !> 1 / dz
+    real(8), intent(in), device, contiguous  :: Jacobian(nx,ny)     !> Jacobian determinant for scaling
+    real(8), intent(in), device, contiguous  :: QJ(5,nx,ny,nz)      !> Q/Jacobian (scaled conserved variables)
+    real(8), intent(out), device, contiguous :: Q(5,nx,ny,nz)       !> Q(rho, u, v, w, p) primitive variables
+    real(8), intent(out), device, contiguous :: T(nx,ny,nz)         !> temperature field (for viscosity & heat flux)
+    real(8), intent(out), device, contiguous :: mu(nx,ny,nz)        !> molecular viscosity via Sutherland's law
+    real(8), intent(out), device, contiguous :: mut(1,1,1)          !> SGS turbulent viscosity (unused for NS)
+    real(8), intent(out), device, contiguous :: qc2(1,1,1)          !> SGS kinetic energy (unused for NS)
+    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !> x-direction flux (convective + viscous)
+    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !> y-direction flux (convective + viscous)
+    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> z-direction flux (convective + viscous)
     integer stat
     ! Step 1: Decode Q and compute T(rho) and mu(T) via Sutherland's formula
     call calc_quantities_T_3D(nx, ny, nz, Jacobian, QJ, Q, T, mu)
@@ -204,23 +204,23 @@ contains
   !> Filters out subgrid scales: nu_t = (C_s * Delta)^2 * |S_ij| where Delta is grid filter width
   subroutine calc_EFG_LES(id_visc, nx, ny, nz, inv_dx, inv_dy, inv_dz, Jacobian, QJ, Q, T, mu, mut, qc2, E, F, G)
     use mod_globals, only : id_scheme
-    integer(8), intent(in), value :: id_visc             !> ID for equation, int 8 means LES
-    integer, intent(in), value    :: nx                  !> number of grid points in x direction
-    integer, intent(in), value    :: ny                  !> number of grid points in y direction
-    integer, intent(in), value    :: nz                  !> number of grid points in z direction
-    real(8), intent(in), device   :: inv_dx(nx-1)        !> 1 / dx
-    real(8), intent(in), device   :: inv_dy(ny-1)        !> 1 / dy
-    real(8), intent(in), device   :: inv_dz(nz-1)        !> 1 / dz
-    real(8), intent(in), device   :: Jacobian(nx,ny)     !> Jacobian
-    real(8), intent(in), device   :: QJ(5,nx,ny,nz)      !> Q(rho, rhou, rhov, rhow, E) / Jacobian
-    real(8), intent(out), device  :: Q(5,nx,ny,nz)       !> Q(rho, u, v, w, p)
-    real(8), intent(out), device  :: T(nx,ny,nz)         !> temperature
-    real(8), intent(out), device  :: mu(nx,ny,nz)        !> viscosity
-    real(8), intent(out), device  :: mut(nx,ny,nz)       !> SGS viscosity
-    real(8), intent(out), device  :: qc2(nx,ny,nz)       !> SGS kinetic energy
-    real(8), intent(out), device  :: E(5,nx-1,ny-2,nz-2) !> Flux in x direction
-    real(8), intent(out), device  :: F(5,nx-2,ny-1,nz-2) !> Flux in y direction
-    real(8), intent(out), device  :: G(5,nx-2,ny-2,nz-1) !> Flux in z direction
+    integer(8), intent(in), value            :: id_visc             !> ID for equation, int 8 means LES
+    integer, intent(in), value               :: nx                  !> number of grid points in x direction
+    integer, intent(in), value               :: ny                  !> number of grid points in y direction
+    integer, intent(in), value               :: nz                  !> number of grid points in z direction
+    real(8), intent(in), device, contiguous  :: inv_dx(nx-1)        !> 1 / dx
+    real(8), intent(in), device, contiguous  :: inv_dy(ny-1)        !> 1 / dy
+    real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !> 1 / dz
+    real(8), intent(in), device, contiguous  :: Jacobian(nx,ny)     !> Jacobian
+    real(8), intent(in), device, contiguous  :: QJ(5,nx,ny,nz)      !> Q(rho, rhou, rhov, rhow, E) / Jacobian
+    real(8), intent(out), device, contiguous :: Q(5,nx,ny,nz)       !> Q(rho, u, v, w, p)
+    real(8), intent(out), device, contiguous :: T(nx,ny,nz)         !> temperature
+    real(8), intent(out), device, contiguous :: mu(nx,ny,nz)        !> viscosity
+    real(8), intent(out), device, contiguous :: mut(nx,ny,nz)       !> SGS viscosity
+    real(8), intent(out), device, contiguous :: qc2(nx,ny,nz)       !> SGS kinetic energy
+    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !> Flux in x direction
+    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !> Flux in y direction
+    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> Flux in z direction
     integer stat
     mut = 0.d0
     qc2 = 0.d0

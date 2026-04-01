@@ -5,10 +5,11 @@ module calc_physical_quantities
   implicit none
 contains
   subroutine calc_quantities_2D(nx, ny, Jacobian, QJ, Q, T)
-    integer, intent(in), value   :: nx, ny
-    real(8), intent(in), device  :: Jacobian(nx,ny)
-    real(8), intent(in), device  :: QJ(4,nx,ny) ! Q / Jacobian
-    real(8), intent(out), device :: Q(4,nx,ny), T(nx,ny)
+    integer, intent(in), value               :: nx, ny
+    real(8), intent(in), device, contiguous  :: Jacobian(nx,ny)
+    real(8), intent(in), device, contiguous  :: QJ(4,nx,ny) ! Q / Jacobian
+    real(8), intent(out), device, contiguous :: Q(4,nx,ny)
+    real(8), intent(out), device, contiguous :: T(nx,ny)
     integer i, j
     real(8) :: over_Q1, rho, u, v, p
     !$cuf kernel do(2) <<<*,(32,4)>>>
@@ -29,10 +30,12 @@ contains
   
 
   subroutine calc_quantities_T_2D(nx, ny, Jacobian, QJ, Q, T, mu)
-    integer, intent(in), value   :: nx, ny
-    real(8), intent(in), device  :: Jacobian(nx,ny)
-    real(8), intent(in), device  :: QJ(4,nx,ny) ! Q / Jacobian
-    real(8), intent(out), device :: Q(4,nx,ny), T(nx,ny), mu(nx,ny)
+    integer, intent(in), value               :: nx, ny
+    real(8), intent(in), device, contiguous  :: Jacobian(nx,ny)
+    real(8), intent(in), device, contiguous  :: QJ(4,nx,ny) ! Q / Jacobian
+    real(8), intent(out), device, contiguous :: Q(4,nx,ny)
+    real(8), intent(out), device, contiguous :: T(nx,ny)
+    real(8), intent(out), device, contiguous :: mu(nx,ny)
     integer i, j
     real(8) :: over_Q1, rho, u, v, p, temp
     !$cuf kernel do(2) <<<*,(32,4)>>>
@@ -55,10 +58,11 @@ contains
 
 
   subroutine calc_quantities_3D(nx, ny, nz, Jacobian, QJ, Q, T)
-    integer, intent(in), value   :: nx, ny, nz
-    real(8), intent(in), device  :: Jacobian(nx,ny)
-    real(8), intent(in), device  :: QJ(5,nx,ny,nz) ! Q / Jacobian
-    real(8), intent(out), device :: Q(5,nx,ny,nz), T(nx,ny,nz)
+    integer, intent(in), value               :: nx, ny, nz
+    real(8), intent(in), device, contiguous  :: Jacobian(nx,ny)
+    real(8), intent(in), device, contiguous  :: QJ(5,nx,ny,nz) ! Q / Jacobian
+    real(8), intent(out), device, contiguous :: Q(5,nx,ny,nz)
+    real(8), intent(out), device, contiguous :: T(nx,ny,nz)
     integer i, j, k
     real(8) :: over_Q1, rho, u, v, w, p
     !$cuf kernel do(3) <<<*,(32,4,2)>>>
@@ -82,10 +86,12 @@ contains
   
 
   subroutine calc_quantities_T_3D(nx, ny, nz, Jacobian, QJ, Q, T, mu)
-    integer, intent(in), value   :: nx, ny, nz
-    real(8), intent(in), device  :: Jacobian(nx,ny)
-    real(8), intent(in), device  :: QJ(5,nx,ny,nz) ! Q / Jacobian
-    real(8), intent(out), device :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
+    integer, intent(in), value               :: nx, ny, nz
+    real(8), intent(in), device, contiguous  :: Jacobian(nx,ny)
+    real(8), intent(in), device, contiguous  :: QJ(5,nx,ny,nz) ! Q / Jacobian
+    real(8), intent(out), device, contiguous :: Q(5,nx,ny,nz)
+    real(8), intent(out), device, contiguous :: T(nx,ny,nz)
+    real(8), intent(out), device, contiguous :: mu(nx,ny,nz)
     integer i, j, k
     real(8) :: over_Q1, rho, u, v, w, p, temp
     !$cuf kernel do(3) <<<*,(32,4,2)>>>
