@@ -1,12 +1,19 @@
+!> Module for Large-Eddy Simulation (LES) subgrid-scale modeling
+!> Implements DNS/RANS and dynamic Smagorinsky LES turbulence models
 module calc_les
   implicit none
   private
   public calc_mut
 contains
+
+  !> Compute velocity gradients from 3x3x3 stencil
+  !> Used for strain rate and vorticity calculations in LES modeling
   pure attributes(device) subroutine calc_differential(u,v,w,dx,dy,dz,dudx,dudy,dudz,dvdx,dvdy,dvdz,dwdx,dwdy,dwdz)
-    real(8), intent(in), dimension(3,3,3), device :: u, v, w
-    real(8), intent(in), value                    :: dx, dy, dz ! 1 /dx, 1 / dy, 1 / dz
-    real(8), intent(out) :: dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz
+    real(8), intent(in), dimension(3,3,3), device :: u          !< u velocity 3x3x3 stencil
+    real(8), intent(in), dimension(3,3,3), device :: v          !< v velocity 3x3x3 stencil
+    real(8), intent(in), dimension(3,3,3), device :: w          !< w velocity 3x3x3 stencil
+    real(8), intent(in), value                    :: dx, dy, dz !< inverse grid spacing (1/dx, 1/dy, 1/dz)
+    real(8), intent(out) :: dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz !< strain rate components
     dudx = 0.5d0 * (-u(1,2,2) + u(3,2,2)) * dx
     dudy = 0.5d0 * (-u(2,1,2) + u(2,3,2)) * dy
     dudz = 0.5d0 * (-u(2,2,1) + u(2,2,3)) * dz

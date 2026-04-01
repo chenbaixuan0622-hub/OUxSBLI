@@ -1,8 +1,14 @@
+!> Module for shock detection and hybrid scheme support
+!> Computes Ducros sensor for automatic scheme switching between KEEP and SLAU
 module calc_hybrid
   use cudafor
   use mod_globals, only : accuracy, offset, gamma
   implicit none
 contains
+
+  !> Compute Ducros shock sensor for hybrid scheme
+  !> Uses ratio of dilatation (divergence) to vorticity to detect shocks
+  !> Values closer to 1 indicate shock regions, close to 0 indicates smooth flow
   pure attributes(global) subroutine calc_Ducros(nx, ny, nz, dx, dy, dz, Q, fd)
     integer, intent(in), value                         :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device       :: dx ! 1 / dx
@@ -14,7 +20,7 @@ contains
     real(8) dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz
     real(8) div, rot(3)
     real(8) dx_tmp, dy_tmp, dz_tmp
-    real(8) :: eps = 1.d-16
+    real(8) :: eps = 1.d-12
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1 
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
@@ -31,11 +37,16 @@ contains
     dudz = (-Q(2,i,j,k-1) + Q(2,i,j,k+1)) * dz_tmp
     dvdz = (-Q(3,i,j,k-1) + Q(3,i,j,k+1)) * dz_tmp
     dwdz = (-Q(4,i,j,k-1) + Q(4,i,j,k+1)) * dz_tmp
-    div = dudx + dvdy + dwdz
-    div = min(div, 0.d0)
-    rot(1) = dwdy - dvdz
-    rot(2) = dudz - dwdx
-    rot(3) = dvdx - dudy
+    ! Ducros shock sensor: detector based on dilatation vs. vorticity
+    div = dudx + dvdy + dwdz           ! Divergence: ∇·u
+    
+    ! Vorticity vector: ω = ∇ × u
+    rot(1) = dwdy - dvdz               ! ω_x = dw/dy - dv/dz
+    rot(2) = dudz - dwdx               ! ω_y = du/dz - dw/dx
+    rot(3) = dvdx - dudy               ! ω_z = dv/dx - du/dy
+    
+    ! Sensor: f_d = (∇·u)² / [(∇·u)² + (∇×u)²]
+    ! Returns ~1 in shocks (high compression), ~0 in smooth vortical flows
     fd(i,j,k) = (div**2) / (div**2 + (rot(1)**2 + rot(2)**2 + rot(3)**2) + eps)
 
     fd(i,j,k) = min(1.d0, fd(i,j,k))

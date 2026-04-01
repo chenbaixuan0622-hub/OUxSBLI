@@ -2,7 +2,7 @@ program main
   use, intrinsic :: iso_fortran_env
   use cudafor
   use mpi
-  use mod_globals,  only : id_RungeKutta, id_recal, nx1, nx2, ny1, ny2, nz1, nz2, Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, &
+  use mod_globals,  only : id_RungeKutta, id_rescale, id_recal, nx1, nx2, ny1, ny2, nz1, nz2, Lx1, Lx2, Ly1, Ly2, Lz1, Lz2, &
   & mygpu1, mygpu2, blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
   & blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv
   use set_coordinate
@@ -83,7 +83,7 @@ program main
 
   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   call cpu_time(t_start)
-  call RungeKutta(id_RungeKutta, myrank, mygpu, nx, ny, nz, x, dx, y, dy, z, dz, Jacobian, Q)
+  call RungeKutta(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, nz, x, dx, y, dy, z, dz, Jacobian, Q)
   call cpu_time(t_end)
 
   if (mod(myrank,2) == 0) then

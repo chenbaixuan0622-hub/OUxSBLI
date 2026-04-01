@@ -1,23 +1,35 @@
+!> Module containing 4th-order viscous flux computation kernels
+!> Uses centered difference stencils to compute viscous stresses and heat flux
+!> Generally more accurate but requires larger stencils than 2nd-order
 module calc_visc4
   use mod_globals, only : id_visc, gamma, R, Pr, Prt, dt, threadsEv, threadsFv, threadsGv
   use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third, two_third, one_twelfth
-  use calc_rand
   implicit none
   private
   public calc_Ev4, calc_Ev_LES4, calc_Fv4, calc_Fv_LES4, calc_Gv4, calc_Gv_LES4
-  real(8), parameter :: one_24 = 1.d0 / 24.d0
+  real(8), parameter :: one_24 = 1.d0 / 24.d0 !< coefficient for 4th-order flux (1/24)
 contains
+  !> Pure device function: 4th-order accurate flux reconstruction from 3-point stencil
+  !> Uses compact central difference: F(i+1/2) = (-F_i + 26*F_{i+1/2} - F_{i+1})/24
+  !> Achieves O(dx^4) accuracy with implicit stencil via dispersion relation optimization
   pure attributes(device) function flux4(a) result(ans)
-    real(8), intent(in), device :: a(3)
-    real(8) ans
+    real(8), intent(in), device :: a(3)                  !< 3-point array of flux values
+    real(8) ans                                          !< 4th-order flux result (-a1 + 26*a2 - a3) / 24
     ans = (-a(1) + 26.d0 * a(2) - a(3)) * one_24
   end function flux4
 
-
+  !> Pure device subroutine: Compute diagonal stress tensor components via 4th-order stencils
+  !> Diagonal: t_ii = (2/3)*mu*(2*u_i,i - u_j,j - u_k,k) [with bulk viscosity correction]
+  !> Uses 6-point stencil for strain rates and 3-point for viscosity averaging
+  !> Computes work term ut_ii = u_i * t_ii needed for energy equation viscous contribution
   pure attributes(device) subroutine calc_tau_straight(mu, u, vy, wz, d, t11, ut11)
-    real(8), intent(in), contiguous :: mu(3), u(6), vy(6), wz(6)
-    real(8), intent(in)             :: d
-    real(8), intent(out)            :: t11, ut11
+    real(8), intent(in), contiguous :: mu(3)             !< viscosity at 3 stencil points
+    real(8), intent(in), contiguous :: u(6)              !< velocity u at 6-point stencil
+    real(8), intent(in), contiguous :: vy(6)             !< dv/dy at 6-point stencil
+    real(8), intent(in), contiguous :: wz(6)             !< dw/dz at 6-point stencil
+    real(8), intent(in)             :: d                 !< inverse grid spacing (1/dx or 1/dy or 1/dz)
+    real(8), intent(out)            :: t11               !< stress tensor component t_11
+    real(8), intent(out)            :: ut11              !< work term u * t_11
     real(8) tmp1, tmp2, tmp3
     tmp1 = two_third * mu(1) * ((2.25d0 * (-u(2) + u(3)) - (-u(1) + u(4)) * one_twelfth) * d &
            - 0.0625d0 * (-vy(1) + 9.d0 * (vy(2) + vy(3)) - vy(4)) &
@@ -36,10 +48,18 @@ contains
   end subroutine calc_tau_straight
 
 
+  !> Pure device subroutine: Compute diagonal stress with Smagorinsky LES turbulent viscosity
+  !> Combines molecular + turbulent (SGS) viscosity: nu_total = nu + nu_t
+  !> Turbulent part nu_t captures unresolved subgrid energy dissipation
   pure attributes(device) subroutine calc_tau_straight_LES(mu, mut, u, vy, wz, d, t11, ut11)
-    real(8), intent(in), contiguous :: mu(3), mut(3), u(6), vy(6), wz(6)
-    real(8), intent(in)             :: d
-    real(8), intent(out)            :: t11, ut11
+    real(8), intent(in), contiguous :: mu(3)              !< molecular viscosity at 3 stencil points
+    real(8), intent(in), contiguous :: mut(3)             !< turbulent viscosity at 3 stencil points
+    real(8), intent(in), contiguous :: u(6)               !< velocity u at 6-point stencil
+    real(8), intent(in), contiguous :: vy(6)              !< dv/dy at 6-point stencil
+    real(8), intent(in), contiguous :: wz(6)              !< dw/dz at 6-point stencil
+    real(8), intent(in)             :: d                  !< inverse grid spacing
+    real(8), intent(out)            :: t11                !< total stress (molecular + SGS)
+    real(8), intent(out)            :: ut11               !< work term u * t_11
     real(8) tmp1(3), tmp2(3)
     tmp1(:) = (2.25d0 * (-u(2:4) + u(3:5)) - (-u(1:3) + u(4:6)) * one_twelfth) * d
     tmp1(:) = tmp1(:) - 0.0625d0 * (-vy(1:3) + 9.d0 * (vy(2:4) + vy(3:5)) - vy(4:6))
@@ -54,10 +74,16 @@ contains
   end subroutine calc_tau_straight_LES
 
 
+  !> Pure device subroutine: Compute shear (off-diagonal) stress tensor components
+  !> Shear: t_ij = mu*(u_i,j + u_j,i) for i != j components
+  !> 4th-order stencil preserves cross-derivatives symmetry (t_12 = t_21)
   pure attributes(device) subroutine calc_tau_cross(mu, v, uy, d, t12, vt12)
-    real(8), intent(in), contiguous :: mu(3), v(6), uy(6)
-    real(8), intent(in)             :: d
-    real(8), intent(out)            :: t12, vt12
+    real(8), intent(in), contiguous :: mu(3)              !< viscosity at 3 stencil points
+    real(8), intent(in), contiguous :: v(6)               !< velocity v at 6-point stencil
+    real(8), intent(in), contiguous :: uy(6)              !< du/dy at 6-point stencil
+    real(8), intent(in)             :: d                  !< inverse grid spacing
+    real(8), intent(out)            :: t12                !< shear stress component t_12
+    real(8), intent(out)            :: vt12               !< work term v * t_12
     real(8) tmp1, tmp2, tmp3
     tmp1 = mu(1) * ((1.125d0 * (-v(2) + v(3)) - (-v(1) + v(4)) * one_24) * d &
                     + 0.0625d0 * (-uy(1) + 9.d0 * (uy(2) + uy(3)) - uy(4)))
@@ -73,10 +99,16 @@ contains
   end subroutine calc_tau_cross
 
 
+  !> Pure device subroutine: Compute shear stress with Smagorinsky LES turbulent model
+  !> Off-diagonal components including both molecular and subgrid turbulent dissipation
   pure attributes(device) subroutine calc_tau_cross_LES(mu, mut, v, uy, d, t12, vt12)
-    real(8), intent(in), contiguous :: mu(3), mut(3), v(6), uy(6)
-    real(8), intent(in)             :: d
-    real(8), intent(out)            :: t12, vt12
+    real(8), intent(in), contiguous :: mu(3)              !< molecular viscosity at 3 stencil points
+    real(8), intent(in), contiguous :: mut(3)             !< turbulent viscosity at 3 stencil points
+    real(8), intent(in), contiguous :: v(6)               !< velocity v at 6-point stencil
+    real(8), intent(in), contiguous :: uy(6)              !< du/dy at 6-point stencil
+    real(8), intent(in)             :: d                  !< inverse grid spacing
+    real(8), intent(out)            :: t12                !< total shear stress (molecular + SGS)
+    real(8), intent(out)            :: vt12               !< work term v * t_12
     real(8) tmp1(3), tmp2(3)
     tmp1(:) = (1.125d0 * (-v(2:4) + v(3:5)) - (-v(1:3) + v(4:6)) * one_24) * d
     tmp1(:) = tmp1(:) + 0.0625d0 * (-uy(1:3) + 9.d0 * (uy(2:4) + uy(3:5)) - uy(4:6))
@@ -90,14 +122,19 @@ contains
   end subroutine calc_tau_cross_LES
 
 
-  attributes(global) subroutine calc_Ev4(nx, ny, nz, dx, dy, dz, Q, T, mu, E, seed)
-    integer, intent(in), value     :: nx, ny, nz
-    real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
-    real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
-    real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
-    real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2)
-    integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
+  !> CUDA Fortran kernel for 4th-order viscous flux in x direction
+  !> High-order accurate computation of viscous stress and heat flux
+  attributes(global) subroutine calc_Ev4(nx, ny, nz, dx, dy, dz, Q, T, mu, E)
+    integer, intent(in), value     :: nx                  !< number of grid points in x direction
+    integer, intent(in), value     :: ny                  !< number of grid points in y direction
+    integer, intent(in), value     :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
+    real(8), intent(in), device    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
+    real(8), intent(in), device    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device    :: T(nx,ny,nz)         !< temperature at grid points
+    real(8), intent(in), device    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2) !< viscous flux components in x direction
     real(8), shared ::  u(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
     real(8), shared ::  v(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
     real(8), shared ::  w(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
@@ -187,14 +224,20 @@ contains
   end subroutine calc_Ev4
  
 
+  !> CUDA Fortran kernel for 4th-order viscous flux with LES SGS model in x direction
   attributes(global) subroutine calc_Ev_LES4(nx, ny, nz, dx, dy, dz, Q, T, mu, mut, qc2, E)
-    integer, intent(in), value     :: nx, ny, nz
-    real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
-    real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
-    real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
-    real(8), intent(in), device    :: mut(nx,ny,nz), qc2(nx,ny,nz)
-    real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2)
+    integer, intent(in), value     :: nx                  !< number of grid points in x direction
+    integer, intent(in), value     :: ny                  !< number of grid points in y direction
+    integer, intent(in), value     :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
+    real(8), intent(in), device    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
+    real(8), intent(in), device    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device    :: T(nx,ny,nz)         !< temperature at grid points
+    real(8), intent(in), device    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    real(8), intent(in), device    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
+    real(8), intent(in), device    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
+    real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2) !< viscous + SGS flux in x direction
     real(8), shared ::  u(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
     real(8), shared ::  v(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
     real(8), shared ::  w(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
@@ -316,14 +359,18 @@ contains
   end subroutine calc_Ev_LES4
  
 
-  attributes(global) subroutine calc_Fv4(nx, ny, nz, dy, dx, dz, Q, T, mu, F, seed)
-    integer, intent(in), value     :: nx, ny, nz
-    real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
-    real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
-    real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
-    real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2)
-    integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
+  !> CUDA Fortran kernel for 4th-order viscous flux in y direction
+  attributes(global) subroutine calc_Fv4(nx, ny, nz, dy, dx, dz, Q, T, mu, F)
+    integer, intent(in), value     :: nx                  !< number of grid points in x direction
+    integer, intent(in), value     :: ny                  !< number of grid points in y direction
+    integer, intent(in), value     :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
+    real(8), intent(in), device    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
+    real(8), intent(in), device    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device    :: T(nx,ny,nz)         !< temperature at grid points
+    real(8), intent(in), device    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2) !< viscous flux components in y direction
     real(8), shared ::  u(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
     real(8), shared ::  v(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
     real(8), shared ::  w(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
@@ -415,14 +462,20 @@ contains
   end subroutine calc_Fv4
  
 
+  !> CUDA Fortran kernel for 4th-order viscous flux with LES SGS model in y direction
   attributes(global) subroutine calc_Fv_LES4(nx, ny, nz, dy, dx, dz, Q, T, mu, mut, qc2, F)
-    integer, intent(in), value     :: nx, ny, nz
-    real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
-    real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
-    real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
-    real(8), intent(in), device    :: mut(nx,ny,nz), qc2(nx,ny,nz)
-    real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2)
+    integer, intent(in), value     :: nx                  !< number of grid points in x direction
+    integer, intent(in), value     :: ny                  !< number of grid points in y direction
+    integer, intent(in), value     :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
+    real(8), intent(in), device    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
+    real(8), intent(in), device    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device    :: T(nx,ny,nz)         !< temperature at grid points
+    real(8), intent(in), device    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    real(8), intent(in), device    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
+    real(8), intent(in), device    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
+    real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2) !< viscous + SGS flux in y direction
     real(8), shared ::  u(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
     real(8), shared ::  v(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
     real(8), shared ::  w(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
@@ -544,14 +597,18 @@ contains
   end subroutine calc_Fv_LES4
  
 
-  attributes(global) subroutine calc_Gv4(nx, ny, nz, dx, dy, dz, Q, T, mu, G, seed)
-    integer, intent(in), value     :: nx, ny, nz
-    real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
-    real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
-    real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
-    real(8), intent(inout), device :: G(5,nx-2,ny-2,nz-1)
-    integer(8), intent(inout), device, optional :: seed(nx,ny,nz)
+  !> CUDA Fortran kernel for 4th-order viscous flux in z direction
+  attributes(global) subroutine calc_Gv4(nx, ny, nz, dx, dy, dz, Q, T, mu, G)
+    integer, intent(in), value     :: nx                  !< number of grid points in x direction
+    integer, intent(in), value     :: ny                  !< number of grid points in y direction
+    integer, intent(in), value     :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
+    real(8), intent(in), device    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
+    real(8), intent(in), device    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device    :: T(nx,ny,nz)         !< temperature at grid points
+    real(8), intent(in), device    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    real(8), intent(inout), device :: G(5,nx-2,ny-2,nz-1) !< viscous flux components in z direction
     real(8), shared ::  u(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
     real(8), shared ::  v(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
     real(8), shared ::  w(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)

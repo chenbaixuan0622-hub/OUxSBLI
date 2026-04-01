@@ -234,7 +234,8 @@ contains
             ustd(i,j,k) = 2.d0 * rand * u0 * randum(1,ir,jr,kr)
             vstd(i,j,k) =        rand * u0 * randum(2,ir,jr,kr)
             wstd(i,j,k) =        rand * u0 * randum(3,ir,jr,kr)
-            Tstd(i,j,k) = T0 * gamma_1 * M0**2 * randum(4,ir,jr,kr) * rand
+            !Tstd(i,j,k) = T0 * gamma_1 * M0**2 * randum(4,ir,jr,kr) * rand ! old version. This is not wrong.
+            Tstd(i,j,k) = T0 * gamma_1 * M0**2 * randum(4,ir,jr,kr) * rand * u(j) / u0 ! fixed 2026/03/30
           else
             ustd(i,j,k) = 0.d0
             vstd(i,j,k) = 0.d0

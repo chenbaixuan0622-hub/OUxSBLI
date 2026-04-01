@@ -106,6 +106,28 @@ Turbulent kinetic energy budget; solid lines for present simulation, dashed line
 
 ---
 
+## Documentation
+
+The project documentation is located in the `./docs/` directory:
+
+- **ALGORITHM_DOCUMENTATION_SUMMARY.md** - Detailed algorithm documentation with mathematical formulations
+- **CODE_ANALYSIS.md** - Code quality and design analysis
+- **bugs.md** - Known issues, bugs, and recommendations for fixes
+- **EXECUTIVE_SUMMARY.md** - Multi-GPU optimization strategy overview
+- **QUICK_START.md** - Quick start checklist for multi-GPU implementation
+- **MULTI_GPU_SCALABILITY_PLAN.md** - Comprehensive multi-GPU scalability roadmap
+- **IMPLEMENTATION_GUIDE.md** - Step-by-step implementation guide with code templates
+- **technical_doc.md** - Technical reference documentation
+- **api.md** - Auto-generated API reference
+
+**Key Points for First-Time Users:**
+1. Start with this README for setup instructions
+2. Check `ALGORITHM_DOCUMENTATION_SUMMARY.md` to understand the numerical schemes
+3. Review `docs/bugs.md` for known issues and their status
+4. For multi-GPU optimization, follow the roadmap in `docs/EXECUTIVE_SUMMARY.md`
+
+---
+
 ## Reference
 
 1. [Yuichi Kuya, Kosuke Totani, Soshi Kawai, *Kinetic energy and entropy preserving schemes for compressible flows by split convective forms*, Journal of Computational Physics, 2018](https://www.sciencedirect.com/science/article/abs/pii/S0021999118305916)
