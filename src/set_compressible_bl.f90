@@ -1,6 +1,6 @@
 module set_compressible_bl
   use mod_globals, only : R, rf,  Taw
-  use mod_constant, only : Cp
+  use mod_constant, only : Cp, mu0_T0_S_over_T0_2_3
   implicit none
   integer, parameter :: Neta = 29
   real(8), parameter :: eta_tab(Neta) = (/ &
@@ -48,8 +48,8 @@ contains
     real(8), intent(in) :: y(ny), blt0, u0, T0, p0, M0
     real(8), intent(out) :: rho_out(ny), u_out(ny), v_out(ny), T_out(ny)
     real(8), allocatable :: rho(:), u(:), v(:), T(:), T_r(:), integral_part(:), y_physical(:)
-    real(8) :: eta99 = 4.91d0, Tw = Taw
-    real(8) coeff, I_99, v_coeff
+    real(8) :: Tw = Taw, eta99 = 4.91d0 ! u / u0 = fp_tab = 0.99 when eta = 4.91
+    real(8) deta, mu0, nu0, coeff, I_99, v_coeff
     integer j
     allocate(rho(Neta), u(Neta), v(Neta), T(Neta), T_r(Neta), integral_part(Neta), y_physical(Neta))
     do j = 1, Neta
@@ -58,20 +58,40 @@ contains
       T_r(j) = T(j) / T0
       rho(j) = p0 / (R * T(j))
     enddo
-    integral_part(1) = 0.0d0 ! Howarth-Dorodnitsyn transform
+    !> Howarth-Dorodnitsyn transformation
+    ! Yc = \int rho / rho_infty dy
+    ! y  !< physical coordinate [m]
+    ! Yc !< transformed coordinate for compressible flow [m]
+    ! Step1
+    ! rho_infty * T_infty = rho * T, since p = const in a boundary layer
+    ! Step2
+    ! rho_infty / rho = T / T_infty
+    ! Step3
+    ! dy = rho_infty / rho * dYc
+    !    = T / T_infty dYc
+    !    = T_r dYc
+    ! T_r = T / T_infty !< temperature ratio [-]
+    ! Step4
+    ! eta  = Yc  sqrt(u_infty / (2 nu_infty x))
+    ! deta = dYc sqrt(u_infty / (2 nu_infty x))
+    integral_part(1) = 0.0d0 !< integrated eta [-]
     do j = 2, Neta
-      integral_part(j) = integral_part(j-1) + 0.5d0 * (1.d0 / T_r(j-1) + 1.d0 / T_r(j)) * (-eta_tab(j-1) + eta_tab(j))
+      deta = -eta_tab(j-1) + eta_tab(j)
+      integral_part(j) = integral_part(j-1) + 0.5d0 * (T_r(j-1) + T_r(j)) * deta
     enddo
-    I_99 = 0.0d0
+    I_99 = 0.0d0 !< integrated eta 99% [-]
     do j = 2, Neta
       if (eta_tab(j) <= eta99) then
-        I_99 = I_99 + 0.5d0 * (T_r(j-1) + T_r(j)) * (eta_tab(j) - eta_tab(j-1))
+        deta = -eta_tab(j-1) + eta_tab(j)
+        I_99 = I_99 + 0.5d0 * (T_r(j-1) + T_r(j)) * deta
       else
         exit
       endif
     enddo
-    coeff   = I_99 / blt0
-    v_coeff = 0.5d0 * u0 / coeff
+    coeff   = I_99 / blt0 !< [1/m]
+    mu0     = mu0_T0_S_over_T0_2_3 / (T0 + 111.d0) * T0**1.5d0
+    nu0     = mu0 * R * T0 / p0 
+    v_coeff = nu0 * coeff !< [m^2/s] [1/m]
     do j = 1, Neta
       y_physical(j) = integral_part(j) / coeff
       v(j) = v_coeff * (integral_part(j) * fp_tab(j) - T_r(j) * f_tab(j))
