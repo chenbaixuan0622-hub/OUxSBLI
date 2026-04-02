@@ -204,6 +204,7 @@ contains
     nyr = (ny+1) / 2
     nzr = (nz+1) / 2
     allocate(rho(ny), u(ny), v(ny), T(ny))
+    call calc_HD_Blasius(ny, y, blt0, u0, T0, p0, M0, rho, u, v, T)
     allocate(randum(4,nxr,nyr,nzr), ustd(nx,ny,nz), vstd(nx,ny,nz), wstd(nx,ny,nz), Tstd(nx,ny,nz))
     call random_seed(size=sz)
     allocate(seed(sz))
@@ -271,7 +272,6 @@ contains
     call calc_Gaussian_filter_z(nx, ny, nz, 3, z, Tstd)
     call set_bc_cyclic_x_cpu(nx, ny, nz, ustd, vstd, wstd, Tstd)
     call set_bc_cyclic_z_cpu(nx, ny, nz, ustd, vstd, wstd, Tstd)
-    call calc_HD_Blasius(ny, y, blt0, u0, T0, p0, M0, rho, u, v, T)
     ! add fluctuation
     do k = 1, nz
       do j = 1, ny

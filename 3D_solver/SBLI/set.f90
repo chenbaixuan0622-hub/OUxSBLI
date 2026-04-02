@@ -9,6 +9,7 @@ module set
   use set_init_common
   use calc_para
   implicit none
+  integer No
 contains
   subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, Lx1, x, y, z, dx, dy, dz)
     integer, intent(in)  :: myrank, nx, ny, nz
@@ -16,37 +17,60 @@ contains
     real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
     integer i, j, k, nx1, ny_b
     real(8) dx1, dy1, dz1, ximp, Lx_s
-    dx1 = Lx / dble(nx-1)
-    dy1 = dx1
-    dz1 = Lz / dble(nz-1)
+    dx1  = 20.d0 * blt / dble(512)
+    dy1  = dx1
+    dz1  = Lz / dble(nz-1)
+    ximp = 0.9d0 * Lx1 + 30.d0 * blt
 
     if (myrank == 0) then
       x(1) = 0.d0
+      do i = 1, nx-1
+        dx(i) = dx1
+        x(i+1) = x(i) + dx(i)
+      enddo
     else
       x(1) = Lx1
+      nx1  = int(0.9d0 * dble(nx-1))
+      ! computational region
+      do i = 1, nx1
+        dx(i)  = dx1
+        x(i+1) = x(i) + dx(i)
+      enddo
+      ! buffer region
+      do i = nx1 + 1, nx-1
+        dx(i)  = dx1 * (1.d0 + 3.d0 * dble(i-nx1) / dble(nx-nx1))
+        x(i+1) = x(i) + dx(i)
+      enddo
     endif
-    do i = 1, nx-1
-      dx(i) = dx1
-      x(i+1) = x(i) + dx(i)
-    enddo
+    x(:) = x(:) - ximp
 
     y(1) = 0.d0
     do j = 1, ny-1
       if (y(j) <= 3.d0 * blt) then
         dy(j) = min(1.d0, max(0.07d0, dble(j)/dble(128))) * dy1
-      elseif (3.d0 * blt <= y(j) .and. y(j) <= 8.d0 * blt) then
-        dy(j) = 1.5d0 * dy1
+        ny_b  = j
       else
-        dy(j) = 1.75d0 * dy1
+        dy(j) = dy1 * (1.d0 + 0.75d0 * dble(j-ny_b) / dble(ny2-ny_b))
       endif
       y(j+1) = y(j) + dy(j)
     enddo
+
+    if (myrank == 2) then
+      Lx_s = y(ny) / dble(beta) / blt
+      do i = 1, nx
+        if (x(i) / blt + Lx_s >= 0.d0) then
+          No = i
+          exit
+        endif
+      enddo
+    endif
 
     z(1) = 0.d0
     do k = 1, nz-1
       dz(k) = dz1
       z(k+1) = z(k) + dz(k)
     enddo
+    z(:) = z(:) - 0.5d0 * Lz
   end subroutine set_grid
 
 
@@ -140,16 +164,11 @@ contains
         do j = ny1-1, ny-1
           ! inlet free stream flow
           Jacobian_tmp = 1.d0 / Jacobian(1,j)
-          !rho  = QJ(1,1,ny1-2,k) * Jacobian(1,ny1-2)
-          !rhou = QJ(2,1,ny1-2,k) * Jacobian(1,ny1-2)
-          !rhov = QJ(3,1,ny1-2,k) * Jacobian(1,ny1-2)
-          !rhow = QJ(4,1,ny1-2,k) * Jacobian(1,ny1-2)
-          !e    = QJ(5,1,ny1-2,k) * Jacobian(1,ny1-2)
           QJ(1,1,j,k) = rho0 * Jacobian_tmp     !rho  * Jacobian_tmp
           QJ(2,1,j,k) = rho0 * u0 * Jacobian_tmp!rhou * Jacobian_tmp
           QJ(3,1,j,k) = 0.d0                    !rhov * Jacobian_tmp
           QJ(4,1,j,k) = 0.d0                    !rhow * Jacobian_tmp
-          QJ(5,1,j,k) = (p0 * over_gamma_1 + 0.5d0 * rho0 * u0**2) * Jacobian_tmp!e    * Jacobian_tmp
+          QJ(5,1,j,k) = (p0 * over_gamma_1 + 0.5d0 * rho0 * u0**2) * Jacobian_tmp!e * Jacobian_tmp
       enddo;enddo
       !$cuf kernel do(2)<<<*,*>>>
       do k = 4, nz-3
@@ -171,12 +190,12 @@ contains
         rhoin = QJ(1,i,ny-1,k) * Jacobian(i,ny-1)
         cin   = sqrt(gamma * pin / rhoin)
         vin   = QJ(3,i,ny-1,k) / QJ(1,i,ny-1,k)
-        Rp   = vin + 2.d0 * cin * over_gamma_1
-        Rm   = v0  - 2.d0 * c0  * over_gamma_1
-        vb   = 0.5d0 * (Rp + Rm)
-        cb   = 0.25d0 * gamma_1 * (Rp - Rm)
-        rhob = (cb / c0)**(2.d0 * over_gamma_1) * rho0
-        pb   = (rhob * cb**2) / gamma
+        Rp    = vin + 2.d0 * cin * over_gamma_1
+        Rm    = v0  - 2.d0 * c0  * over_gamma_1
+        vb    = 0.5d0 * (Rp + Rm)
+        cb    = 0.25d0 * gamma_1 * (Rp - Rm)
+        rhob  = (cb / c0)**(2.d0 * over_gamma_1) * rho0
+        pb    = (rhob * cb**2) / gamma
         QJ(1,i,ny,k) = rhob * Jacobian_tmp
         QJ(2,i,ny,k) = rhob * u0 * Jacobian_tmp
         QJ(3,i,ny,k) = rhob * vb * Jacobian_tmp
@@ -194,7 +213,6 @@ contains
     !call set_bc_Neumann_tbl_top_down(nx, ny, nz, 3, 1, nx, Jacobian, QJ)
 
     if (myrank == 2) then
-      No = int(dble(nx) * 0.1d0)
       !$cuf kernel do(2)<<<*,*>>>
       do k = 1, nz
         do i = No, nx
@@ -280,15 +298,5 @@ contains
         qc2(i,j,nz)   = qc2(i,j,6)
     enddo;enddo
   end subroutine set_bc_mut
-
-
-  subroutine calc_forcing(nx, ny, nz, dx, dy, dz, Q, fx, fy, fz)
-    integer, intent(in), value   :: nx, ny, nz
-    real(8), intent(in), device  :: dx(nx-1) ! 1 / dx
-    real(8), intent(in), device  :: dy(ny-1) ! 1 / dy
-    real(8), intent(in), device  :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device  :: Q(5,nx,ny,nz)
-    real(8), intent(out), device :: fx(nx-2,ny-2,nz-2), fy(nx-2,ny-2,nz-2), fz(nx-2,ny-2,nz-2)
-  end subroutine calc_forcing
 end module set
 
