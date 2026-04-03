@@ -17,23 +17,16 @@
 - CUDA toolkit (compatible with HPC SDK)
 - MPI library
 - ParaView (VTK output visualization)
-- Python interface (development): pybind11
 
 ---
 
 ## 2. Code Architecture
 
+
 ### Directory Structure
 
-```
+~~~
 OUxSBLI/
-├── 1D_solver/          # 1D solvers (under development)
-│   ├── NS/             # Navier-Stokes 1D
-│   ├── ST/             # Shock tube test case
-│   └── src/            # Common 1D routines
-├── 2D_solver/          # 2D solvers
-│   ├── 2D/, DSL/, KHI/, NS/, SBLI/, etc.  # Various test cases
-│   └── src/            # Common 2D source routines
 ├── 3D_solver/          # Main 3D solver (most complete)
 │   ├── ETGV/           # Euler Taylor-Green Vortex
 │   ├── IVST/           # Isentropic Vortex
@@ -56,13 +49,13 @@ OUxSBLI/
 └── docs/
     ├── api.md          # Auto-generated API reference
     └── technical_doc.md # This file
-```
+~~~
 
 ### Configuration Per Case
 
 Each case folder (3D_solver/ETGV, SBLI, etc.) contains:
 
-```
+~~~
 case_name/
 ├── mod_globals.f90     # Global parameters (equation type, scheme, grid size, block dimensions)
 ├── set.f90             # Grid, initial conditions, boundary conditions
@@ -70,7 +63,7 @@ case_name/
 ├── calc.sh             # Execution script
 ├── profile.sh          # Profiling script (when available)
 └── data/               # Output directory
-```
+~~~
 
 ---
 
@@ -192,7 +185,7 @@ subroutine RungeKutta_4th(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, nz, 
 
 #### Kernel Structure Example (calc_keep_x6)
 
-```fortran
+~~~fortran
 attributes(global) subroutine calc_keep_x6(id_accuracy, nx, ny, nz, Q, T, E)
   ! Declarations: thread indices (it, jt, kt), global coords (i, j, k)
   integer, parameter :: sx = threadsE%x + 5  ! Tile size with padding
@@ -218,7 +211,7 @@ attributes(global) subroutine calc_keep_x6(id_accuracy, nx, ny, nz, Q, T, E)
     E(:,i,j-1,k-1) = KEEP2(rho(idx:idx+1), ...)    ! 2-pt at edges
   endif
 end subroutine
-```
+~~~
 
 #### Key Optimizations
 - **Shared Memory**: Reduces global memory bandwidth by 10-100x
@@ -260,7 +253,7 @@ end subroutine
 
 Provides abstraction for MPI with GPU memory:
 
-```fortran
+~~~fortran
 interface CPUGPU_MPI_SEND
   module procedure CPU_MPI_SEND, GPU_MPI_SEND
 end interface
@@ -268,7 +261,7 @@ end interface
 interface CPUGPU_MPI_ISEND
   module procedure CPU_MPI_ISEND, GPU_MPI_ISEND
 end interface
-```
+~~~
 
 #### CPU_MPI_* (Pinned Host Memory)
 - Copies device → host memory
@@ -351,10 +344,10 @@ real(8), parameter :: Lx = 2.d0*pi, Ly = 1.d0*pi, Lz = 2.d0*pi
 integer(kind=2), parameter :: id_visc = 1
 
 ! Scheme selection
-integer(kind=2), parameter :: id_scheme   = 1      ! 1=KEEP, 2=SLAU, 3=Roe
-integer(kind=2), parameter :: id_accuracy = 8      ! 2,4,6,8 (points)
+real(2), parameter         :: id_scheme   = 1      ! 1=KEEP, 2=SLAU, 3=Roe
+integer(kind=8), parameter :: id_accuracy = 8      ! 2,4,6,8 (points)
 integer(kind=2), parameter :: id_tvd      = 2      ! Time stepping type
-integer(kind=2), parameter :: id_slau     = ?      ! SLAU variant
+integer(kind=4), parameter :: id_slau     = 0      ! SLAU variant
 
 ! GPU thread/block configuration
 type(dim3) :: threads, threadsE, threadsF, threadsG
@@ -362,7 +355,7 @@ type(dim3) :: blocks, blocksE, blocksF, blocksG
 ! Similar for viscous: threadsEv, threadsFv, threadsGv, etc.
 
 ! Rescaling (SBLI cases)
-integer(kind=4), parameter :: id_rescale = 10      ! Rescaling interval or 0
+integer(kind=2), parameter :: id_rescale = 0      ! Rescaling interval or 0
 
 ! Restart flag
 integer(kind=2), parameter :: id_recal = 2         ! 2=fresh, 4=restart
@@ -612,142 +605,6 @@ bash profile.sh             # Generate nsys/ncu profiles
 
 ---
 
-## 11. Configuration Guide
-
-### Parameter Selection
-
-#### Equation Type (id_visc)
-```
-0 = Euler (inviscid)
-1 = Navier-Stokes (viscous)
-```
-
-#### Convection Scheme (id_scheme)
-```
-1 = KEEP        (energy-preserving, recommended for smooth flows)
-2 = SLAU        (low-dissipation with shock sensor)
-3 = Roe         (classical, good for shocks)
-```
-
-#### Spatial Accuracy (id_accuracy)
-```
-2 = 2nd-order  (2-point stencil)
-4 = 4th-order  (4-point stencil)
-6 = 6th-order  (6-point stencil)
-8 = 8th-order  (8-point stencil, not all schemes)
-```
-
-#### Time Integration (id_RungeKutta)
-```
-2 = 3rd-order TVD Runge-Kutta (recommended with high-order spatial)
-4 = 4th-order Runge-Kutta
-```
-
-#### Rescaling (id_rescale)
-```
-0 = No rescaling
-N > 0 = Rescale every N time steps (SBLI cases)
-```
-
-#### Restart (id_recal)
-```
-2 = Fresh start with set_init()
-4 = Restart from checkpoint file
-```
-
-#### Block/Thread Tuning
-
-**Example for NVIDIA A100**:
-```fortran
-type(dim3) :: threads = dim3(8, 16, 4)        ! 512 threads/block
-type(dim3) :: threadsE = dim3(32, 8, 4)       ! E-flux layout
-type(dim3) :: threadsF = dim3(8, 32, 4)       ! F-flux layout
-type(dim3) :: threadsG = dim3(8, 8, 8)        ! G-flux layout
-```
-
-General heuristic:
-- Total threads/block: 128-512 (avoid exceeding SM capacity)
-- Balance x,y,z for stencil computation patterns
-- More threads in direction with more memory reuse
-
----
-
-## 12. Validation Cases
-
-### 12.1 Euler Vortex Convection (1D_solver/NS, 3D_solver/ETGV)
-
-- **Purpose**: Grid convergence study
-- **Setup**: Isentropic vortex advecting in uniform flow
-- **Metrics**: L² error vs grid resolution
-- **Expected**: 2nd-order KEEP ≈ O(h²), 6th-order KEEP ≈ O(h⁶)
-
-### 12.2 Sod Shock Tube (1D_solver/ST)
-
-- **Purpose**: Shock capturing validation
-- **Setup**: Riemann problem with discontinuity
-- **Metrics**: Visual comparison with reference solution
-- **Schemes**: SLAU, KEEP all capture shock with appropriate dissipation
-
-### 12.3 3D Taylor-Green Vortex (3D_solver/ETGV, NSTGV)
-
-- **Purpose**: High-order accuracy on smooth periodic flow
-- **Setup**: Viscous decay on [0, 2π]³
-- **Metrics**: Kinetic energy, enstrophy evolution
-- **Expected**: Excellent agreement with analytical decay rates
-
-### 12.4 M=1.9 Supersonic Boundary Layer (3D_solver/TBL)
-
-- **Purpose**: Wall-bounded turbulent flow
-- **Setup**: Turbulent boundary layer at Mach 1.9
-- **Metrics**: Van Driest transformed mean velocity, Reynolds stress profiles
-- **Validation**: Against DNS/experiments
-
-### 12.5 Shock-Boundary Layer Interaction (3D_solver/SBLI)
-
-- **Purpose**: Complex compressible turbulence
-- **Setup**: Incident shock on supersonic boundary layer
-- **Features**: Uses rescaling module to maintain reference state
-- **Metrics**: Unsteady shock motion, separation bubble dynamics
-
----
-
-## 13. Known Issues & Limitations
-
-### Under Development
-- 1D and 2D solvers: Feature-complete but less tested than 3D
-- LES module (`calc_les.f90`): SGS model validation ongoing
-- Python interface (`pyETGV`, `pyNSTGV`): Not yet functional
-- Gauss-Legendre RK time stepping: Experimental
-
-### Current Constraints
-- **Grid**: Only rectilinear (no body-fitted curvilinear)
-- **BC**: Primarily cyclic periodic; other BCs case-specific
-- **Restart**: ASCII format only (slow I/O at high resolution)
-- **Visualization**: Manual VTK output generation (not real-time)
-
-### Performance Considerations
-- **Memory**: Entire Q, E, F, G arrays in device memory; watch for OOM on small GPUs
-- **Bandwidth**: Communication overhead increases with rank count; test scaling
-- **Block/Thread Tuning**: May require optimization per GPU model and case
-
----
-
-## 14. References
-
-1. Kuya, Y., Totani, K., & Kawai, S. (2018). *Kinetic energy and entropy preserving schemes for compressible flows by split convective forms*. Journal of Computational Physics, 372, 359-386.
-
-2. Kuya, Y., & Kawai, S. (2021). *High-order accurate kinetic-energy and entropy preserving (KEEP) schemes on curvilinear grids*. Journal of Computational Physics, 432, 110134.
-
-3. Jacobs, C. T., Jammy, S. P., & Sandham, N. D. (2017). *OpenSBLI: A framework for the automated derivation and parallel execution of finite difference solvers on a range of computer architectures*. Computer Physics Communications, 220, 1-12.
-
-4. Allaneau, Y., & Jameson, A. (2012). *Direct numerical simulations of a two-dimensional viscous flow in a shocktube using kinetic energy preserving scheme*. AIAA Paper 2009-3797.
-
-5. Tamaki, Y., & Kawai, S. (2023). *Wall-modeled LES of transonic buffet over NASA-CRM using Cartesian-grid-based flow solver FFVHC-ACE*. AIAA Paper 2023-0429.
-
-6. NVIDIA. (2017). *CUDA Fortran Programming Guide and Reference*. https://docs.nvidia.com/hpc-sdk/pgi-compilers/2017/pgi17cudaforug.pdf
-
----
-
 ## Appendix A: Quick Reference
 
 ### Environment Setup
@@ -812,6 +669,7 @@ ncu --config full ./a.out    # Full metrics
 
 ---
 
-**Document Version**: 1.0 (March 31, 2026)  
+**Document Version**: 1.1 (April 3, 2026)  
 **Generated From**: OUxSBLI source code analysis  
-**Relevant Source Docs**: `api.md`, `README.md`
+**Relevant Source Docs**: `api.md`, `README.md`, `CODE_ANALYSIS.md`
+**Last Updated**: Comprehensive project survey and parameter documentation

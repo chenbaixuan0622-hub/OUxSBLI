@@ -55,15 +55,11 @@ $ bash ./calc.sh
 ### Supersonic Taylor-Green vortex
 The results are consistent with Lusher's results.
 * Numerical setup
-~~~math
-Re = 1600
-~~~
-~~~math
-M = 1.25
-~~~
-~~~math
-N_x \times N_y \times N_z = 512 \times 512 \times 512
-~~~
+
+|$Re$   |$1600$ |
+| :---: | :---: |
+|$Ma$   |$1.25$ |
+|$N_x \times N_y \times N_z$|$512\times512\times512$|
 
 ~~~bash
 @article{lusher2021assessment,
@@ -87,6 +83,10 @@ N_x \times N_y \times N_z = 512 \times 512 \times 512
 </div>
 
 ### Shock Boundary Layer Interaction (SBLI)
+
+<div align="center">
+  <img src="./img/sbli_2d.png" alt="SBLI" width="900">  
+</div>
 
 ## Related Publication
 This repository contains the implementation used in the following publication:
