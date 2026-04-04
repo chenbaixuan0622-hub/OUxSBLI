@@ -1,5 +1,5 @@
 module calc_keep_kernel
-  use mod_globals, only : id_igr, threadsE, threadsF, threadsG
+  use mod_globals, only : threadsE, threadsF, threadsG
   use mod_constant, only : R_over_gamma_1, one_third, one_sixth, one_twelfth, two_third
   implicit none
   private
@@ -22,6 +22,10 @@ module calc_keep_kernel
   interface calc_keep_z
     module procedure calc_keep_z2, calc_keep_z4, calc_keep_z6
   end interface calc_keep_z
+
+  interface KEEP
+    module procedure KEEP2, KEEP4, KEEP6
+  end interface KEEP
 contains
   include 'calc_keep_3d.f90'
 
@@ -53,12 +57,9 @@ contains
       i = i_base + ii
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = ii + offset_yz
-        rho(idx) = Q(1,i,j,k)
-          u(idx) = Q(2,i,j,k)
-          v(idx) = Q(3,i,j,k)
-          w(idx) = Q(4,i,j,k)
-          p(idx) = Q(5,i,j,k)
-        tmp(idx) =   T(i,j,k)
+        rho(idx) = Q(1,i,j,k);   u(idx) = Q(2,i,j,k)
+          v(idx) = Q(3,i,j,k);   w(idx) = Q(4,i,j,k)
+          p(idx) = Q(5,i,j,k); tmp(idx) =   T(i,j,k)
       endif
     enddo
     call syncthreads()
@@ -67,20 +68,23 @@ contains
     idx = it + offset_yz
     associate(uu => u)
     if (3 <= i .and. i <= nx-3) then
-      E(:,i,j-1,k-1) = KEEP6(rho(idx-2:idx+3), u(idx-2:idx+3), &
-                               v(idx-2:idx+3), w(idx-2:idx+3), &
-                              uu(idx-2:idx+3), p(idx-2:idx+3), &
-                             tmp(idx-2:idx+3), Normal_x)
+      E(:,i,j-1,k-1) = KEEP(id_accuracy, &
+                            rho(idx-2:idx+3), u(idx-2:idx+3), &
+                              v(idx-2:idx+3), w(idx-2:idx+3), &
+                             uu(idx-2:idx+3), p(idx-2:idx+3), &
+                            tmp(idx-2:idx+3), Normal_x)
     elseif (2 <= i .and. i <= nx-2) then
-      E(:,i,j-1,k-1) = KEEP4(rho(idx-1:idx+2), u(idx-1:idx+2), &
-                               v(idx-1:idx+2), w(idx-1:idx+2), &
-                              uu(idx-1:idx+2), p(idx-1:idx+2), &
-                             tmp(idx-1:idx+2), Normal_x)
+      E(:,i,j-1,k-1) = KEEP(id_accuracy, & 
+                            rho(idx-1:idx+2), u(idx-1:idx+2), &
+                              v(idx-1:idx+2), w(idx-1:idx+2), &
+                             uu(idx-1:idx+2), p(idx-1:idx+2), &
+                            tmp(idx-1:idx+2), Normal_x)
     else
-      E(:,i,j-1,k-1) = KEEP2(rho(idx:idx+1), u(idx:idx+1), &
-                               v(idx:idx+1), w(idx:idx+1), &
-                              uu(idx:idx+1), p(idx:idx+1), &
-                             tmp(idx:idx+1), Normal_x)
+      E(:,i,j-1,k-1) = KEEP(id_accuracy, &
+                            rho(idx:idx+1), u(idx:idx+1), &
+                              v(idx:idx+1), w(idx:idx+1), &
+                             uu(idx:idx+1), p(idx:idx+1), &
+                            tmp(idx:idx+1), Normal_x)
     endif
     end associate
   end subroutine calc_keep_x6
@@ -114,12 +118,9 @@ contains
       j = j_base + jj
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = jj + offset_xz
-        rho(idx) = Q(1,i,j,k)
-          u(idx) = Q(2,i,j,k)
-          v(idx) = Q(3,i,j,k)
-          w(idx) = Q(4,i,j,k)
-          p(idx) = Q(5,i,j,k)
-        tmp(idx) =   T(i,j,k)
+        rho(idx) = Q(1,i,j,k);   u(idx) = Q(2,i,j,k)
+          v(idx) = Q(3,i,j,k);   w(idx) = Q(4,i,j,k)
+          p(idx) = Q(5,i,j,k); tmp(idx) =   T(i,j,k)
       endif
     enddo
     call syncthreads()
@@ -128,20 +129,23 @@ contains
     idx = jt + offset_xz
     associate(vv => v)
     if (3 <= j .and. j <= ny-3) then
-      F(:,i-1,j,k-1) = KEEP6(rho(idx-2:idx+3), u(idx-2:idx+3), &
-                               v(idx-2:idx+3), w(idx-2:idx+3), &
-                              vv(idx-2:idx+3), p(idx-2:idx+3), &
-                             tmp(idx-2:idx+3), Normal_y)
+      F(:,i-1,j,k-1) = KEEP(id_accuracy, &
+                            rho(idx-2:idx+3), u(idx-2:idx+3), &
+                              v(idx-2:idx+3), w(idx-2:idx+3), &
+                             vv(idx-2:idx+3), p(idx-2:idx+3), &
+                            tmp(idx-2:idx+3), Normal_y)
     elseif (2 <= j .and. j <= ny-2) then
-      F(:,i-1,j,k-1) = KEEP4(rho(idx-1:idx+2), u(idx-1:idx+2), &
-                               v(idx-1:idx+2), w(idx-1:idx+2), &
-                              vv(idx-1:idx+2), p(idx-1:idx+2), &
-                             tmp(idx-1:idx+2), Normal_y)
+      F(:,i-1,j,k-1) = KEEP(id_accuracy, &
+                            rho(idx-1:idx+2), u(idx-1:idx+2), &
+                              v(idx-1:idx+2), w(idx-1:idx+2), &
+                             vv(idx-1:idx+2), p(idx-1:idx+2), &
+                            tmp(idx-1:idx+2), Normal_y)
     else
-      F(:,i-1,j,k-1) = KEEP2(rho(idx:idx+1), u(idx:idx+1), &
-                               v(idx:idx+1), w(idx:idx+1), &
-                              vv(idx:idx+1), p(idx:idx+1), &
-                             tmp(idx:idx+1), Normal_y)
+      F(:,i-1,j,k-1) = KEEP(id_accuracy, &
+                            rho(idx:idx+1), u(idx:idx+1), &
+                              v(idx:idx+1), w(idx:idx+1), &
+                             vv(idx:idx+1), p(idx:idx+1), &
+                            tmp(idx:idx+1), Normal_y)
     endif
     end associate
   end subroutine calc_keep_y6
@@ -175,12 +179,9 @@ contains
       k = k_base + kk
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = kk + offset_xy
-        rho(idx) = Q(1,i,j,k)
-          u(idx) = Q(2,i,j,k)
-          v(idx) = Q(3,i,j,k)
-          w(idx) = Q(4,i,j,k)
-          p(idx) = Q(5,i,j,k)
-        tmp(idx) =   T(i,j,k)
+        rho(idx) = Q(1,i,j,k);   u(idx) = Q(2,i,j,k)
+          v(idx) = Q(3,i,j,k);   w(idx) = Q(4,i,j,k)
+          p(idx) = Q(5,i,j,k); tmp(idx) =   T(i,j,k)
       endif
     enddo
     call syncthreads()
@@ -189,20 +190,23 @@ contains
     idx = kt + offset_xy
     associate(ww => w)
     if (3 <= k .and. k <= nz-3) then
-      G(:,i-1,j-1,k) = KEEP6(rho(idx-2:idx+3), u(idx-2:idx+3), &
-                               v(idx-2:idx+3), w(idx-2:idx+3), &
-                              ww(idx-2:idx+3), p(idx-2:idx+3), &
-                             tmp(idx-2:idx+3), Normal_z)
+      G(:,i-1,j-1,k) = KEEP(id_accuracy, &
+                            rho(idx-2:idx+3), u(idx-2:idx+3), &
+                              v(idx-2:idx+3), w(idx-2:idx+3), &
+                             ww(idx-2:idx+3), p(idx-2:idx+3), &
+                            tmp(idx-2:idx+3), Normal_z)
     elseif (2 <= k .and. k <= nz-2) then
-      G(:,i-1,j-1,k) = KEEP4(rho(idx-1:idx+2), u(idx-1:idx+2), &
-                               v(idx-1:idx+2), w(idx-1:idx+2), &
-                              ww(idx-1:idx+2), p(idx-1:idx+2), &
-                             tmp(idx-1:idx+2), Normal_z)
+      G(:,i-1,j-1,k) = KEEP(id_accuracy, &
+                            rho(idx-1:idx+2), u(idx-1:idx+2), &
+                              v(idx-1:idx+2), w(idx-1:idx+2), &
+                             ww(idx-1:idx+2), p(idx-1:idx+2), &
+                            tmp(idx-1:idx+2), Normal_z)
     else
-      G(:,i-1,j-1,k) = KEEP2(rho(idx:idx+1), u(idx:idx+1), &
-                               v(idx:idx+1), w(idx:idx+1), &
-                              ww(idx:idx+1), p(idx:idx+1), &
-                             tmp(idx:idx+1), Normal_z)
+      G(:,i-1,j-1,k) = KEEP(id_accuracy, &
+                            rho(idx:idx+1), u(idx:idx+1), &
+                              v(idx:idx+1), w(idx:idx+1), &
+                             ww(idx:idx+1), p(idx:idx+1), &
+                            tmp(idx:idx+1), Normal_z)
     endif
     end associate
   end subroutine calc_keep_z6
@@ -236,12 +240,9 @@ contains
       i = i_base + ii
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = ii + offset_yz
-        rho(idx) = Q(1,i,j,k)
-          u(idx) = Q(2,i,j,k)
-          v(idx) = Q(3,i,j,k)
-          w(idx) = Q(4,i,j,k)
-          p(idx) = Q(5,i,j,k)
-        tmp(idx) =   T(i,j,k)
+        rho(idx) = Q(1,i,j,k);   u(idx) = Q(2,i,j,k)
+          v(idx) = Q(3,i,j,k);   w(idx) = Q(4,i,j,k)
+          p(idx) = Q(5,i,j,k); tmp(idx) =   T(i,j,k)
       endif
     enddo
     call syncthreads()
@@ -250,15 +251,17 @@ contains
     idx = it + offset_yz
     associate(uu => u)
     if (2 <= i .and. i <= nx-2) then
-      E(:,i,j-1,k-1) = KEEP4(rho(idx-1:idx+2), u(idx-1:idx+2), &
-                               v(idx-1:idx+2), w(idx-1:idx+2), &
-                              uu(idx-1:idx+2), p(idx-1:idx+2), &
-                             tmp(idx-1:idx+2), Normal_x)
+      E(:,i,j-1,k-1) = KEEP(id_accuracy, &
+                            rho(idx-1:idx+2), u(idx-1:idx+2), &
+                              v(idx-1:idx+2), w(idx-1:idx+2), &
+                             uu(idx-1:idx+2), p(idx-1:idx+2), &
+                            tmp(idx-1:idx+2), Normal_x)
     else
-      E(:,i,j-1,k-1) = KEEP2(rho(idx:idx+1), u(idx:idx+1), &
-                               v(idx:idx+1), w(idx:idx+1), &
-                              uu(idx:idx+1), p(idx:idx+1), &
-                             tmp(idx:idx+1), Normal_x)
+      E(:,i,j-1,k-1) = KEEP(id_accuracy, &
+                            rho(idx:idx+1), u(idx:idx+1), &
+                              v(idx:idx+1), w(idx:idx+1), &
+                             uu(idx:idx+1), p(idx:idx+1), &
+                            tmp(idx:idx+1), Normal_x)
     endif
     end associate
   end subroutine calc_keep_x4
@@ -292,12 +295,9 @@ contains
       j = j_base + jj
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = jj + offset_xz
-        rho(idx) = Q(1,i,j,k)
-          u(idx) = Q(2,i,j,k)
-          v(idx) = Q(3,i,j,k)
-          w(idx) = Q(4,i,j,k)
-          p(idx) = Q(5,i,j,k)
-        tmp(idx) =   T(i,j,k)
+        rho(idx) = Q(1,i,j,k);   u(idx) = Q(2,i,j,k)
+          v(idx) = Q(3,i,j,k);   w(idx) = Q(4,i,j,k)
+          p(idx) = Q(5,i,j,k); tmp(idx) =   T(i,j,k)
       endif
     enddo
     call syncthreads()
@@ -306,15 +306,17 @@ contains
     idx = jt + offset_xz
     associate(vv => v)
     if (2 <= j .and. j <= ny-2) then
-      F(:,i-1,j,k-1) = KEEP4(rho(idx-1:idx+2), u(idx-1:idx+2), &
-                               v(idx-1:idx+2), w(idx-1:idx+2), &
-                              vv(idx-1:idx+2), p(idx-1:idx+2), &
-                             tmp(idx-1:idx+2), Normal_y)
+      F(:,i-1,j,k-1) = KEEP(id_accuracy, &
+                            rho(idx-1:idx+2), u(idx-1:idx+2), &
+                              v(idx-1:idx+2), w(idx-1:idx+2), &
+                             vv(idx-1:idx+2), p(idx-1:idx+2), &
+                            tmp(idx-1:idx+2), Normal_y)
     else
-      F(:,i-1,j,k-1) = KEEP2(rho(idx:idx+1), u(idx:idx+1), &
-                               v(idx:idx+1), w(idx:idx+1), &
-                              vv(idx:idx+1), p(idx:idx+1), &
-                             tmp(idx:idx+1), Normal_y)
+      F(:,i-1,j,k-1) = KEEP(id_accuracy, &
+                            rho(idx:idx+1), u(idx:idx+1), &
+                              v(idx:idx+1), w(idx:idx+1), &
+                             vv(idx:idx+1), p(idx:idx+1), &
+                            tmp(idx:idx+1), Normal_y)
     endif
     end associate
   end subroutine calc_keep_y4
@@ -348,12 +350,9 @@ contains
       k = k_base + kk
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = kk + offset_xy
-        rho(idx) = Q(1,i,j,k)
-          u(idx) = Q(2,i,j,k)
-          v(idx) = Q(3,i,j,k)
-          w(idx) = Q(4,i,j,k)
-          p(idx) = Q(5,i,j,k)
-        tmp(idx) =   T(i,j,k)
+        rho(idx) = Q(1,i,j,k);   u(idx) = Q(2,i,j,k)
+          v(idx) = Q(3,i,j,k);   w(idx) = Q(4,i,j,k)
+          p(idx) = Q(5,i,j,k); tmp(idx) =   T(i,j,k)
       endif
     enddo
     call syncthreads()
@@ -362,15 +361,17 @@ contains
     idx = kt + offset_xy
     associate(ww => w)
     if (2 <= k .and. k <= nz-2) then
-      G(:,i-1,j-1,k) = KEEP4(rho(idx-1:idx+2), u(idx-1:idx+2), &
-                               v(idx-1:idx+2), w(idx-1:idx+2), &
-                              ww(idx-1:idx+2), p(idx-1:idx+2), &
-                             tmp(idx-1:idx+2), Normal_z)
+      G(:,i-1,j-1,k) = KEEP(id_accuracy, &
+                            rho(idx-1:idx+2), u(idx-1:idx+2), &
+                              v(idx-1:idx+2), w(idx-1:idx+2), &
+                             ww(idx-1:idx+2), p(idx-1:idx+2), &
+                            tmp(idx-1:idx+2), Normal_z)
     else
-      G(:,i-1,j-1,k) = KEEP2(rho(idx:idx+1), u(idx:idx+1), &
-                               v(idx:idx+1), w(idx:idx+1), &
-                              ww(idx:idx+1), p(idx:idx+1), &
-                             tmp(idx:idx+1), Normal_z)
+      G(:,i-1,j-1,k) = KEEP(id_accuracy, &
+                            rho(idx:idx+1), u(idx:idx+1), &
+                              v(idx:idx+1), w(idx:idx+1), &
+                             ww(idx:idx+1), p(idx:idx+1), &
+                            tmp(idx:idx+1), Normal_z)
     endif
     end associate
   end subroutine calc_keep_z4
@@ -396,13 +397,10 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    rho = Q(1,i:i+1,j,k)
-    u   = Q(2,i:i+1,j,k)
-    v   = Q(3,i:i+1,j,k)
-    w   = Q(4,i:i+1,j,k)
-    p   = Q(5,i:i+1,j,k)
-    tmp = T(i:i+1,j,k)
-    E(:,i,j-1,k-1) = KEEP2(rho, u, v, w, u, p, tmp, Normal_x)
+    rho = Q(1,i:i+1,j,k); u   = Q(2,i:i+1,j,k)
+    v   = Q(3,i:i+1,j,k); w   = Q(4,i:i+1,j,k)
+    p   = Q(5,i:i+1,j,k); tmp = T(i:i+1,j,k)
+    E(:,i,j-1,k-1) = KEEP(id_accuracy, rho, u, v, w, u, p, tmp, Normal_x)
   end subroutine calc_keep_x2
 
 
@@ -426,13 +424,10 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    rho = Q(1,i,j:j+1,k)
-    u   = Q(2,i,j:j+1,k)
-    v   = Q(3,i,j:j+1,k)
-    w   = Q(4,i,j:j+1,k)
-    p   = Q(5,i,j:j+1,k)
-    tmp = T(i,j:j+1,k)
-    F(:,i-1,j,k-1) = KEEP2(rho, u, v, w, v, p, tmp, Normal_y)
+    rho = Q(1,i,j:j+1,k); u   = Q(2,i,j:j+1,k)
+    v   = Q(3,i,j:j+1,k); w   = Q(4,i,j:j+1,k)
+    p   = Q(5,i,j:j+1,k); tmp = T(i,j:j+1,k)
+    F(:,i-1,j,k-1) = KEEP(id_accuracy, rho, u, v, w, v, p, tmp, Normal_y)
   end subroutine calc_keep_y2
 
 
@@ -456,13 +451,10 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     k  = (blockIdx%z-1)*blockDim%z + kt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    rho = Q(1,i,j,k:k+1)
-    u   = Q(2,i,j,k:k+1)
-    v   = Q(3,i,j,k:k+1)
-    w   = Q(4,i,j,k:k+1)
-    p   = Q(5,i,j,k:k+1)
-    tmp = T(i,j,k:k+1)
-    G(:,i-1,j-1,k) = KEEP2(rho, u, v, w, w, p, tmp, Normal_z)
+    rho = Q(1,i,j,k:k+1); u   = Q(2,i,j,k:k+1)
+    v   = Q(3,i,j,k:k+1); w   = Q(4,i,j,k:k+1)
+    p   = Q(5,i,j,k:k+1); tmp = T(i,j,k:k+1)
+    G(:,i-1,j-1,k) = KEEP(id_accuracy, rho, u, v, w, w, p, tmp, Normal_z)
   end subroutine calc_keep_z2
 end module calc_keep_kernel
 

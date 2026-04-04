@@ -8,6 +8,7 @@ module calc_flux_base
   use calc_physical_quantities
   use calc_hybrid
   use calc_keep_kernel
+  use calc_keep_kernel_internal
   use calc_slau_kernel
   use calc_roe_kernel
   use calc_hybrid_kernel
@@ -47,6 +48,9 @@ contains
     call calc_keep_x<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, T, E)
     call calc_keep_y<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, Q, T, F)
     call calc_keep_z<<<blocksG,threadsG,3>>>(id_accuracy, nx, ny, nz, Q, T, G)
+    !call calc_keep_x_in<<<blocksE,threadsE,1>>>(nx, ny, nz, Q, T, E)
+    !call calc_keep_y_in<<<blocksF,threadsF,2>>>(nx, ny, nz, Q, T, F)
+    !call calc_keep_z_in<<<blocksG,threadsG,3>>>(nx, ny, nz, Q, T, G)
   end subroutine calc_conv_keep
 
 

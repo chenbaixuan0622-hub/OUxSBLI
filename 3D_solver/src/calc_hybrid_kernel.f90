@@ -12,6 +12,10 @@ module calc_hybrid_kernel
   real(8), parameter :: one_120       = 1.d0 / 120.d0
   real(8), parameter :: one_240       = 1.d0 / 240.d0
   real(8), parameter :: seven_twelfth = 7.d0 / 12.d0
+
+  interface KEEP
+    module procedure KEEP2, KEEP4, KEEP6
+  end interface KEEP
   
   interface SLAU
     module procedure SLAU1, HRSLAU2
@@ -70,9 +74,10 @@ contains
             real(8) tmp(6)
             tmp = T(i-2:i+3,j,k)
             associate(uu => u)
-              E(:,i,j-1,k-1) = KEEP6(rho(it-2:it+3,jt,kt), u(it-2:it+3,jt,kt), &
-                                       v(it-2:it+3,jt,kt), w(it-2:it+3,jt,kt), &
-                                      uu(it-2:it+3,jt,kt), p(it-2:it+3,jt,kt), tmp, Normal_x)
+              E(:,i,j-1,k-1) = KEEP(id_accuracy, &
+                                    rho(it-2:it+3,jt,kt), u(it-2:it+3,jt,kt), &
+                                      v(it-2:it+3,jt,kt), w(it-2:it+3,jt,kt), &
+                                     uu(it-2:it+3,jt,kt), p(it-2:it+3,jt,kt), tmp, Normal_x)
             end associate
           end block
         else
@@ -88,9 +93,10 @@ contains
             real(8) tmp(4)
             tmp = T(i-1:i+2,j,k)
             associate(uu => u)
-              E(:,i,j-1,k-1) = KEEP4(rho(it-1:it+2,jt,kt), u(it-1:it+2,jt,kt), &
-                                       v(it-1:it+2,jt,kt), w(it-1:it+2,jt,kt), &
-                                      uu(it-1:it+2,jt,kt), p(it-1:it+2,jt,kt), tmp, Normal_x)
+              E(:,i,j-1,k-1) = KEEP(id_accuracy, &
+                                    rho(it-1:it+2,jt,kt), u(it-1:it+2,jt,kt), &
+                                      v(it-1:it+2,jt,kt), w(it-1:it+2,jt,kt), &
+                                     uu(it-1:it+2,jt,kt), p(it-1:it+2,jt,kt), tmp, Normal_x)
             end associate
           end block
         else
@@ -106,9 +112,10 @@ contains
             real(8) tmp(2)
             tmp = T(i:i+1,j,k)
             associate(uu => u)
-              E(:,i,j-1,k-1) = KEEP2(rho(it:it+1,jt,kt), u(it:it+1,jt,kt), &
-                                       v(it:it+1,jt,kt), w(it:it+1,jt,kt), &
-                                      uu(it:it+1,jt,kt), p(it:it+1,jt,kt), tmp, Normal_x)
+              E(:,i,j-1,k-1) = KEEP(id_accuracy, &
+                                    rho(it:it+1,jt,kt), u(it:it+1,jt,kt), &
+                                      v(it:it+1,jt,kt), w(it:it+1,jt,kt), &
+                                     uu(it:it+1,jt,kt), p(it:it+1,jt,kt), tmp, Normal_x)
             end associate
           end block
         else
@@ -173,9 +180,10 @@ contains
             real(8) tmp(6)
             tmp = T(i,j-2:j+3,k)
             associate(vv => v)
-              F(:,i-1,j,k-1) = KEEP6(rho(jt-2:jt+3,it,kt), u(jt-2:jt+3,it,kt), &
-                                       v(jt-2:jt+3,it,kt), w(jt-2:jt+3,it,kt), &
-                                      vv(jt-2:jt+3,it,kt), p(jt-2:jt+3,it,kt), tmp, Normal_y)
+              F(:,i-1,j,k-1) = KEEP(id_accuracy, &
+                                    rho(jt-2:jt+3,it,kt), u(jt-2:jt+3,it,kt), &
+                                      v(jt-2:jt+3,it,kt), w(jt-2:jt+3,it,kt), &
+                                     vv(jt-2:jt+3,it,kt), p(jt-2:jt+3,it,kt), tmp, Normal_y)
             end associate
           end block
         else
@@ -191,9 +199,10 @@ contains
             real(8) tmp(4)
             tmp = T(i,j-1:j+2,k)
             associate(vv => v)
-              F(:,i-1,j,k-1) = KEEP4(rho(jt-1:jt+2,it,kt), u(jt-1:jt+2,it,kt), &
-                                       v(jt-1:jt+2,it,kt), w(jt-1:jt+2,it,kt), &
-                                      vv(jt-1:jt+2,it,kt), p(jt-1:jt+2,it,kt), tmp, Normal_y)
+              F(:,i-1,j,k-1) = KEEP(id_accuracy, &
+                                    rho(jt-1:jt+2,it,kt), u(jt-1:jt+2,it,kt), &
+                                      v(jt-1:jt+2,it,kt), w(jt-1:jt+2,it,kt), &
+                                     vv(jt-1:jt+2,it,kt), p(jt-1:jt+2,it,kt), tmp, Normal_y)
             end associate
           end block
         else
@@ -209,9 +218,10 @@ contains
             real(8) tmp(2)
             tmp = T(i,j:j+1,k)
             associate(vv => v)
-              F(:,i-1,j,k-1) = KEEP2(rho(jt:jt+1,it,kt), u(jt:jt+1,it,kt), &
-                                       v(jt:jt+1,it,kt), w(jt:jt+1,it,kt), &
-                                      vv(jt:jt+1,it,kt), p(jt:jt+1,it,kt), tmp, Normal_y)
+              F(:,i-1,j,k-1) = KEEP(id_accuracy, &
+                                    rho(jt:jt+1,it,kt), u(jt:jt+1,it,kt), &
+                                      v(jt:jt+1,it,kt), w(jt:jt+1,it,kt), &
+                                     vv(jt:jt+1,it,kt), p(jt:jt+1,it,kt), tmp, Normal_y)
             end associate
           end block
         else
@@ -276,9 +286,10 @@ contains
             real(8) tmp(6)
             tmp = T(i,j,k-2:k+3)
             associate(ww => w)
-              G(:,i-1,j-1,k) = KEEP6(rho(kt-2:kt+3,jt,it), u(kt-2:kt+3,jt,it), &
-                                       v(kt-2:kt+3,jt,it), w(kt-2:kt+3,jt,it), &
-                                      ww(kt-2:kt+3,jt,it), p(kt-2:kt+3,jt,it), tmp, Normal_z)
+              G(:,i-1,j-1,k) = KEEP(id_accuracy, &
+                                    rho(kt-2:kt+3,jt,it), u(kt-2:kt+3,jt,it), &
+                                      v(kt-2:kt+3,jt,it), w(kt-2:kt+3,jt,it), &
+                                     ww(kt-2:kt+3,jt,it), p(kt-2:kt+3,jt,it), tmp, Normal_z)
             end associate
           end block
         else
@@ -294,9 +305,10 @@ contains
             real(8) tmp(4)
             tmp = T(i,j,k-1:k+2)
             associate(ww => w)
-              G(:,i-1,j-1,k) = KEEP4(rho(kt-1:kt+2,jt,it), u(kt-1:kt+2,jt,it), &
-                                       v(kt-1:kt+2,jt,it), w(kt-1:kt+2,jt,it), &
-                                      ww(kt-1:kt+2,jt,it), p(kt-1:kt+2,jt,it), tmp, Normal_z)
+              G(:,i-1,j-1,k) = KEEP(id_accuracy, &
+                                    rho(kt-1:kt+2,jt,it), u(kt-1:kt+2,jt,it), &
+                                      v(kt-1:kt+2,jt,it), w(kt-1:kt+2,jt,it), &
+                                     ww(kt-1:kt+2,jt,it), p(kt-1:kt+2,jt,it), tmp, Normal_z)
             end associate
           end block
         else
@@ -312,9 +324,10 @@ contains
             real(8) tmp(2)
             tmp = T(i,j,k:k+1)
             associate(ww => w)
-              G(:,i-1,j-1,k) = KEEP2(rho(kt:kt+1,jt,it), u(kt:kt+1,jt,it), &
-                                       v(kt:kt+1,jt,it), w(kt:kt+1,jt,it), &
-                                      ww(kt:kt+1,jt,it), p(kt:kt+1,jt,it), tmp, Normal_z)
+              G(:,i-1,j-1,k) = KEEP(id_accuracy, &
+                                    rho(kt:kt+1,jt,it), u(kt:kt+1,jt,it), &
+                                      v(kt:kt+1,jt,it), w(kt:kt+1,jt,it), &
+                                     ww(kt:kt+1,jt,it), p(kt:kt+1,jt,it), tmp, Normal_z)
             end associate
           end block
         else
@@ -379,9 +392,10 @@ contains
             real(8) tmp(4)
             tmp = T(i-1:i+2,j,k)
             associate(uu => u)
-              E(:,i,j-1,k-1) = KEEP4(rho(it-1:it+2,jt,kt), u(it-1:it+2,jt,kt), &
-                                       v(it-1:it+2,jt,kt), w(it-1:it+2,jt,kt), &
-                                      uu(it-1:it+2,jt,kt), p(it-1:it+2,jt,kt), tmp, Normal_x)
+              E(:,i,j-1,k-1) = KEEP(id_accuracy, &
+                                    rho(it-1:it+2,jt,kt), u(it-1:it+2,jt,kt), &
+                                      v(it-1:it+2,jt,kt), w(it-1:it+2,jt,kt), &
+                                     uu(it-1:it+2,jt,kt), p(it-1:it+2,jt,kt), tmp, Normal_x)
             end associate
           end block
         else
@@ -397,9 +411,10 @@ contains
             real(8) tmp(2)
             tmp = T(i:i+1,j,k)
             associate(uu => u)
-              E(:,i,j-1,k-1) = KEEP2(rho(it:it+1,jt,kt), u(it:it+1,jt,kt), &
-                                       v(it:it+1,jt,kt), w(it:it+1,jt,kt), &
-                                      uu(it:it+1,jt,kt), p(it:it+1,jt,kt), tmp, Normal_x)
+              E(:,i,j-1,k-1) = KEEP(id_accuracy, &
+                                    rho(it:it+1,jt,kt), u(it:it+1,jt,kt), &
+                                      v(it:it+1,jt,kt), w(it:it+1,jt,kt), &
+                                     uu(it:it+1,jt,kt), p(it:it+1,jt,kt), tmp, Normal_x)
             end associate
           end block
         else
@@ -464,9 +479,10 @@ contains
             real(8) tmp(4)
             tmp = T(i,j-1:j+2,k)
             associate(vv => v)
-              F(:,i-1,j,k-1) = KEEP4(rho(jt-1:jt+2,it,kt), u(jt-1:jt+2,it,kt), &
-                                       v(jt-1:jt+2,it,kt), w(jt-1:jt+2,it,kt), &
-                                      vv(jt-1:jt+2,it,kt), p(jt-1:jt+2,it,kt), tmp, Normal_y)
+              F(:,i-1,j,k-1) = KEEP(id_accuracy, &
+                                    rho(jt-1:jt+2,it,kt), u(jt-1:jt+2,it,kt), &
+                                      v(jt-1:jt+2,it,kt), w(jt-1:jt+2,it,kt), &
+                                     vv(jt-1:jt+2,it,kt), p(jt-1:jt+2,it,kt), tmp, Normal_y)
             end associate
           end block
         else
@@ -482,9 +498,10 @@ contains
             real(8) tmp(2)
             tmp = T(i,j:j+1,k)
             associate(vv => v)
-              F(:,i-1,j,k-1) = KEEP2(rho(jt:jt+1,it,kt), u(jt:jt+1,it,kt), &
-                                       v(jt:jt+1,it,kt), w(jt:jt+1,it,kt), &
-                                      vv(jt:jt+1,it,kt), p(jt:jt+1,it,kt), tmp, Normal_y)
+              F(:,i-1,j,k-1) = KEEP(id_accuracy, &
+                                    rho(jt:jt+1,it,kt), u(jt:jt+1,it,kt), &
+                                      v(jt:jt+1,it,kt), w(jt:jt+1,it,kt), &
+                                     vv(jt:jt+1,it,kt), p(jt:jt+1,it,kt), tmp, Normal_y)
             end associate
           end block
         else
@@ -549,9 +566,10 @@ contains
             real(8) tmp(4)
             tmp = T(i,j,k-1:k+2)
             associate(ww => w)
-              G(:,i-1,j-1,k) = KEEP4(rho(kt-1:kt+2,jt,it), u(kt-1:kt+2,jt,it), &
-                                       v(kt-1:kt+2,jt,it), w(kt-1:kt+2,jt,it), &
-                                      ww(kt-1:kt+2,jt,it), p(kt-1:kt+2,jt,it), tmp, Normal_z)
+              G(:,i-1,j-1,k) = KEEP(id_accuracy, &
+                                    rho(kt-1:kt+2,jt,it), u(kt-1:kt+2,jt,it), &
+                                      v(kt-1:kt+2,jt,it), w(kt-1:kt+2,jt,it), &
+                                     ww(kt-1:kt+2,jt,it), p(kt-1:kt+2,jt,it), tmp, Normal_z)
             end associate
           end block
         else
@@ -567,9 +585,10 @@ contains
             real(8) tmp(2)
             tmp = T(i,j,k:k+1)
             associate(ww => w)
-              G(:,i-1,j-1,k) = KEEP2(rho(kt:kt+1,jt,it), u(kt:kt+1,jt,it), &
-                                       v(kt:kt+1,jt,it), w(kt:kt+1,jt,it), &
-                                      ww(kt:kt+1,jt,it), p(kt:kt+1,jt,it), tmp, Normal_z)
+              G(:,i-1,j-1,k) = KEEP(id_accuracy, &
+                                    rho(kt:kt+1,jt,it), u(kt:kt+1,jt,it), &
+                                      v(kt:kt+1,jt,it), w(kt:kt+1,jt,it), &
+                                     ww(kt:kt+1,jt,it), p(kt:kt+1,jt,it), tmp, Normal_z)
             end associate
           end block
         else
@@ -629,9 +648,10 @@ contains
         real(8) tmp(2)
         tmp = T(i:i+1,j,k)
         associate(uu => u)
-          E(:,i,j-1,k-1) = KEEP2(rho(it:it+1,jt,kt), u(it:it+1,jt,kt), &
-                                   v(it:it+1,jt,kt), w(it:it+1,jt,kt), &
-                                  uu(it:it+1,jt,kt), p(it:it+1,jt,kt), tmp, Normal_x)
+          E(:,i,j-1,k-1) = KEEP(id_accuracy, &
+                                rho(it:it+1,jt,kt), u(it:it+1,jt,kt), &
+                                  v(it:it+1,jt,kt), w(it:it+1,jt,kt), &
+                                 uu(it:it+1,jt,kt), p(it:it+1,jt,kt), tmp, Normal_x)
         end associate
       end block
     else
@@ -676,9 +696,10 @@ contains
         real(8) tmp(2)
         tmp = T(i,j:j+1,k)
         associate(vv => v)
-          F(:,i-1,j,k-1) = KEEP2(rho(jt:jt+1,it,kt), u(jt:jt+1,it,kt), &
-                                   v(jt:jt+1,it,kt), w(jt:jt+1,it,kt), &
-                                  vv(jt:jt+1,it,kt), p(jt:jt+1,it,kt), tmp, Normal_y)
+          F(:,i-1,j,k-1) = KEEP(id_accuracy, &
+                                rho(jt:jt+1,it,kt), u(jt:jt+1,it,kt), &
+                                  v(jt:jt+1,it,kt), w(jt:jt+1,it,kt), &
+                                 vv(jt:jt+1,it,kt), p(jt:jt+1,it,kt), tmp, Normal_y)
         end associate
       end block
     else
@@ -723,9 +744,10 @@ contains
         real(8) tmp(2)
         tmp = T(i,j,k:k+1)
         associate(ww => w)
-          G(:,i-1,j-1,k) = KEEP2(rho(kt:kt+1,jt,it), u(kt:kt+1,jt,it), &
-                                   v(kt:kt+1,jt,it), w(kt:kt+1,jt,it), &
-                                  ww(kt:kt+1,jt,it), p(kt:kt+1,jt,it), tmp, Normal_z)
+          G(:,i-1,j-1,k) = KEEP(id_accuracy, &
+                                rho(kt:kt+1,jt,it), u(kt:kt+1,jt,it), &
+                                  v(kt:kt+1,jt,it), w(kt:kt+1,jt,it), &
+                                 ww(kt:kt+1,jt,it), p(kt:kt+1,jt,it), tmp, Normal_z)
         end associate
       end block
     else

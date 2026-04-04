@@ -26,6 +26,7 @@ OBJ =	mod_globals.o \
       calc_hybrid.o \
       calc_muscl.o \
       calc_keep_kernel.o \
+      calc_keep_kernel_internal.o \
       calc_slau_kernel.o \
       calc_roe_kernel.o \
       calc_hybrid_kernel.o \
@@ -54,6 +55,7 @@ calc_visc2.o: mod_globals.mod mod_constant.mod
 calc_visc4.o: mod_globals.mod mod_constant.mod
 calc_muscl.o: mod_globals.mod
 calc_keep_kernel.o: mod_globals.mod calc_keep_3d.f90
+calc_keep_kernel_internal.o: mod_globals.mod calc_keep_3d.f90
 calc_slau_kernel.o: mod_globals.mod mod_constant.mod calc_muscl.mod calc_hybrid.mod calc_slau_3d.f90
 calc_roe_kernel.o: mod_globals.mod mod_constant.mod calc_muscl.mod calc_hybrid.mod calc_roe_3d.f90
 calc_hybrid_kernel.o: mod_globals.mod mod_constant.mod calc_keep_3d.f90 calc_muscl.mod calc_hybrid.mod calc_slau_3d.f90

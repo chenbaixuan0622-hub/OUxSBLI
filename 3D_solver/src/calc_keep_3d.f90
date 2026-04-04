@@ -1,4 +1,5 @@
-  pure attributes(device) function KEEP2(rho, u, v, w, uu, p, T, Normal) result(F)
+  pure attributes(device) function KEEP2(id_accuracy, rho, u, v, w, uu, p, T, Normal) result(F)
+    integer(2), intent(in), value     :: id_accuracy
     real(8), intent(in), dimension(2) :: rho, u, v, w, uu, p, T
     real(8), intent(in), dimension(5) :: Normal
     real(8) F(5)
@@ -12,7 +13,8 @@
   end function KEEP2
 
 
-  pure attributes(device) function KEEP4(rho, u, v, w, uu, p, T, Normal) result(F)
+  pure attributes(device) function KEEP4(id_accuracy, rho, u, v, w, uu, p, T, Normal) result(F)
+    integer(4), intent(in), value     :: id_accuracy
     real(8), intent(in), dimension(4) :: rho, u, v, w, uu, p, T
     real(8), intent(in), dimension(5) :: Normal
     real(8) F(5), RV1, RV2, RV3, RV1_RV2, RV1_RV3 
@@ -52,7 +54,8 @@
   end function KEEP4
 
 
-  pure attributes(device) function KEEP6(rho, u, v, w, uu, p, T, Normal) result(F)
+  pure attributes(device) function KEEP6(id_accuracy, rho, u, v, w, uu, p, T, Normal) result(F)
+    integer(8), intent(in), value     :: id_accuracy
     real(8), intent(in), dimension(6) :: rho, u, v, w, uu, p, T
     real(8), intent(in), dimension(5) :: Normal
     real(8) F(5), RV1, RV2, RV3, RV4, RV5, RV6, RV3_RV5, RV2_RV5, RV1_RV2_RV4, RV1_RV3_RV6
