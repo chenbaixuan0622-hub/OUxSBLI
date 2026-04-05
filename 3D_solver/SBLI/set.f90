@@ -112,7 +112,7 @@ contains
     real(8), intent(in), device    :: Jacobian(nx,ny)
     real(8), intent(inout), device :: QJ(5,nx,ny,nz) ! Q / Jacobian
     real(8), intent(in), device, optional :: Qre(ny*(nz-6)*5)
-    integer i, j, k, l, No, ireq, ierr, istat(MPI_STATUS_SIZE)
+    integer i, j, k, l, ireq, ierr, istat(MPI_STATUS_SIZE)
     real(8) :: p_wall, pre, rho, rhou, rhov, rhow, p, e
     ! Riemann invariants
     real(8) :: rhoin, pin, cin, vin, Rp, Rm, rhob, ub, vb, cb, pb, v0 = 0.d0
