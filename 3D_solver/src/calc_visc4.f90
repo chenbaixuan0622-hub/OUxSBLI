@@ -2,7 +2,7 @@
 !> Uses centered difference stencils to compute viscous stresses and heat flux
 !> Generally more accurate but requires larger stencils than 2nd-order
 module calc_visc4
-  use mod_globals, only : id_visc, gamma, R, Pr, Prt, dt, threadsEv, threadsFv, threadsGv
+  use mod_globals, only : id_visc, id_bc_x, id_bc_y, id_bc_z, gamma, R, Pr, Prt, dt, threadsEv, threadsFv, threadsGv
   use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third, two_third, one_twelfth
   implicit none
   private
@@ -183,7 +183,8 @@ contains
         call calc_tau_cross(mu3, v(it-2:it+3,jt,kt), uy(it-2:it+3,jt,kt), dx(i), txy, vtxy)
         call calc_tau_cross(mu3, w(it-2:it+3,jt,kt), uz(it-2:it+3,jt,kt), dx(i), txz, wtxz)
       end block
-    else
+    endif
+    if (id_bc_x) then
       block
         real(8) mx, mux, mvx, mwx, muy, mvy, muz, mwz
         mx  = 0.5d0 * (mu(i,j,k) + mu(i+1,j,k))
@@ -292,7 +293,8 @@ contains
           Hsgs = -flux4(mut3) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dx(i) / Prt
         end block
       end block
-    else
+    endif
+    if (id_bc_x) then
       block
         real(8), dimension(2), device :: my, mysgs, mz, mzsgs
         real(8) mx, mxsgs, mux, muxsgs, mvx, mvxsgs, mwx, mwxsgs, muy, muysgs, mvy, mvysgs, muz, muzsgs, mwz, mwzsgs
@@ -419,7 +421,8 @@ contains
         call calc_tau_cross(mu3, u(jt-2:jt+3,it,kt), vx(jt-2:jt+3,it,kt), dy(j), tyx, utyx)
         call calc_tau_cross(mu3, w(jt-2:jt+3,it,kt), vz(jt-2:jt+3,it,kt), dy(j), tyz, wtyz)
       end block
-    else
+    endif
+    if (id_bc_y) then
       block
         real(8) my, muy, mvy, mwy, mvz, mwz, mux, mvx
         my  = 0.5d0 * (mu(i,j,k) + mu(i,j+1,k))
@@ -530,7 +533,8 @@ contains
           Hsgs = -flux4(mut) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dy(j) / Prt
         end block
       end block
-    else
+    endif
+    if (id_bc_y) then
       block
         real(8), dimension(2), device :: u2, v2, w2, mz, mzsgs, mx, mxsgs
         real(8) my, mysgs, muy, muysgs, mvy, mvysgs, mwy, mwysgs, mvz, mvzsgs, mwz, mwzsgs, mux, muxsgs, mvx, mvxsgs
@@ -657,7 +661,8 @@ contains
         call calc_tau_cross(mu3, u(kt-2:kt+3,jt,it), wx(kt-2:kt+3,jt,it), dz(k), tzx, utzx)
         call calc_tau_cross(mu3, v(kt-2:kt+3,jt,it), wy(kt-2:kt+3,jt,it), dz(k), tzy, vtzy)
       end block
-    else
+    endif
+    if (id_bc_z) then
       block
         real(8) mz, muz, mvz, mwz, mwx, mux, mvy, mwy
         mz  = 0.5d0 * (mu(i,j,k) + mu(i,j,k+1))
@@ -762,7 +767,8 @@ contains
           Hsgs = -flux4(mut) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dz(k) / Prt
         end block
       end block
-    else
+    endif
+    if (id_bc_z) then
       block
         real(8), dimension(2), device :: mx, mxsgs, my, mysgs
         real(8) mz, mzsgs, muz, muzsgs, mvz, mvzsgs, mwz, mwzsgs, mwx, mwxsgs, mux, muxsgs, mvy, mvysgs, mwy, mwysgs

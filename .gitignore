@@ -8,8 +8,10 @@
 *.png
 *.so
 *.err
-post/__pycache__/
-post/mod/__pycache__/
-post/mod_AI/__pycache__/
-CUDA_solver/__pycache__/
+.vscode
+3D_solver/ETGV/data
+3D_solver/NSTGV/data
+3D_solver/IVST/data
+3D_solver/TBL/data
+3D_solver/SBLI/data
 

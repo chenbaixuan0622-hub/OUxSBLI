@@ -40,6 +40,7 @@ module mod_globals
 
   integer, parameter :: mygpu1 = 0
   integer, parameter :: mygpu2 = 0!1
+  
   ! boundary layer
   real(8), parameter :: Lx1 = 20.d0 * blt
   real(8), parameter :: Ly1 = 5.d0 * blt
@@ -56,6 +57,11 @@ module mod_globals
   integer, parameter :: ny2 = 353
   integer, parameter :: nz2 = nz1
 
+  ! boundary condition
+  logical, parameter :: id_bc_x = .true.
+  logical, parameter :: id_bc_y = .true.
+  logical, parameter :: id_bc_z = .false.
+  
   integer, parameter :: nre1 = int(0.8 * nx1)
   integer, parameter :: nre2 = int(0.9 * nx1)
   integer, parameter :: rerank = 0
