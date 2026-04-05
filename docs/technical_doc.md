@@ -163,9 +163,6 @@ subroutine RungeKutta_4th(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, nz, 
 - `RungeKutta_4th_rescale()`: 4th-order with reference state rescaling
 - Used for shock-boundary layer interaction (SBLI) cases
 
-#### Gauss-Legendre Runge-Kutta
-- Under development
-
 ---
 
 ## 5. CUDA Fortran GPU Implementation
