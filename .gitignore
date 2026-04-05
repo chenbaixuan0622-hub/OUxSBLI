@@ -9,6 +9,7 @@
 *.so
 *.err
 .vscode
+docs/auto_summary.md
 3D_solver/ETGV/data
 3D_solver/NSTGV/data
 3D_solver/IVST/data

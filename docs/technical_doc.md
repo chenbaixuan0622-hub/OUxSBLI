@@ -38,14 +38,14 @@ OUxSBLI/
 ├── src/                # Top-level utilities
 │   ├── main.f90        # Main entry point
 │   ├── sbli.f90        # Alternative SBLI-specific main
-│   ├── mod_globals_c.f90      # C bindings for Python interface
 │   ├── mod_constant.f90       # Physical constants
 │   ├── cpu_gpu_mpi.f90        # CPU-GPU MPI abstractions
 │   ├── print.f90              # Output/printing utilities
 │   ├── calc_muscl.f90         # MUSCL reconstruction
 │   ├── calc_physical_quantities.f90  # Primitive-conservative conversion
 │   ├── set_compressible_bl.f90      # Boundary layer setup
-│   └── set_coordinate.f90           # Coordinate transformations & Jacobian
+│   ├── set_coordinate.f90           # Coordinate transformations & Jacobian
+│   └── (other flux/visc modules)    # calc_keep_kernel, calc_visc2/4, etc.
 └── docs/
     ├── api.md          # Auto-generated API reference
     └── technical_doc.md # This file
@@ -62,7 +62,8 @@ case_name/
 ├── Makefile            # Build configuration
 ├── calc.sh             # Execution script
 ├── profile.sh          # Profiling script (when available)
-└── data/               # Output directory
+├── data/               # Output directory
+└── recal/              # Restart/checkpoint files
 ~~~
 
 ---
@@ -495,11 +496,54 @@ Used for SBLI simulations to preserve background flow while evolving turbulence:
 - `rescale_recv_send(...)`: MPI communication for mean data
 - `set_rescale(flag_re, step, nx, ny, nz, y, Jacobian, Qm, bltre, Qre)`: Transform Q back
 
+### 8.10 calc_keep_kernel_internal.f90 (Optimized KEEP Kernels)
+
+**Purpose**: Consolidated multi-accuracy KEEP scheme kernel implementation with optimized shared memory management.
+
+**Key Features**:
+- Unified interface supporting 2nd, 4th, and 6th-order accuracy
+- Accuracy selection via `kind(id_accuracy)` parameter
+- Stencil padding automatically adjusted: `sx = threadsE%x + 2*io + 1`
+- Shared memory access patterns optimized for GPU cache efficiency
+- Calls `include 'calc_keep_3d.f90'` for KEEP flux computations
+
+**Kernels**:
+```fortran
+attributes(global) subroutine calc_keep_x_in(nx, ny, nz, Q, T, E)
+attributes(global) subroutine calc_keep_y_in(nx, ny, nz, Q, T, F)
+attributes(global) subroutine calc_keep_z_in(nx, ny, nz, Q, T, G)
+```
+
+### 8.11 calc_slau_kernel_internal.f90 (Optimized SLAU Kernels)
+
+**Purpose**: Refactored SLAU scheme with adaptive interpolation and shock sensing for efficient GPU computation.
+
+**Key Optimizations**:
+- **Multi-Accuracy Interpolation**: Device functions `interp2`, `interp4`, `interp6` for flexible accuracy
+- **Shock-Adaptive Dissipation**: Wiggle detector integrated for automatic shock detection
+- **Memory Efficiency**: Separates interpolation and flux computation to enable shared memory reuse
+- **Stack Frame Avoidance**: Reuses shared memory arrays instead of large stack allocations
+- **Calls**: `include 'calc_slau_3d.f90'` for SLAU1/HR-SLAU2 flux functions
+
+**Kernels**:
+```fortran
+attributes(global) subroutine calc_slau_x_in(nx, ny, nz, Q, sensor, E)
+attributes(global) subroutine calc_slau_y_in(nx, ny, nz, Q, sensor, F)
+attributes(global) subroutine calc_slau_z_in(nx, ny, nz, Q, sensor, G)
+```
+
+**Interpolation Dispatch**:
+```fortran
+interface interp
+  module procedure interp2, interp4, interp6  ! Selects based on id_accuracy
+end interface interp
+```
+
 ---
 
-## 9. Main Execution Flow
+## 12. Main Execution Flow
 
-### 9.1 Program Entry Point (src/main.f90)
+### 12.1 Program Entry Point (src/main.f90)
 
 ```fortran
 program main
@@ -555,7 +599,7 @@ program main
 end program main
 ```
 
-### 9.2 SBLI Variant (src/sbli.f90)
+### 12.2 SBLI Variant (src/sbli.f90)
 
 - Supports dual regions (boundary layer + shock interaction)
 - Different grid sizes for each region: `nx1/ny1/nz1` vs `nx2/ny2/nz2`
@@ -564,9 +608,9 @@ end program main
 
 ---
 
-## 10. Build & Execution Workflow
+## 13. Build & Execution Workflow
 
-### 10.1 Compilation
+### 13.1 Compilation
 
 ```bash
 cd 3D_solver/ETGV    # Navigate to case directory
@@ -580,7 +624,7 @@ make                 # Compile with HPC SDK compiler
 - CUDA Fortran compilation flags
 - Link to MPI library
 
-### 10.2 Execution
+### 13.2 Execution
 
 ```bash
 bash calc.sh                 # Run simulation
@@ -590,14 +634,14 @@ bash calc.sh                 # Run simulation
 bash profile.sh             # Generate nsys/ncu profiles
 ```
 
-### 10.3 Checkpoint Files
+### 13.3 Checkpoint Files
 
 - **Input**: `recal/Q00001.dat`, `recal/Q00002.dat`, ... (one per rank pair)
 - **Output**: Same structure; overwritten each output interval
 - **Format**: Sequential unformatted Fortran or stream binary
 - **Data**: Q array with Jacobian applied
 
-### 10.4 Performance Monitoring
+### 13.4 Performance Monitoring
 
 - **nsys** (system profiler): GPU utilization, memory bandwidth
 - **ncu** (kernel profiler): Per-kernel metrics (occupancy, bandwidth, etc.)
@@ -669,7 +713,7 @@ ncu --config full ./a.out    # Full metrics
 
 ---
 
-**Document Version**: 1.1 (April 3, 2026)  
+**Document Version**: 1.2 (April 5, 2026)  
 **Generated From**: OUxSBLI source code analysis  
 **Relevant Source Docs**: `api.md`, `README.md`, `CODE_ANALYSIS.md`
-**Last Updated**: Comprehensive project survey and parameter documentation
+**Last Updated**: Optimized kernel implementation documentation (calc_keep_kernel_internal, calc_slau_kernel_internal)

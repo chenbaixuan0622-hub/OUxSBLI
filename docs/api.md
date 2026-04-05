@@ -485,6 +485,87 @@
   - `my(2)` (`real(8), device`)
   - `H(2)` (`real(8), device`)
 
+## File: `calc_slau_kernel_internal.f90`
+
+### `module calc_slau_kernel_internal`
+
+### `module procedure`
+- **Description:** io = 0, 1, 2 (2nd, 4th, 6th)
+
+### `module procedure`
+
+### `subroutine interp6(id_accuracy, rho,  u,  v,  w,  p,                                                       rhol, ul, vl, wl, pl,                                                       rhor, ur, vr, wr, pr, fd)`
+- **Arguments & Variables:**
+  - `id_accuracy` (`integer(8), intent(in), value`)
+  - `rho(6), u(6), v(6), w(6), p(6)` (`real(8), intent(in), contiguous`)
+  - `rhol, ul, vl, wl, pl` (`real(8), intent(out)`)
+  - `rhor, ur, vr, wr, pr` (`real(8), intent(out)`)
+  - `fd` (`real(8), intent(inout)`)
+
+### `subroutine interp4(id_accuracy, rho,  u,  v,  w,  p,                                                       rhol, ul, vl, wl, pl,                                                       rhor, ur, vr, wr, pr, fd)`
+- **Arguments & Variables:**
+  - `id_accuracy` (`integer(4), intent(in), value`)
+  - `rho(4), u(4), v(4), w(4), p(4)` (`real(8), intent(in), contiguous`)
+  - `rhol, ul, vl, wl, pl` (`real(8), intent(out)`)
+  - `rhor, ur, vr, wr, pr` (`real(8), intent(out)`)
+  - `fd` (`real(8), intent(inout)`)
+
+### `subroutine interp2(id_accuracy, rho,  u,  v,  w,  p,                                                       rhol, ul, vl, wl, pl,                                                       rhor, ur, vr, wr, pr, fd)`
+- **Arguments & Variables:**
+  - `id_accuracy` (`integer(2), intent(in), value`)
+  - `rho(2), u(2), v(2), w(2), p(2)` (`real(8), intent(in), contiguous`)
+  - `rhol, ul, vl, wl, pl` (`real(8), intent(out)`)
+  - `rhor, ur, vr, wr, pr` (`real(8), intent(out)`)
+  - `fd` (`real(8), intent(inout)`)
+
+### `subroutine calc_slau_x_in(nx, ny, nz, Q, sensor, E)`
+- **Description:** CUDA Fortran kernel for 4 points SLAU scheme in x direction
+- **Arguments & Variables:**
+  - `nx` (`integer, intent(in), value`) : number of grid points in x direction
+  - `ny` (`integer, intent(in), value`) : number of grid points in y direction
+  - `nz` (`integer, intent(in), value`) : number of grid points in z direction
+  - `Q(5,nx,ny,nz)` (`real(8), intent(in), device`) : Q(rho, u, v, w, p)
+  - `sensor(nx,ny,nz)` (`real(8), intent(in), device`) : shock sensor
+  - `E(5,nx-1,ny-2,nz-2)` (`real(8), intent(out), device`) : Flux in x direction
+  - `sx  = threadsE%x + 2*io + 1` (`integer, parameter`) : tile size in x direction to calc high-order interpolation
+  - `sxr = threadsE%x` (`integer, parameter`) : tile size in x direction to store the results
+  - `sy  = threadsE%y` (`integer, parameter`) : tile size in y direction
+  - `sz  = threadsE%z` (`integer, parameter`) : tile size in z direction
+  - `rho,  u,  v,  w,  p` (`real(8), dimension(-(io-1):sx*sy*sz-io), shared`) : 1st use: stensils, 2nd use: left
+  - `rhor, ur, vr, wr, pr` (`real(8), dimension(sxr*sy*sz), shared`) : right
+
+### `subroutine calc_slau_y_in(nx, ny, nz, Q, sensor, F)`
+- **Description:** CUDA Fortran kernel for 4 points SLAU scheme in y direction
+- **Arguments & Variables:**
+  - `nx` (`integer, intent(in), value`) : number of grid points in x direction
+  - `ny` (`integer, intent(in), value`) : number of grid points in y direction
+  - `nz` (`integer, intent(in), value`) : number of grid points in z direction
+  - `Q(5,nx,ny,nz)` (`real(8), intent(in), device`) : Q(rho, u, v, w, p)
+  - `sensor(nx,ny,nz)` (`real(8), intent(in), device`) : shock sensor
+  - `F(5,nx-2,ny-1,nz-2)` (`real(8), intent(out), device`) : Flux in y direction
+  - `sx  = threadsF%x` (`integer, parameter`) : tile size in x direction
+  - `sy  = threadsF%y + 2*io + 1` (`integer, parameter`) : tile size in y direction to calc high-order interpolation
+  - `syr = threadsF%y` (`integer, parameter`) : tile size in y direction to store the results
+  - `sz  = threadsF%z` (`integer, parameter`) : tile size in z direction
+  - `rho,  u,  v,  w,  p` (`real(8), dimension(-(io-1):sx*sy*sz-io), shared`) : 1st use: stencils, 2nd use: left
+  - `rhor, ur, vr, wr, pr` (`real(8), dimension(sx*syr*sz), shared`) : right
+
+### `subroutine calc_slau_z_in(nx, ny, nz, Q, sensor, G)`
+- **Description:** CUDA Fortran kernel for 4 points SLAU scheme in z direction
+- **Arguments & Variables:**
+  - `nx` (`integer, intent(in), value`) : number of grid points in x direction
+  - `ny` (`integer, intent(in), value`) : number of grid points in y direction
+  - `nz` (`integer, intent(in), value`) : number of grid points in z direction
+  - `Q(5,nx,ny,nz)` (`real(8), intent(in), device`) : Q(rho, u, v, w, p)
+  - `sensor(nx,ny,nz)` (`real(8), intent(in), device`) : shock sensor
+  - `G(5,nx-2,ny-2,nz-1)` (`real(8), intent(out), device`) : Flux in z direction
+  - `sx  = threadsG%x` (`integer, parameter`) : tile size in x direction
+  - `sy  = threadsG%y` (`integer, parameter`) : tile size in y direction
+  - `sz  = threadsG%z + 2*io + 1` (`integer, parameter`) : tile size in z direction to calc high-order interpolation
+  - `szr = threadsG%z` (`integer, parameter`) : tile size in z direction to store the results
+  - `rho,  u,  v,  w,  p` (`real(8), dimension(-(io-1):sx*sy*sz-io), shared`) : 1st use: stencils, 2nd use: left
+  - `rhor, ur, vr, wr, pr` (`real(8), dimension(sx*sy*szr), shared`) : right
+
 ## File: `calc_flux_base.f90`
 
 ### `module calc_flux_base`
@@ -501,14 +582,14 @@
   - `nx` (`integer, intent(in), value`) : number of grid points in x direction
   - `ny` (`integer, intent(in), value`) : number of grid points in y direction
   - `nz` (`integer, intent(in), value`) : number of grid points in z direction
-  - `inv_dx(nx-1)` (`real(8), intent(in), device`) : inverse grid spacing x (1/dx)
-  - `inv_dy(ny-1)` (`real(8), intent(in), device`) : inverse grid spacing y (1/dy)
-  - `inv_dz(nz-1)` (`real(8), intent(in), device`) : inverse grid spacing z (1/dz)
-  - `Q(5,nx,ny,nz)` (`real(8), intent(in), device`) : conservative variables Q(rho, u, v, w, p)
-  - `T(nx,ny,nz)` (`real(8), intent(in), device`) : temperature field
-  - `E(5,nx-1,ny-2,nz-2)` (`real(8), intent(out), device`) : convective flux in x direction
-  - `F(5,nx-2,ny-1,nz-2)` (`real(8), intent(out), device`) : convective flux in y direction
-  - `G(5,nx-2,ny-2,nz-1)` (`real(8), intent(out), device`) : convective flux in z direction
+  - `inv_dx(nx-1)` (`real(8), intent(in), device, contiguous`) : inverse grid spacing x (1/dx)
+  - `inv_dy(ny-1)` (`real(8), intent(in), device, contiguous`) : inverse grid spacing y (1/dy)
+  - `inv_dz(nz-1)` (`real(8), intent(in), device, contiguous`) : inverse grid spacing z (1/dz)
+  - `Q(5,nx,ny,nz)` (`real(8), intent(in), device, contiguous`) : conservative variables Q(rho, u, v, w, p)
+  - `T(nx,ny,nz)` (`real(8), intent(in), device, contiguous`) : temperature field
+  - `E(5,nx-1,ny-2,nz-2)` (`real(8), intent(out), device, contiguous`) : convective flux in x direction
+  - `F(5,nx-2,ny-1,nz-2)` (`real(8), intent(out), device, contiguous`) : convective flux in y direction
+  - `G(5,nx-2,ny-2,nz-1)` (`real(8), intent(out), device, contiguous`) : convective flux in z direction
 
 ### `subroutine calc_conv_slau(id_scheme, nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, E, F, G)`
 - **Description:** Dissipation modulated by Ducros sensor: f_d controls blend ratio
@@ -517,14 +598,14 @@
   - `nx` (`integer, intent(in), value`) : number of grid points in x direction
   - `ny` (`integer, intent(in), value`) : number of grid points in y direction
   - `nz` (`integer, intent(in), value`) : number of grid points in z direction
-  - `inv_dx(nx-1)` (`real(8), intent(in), device`) : inverse grid spacing x (1/dx)
-  - `inv_dy(ny-1)` (`real(8), intent(in), device`) : inverse grid spacing y (1/dy)
-  - `inv_dz(nz-1)` (`real(8), intent(in), device`) : inverse grid spacing z (1/dz)
-  - `Q(5,nx,ny,nz)` (`real(8), intent(in), device`) : conservative variables
-  - `T(nx,ny,nz)` (`real(8), intent(in), device`) : temperature field
-  - `E(5,nx-1,ny-2,nz-2)` (`real(8), intent(out), device`) : convective flux in x direction
-  - `F(5,nx-2,ny-1,nz-2)` (`real(8), intent(out), device`) : convective flux in y direction
-  - `G(5,nx-2,ny-2,nz-1)` (`real(8), intent(out), device`) : convective flux in z direction
+  - `inv_dx(nx-1)` (`real(8), intent(in), device, contiguous`) : inverse grid spacing x (1/dx)
+  - `inv_dy(ny-1)` (`real(8), intent(in), device, contiguous`) : inverse grid spacing y (1/dy)
+  - `inv_dz(nz-1)` (`real(8), intent(in), device, contiguous`) : inverse grid spacing z (1/dz)
+  - `Q(5,nx,ny,nz)` (`real(8), intent(in), device, contiguous`) : conservative variables
+  - `T(nx,ny,nz)` (`real(8), intent(in), device, contiguous`) : temperature field
+  - `E(5,nx-1,ny-2,nz-2)` (`real(8), intent(out), device, contiguous`) : convective flux in x direction
+  - `F(5,nx-2,ny-1,nz-2)` (`real(8), intent(out), device, contiguous`) : convective flux in y direction
+  - `G(5,nx-2,ny-2,nz-1)` (`real(8), intent(out), device, contiguous`) : convective flux in z direction
   - `sensor(nx,ny,nz)` (`real(8), device`)
 
 ### `subroutine calc_conv_roe(id_scheme, nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, E, F, G)`
@@ -534,14 +615,14 @@
   - `nx` (`integer, intent(in), value`) : number of grid points in x direction
   - `ny` (`integer, intent(in), value`) : number of grid points in y direction
   - `nz` (`integer, intent(in), value`) : number of grid points in z direction
-  - `inv_dx(nx-1)` (`real(8), intent(in), device`) : inverse grid spacing x (1/dx)
-  - `inv_dy(ny-1)` (`real(8), intent(in), device`) : inverse grid spacing y (1/dy)
-  - `inv_dz(nz-1)` (`real(8), intent(in), device`) : inverse grid spacing z (1/dz)
-  - `Q(5,nx,ny,nz)` (`real(8), intent(in), device`) : conservative variables
-  - `T(nx,ny,nz)` (`real(8), intent(in), device`) : temperature field
-  - `E(5,nx-1,ny-2,nz-2)` (`real(8), intent(out), device`) : convective flux in x direction
-  - `F(5,nx-2,ny-1,nz-2)` (`real(8), intent(out), device`) : convective flux in y direction
-  - `G(5,nx-2,ny-2,nz-1)` (`real(8), intent(out), device`) : convective flux in z direction
+  - `inv_dx(nx-1)` (`real(8), intent(in), device, contiguous`) : inverse grid spacing x (1/dx)
+  - `inv_dy(ny-1)` (`real(8), intent(in), device, contiguous`) : inverse grid spacing y (1/dy)
+  - `inv_dz(nz-1)` (`real(8), intent(in), device, contiguous`) : inverse grid spacing z (1/dz)
+  - `Q(5,nx,ny,nz)` (`real(8), intent(in), device, contiguous`) : conservative variables
+  - `T(nx,ny,nz)` (`real(8), intent(in), device, contiguous`) : temperature field
+  - `E(5,nx-1,ny-2,nz-2)` (`real(8), intent(out), device, contiguous`) : convective flux in x direction
+  - `F(5,nx-2,ny-1,nz-2)` (`real(8), intent(out), device, contiguous`) : convective flux in y direction
+  - `G(5,nx-2,ny-2,nz-1)` (`real(8), intent(out), device, contiguous`) : convective flux in z direction
   - `sensor(nx,ny,nz)` (`real(8), device`)
 
 ### `subroutine calc_conv_hybrid(id_scheme, nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, E, F, G)`
@@ -551,7 +632,7 @@
   - `nx` (`integer, intent(in), value`) : number of grid points in x direction
   - `ny` (`integer, intent(in), value`) : number of grid points in y direction
   - `nz` (`integer, intent(in), value`) : number of grid points in z direction
-  - `inv_dx(nx-1)` (`real(8), intent(in), device`) : inverse grid spacing x (1/dx)
+  - `inv_dx(nx-1)` (`real(8), intent(in), device, contiguous`) : inverse grid spacing x (1/dx)
   - `sensor(nx,ny,nz)` (`real(8), device`)
 
 ### `subroutine calc_EFG_Euler(id_visc, nx, ny, nz, inv_dx, inv_dy, inv_dz, Jacobian, QJ, Q, T, mu, mut, qc2, E, F, G)`
@@ -733,6 +814,8 @@
 
 ### `module procedure`
 
+### `module procedure`
+
 ### `subroutine calc_hybrid_x6(id_accuracy, nx, ny, nz, Q, T, sensor, E)`
 - **Arguments & Variables:**
   - `id_accuracy` (`integer(kind=8), intent(in), value`)
@@ -861,14 +944,14 @@
   - `Jacobian_cpu(nx,ny)` (`real(8), intent(in)`) : Jacobian determinant (host)
   - `Q(5,nx,ny,nz)` (`real(8), intent(inout)`) : conservative variables on host
   - `overlap` (`integer, intent(out)`) : ghost cell width for MPI halo exchange
-  - `dx(nx-1)` (`real(8), intent(out), device`) : inverse x spacing (device)
-  - `dy(ny-1)` (`real(8), intent(out), device`) : inverse y spacing (device)
-  - `dz(nz-1)` (`real(8), intent(out), device`) : inverse z spacing (device)
-  - `xix(nx-1)` (`real(8), intent(out), device`) : x coordinate metric (device)
-  - `etay(ny-1)` (`real(8), intent(out), device`) : y coordinate metric (device)
-  - `zetaz(nz-1)` (`real(8), intent(out), device`) : z coordinate metric (device)
-  - `Jacobian(nx,ny)` (`real(8), intent(out), device`) : Jacobian determinant (device)
-  - `QJ(5,nx,ny,nz)` (`real(8), intent(out), device`) : Q divided by Jacobian (device)
+  - `dx(nx-1)` (`real(8), intent(out), device, contiguous`) : inverse x spacing (device)
+  - `dy(ny-1)` (`real(8), intent(out), device, contiguous`) : inverse y spacing (device)
+  - `dz(nz-1)` (`real(8), intent(out), device, contiguous`) : inverse z spacing (device)
+  - `xix(nx-1)` (`real(8), intent(out), device, contiguous`) : x coordinate metric (device)
+  - `etay(ny-1)` (`real(8), intent(out), device, contiguous`) : y coordinate metric (device)
+  - `zetaz(nz-1)` (`real(8), intent(out), device, contiguous`) : z coordinate metric (device)
+  - `Jacobian(nx,ny)` (`real(8), intent(out), device, contiguous`) : Jacobian determinant (device)
+  - `QJ(5,nx,ny,nz)` (`real(8), intent(out), device, contiguous`) : Q divided by Jacobian (device)
   - `ke0` (`real(4), intent(inout)`) : reference kinetic energy
   - `entropy0` (`real(4), intent(inout)`) : reference entropy
 
@@ -1022,6 +1105,55 @@
   - `p_wall` (`real(8)`)
   - `fd, pi = acos(-1.d0)` (`real(8)`)
   - `rho(:), u(:), v(:), T(:), randum(:,:,:,:), ustd(:,:,:), vstd(:,:,:), wstd(:,:,:), Tstd(:,:,:)` (`real(8), allocatable`)
+
+## File: `calc_keep_kernel_internal.f90`
+
+### `module calc_keep_kernel_internal`
+
+### `module procedure`
+- **Description:** io = 0, 1, 2 (2nd, 4th, 6th)
+
+### `subroutine calc_keep_x_in(nx, ny, nz, Q, T, E)`
+- **Description:** CUDA Fortran kernel for KEEP scheme in x direction
+- **Arguments & Variables:**
+  - `nx` (`integer, intent(in), value`) : number of grid points in x direction
+  - `ny` (`integer, intent(in), value`) : number of grid points in y direction
+  - `nz` (`integer, intent(in), value`) : number of grid points in z direction
+  - `Q(5,nx,ny,nz)` (`real(8), intent(in), device`) : Q(rho, u, v, w, p)
+  - `T(nx,ny,nz)` (`real(8), intent(in), device`) : Temperature
+  - `E(5,nx-1,ny-2,nz-2)` (`real(8), intent(out), device`) : Flux in x direction
+  - `sx = threadsE%x + 2*io + 1` (`integer, parameter`) : tile size in x direction
+  - `sy = threadsE%y` (`integer, parameter`) : tile size in y direction
+  - `sz = threadsE%z` (`integer, parameter`) : tile size in z direction
+  - `rho, u, v, w, p, tmp` (`real(8), dimension(-(io-1):sx*sy*sz-io), shared`)
+
+### `subroutine calc_keep_y_in(nx, ny, nz, Q, T, F)`
+- **Description:** CUDA Fortran kernel for KEEP scheme in y direction
+- **Arguments & Variables:**
+  - `nx` (`integer, intent(in), value`) : number of grid points in x direction
+  - `ny` (`integer, intent(in), value`) : number of grid points in y direction
+  - `nz` (`integer, intent(in), value`) : number of grid points in z direction
+  - `Q(5,nx,ny,nz)` (`real(8), intent(in), device`) : Q(rho, u, v, w, p)
+  - `T(nx,ny,nz)` (`real(8), intent(in), device`) : Temperature
+  - `F(5,nx-2,ny-1,nz-2)` (`real(8), intent(out), device`) : Flux in y direction
+  - `sx = threadsF%x` (`integer, parameter`) : tile size in x direction
+  - `sy = threadsF%y + 2*io + 1` (`integer, parameter`) : tile size in y direction
+  - `sz = threadsF%z` (`integer, parameter`) : tile size in z direction
+  - `rho, u, v, w, p, tmp` (`real(8), dimension(-(io-1):sx*sy*sz-io), shared`)
+
+### `subroutine calc_keep_z_in(nx, ny, nz, Q, T, G)`
+- **Description:** CUDA Fortran kernel for KEEP scheme in z direction
+- **Arguments & Variables:**
+  - `nx` (`integer, intent(in), value`) : number of grid points in x direction
+  - `ny` (`integer, intent(in), value`) : number of grid points in y direction
+  - `nz` (`integer, intent(in), value`) : number of grid points in z direction
+  - `Q(5,nx,ny,nz)` (`real(8), intent(in), device`) : Q(rho, u, v, w, p)
+  - `T(nx,ny,nz)` (`real(8), intent(in), device`) : Temperature
+  - `G(5,nx-2,ny-2,nz-1)` (`real(8), intent(out), device`) : Flux in z direction
+  - `sx = threadsG%x` (`integer, parameter`) : tile size in x direction
+  - `sy = threadsG%y` (`integer, parameter`) : tile size in y direction
+  - `sz = threadsG%z + 2*io + 1` (`integer, parameter`) : tile size in z direction
+  - `rho, u, v, w, p, tmp` (`real(8), dimension(-(io-1):sx*sy*sz-io), shared`)
 
 ## File: `calc_para.f90`
 
@@ -1203,6 +1335,8 @@
 ## File: `calc_keep_kernel.f90`
 
 ### `module calc_keep_kernel`
+
+### `module procedure`
 
 ### `module procedure`
 
