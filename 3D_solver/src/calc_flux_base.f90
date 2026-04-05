@@ -2,7 +2,7 @@
 !> Dispatches to different numerical schemes (KEEP, SLAU, Roe, Hybrid)
 !> Groups all GPU kernel calls for computing E, F, G flux components
 module calc_flux_base
-  use mod_globals, only : id_accuracy, &
+  use mod_globals, only : id_accuracy, id_bc_x, id_bc_y, id_bc_z, &
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
   & blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv
   use calc_physical_quantities
@@ -10,6 +10,7 @@ module calc_flux_base
   use calc_keep_kernel
   use calc_keep_kernel_internal
   use calc_slau_kernel
+  use calc_slau_kernel_internal
   use calc_roe_kernel
   use calc_hybrid_kernel
   use calc_visc2
@@ -45,12 +46,21 @@ contains
     real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< convective flux in x direction
     real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< convective flux in y direction
     real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
-    call calc_keep_x<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, T, E)
-    call calc_keep_y<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, Q, T, F)
-    call calc_keep_z<<<blocksG,threadsG,3>>>(id_accuracy, nx, ny, nz, Q, T, G)
-    !call calc_keep_x_in<<<blocksE,threadsE,1>>>(nx, ny, nz, Q, T, E)
-    !call calc_keep_y_in<<<blocksF,threadsF,2>>>(nx, ny, nz, Q, T, F)
-    !call calc_keep_z_in<<<blocksG,threadsG,3>>>(nx, ny, nz, Q, T, G)
+    if (id_bc_x) then
+      call calc_keep_x<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, T, E)
+    else
+      call calc_keep_x_in<<<blocksE,threadsE,1>>>(nx, ny, nz, Q, T, E)
+    endif
+    if (id_bc_y) then
+      call calc_keep_y<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, Q, T, F)
+    else
+      call calc_keep_y_in<<<blocksF,threadsF,2>>>(nx, ny, nz, Q, T, F)
+    endif
+    if (id_bc_z) then
+      call calc_keep_z<<<blocksG,threadsG,3>>>(id_accuracy, nx, ny, nz, Q, T, G)
+    else
+      call calc_keep_z_in<<<blocksG,threadsG,3>>>(nx, ny, nz, Q, T, G)
+    endif
   end subroutine calc_conv_keep
 
 
@@ -74,9 +84,21 @@ contains
     real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
     real(8), device :: sensor(nx,ny,nz)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
-    call calc_slau_x<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
-    call calc_slau_y<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, Q, sensor, F)
-    call calc_slau_z<<<blocksG,threadsG,3>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
+    if (id_bc_x) then
+      call calc_slau_x<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
+    else
+      call calc_slau_x_in<<<blocksE,threadsE,1>>>(nx, ny, nz, Q, sensor, E)
+    endif
+    if (id_bc_y) then
+      call calc_slau_y<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, Q, sensor, F)
+    else
+      call calc_slau_y_in<<<blocksF,threadsF,2>>>(nx, ny, nz, Q, sensor, F)
+    endif
+    if (id_bc_z) then
+      call calc_slau_z<<<blocksG,threadsG,3>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
+    else
+      call calc_slau_z_in<<<blocksG,threadsG,3>>>(nx, ny, nz, Q, sensor, G)
+    endif
   end subroutine calc_conv_slau
 
 

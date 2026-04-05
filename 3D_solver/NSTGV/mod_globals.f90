@@ -44,9 +44,14 @@ module mod_globals
   real(8), parameter :: Lx = 2.d0 * pi * L0
   real(8), parameter :: Ly = 2.d0 * pi * L0
   real(8), parameter :: Lz = 2.d0 * pi * L0
-  integer, parameter :: nx = 130!258
-  integer, parameter :: ny = 130!258
-  integer, parameter :: nz = 130!258
+  integer, parameter :: nx = 513
+  integer, parameter :: ny = 513
+  integer, parameter :: nz = 513
+  
+  ! boundary condition
+  logical, parameter :: id_bc_x = .false.
+  logical, parameter :: id_bc_y = .false.
+  logical, parameter :: id_bc_z = .false.
 
   integer, parameter :: nre1 = 1
   integer, parameter :: nre2 = nx

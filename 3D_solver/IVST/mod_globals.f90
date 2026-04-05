@@ -45,6 +45,11 @@ module mod_globals
   integer, parameter :: nx = 129
   integer, parameter :: ny = 7
   integer, parameter :: nz = 7
+  
+  ! boundary condition
+  logical, parameter :: id_bc_x = .true.
+  logical, parameter :: id_bc_y = .false.
+  logical, parameter :: id_bc_z = .false.
 
   integer, parameter :: nre1 = int(1.d0 * dble(nx) / 7.d0)
   integer, parameter :: nre2 = int(2.d0 * dble(nx) / 7.d0)

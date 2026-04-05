@@ -29,9 +29,9 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer, parameter         :: dimension   = 3
   integer(4), parameter      :: id_visc     = 1
-  integer(2), parameter      :: id_scheme   = 0
+  real(2), parameter         :: id_scheme   = 0
   real(8), parameter         :: threshold   = 0.4d0
-  integer(kind=2), parameter :: id_accuracy = 0
+  integer(kind=8), parameter :: id_accuracy = 0
   integer(kind=2), parameter :: id_tvd      = 0
   integer(kind=4), parameter :: id_slau     = 0
   integer(kind=4), parameter :: id_rescale  = 0
@@ -46,6 +46,11 @@ module mod_globals
   integer, parameter :: nx = 129!257!513
   integer, parameter :: ny = 129!161
   integer, parameter :: nz = 33!65!129
+  
+  ! boundary condition
+  logical, parameter :: id_bc_x = .true.
+  logical, parameter :: id_bc_y = .true.
+  logical, parameter :: id_bc_z = .false.
 
   integer, parameter :: nre1 = int(0.5 * nx)
   integer, parameter :: nre2 = int(0.9 * nx)
