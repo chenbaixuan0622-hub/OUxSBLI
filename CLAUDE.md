@@ -86,3 +86,7 @@ Copy an existing case directory (e.g., `cp -r 3D_solver/NSTGV 3D_solver/MYCASE`)
 1. `mod_globals.f90` — grid size, physical parameters, scheme flags
 2. `set.f90` — grid generation, initial conditions, boundary condition calls
 3. `calc.sh` — MPI rank count and any case-specific runtime args
+
+## Notice
+From an occupancy perspective, the subroutines invoked within `calc_flux_base.f90` should not be executed on separate streams.
+

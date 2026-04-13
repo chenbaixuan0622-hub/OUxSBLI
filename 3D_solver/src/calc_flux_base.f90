@@ -47,19 +47,19 @@ contains
     real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< convective flux in y direction
     real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
     if (id_bc_x) then
-      call calc_keep_x<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, T, E)
+      call calc_keep_x<<<blocksE,threadsE>>>(id_accuracy, nx, ny, nz, Q, T, E)
     else
-      call calc_keep_x_in<<<blocksE,threadsE,1>>>(nx, ny, nz, Q, T, E)
+      call calc_keep_x_in<<<blocksE,threadsE>>>(nx, ny, nz, Q, T, E)
     endif
     if (id_bc_y) then
-      call calc_keep_y<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, Q, T, F)
+      call calc_keep_y<<<blocksF,threadsF>>>(id_accuracy, nx, ny, nz, Q, T, F)
     else
-      call calc_keep_y_in<<<blocksF,threadsF,2>>>(nx, ny, nz, Q, T, F)
+      call calc_keep_y_in<<<blocksF,threadsF>>>(nx, ny, nz, Q, T, F)
     endif
     if (id_bc_z) then
-      call calc_keep_z<<<blocksG,threadsG,3>>>(id_accuracy, nx, ny, nz, Q, T, G)
+      call calc_keep_z<<<blocksG,threadsG>>>(id_accuracy, nx, ny, nz, Q, T, G)
     else
-      call calc_keep_z_in<<<blocksG,threadsG,3>>>(nx, ny, nz, Q, T, G)
+      call calc_keep_z_in<<<blocksG,threadsG>>>(nx, ny, nz, Q, T, G)
     endif
   end subroutine calc_conv_keep
 
@@ -85,19 +85,19 @@ contains
     real(8), device :: sensor(nx,ny,nz)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
     if (id_bc_x) then
-      call calc_slau_x<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
+      call calc_slau_x<<<blocksE,threadsE>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
     else
-      call calc_slau_x_in<<<blocksE,threadsE,1>>>(nx, ny, nz, Q, sensor, E)
+      call calc_slau_x_in<<<blocksE,threadsE>>>(nx, ny, nz, Q, sensor, E)
     endif
     if (id_bc_y) then
-      call calc_slau_y<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, Q, sensor, F)
+      call calc_slau_y<<<blocksF,threadsF>>>(id_accuracy, nx, ny, nz, Q, sensor, F)
     else
-      call calc_slau_y_in<<<blocksF,threadsF,2>>>(nx, ny, nz, Q, sensor, F)
+      call calc_slau_y_in<<<blocksF,threadsF>>>(nx, ny, nz, Q, sensor, F)
     endif
     if (id_bc_z) then
-      call calc_slau_z<<<blocksG,threadsG,3>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
+      call calc_slau_z<<<blocksG,threadsG>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
     else
-      call calc_slau_z_in<<<blocksG,threadsG,3>>>(nx, ny, nz, Q, sensor, G)
+      call calc_slau_z_in<<<blocksG,threadsG>>>(nx, ny, nz, Q, sensor, G)
     endif
   end subroutine calc_conv_slau
 
@@ -123,9 +123,9 @@ contains
     real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
     real(8), device :: sensor(nx,ny,nz)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
-    call calc_roe_x<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
-    call calc_roe_y<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, Q, sensor, F)
-    call calc_roe_z<<<blocksG,threadsG,3>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
+    call calc_roe_x<<<blocksE,threadsE>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
+    call calc_roe_y<<<blocksF,threadsF>>>(id_accuracy, nx, ny, nz, Q, sensor, F)
+    call calc_roe_z<<<blocksG,threadsG>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
   end subroutine calc_conv_roe
 
 
@@ -150,9 +150,9 @@ contains
     real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> Flux in z direction
     real(8), device :: sensor(nx,ny,nz)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
-    call calc_hybrid_x<<<blocksE,threadsE,1>>>(id_accuracy, nx, ny, nz, Q, T, sensor, E)
-    call calc_hybrid_y<<<blocksF,threadsF,2>>>(id_accuracy, nx, ny, nz, Q, T, sensor, F)
-    call calc_hybrid_z<<<blocksG,threadsG,3>>>(id_accuracy, nx, ny, nz, Q, T, sensor, G)
+    call calc_hybrid_x<<<blocksE,threadsE>>>(id_accuracy, nx, ny, nz, Q, T, sensor, E)
+    call calc_hybrid_y<<<blocksF,threadsF>>>(id_accuracy, nx, ny, nz, Q, T, sensor, F)
+    call calc_hybrid_z<<<blocksG,threadsG>>>(id_accuracy, nx, ny, nz, Q, T, sensor, G)
   end subroutine calc_conv_hybrid
 
 
@@ -212,16 +212,15 @@ contains
     ! Step 3: Add viscous fluxes (choose 2nd or 4th-order stencils)
     if (id_visc == 2) then
       ! 4th-order compact finite differences (higher accuracy, larger stencil)
-      call calc_Ev4<<<blocksEv,threadsEv,1>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, E)
-      call calc_Fv4<<<blocksFv,threadsFv,2>>>(nx, ny, nz, inv_dy, inv_dx, inv_dz, Q, T, mu, F)
-      call calc_Gv4<<<blocksGv,threadsGv,3>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
+      call calc_Ev4<<<blocksEv,threadsEv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, E)
+      call calc_Fv4<<<blocksFv,threadsFv>>>(nx, ny, nz, inv_dy, inv_dx, inv_dz, Q, T, mu, F)
+      call calc_Gv4<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
     else
       ! 2nd-order centered differences (standard, 3-point stencil)
-      call calc_Ev2<<<blocksEv,threadsEv,1>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, E)
-      call calc_Fv2<<<blocksFv,threadsFv,2>>>(nx, ny, nz, inv_dy, inv_dx, inv_dz, Q, T, mu, F)
-      call calc_Gv2<<<blocksGv,threadsGv,3>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
+      call calc_Ev2<<<blocksEv,threadsEv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, E)
+      call calc_Fv2<<<blocksFv,threadsFv>>>(nx, ny, nz, inv_dy, inv_dx, inv_dz, Q, T, mu, F)
+      call calc_Gv2<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
     endif
-    stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_visc
 
  
@@ -253,18 +252,16 @@ contains
     call calc_quantities_T_3D(nx, ny, nz, Jacobian, QJ, Q, T, mu)
     call calc_conv(id_scheme, nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, E, F, G)
     call calc_mut<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, mut, qc2)
-    stat = cudaDeviceSynchronize()
     call set_bc_mut(nx, ny, nz, mut, qc2)
     if (id_visc == 2) then
-      call calc_Ev_LES4<<<blocksEv,threadsEv,1>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, E)
-      call calc_Fv_LES4<<<blocksFv,threadsFv,2>>>(nx, ny, nz, inv_dy, inv_dx, inv_dz, Q, T, mu, mut, qc2, F)
-      call calc_Gv_LES4<<<blocksGv,threadsGv,3>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, G)
+      call calc_Ev_LES4<<<blocksEv,threadsEv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, E)
+      call calc_Fv_LES4<<<blocksFv,threadsFv>>>(nx, ny, nz, inv_dy, inv_dx, inv_dz, Q, T, mu, mut, qc2, F)
+      call calc_Gv_LES4<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, G)
     else
-      call calc_Ev_LES2<<<blocksEv,threadsEv,1>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, E)
-      call calc_Fv_LES2<<<blocksFv,threadsFv,2>>>(nx, ny, nz, inv_dy, inv_dx, inv_dz, Q, T, mu, mut, qc2, F)
-      call calc_Gv_LES2<<<blocksGv,threadsGv,3>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, G)
+      call calc_Ev_LES2<<<blocksEv,threadsEv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, E)
+      call calc_Fv_LES2<<<blocksFv,threadsFv>>>(nx, ny, nz, inv_dy, inv_dx, inv_dz, Q, T, mu, mut, qc2, F)
+      call calc_Gv_LES2<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, G)
     endif
-    stat = cudaDeviceSynchronize()
   end subroutine calc_EFG_LES
 end module calc_flux_base
 
