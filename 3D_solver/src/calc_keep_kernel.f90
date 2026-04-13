@@ -33,12 +33,12 @@ contains
   attributes(global) subroutine calc_keep_x6(id_accuracy, nx, ny, nz, Q, T, E)
     use mod_constant, only : Normal_x
     integer(8), intent(in), value :: id_accuracy         !< ID for accuracy, 8 means 6th-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer ii, i_base, idx, offset_yz
@@ -94,12 +94,12 @@ contains
   attributes(global) subroutine calc_keep_y6(id_accuracy, nx, ny, nz, Q, T, F)
     use mod_constant, only : Normal_y
     integer(8), intent(in), value :: id_accuracy         !< ID for accuracy, 8 means 6th-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer jj, j_base, idx, offset_xz
@@ -155,12 +155,12 @@ contains
   attributes(global) subroutine calc_keep_z6(id_accuracy, nx, ny, nz, Q, T, G)
     use mod_constant, only : Normal_z
     integer(8), intent(in), value :: id_accuracy         !< ID for accuracy, 8 means 6th-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer kk, k_base, idx, offset_xy
@@ -216,12 +216,12 @@ contains
   attributes(global) subroutine calc_keep_x4(id_accuracy, nx, ny, nz, Q, T, E)
     use mod_constant, only : Normal_x
     integer(4), intent(in), value :: id_accuracy         !< ID for accuracy, 4 means 4th-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer ii, i_base, idx, offset_yz
@@ -271,12 +271,12 @@ contains
   attributes(global) subroutine calc_keep_y4(id_accuracy, nx, ny, nz, Q, T, F)
     use mod_constant, only : Normal_y
     integer(4), intent(in), value :: id_accuracy         !< ID for accuracy, 4 means 4th-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer jj, j_base, idx, offset_xz
@@ -326,12 +326,12 @@ contains
   attributes(global) subroutine calc_keep_z4(id_accuracy, nx, ny, nz, Q, T, G)
     use mod_constant, only : Normal_z
     integer(4), intent(in), value :: id_accuracy         !< ID for accuracy, 4 means 4th-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer kk, k_base, idx, offset_xy
@@ -381,12 +381,12 @@ contains
   attributes(global) subroutine calc_keep_x2(id_accuracy, nx, ny, nz, Q, T, E)
     use mod_constant, only : Normal_x
     integer(2), intent(in), value :: id_accuracy         !< ID for accuracy, 2 means 2nd-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     real(8), dimension(2), device :: rho, u, v, w, p, tmp
@@ -408,12 +408,12 @@ contains
   attributes(global) subroutine calc_keep_y2(id_accuracy, nx, ny, nz, Q, T, F)
     use mod_constant, only : Normal_y
     integer(2), intent(in), value :: id_accuracy         !< ID for accuracy, 2 means 2nd-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     real(8), dimension(2), device :: rho, u, v, w, p, tmp
@@ -435,12 +435,12 @@ contains
   attributes(global) subroutine calc_keep_z2(id_accuracy, nx, ny, nz, Q, T, G)
     use mod_constant, only : Normal_z
     integer(2), intent(in), value :: id_accuracy         !< ID for accuracy, 2 means 2nd-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     real(8), dimension(2), device :: rho, u, v, w, p, tmp

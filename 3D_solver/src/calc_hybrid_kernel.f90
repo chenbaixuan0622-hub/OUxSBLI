@@ -38,10 +38,10 @@ contains
 
   attributes(global) subroutine calc_hybrid_x6(id_accuracy, nx, ny, nz, Q, T, sensor, E)
     use mod_constant, only : Normal_x
-    integer(kind=8), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: E(5,nx-1,ny-2,nz-2)
+    integer(kind=8), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(-1:threadsE%x+3,threadsE%y,threadsE%z), shared :: rho,  u,  v,  w,  p
     real(8), dimension(   threadsE%x,  threadsE%y,threadsE%z), shared :: rhor, ur, vr, wr, pr
@@ -144,10 +144,10 @@ contains
 
   attributes(global) subroutine calc_hybrid_y6(id_accuracy, nx, ny, nz, Q, T, sensor, F)
     use mod_constant, only : Normal_y
-    integer(kind=8), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: F(5,nx-2,ny-1,nz-2)
+    integer(kind=8), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(-1:threadsF%y+3,threadsF%x,threadsF%z), shared :: rho,  u,  v,  w,  p
     real(8), dimension(   threadsF%y,  threadsF%x,threadsF%z), shared :: rhor, ur, vr, wr, pr
@@ -250,10 +250,10 @@ contains
 
   attributes(global) subroutine calc_hybrid_z6(id_accuracy, nx, ny, nz, Q, T, sensor, G)
     use mod_constant, only : Normal_z
-    integer(kind=8), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: G(5,nx-2,ny-2,nz-1)
+    integer(kind=8), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(-1:threadsG%z+3,threadsG%y,threadsG%x), shared :: rho,  u,  v,  w,  p
     real(8), dimension(   threadsG%z,  threadsG%y,threadsG%x), shared :: rhor, ur, vr, wr, pr
@@ -356,10 +356,10 @@ contains
 
   attributes(global) subroutine calc_hybrid_x4(id_accuracy, nx, ny, nz, Q, T, sensor, E)
     use mod_constant, only : Normal_x
-    integer(kind=4), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: E(5,nx-1,ny-2,nz-2)
+    integer(kind=4), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(0:threadsE%x+2,threadsE%y,threadsE%z), shared :: rho,  u,  v,  w,  p
     real(8), dimension(  threadsE%x,  threadsE%y,threadsE%z), shared :: rhor, ur, vr, wr, pr
@@ -443,10 +443,10 @@ contains
 
   attributes(global) subroutine calc_hybrid_y4(id_accuracy, nx, ny, nz, Q, T, sensor, F)
     use mod_constant, only : Normal_y
-    integer(kind=4), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: F(5,nx-2,ny-1,nz-2)
+    integer(kind=4), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(0:threadsF%y+2,threadsF%x,threadsF%z), shared :: rho,  u,  v,  w,  p
     real(8), dimension(  threadsF%y+2,threadsF%x,threadsF%z), shared :: rhor, ur, vr, wr, pr
@@ -530,10 +530,10 @@ contains
 
   attributes(global) subroutine calc_hybrid_z4(id_accuracy, nx, ny, nz, Q, T, sensor, G)
     use mod_constant, only : Normal_z
-    integer(kind=4), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: G(5,nx-2,ny-2,nz-1)
+    integer(kind=4), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(0:threadsG%z+2,threadsG%y,threadsG%x), shared :: rho,  u,  v,  w,  p
     real(8), dimension(  threadsG%z+2,threadsG%y,threadsG%x), shared :: rhor, ur, vr, wr, pr
@@ -617,10 +617,10 @@ contains
 
   attributes(global) subroutine calc_hybrid_x2(id_accuracy, nx, ny, nz, Q, T, sensor, E)
     use mod_constant, only : Normal_x
-    integer(kind=2), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: E(5,nx-1,ny-2,nz-2)
+    integer(kind=2), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(threadsE%x+1,threadsE%y,threadsE%z), shared :: rho, u, v, w, p
     real(8) fdx
@@ -665,10 +665,10 @@ contains
 
   attributes(global) subroutine calc_hybrid_y2(id_accuracy, nx, ny, nz, Q, T, sensor, F)
     use mod_constant, only : Normal_y
-    integer(kind=2), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: F(5,nx-2,ny-1,nz-2)
+    integer(kind=2), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(threadsF%y+1,threadsF%x,threadsF%z), shared :: rho, u, v, w, p
     real(8) fdy
@@ -713,10 +713,10 @@ contains
 
   attributes(global) subroutine calc_hybrid_z2(id_accuracy, nx, ny, nz, Q, T, sensor, G)
     use mod_constant, only : Normal_z
-    integer(kind=2), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: G(5,nx-2,ny-2,nz-1)
+    integer(kind=2), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(threadsG%z+1,threadsG%y,threadsG%x), shared :: rho, u, v, w, p
     real(8) fdz

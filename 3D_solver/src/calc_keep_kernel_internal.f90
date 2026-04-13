@@ -22,12 +22,12 @@ contains
   !> CUDA Fortran kernel for KEEP scheme in x direction
   attributes(global) subroutine calc_keep_x_in(nx, ny, nz, Q, T, E)
     use mod_constant, only : Normal_x
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer ii, i_base, idx, offset_yz
@@ -69,12 +69,12 @@ contains
   !> CUDA Fortran kernel for KEEP scheme in y direction
   attributes(global) subroutine calc_keep_y_in(nx, ny, nz, Q, T, F)
     use mod_constant, only : Normal_y
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer jj, j_base, idx, offset_xz
@@ -116,12 +116,12 @@ contains
   !> CUDA Fortran kernel for KEEP scheme in z direction
   attributes(global) subroutine calc_keep_z_in(nx, ny, nz, Q, T, G)
     use mod_constant, only : Normal_z
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer kk, k_base, idx, offset_xy
