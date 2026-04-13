@@ -12,14 +12,20 @@ module calc_flux_base
   use calc_slau_kernel
   use calc_slau_kernel_internal
   use calc_roe_kernel
+  use calc_roe_kernel_internal
   use calc_hybrid_kernel
+  use calc_hybrid_kernel_internal
   use calc_visc2
   use calc_visc4
   use calc_les
   use set
   implicit none
   private
-  public calc_EFG
+  public calc_EFG, init_sensor
+  !> Persistent Ducros shock sensor on device — allocated once in init_sensor,
+  !> reused across all calls to calc_conv_slau / calc_conv_roe / calc_conv_hybrid.
+  !> Eliminates repeated device heap alloc/free on every RK stage.
+  real(8), allocatable, device, save :: sensor(:,:,:)
   interface calc_conv
     module procedure calc_conv_keep, calc_conv_slau, calc_conv_roe, calc_conv_hybrid
   end interface calc_conv
@@ -28,6 +34,13 @@ module calc_flux_base
     module procedure calc_EFG_Euler, calc_EFG_visc, calc_EFG_LES
   end interface calc_EFG
 contains
+  !> Allocate the persistent Ducros sensor array on the device.
+  !> Call once from preprocess.f90 before the time loop.
+  subroutine init_sensor(nx, ny, nz)
+    integer, intent(in) :: nx, ny, nz
+    allocate(sensor(nx,ny,nz))
+  end subroutine init_sensor
+
   !> Compute convective fluxes using KEEP (energy-preserving) scheme
   !> High-order minimal dissipation scheme for smooth flow regions
   !> Algorithm: F = (H·u) where H = enthalpy, using flux reconstruction via divergence forms
@@ -82,7 +95,6 @@ contains
     real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< convective flux in x direction
     real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< convective flux in y direction
     real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
-    real(8), device :: sensor(nx,ny,nz)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
     if (id_bc_x) then
       call calc_slau_x<<<blocksE,threadsE>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
@@ -121,11 +133,22 @@ contains
     real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< convective flux in x direction
     real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< convective flux in y direction
     real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
-    real(8), device :: sensor(nx,ny,nz)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
-    call calc_roe_x<<<blocksE,threadsE>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
-    call calc_roe_y<<<blocksF,threadsF>>>(id_accuracy, nx, ny, nz, Q, sensor, F)
-    call calc_roe_z<<<blocksG,threadsG>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
+    if (id_bc_x) then
+      call calc_roe_x<<<blocksE,threadsE>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
+    else
+      call calc_roe_x_in<<<blocksE,threadsE>>>(nx, ny, nz, Q, sensor, E)
+    endif
+    if (id_bc_x) then
+      call calc_roe_y<<<blocksF,threadsF>>>(id_accuracy, nx, ny, nz, Q, sensor, F)
+    else
+      call calc_roe_y_in<<<blocksF,threadsF>>>(nx, ny, nz, Q, sensor, F)
+    endif
+    if (id_bc_x) then
+      call calc_roe_z<<<blocksG,threadsG>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
+    else
+      call calc_roe_z_in<<<blocksG,threadsG>>>(nx, ny, nz, Q, sensor, G)
+    endif
   end subroutine calc_conv_roe
 
 
@@ -148,11 +171,22 @@ contains
     real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !> Flux in x direction
     real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !> Flux in y direction
     real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> Flux in z direction
-    real(8), device :: sensor(nx,ny,nz)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
-    call calc_hybrid_x<<<blocksE,threadsE>>>(id_accuracy, nx, ny, nz, Q, T, sensor, E)
-    call calc_hybrid_y<<<blocksF,threadsF>>>(id_accuracy, nx, ny, nz, Q, T, sensor, F)
-    call calc_hybrid_z<<<blocksG,threadsG>>>(id_accuracy, nx, ny, nz, Q, T, sensor, G)
+    if (id_bc_x) then
+      call calc_hybrid_x<<<blocksE,threadsE>>>(id_accuracy, nx, ny, nz, Q, T, sensor, E)
+    else
+      call calc_hybrid_x_in<<<blocksE,threadsE>>>(nx, ny, nz, Q, T, sensor, E)
+    endif
+    if (id_bc_y) then
+      call calc_hybrid_y<<<blocksF,threadsF>>>(id_accuracy, nx, ny, nz, Q, T, sensor, F)
+    else
+      call calc_hybrid_y_in<<<blocksF,threadsF>>>(nx, ny, nz, Q, T, sensor, F)
+    endif
+    if (id_bc_z) then
+      call calc_hybrid_z<<<blocksG,threadsG>>>(id_accuracy, nx, ny, nz, Q, T, sensor, G)
+    else
+      call calc_hybrid_z_in<<<blocksG,threadsG>>>(nx, ny, nz, Q, T, sensor, G)
+    endif
   end subroutine calc_conv_hybrid
 
 

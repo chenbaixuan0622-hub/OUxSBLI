@@ -24,6 +24,7 @@ contains
   !> Size and allocation depends on viscosity model selection
   subroutine allocate_device_mem(myrank, nx, ny, nz, dx, dy, dz, xix, etay, zetaz, Jacobian, ruvwp, T, mu, mut, qc2, E, F, G)
     use mod_globals, only : id_visc
+    use calc_flux_base, only : init_sensor
     integer, intent(in)                       :: myrank   !< MPI rank
     integer, intent(in)                       :: nx       !< x grid dimension
     integer, intent(in)                       :: ny       !< y grid dimension
@@ -53,6 +54,7 @@ contains
     elseif (kind(id_visc) == 8) then
       allocate(T(nx,ny,nz), mu(nx,ny,nz), mut(nx,ny,nz), qc2(nx,ny,nz), stat=ierr)
     endif
+    call init_sensor(nx, ny, nz)
     if (ierr /= 0) then
       print *, "myrank is ", myrank, " memory allocation failed", ierr
     else
