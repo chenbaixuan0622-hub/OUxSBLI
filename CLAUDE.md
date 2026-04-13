@@ -88,5 +88,6 @@ Copy an existing case directory (e.g., `cp -r 3D_solver/NSTGV 3D_solver/MYCASE`)
 3. `calc.sh` — MPI rank count and any case-specific runtime args
 
 ## Notice
-From an occupancy perspective, the subroutines invoked within `calc_flux_base.f90` should not be executed on separate streams.
-
+* From an occupancy perspective, the subroutines invoked within `calc_flux_base.f90` should not be executed on separate streams.
+* `calc_flux_base.f90` and `calc_steps.f90` are the main bottleneck. You should optimize them.
+* Roe scheme is not used. KEEP, SLAU, Hybrid schemes should be optimized.
