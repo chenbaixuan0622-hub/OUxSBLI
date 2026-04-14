@@ -22,6 +22,8 @@ OBJ =	mod_globals.o \
       calc_physical_quantities.o \
       calc_visc2.o \
       calc_visc4.o \
+      calc_visc4_internal.o \
+      calc_visc4_les_internal.o \
       calc_les.o \
       calc_hybrid.o \
       calc_muscl.o \
@@ -61,7 +63,9 @@ set_compressible_bl.o: mod_globals.mod mod_constant.mod
 set.o: mod_globals.mod mod_constant.mod calc_para.mod set_bc_common.mod set_bc_tbl_sbli.mod set_init_common.mod set_coordinate.mod
 calc_physical_quantities.o: mod_globals.mod mod_constant.mod
 calc_visc2.o: mod_globals.mod mod_constant.mod
-calc_visc4.o: mod_globals.mod mod_constant.mod
+calc_visc4.o: mod_globals.mod mod_constant.mod calc_visc_me4_base.f90
+calc_visc4_internal.o: mod_globals.mod mod_constant.mod calc_visc_me4_base.f90
+calc_visc4_les_internal.o: mod_globals.mod mod_constant.mod calc_visc_me4_base.f90
 calc_muscl.o: mod_globals.mod
 calc_keep_kernel.o: mod_globals.mod calc_keep_3d.f90
 calc_keep_kernel_internal.o: mod_globals.mod calc_keep_3d.f90
@@ -71,7 +75,7 @@ calc_roe_kernel.o: mod_globals.mod mod_constant.mod calc_muscl.mod calc_hybrid.m
 calc_roe_kernel_internal.o: mod_globals.mod mod_constant.mod calc_muscl.mod calc_hybrid.mod calc_roe_3d.f90
 calc_hybrid_kernel.o: mod_globals.mod mod_constant.mod calc_keep_3d.f90 calc_muscl.mod calc_hybrid.mod calc_slau_3d.f90
 calc_hybrid_kernel_internal.o: mod_globals.mod mod_constant.mod calc_muscl.mod calc_hybrid.mod calc_keep_3d.f90 calc_slau_3d.f90
-calc_flux_base.o: mod_globals.mod calc_physical_quantities.mod calc_hybrid.mod calc_visc2.mod calc_visc4.mod calc_les.mod set.mod calc_keep_kernel.mod calc_slau_kernel.mod calc_roe_kernel.mod calc_hybrid.mod
+calc_flux_base.o: mod_globals.mod calc_physical_quantities.mod calc_hybrid.mod calc_visc2.mod calc_visc4.mod calc_visc4_internal.mod calc_visc4_les_internal.mod calc_les.mod set.mod calc_keep_kernel.mod calc_slau_kernel.mod calc_roe_kernel.mod calc_hybrid_kernel.mod calc_hybrid.mod
 calc_hybrid.o: mod_globals.mod
 calc_steps.o: mod_globals.mod
 calc_rescale.o: mod_globals.mod mod_constant.mod cpu_gpu_mpi.mod

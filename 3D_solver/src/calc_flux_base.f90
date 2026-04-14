@@ -17,6 +17,8 @@ module calc_flux_base
   use calc_hybrid_kernel_internal
   use calc_visc2
   use calc_visc4
+  use calc_visc4_internal
+  use calc_visc4_les_internal
   use calc_les
   use set
   implicit none
@@ -246,9 +248,21 @@ contains
     ! Step 3: Add viscous fluxes (choose 2nd or 4th-order stencils)
     if (id_visc == 2) then
       ! 4th-order compact finite differences (higher accuracy, larger stencil)
-      call calc_Ev4<<<blocksEv,threadsEv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, E)
-      call calc_Fv4<<<blocksFv,threadsFv>>>(nx, ny, nz, inv_dy, inv_dx, inv_dz, Q, T, mu, F)
-      call calc_Gv4<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
+      if (id_bc_x == .false. .and. kind(id_accuracy) == 8) then
+        call calc_Ev4_in<<<blocksEv,threadsEv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, E)
+      else
+        call calc_Ev4<<<blocksEv,threadsEv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, E)
+      endif
+      if (id_bc_y == .false. .and. kind(id_accuracy) == 8) then
+        call calc_Fv4_in<<<blocksFv,threadsFv>>>(nx, ny, nz, inv_dy, inv_dx, inv_dz, Q, T, mu, F)
+      else
+        call calc_Fv4<<<blocksFv,threadsFv>>>(nx, ny, nz, inv_dy, inv_dx, inv_dz, Q, T, mu, F)
+      endif
+      if (id_bc_z == .false. .and. kind(id_accuracy) == 8) then
+        call calc_Gv4_in<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
+      else
+        call calc_Gv4<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
+      endif
     else
       ! 2nd-order centered differences (standard, 3-point stencil)
       call calc_Ev2<<<blocksEv,threadsEv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, E)
@@ -288,9 +302,21 @@ contains
     call calc_mut<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, mut, qc2)
     call set_bc_mut(nx, ny, nz, mut, qc2)
     if (id_visc == 2) then
-      call calc_Ev_LES4<<<blocksEv,threadsEv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, E)
-      call calc_Fv_LES4<<<blocksFv,threadsFv>>>(nx, ny, nz, inv_dy, inv_dx, inv_dz, Q, T, mu, mut, qc2, F)
-      call calc_Gv_LES4<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, G)
+      if (id_bc_x == .false. .and. kind(id_accuracy) == 8) then
+        call calc_Ev_LES4_in<<<blocksEv,threadsEv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, E)
+      else
+        call calc_Ev_LES4<<<blocksEv,threadsEv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, E)
+      endif
+      if (id_bc_y == .false. .and. kind(id_accuracy) == 8) then
+        call calc_Fv_LES4_in<<<blocksFv,threadsFv>>>(nx, ny, nz, inv_dy, inv_dx, inv_dz, Q, T, mu, mut, qc2, F)
+      else
+        call calc_Fv_LES4<<<blocksFv,threadsFv>>>(nx, ny, nz, inv_dy, inv_dx, inv_dz, Q, T, mu, mut, qc2, F)
+      endif
+      if (id_bc_z == .false. .and. kind(id_accuracy) == 8) then
+        call calc_Gv_LES4_in<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, G)
+      else
+        call calc_Gv_LES4<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, G)
+      endif
     else
       call calc_Ev_LES2<<<blocksEv,threadsEv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, E)
       call calc_Fv_LES2<<<blocksFv,threadsFv>>>(nx, ny, nz, inv_dy, inv_dx, inv_dz, Q, T, mu, mut, qc2, F)

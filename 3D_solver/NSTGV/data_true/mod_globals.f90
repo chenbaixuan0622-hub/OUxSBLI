@@ -49,9 +49,9 @@ module mod_globals
   integer, parameter :: nz = 66
   
   ! boundary condition
-  logical, parameter :: id_bc_x = .false.
-  logical, parameter :: id_bc_y = .false.
-  logical, parameter :: id_bc_z = .false.
+  logical, parameter :: id_bc_x = .true.
+  logical, parameter :: id_bc_y = .true.
+  logical, parameter :: id_bc_z = .true.
 
   integer, parameter :: nre1 = 1
   integer, parameter :: nre2 = nx

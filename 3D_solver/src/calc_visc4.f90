@@ -9,118 +9,7 @@ module calc_visc4
   public calc_Ev4, calc_Ev_LES4, calc_Fv4, calc_Fv_LES4, calc_Gv4, calc_Gv_LES4
   real(8), parameter :: one_24 = 1.d0 / 24.d0 !< coefficient for 4th-order flux (1/24)
 contains
-  !> Pure device function: 4th-order accurate flux reconstruction from 3-point stencil
-  !> Uses compact central difference: F(i+1/2) = (-F_i + 26*F_{i+1/2} - F_{i+1})/24
-  !> Achieves O(dx^4) accuracy with implicit stencil via dispersion relation optimization
-  pure attributes(device) function flux4(a) result(ans)
-    real(8), intent(in) :: a(3) !< 3-point array of flux values
-    real(8) ans                 !< 4th-order flux result (-a1 + 26*a2 - a3) / 24
-    ans = (-a(1) + 26.d0 * a(2) - a(3)) * one_24
-  end function flux4
-
-  !> Pure device subroutine: Compute diagonal stress tensor components via 4th-order stencils
-  !> Diagonal: t_ii = (2/3)*mu*(2*u_i,i - u_j,j - u_k,k) [with bulk viscosity correction]
-  !> Uses 6-point stencil for strain rates and 3-point for viscosity averaging
-  !> Computes work term ut_ii = u_i * t_ii needed for energy equation viscous contribution
-  pure attributes(device) subroutine calc_tau_straight(mu, u, vy, wz, d, t11, ut11)
-    real(8), intent(in), contiguous :: mu(3) !< viscosity at 3 stencil points
-    real(8), intent(in), contiguous :: u(6)  !< velocity u at 6-point stencil
-    real(8), intent(in), contiguous :: vy(6) !< dv/dy at 6-point stencil
-    real(8), intent(in), contiguous :: wz(6) !< dw/dz at 6-point stencil
-    real(8), intent(in)             :: d     !< inverse grid spacing (1/dx or 1/dy or 1/dz)
-    real(8), intent(out)            :: t11   !< stress tensor component t_11
-    real(8), intent(out)            :: ut11  !< work term u * t_11
-    real(8) tmp1, tmp2, tmp3
-    tmp1 = two_third * mu(1) * ((2.25d0 * (-u(2) + u(3)) - (-u(1) + u(4)) * one_twelfth) * d &
-           - 0.0625d0 * (-vy(1) + 9.d0 * (vy(2) + vy(3)) - vy(4)) &
-           - 0.0625d0 * (-wz(1) + 9.d0 * (wz(2) + wz(3)) - wz(4)))
-    tmp2 = two_third * mu(2) * ((2.25d0 * (-u(3) + u(4)) - (-u(2) + u(5)) * one_twelfth) * d &
-           - 0.0625d0 * (-vy(2) + 9.d0 * (vy(3) + vy(4)) - vy(5)) &
-           - 0.0625d0 * (-wz(2) + 9.d0 * (wz(3) + wz(4)) - wz(5)))
-    tmp3 = two_third * mu(3) * ((2.25d0 * (-u(4) + u(5)) - (-u(3) + u(6)) * one_twelfth) * d &
-           - 0.0625d0 * (-vy(3) + 9.d0 * (vy(4) + vy(5)) - vy(6)) &
-           - 0.0625d0 * (-wz(3) + 9.d0 * (wz(4) + wz(5)) - wz(6)))
-    t11  = (-tmp1 + 26.d0 * tmp2 - tmp3) * one_24
-    tmp1 = 0.0625d0 * (-u(1) + 9.d0 * (u(2) + u(3)) - u(4)) * tmp1
-    tmp2 = 0.0625d0 * (-u(2) + 9.d0 * (u(3) + u(4)) - u(5)) * tmp2
-    tmp3 = 0.0625d0 * (-u(3) + 9.d0 * (u(4) + u(5)) - u(6)) * tmp3
-    ut11 = (-tmp1 + 26.d0 * tmp2 - tmp3) * one_24
-  end subroutine calc_tau_straight
-
-
-  !> Pure device subroutine: Compute diagonal stress with Smagorinsky LES turbulent viscosity
-  !> Combines molecular + turbulent (SGS) viscosity: nu_total = nu + nu_t
-  !> Turbulent part nu_t captures unresolved subgrid energy dissipation
-  pure attributes(device) subroutine calc_tau_straight_LES(mu, mut, u, vy, wz, d, t11, ut11)
-    real(8), intent(in), contiguous :: mu(3)  !< molecular viscosity at 3 stencil points
-    real(8), intent(in), contiguous :: mut(3) !< turbulent viscosity at 3 stencil points
-    real(8), intent(in), contiguous :: u(6)   !< velocity u at 6-point stencil
-    real(8), intent(in), contiguous :: vy(6)  !< dv/dy at 6-point stencil
-    real(8), intent(in), contiguous :: wz(6)  !< dw/dz at 6-point stencil
-    real(8), intent(in)             :: d      !< inverse grid spacing
-    real(8), intent(out)            :: t11    !< total stress (molecular + SGS)
-    real(8), intent(out)            :: ut11   !< work term u * t_11
-    real(8) tmp1(3), tmp2(3)
-    tmp1(:) = (2.25d0 * (-u(2:4) + u(3:5)) - (-u(1:3) + u(4:6)) * one_twelfth) * d
-    tmp1(:) = tmp1(:) - 0.0625d0 * (-vy(1:3) + 9.d0 * (vy(2:4) + vy(3:5)) - vy(4:6))
-    tmp1(:) = tmp1(:) - 0.0625d0 * (-wz(1:3) + 9.d0 * (wz(2:4) + wz(3:5)) - wz(4:6))
-    tmp2(:) = two_third * mu(:) * tmp1(:)
-    tmp2(1) = 0.0625d0 * (-u(1) + 9.d0 * (u(2) + u(3)) - u(4)) * tmp2(1)
-    tmp2(2) = 0.0625d0 * (-u(2) + 9.d0 * (u(3) + u(4)) - u(5)) * tmp2(2)
-    tmp2(3) = 0.0625d0 * (-u(3) + 9.d0 * (u(4) + u(5)) - u(6)) * tmp2(3)
-    ut11    = (-tmp2(1) + 26.d0 * tmp2(2) - tmp2(3)) * one_24
-    tmp2(:) = two_third * (mu(:) + mut(:)) * tmp1(:)
-    t11     = (-tmp2(1) + 26.d0 * tmp2(2) - tmp2(3)) * one_24
-  end subroutine calc_tau_straight_LES
-
-
-  !> Pure device subroutine: Compute shear (off-diagonal) stress tensor components
-  !> Shear: t_ij = mu*(u_i,j + u_j,i) for i != j components
-  !> 4th-order stencil preserves cross-derivatives symmetry (t_12 = t_21)
-  pure attributes(device) subroutine calc_tau_cross(mu, v, uy, d, t12, vt12)
-    real(8), intent(in), contiguous :: mu(3) !< viscosity at 3 stencil points
-    real(8), intent(in), contiguous :: v(6)  !< velocity v at 6-point stencil
-    real(8), intent(in), contiguous :: uy(6) !< du/dy at 6-point stencil
-    real(8), intent(in)             :: d      !< inverse grid spacing
-    real(8), intent(out)            :: t12    !< shear stress component t_12
-    real(8), intent(out)            :: vt12   !< work term v * t_12
-    real(8) tmp1, tmp2, tmp3
-    tmp1 = mu(1) * ((1.125d0 * (-v(2) + v(3)) - (-v(1) + v(4)) * one_24) * d &
-                    + 0.0625d0 * (-uy(1) + 9.d0 * (uy(2) + uy(3)) - uy(4)))
-    tmp2 = mu(2) * ((1.125d0 * (-v(3) + v(4)) - (-v(2) + v(5)) * one_24) * d &
-                    + 0.0625d0 * (-uy(2) + 9.d0 * (uy(3) + uy(4)) - uy(5)))
-    tmp3 = mu(3) * ((1.125d0 * (-v(4) + v(5)) - (-v(3) + v(6)) * one_24) * d &
-                    + 0.0625d0 * (-uy(3) + 9.d0 * (uy(4) + uy(5)) - uy(6)))
-    t12  = (-tmp1 + 26.d0 * tmp2 - tmp3) * one_24
-    tmp1 = 0.0625d0 * (-v(1) + 9.d0 * (v(2) + v(3)) - v(4)) * tmp1
-    tmp2 = 0.0625d0 * (-v(2) + 9.d0 * (v(3) + v(4)) - v(5)) * tmp2
-    tmp3 = 0.0625d0 * (-v(3) + 9.d0 * (v(4) + v(5)) - v(6)) * tmp3
-    vt12 = (-tmp1 + 26.d0 * tmp2 - tmp3) * one_24
-  end subroutine calc_tau_cross
-
-
-  !> Pure device subroutine: Compute shear stress with Smagorinsky LES turbulent model
-  !> Off-diagonal components including both molecular and subgrid turbulent dissipation
-  pure attributes(device) subroutine calc_tau_cross_LES(mu, mut, v, uy, d, t12, vt12)
-    real(8), intent(in), contiguous :: mu(3)  !< molecular viscosity at 3 stencil points    
-    real(8), intent(in), contiguous :: mut(3) !< turbulent viscosity at 3 stencil points
-    real(8), intent(in), contiguous :: v(6)   !< velocity v at 6-point stencil
-    real(8), intent(in), contiguous :: uy(6)  !< du/dy at 6-point stencil
-    real(8), intent(in)             :: d      !< inverse grid spacing
-    real(8), intent(out)            :: t12    !< total shear stress (molecular + SGS)
-    real(8), intent(out)            :: vt12   !< work term v * t_12
-    real(8) tmp1(3), tmp2(3)
-    tmp1(:) = (1.125d0 * (-v(2:4) + v(3:5)) - (-v(1:3) + v(4:6)) * one_24) * d
-    tmp1(:) = tmp1(:) + 0.0625d0 * (-uy(1:3) + 9.d0 * (uy(2:4) + uy(3:5)) - uy(4:6))
-    tmp2(:) = mu(:) * tmp1(:)
-    tmp2(1) = 0.0625d0 * (-v(1) + 9.d0 * (v(2) + v(3)) - v(4)) * tmp2(1)
-    tmp2(2) = 0.0625d0 * (-v(2) + 9.d0 * (v(3) + v(4)) - v(5)) * tmp2(2)
-    tmp2(3) = 0.0625d0 * (-v(3) + 9.d0 * (v(4) + v(5)) - v(6)) * tmp2(3)
-    vt12    = (-tmp2(1) + 26.d0 * tmp2(2) - tmp2(3)) * one_24
-    tmp2(:) = (mu(:) + mut(:)) * tmp1(:)
-    t12     = (-tmp2(1) + 26.d0 * tmp2(2) - tmp2(3)) * one_24
-  end subroutine calc_tau_cross_LES
-
+  include 'calc_visc_me4_base.f90'
 
   !> CUDA Fortran kernel for 4th-order viscous flux in x direction
   !> High-order accurate computation of viscous stress and heat flux
@@ -183,8 +72,7 @@ contains
         call calc_tau_cross(mu3, v(it-2:it+3,jt,kt), uy(it-2:it+3,jt,kt), dx(i), txy, vtxy)
         call calc_tau_cross(mu3, w(it-2:it+3,jt,kt), uz(it-2:it+3,jt,kt), dx(i), txz, wtxz)
       end block
-    endif
-    if (id_bc_x) then
+    else
       block
         real(8) mx, mux, mvx, mwx, muy, mvy, muz, mwz
         mx  = 0.5d0 * (mu(i,j,k) + mu(i+1,j,k))
@@ -293,8 +181,7 @@ contains
           Hsgs = -flux4(mut3) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dx(i) / Prt
         end block
       end block
-    endif
-    if (id_bc_x) then
+    else
       block
         real(8), dimension(2) :: my, mysgs, mz, mzsgs
         real(8) mx, mxsgs, mux, muxsgs, mvx, mvxsgs, mwx, mwxsgs, muy, muysgs, mvy, mvysgs, muz, muzsgs, mwz, mwzsgs
@@ -421,8 +308,7 @@ contains
         call calc_tau_cross(mu3, u(jt-2:jt+3,it,kt), vx(jt-2:jt+3,it,kt), dy(j), tyx, utyx)
         call calc_tau_cross(mu3, w(jt-2:jt+3,it,kt), vz(jt-2:jt+3,it,kt), dy(j), tyz, wtyz)
       end block
-    endif
-    if (id_bc_y) then
+    else
       block
         real(8) my, muy, mvy, mwy, mvz, mwz, mux, mvx
         my  = 0.5d0 * (mu(i,j,k) + mu(i,j+1,k))
@@ -533,8 +419,7 @@ contains
           Hsgs = -flux4(mut) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dy(j) / Prt
         end block
       end block
-    endif
-    if (id_bc_y) then
+    else
       block
         real(8), dimension(2) :: u2, v2, w2, mz, mzsgs, mx, mxsgs
         real(8) my, mysgs, muy, muysgs, mvy, mvysgs, mwy, mwysgs, mvz, mvzsgs, mwz, mwzsgs, mux, muxsgs, mvx, mvxsgs
@@ -661,8 +546,7 @@ contains
         call calc_tau_cross(mu3, u(kt-2:kt+3,jt,it), wx(kt-2:kt+3,jt,it), dz(k), tzx, utzx)
         call calc_tau_cross(mu3, v(kt-2:kt+3,jt,it), wy(kt-2:kt+3,jt,it), dz(k), tzy, vtzy)
       end block
-    endif
-    if (id_bc_z) then
+    else
       block
         real(8) mz, muz, mvz, mwz, mwx, mux, mvy, mwy
         mz  = 0.5d0 * (mu(i,j,k) + mu(i,j,k+1))
@@ -772,8 +656,7 @@ contains
           Hsgs = -flux4(mut) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dz(k) / Prt
         end block
       end block
-    endif
-    if (id_bc_z) then
+    else
       block
         real(8), dimension(2) :: mx, mxsgs, my, mysgs
         real(8) mz, mzsgs, muz, muzsgs, mvz, mvzsgs, mwz, mwzsgs, mwx, mwxsgs, mux, muxsgs, mvy, mvysgs, mwy, mwysgs
