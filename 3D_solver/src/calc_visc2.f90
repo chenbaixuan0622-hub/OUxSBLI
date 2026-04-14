@@ -173,7 +173,7 @@ contains
     block
       real(8) :: H(2)
       H(:) = Cp * T(i:i+1,j,k) + 0.5d0 * (Q(2,i:i+1,j,k)**2 + Q(3,i:i+1,j,k)**2 + Q(4,i:i+1,j,k)**2) + qc2(i:i+1,j,k)
-      Hsgs = -mx * (-H(1) + H(2)) * dx(i) / Prt
+      Hsgs = -mxsgs * (-H(1) + H(2)) * dx(i) / Prt
     end block
     E(2,i,j-1,k-1) = E(2,i,j-1,k-1) - txx
     E(3,i,j-1,k-1) = E(3,i,j-1,k-1) - txy
@@ -329,7 +329,7 @@ contains
     block
       real(8) :: H(2)
       H(:) = Cp * T(i,j:j+1,k) + 0.5d0 * (Q(2,i,j:j+1,k)**2 + Q(3,i,j:j+1,k)**2 + Q(4,i,j:j+1,k)**2) + qc2(i,j:j+1,k)
-      Hsgs = -my * (-H(1) + H(2)) * dy(j) / Prt
+      Hsgs = -mysgs * (-H(1) + H(2)) * dy(j) / Prt
     end block
     F(2,i-1,j,k-1) = F(2,i-1,j,k-1) - tyx
     F(3,i-1,j,k-1) = F(3,i-1,j,k-1) - tyy
@@ -483,7 +483,7 @@ contains
     block
       real(8) :: H(2)
       H(:) = Cp * T(i,j,k:k+1) + 0.5d0 * (Q(2,i,j,k:k+1)**2 + Q(3,i,j,k:k+1)**2 + Q(4,i,j,k:k+1)**2) + qc2(i,j,k:k+1)
-      Hsgs = -mz * (-H(1) + H(2)) * dz(k) / Prt
+      Hsgs = -mzsgs * (-H(1) + H(2)) * dz(k) / Prt
     end block
     G(2,i-1,j-1,k) = G(2,i-1,j-1,k) - tzx
     G(3,i-1,j-1,k) = G(3,i-1,j-1,k) - tzy

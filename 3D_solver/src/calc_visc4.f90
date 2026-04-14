@@ -97,7 +97,7 @@ contains
         end block
         mux  = mx * (-u(it,jt,kt) + u(it+1,jt,kt)) * dx(i)
         mvx  = mx * (-v(it,jt,kt) + v(it+1,jt,kt)) * dx(i)
-        mwx  = mx * (-v(it,jt,kt) + w(it+1,jt,kt)) * dx(i)
+        mwx  = mx * (-w(it,jt,kt) + w(it+1,jt,kt)) * dx(i)
         txx  = two_third * (2.d0 * mux - mvy - mwz)
         txy  = muy + mvx
         txz  = mwx + muz
@@ -237,7 +237,7 @@ contains
         block
           real(8) :: H(2)
           H(:) = Cp * T(i:i+1,j,k) + 0.5d0 * (u(it:it+1,jt,kt)**2 + v(it:it+1,jt,kt)**2 + w(it:it+1,jt,kt)**2) + qc2(i:i+1,j,k)
-          Hsgs = -mx * (-H(1) + H(2)) * dx(i) / Prt
+          Hsgs = -mxsgs * (-H(1) + H(2)) * dx(i) / Prt
         end block
       end block
     endif
@@ -416,7 +416,7 @@ contains
         block
           real(8) :: H(4)
           H(:) = Cp * T(i,j-1:j+2,k) + 0.5d0 * (u(jt-1:jt+2,it,kt)**2 + v(jt-1:jt+2,it,kt)**2 + w(jt-1:jt+2,it,kt)**2) + qc2(i,j-1:j+2,k)
-          Hsgs = -flux4(mut) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dy(j) / Prt
+          Hsgs = -flux4(mut3) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dy(j) / Prt
         end block
       end block
     else
@@ -475,7 +475,7 @@ contains
         block
           real(8) :: H(2)
           H(:) = Cp * T(i,j:j+1,k) + 0.5d0 * (u(jt:jt+1,it,kt)**2 + v(jt:jt+1,it,kt)**2 + w(jt:jt+1,it,kt)**2) + qc2(i,j:j+1,k)
-          Hsgs = -my * (-H(1) + H(2)) * dy(j) / Prt
+          Hsgs = -mysgs * (-H(1) + H(2)) * dy(j) / Prt
         end block
       end block
     endif
@@ -653,7 +653,7 @@ contains
         block
           real(8) :: H(4)
           H(:) = Cp * T(i,j,k-1:k+2) + 0.5d0 * (u(kt-1:kt+2,jt,it)**2 + v(kt-1:kt+2,jt,it)**2 + w(kt-1:kt+2,jt,it)**2) + qc2(i,j,k-1:k+2)
-          Hsgs = -flux4(mut) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dz(k) / Prt
+          Hsgs = -flux4(mut3) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dz(k) / Prt
         end block
       end block
     else
@@ -706,13 +706,13 @@ contains
         utzx   = 0.5d0 * (u(kt,jt,it) + u(kt+1,jt,it)) * tzx
         vtzy   = 0.5d0 * (v(kt,jt,it) + v(kt+1,jt,it)) * tzy
         wtzz   = 0.5d0 * (w(kt,jt,it) + w(kt+1,jt,it)) * tzz
-        tzx    = tzx + mwx + muz
-        tzy    = tzy + mvz + mwy
-        tzz    = tzz + two_third * (2.d0 * mwz - mux - mvy)
+        tzx    = tzx + mwxsgs + muzsgs
+        tzy    = tzy + mvzsgs + mwysgs
+        tzz    = tzz + two_third * (2.d0 * mwzsgs - muxsgs - mvysgs)
         block
           real(8) :: H(2)
-          H(:) = Cp * T(i,j,k:k+1) + 0.5d0 * (u(k:k+1,jt,it)**2 + v(kt:kt+1,jt,it)**2 + w(kt:kt+1,jt,it)**2) + qc2(i,j,k:k+1)
-          Hsgs = -mz * (-H(1) + H(2)) * dz(k) / Prt
+          H(:) = Cp * T(i,j,k:k+1) + 0.5d0 * (u(kt:kt+1,jt,it)**2 + v(kt:kt+1,jt,it)**2 + w(kt:kt+1,jt,it)**2) + qc2(i,j,k:k+1)
+          Hsgs = -mzsgs * (-H(1) + H(2)) * dz(k) / Prt
         end block
       end block
     endif
