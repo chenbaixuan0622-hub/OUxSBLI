@@ -13,8 +13,8 @@ contains
   !> Uses compact central difference: F(i+1/2) = (-F_i + 26*F_{i+1/2} - F_{i+1})/24
   !> Achieves O(dx^4) accuracy with implicit stencil via dispersion relation optimization
   pure attributes(device) function flux4(a) result(ans)
-    real(8), intent(in), device :: a(3)                  !< 3-point array of flux values
-    real(8) ans                                          !< 4th-order flux result (-a1 + 26*a2 - a3) / 24
+    real(8), intent(in) :: a(3) !< 3-point array of flux values
+    real(8) ans                 !< 4th-order flux result (-a1 + 26*a2 - a3) / 24
     ans = (-a(1) + 26.d0 * a(2) - a(3)) * one_24
   end function flux4
 
@@ -23,13 +23,13 @@ contains
   !> Uses 6-point stencil for strain rates and 3-point for viscosity averaging
   !> Computes work term ut_ii = u_i * t_ii needed for energy equation viscous contribution
   pure attributes(device) subroutine calc_tau_straight(mu, u, vy, wz, d, t11, ut11)
-    real(8), intent(in), contiguous :: mu(3)             !< viscosity at 3 stencil points
-    real(8), intent(in), contiguous :: u(6)              !< velocity u at 6-point stencil
-    real(8), intent(in), contiguous :: vy(6)             !< dv/dy at 6-point stencil
-    real(8), intent(in), contiguous :: wz(6)             !< dw/dz at 6-point stencil
-    real(8), intent(in)             :: d                 !< inverse grid spacing (1/dx or 1/dy or 1/dz)
-    real(8), intent(out)            :: t11               !< stress tensor component t_11
-    real(8), intent(out)            :: ut11              !< work term u * t_11
+    real(8), intent(in), contiguous :: mu(3) !< viscosity at 3 stencil points
+    real(8), intent(in), contiguous :: u(6)  !< velocity u at 6-point stencil
+    real(8), intent(in), contiguous :: vy(6) !< dv/dy at 6-point stencil
+    real(8), intent(in), contiguous :: wz(6) !< dw/dz at 6-point stencil
+    real(8), intent(in)             :: d     !< inverse grid spacing (1/dx or 1/dy or 1/dz)
+    real(8), intent(out)            :: t11   !< stress tensor component t_11
+    real(8), intent(out)            :: ut11  !< work term u * t_11
     real(8) tmp1, tmp2, tmp3
     tmp1 = two_third * mu(1) * ((2.25d0 * (-u(2) + u(3)) - (-u(1) + u(4)) * one_twelfth) * d &
            - 0.0625d0 * (-vy(1) + 9.d0 * (vy(2) + vy(3)) - vy(4)) &
@@ -52,14 +52,14 @@ contains
   !> Combines molecular + turbulent (SGS) viscosity: nu_total = nu + nu_t
   !> Turbulent part nu_t captures unresolved subgrid energy dissipation
   pure attributes(device) subroutine calc_tau_straight_LES(mu, mut, u, vy, wz, d, t11, ut11)
-    real(8), intent(in), contiguous :: mu(3)              !< molecular viscosity at 3 stencil points
-    real(8), intent(in), contiguous :: mut(3)             !< turbulent viscosity at 3 stencil points
-    real(8), intent(in), contiguous :: u(6)               !< velocity u at 6-point stencil
-    real(8), intent(in), contiguous :: vy(6)              !< dv/dy at 6-point stencil
-    real(8), intent(in), contiguous :: wz(6)              !< dw/dz at 6-point stencil
-    real(8), intent(in)             :: d                  !< inverse grid spacing
-    real(8), intent(out)            :: t11                !< total stress (molecular + SGS)
-    real(8), intent(out)            :: ut11               !< work term u * t_11
+    real(8), intent(in), contiguous :: mu(3)  !< molecular viscosity at 3 stencil points
+    real(8), intent(in), contiguous :: mut(3) !< turbulent viscosity at 3 stencil points
+    real(8), intent(in), contiguous :: u(6)   !< velocity u at 6-point stencil
+    real(8), intent(in), contiguous :: vy(6)  !< dv/dy at 6-point stencil
+    real(8), intent(in), contiguous :: wz(6)  !< dw/dz at 6-point stencil
+    real(8), intent(in)             :: d      !< inverse grid spacing
+    real(8), intent(out)            :: t11    !< total stress (molecular + SGS)
+    real(8), intent(out)            :: ut11   !< work term u * t_11
     real(8) tmp1(3), tmp2(3)
     tmp1(:) = (2.25d0 * (-u(2:4) + u(3:5)) - (-u(1:3) + u(4:6)) * one_twelfth) * d
     tmp1(:) = tmp1(:) - 0.0625d0 * (-vy(1:3) + 9.d0 * (vy(2:4) + vy(3:5)) - vy(4:6))
@@ -78,12 +78,12 @@ contains
   !> Shear: t_ij = mu*(u_i,j + u_j,i) for i != j components
   !> 4th-order stencil preserves cross-derivatives symmetry (t_12 = t_21)
   pure attributes(device) subroutine calc_tau_cross(mu, v, uy, d, t12, vt12)
-    real(8), intent(in), contiguous :: mu(3)              !< viscosity at 3 stencil points
-    real(8), intent(in), contiguous :: v(6)               !< velocity v at 6-point stencil
-    real(8), intent(in), contiguous :: uy(6)              !< du/dy at 6-point stencil
-    real(8), intent(in)             :: d                  !< inverse grid spacing
-    real(8), intent(out)            :: t12                !< shear stress component t_12
-    real(8), intent(out)            :: vt12               !< work term v * t_12
+    real(8), intent(in), contiguous :: mu(3) !< viscosity at 3 stencil points
+    real(8), intent(in), contiguous :: v(6)  !< velocity v at 6-point stencil
+    real(8), intent(in), contiguous :: uy(6) !< du/dy at 6-point stencil
+    real(8), intent(in)             :: d      !< inverse grid spacing
+    real(8), intent(out)            :: t12    !< shear stress component t_12
+    real(8), intent(out)            :: vt12   !< work term v * t_12
     real(8) tmp1, tmp2, tmp3
     tmp1 = mu(1) * ((1.125d0 * (-v(2) + v(3)) - (-v(1) + v(4)) * one_24) * d &
                     + 0.0625d0 * (-uy(1) + 9.d0 * (uy(2) + uy(3)) - uy(4)))
@@ -102,13 +102,13 @@ contains
   !> Pure device subroutine: Compute shear stress with Smagorinsky LES turbulent model
   !> Off-diagonal components including both molecular and subgrid turbulent dissipation
   pure attributes(device) subroutine calc_tau_cross_LES(mu, mut, v, uy, d, t12, vt12)
-    real(8), intent(in), contiguous :: mu(3)              !< molecular viscosity at 3 stencil points
-    real(8), intent(in), contiguous :: mut(3)             !< turbulent viscosity at 3 stencil points
-    real(8), intent(in), contiguous :: v(6)               !< velocity v at 6-point stencil
-    real(8), intent(in), contiguous :: uy(6)              !< du/dy at 6-point stencil
-    real(8), intent(in)             :: d                  !< inverse grid spacing
-    real(8), intent(out)            :: t12                !< total shear stress (molecular + SGS)
-    real(8), intent(out)            :: vt12               !< work term v * t_12
+    real(8), intent(in), contiguous :: mu(3)  !< molecular viscosity at 3 stencil points    
+    real(8), intent(in), contiguous :: mut(3) !< turbulent viscosity at 3 stencil points
+    real(8), intent(in), contiguous :: v(6)   !< velocity v at 6-point stencil
+    real(8), intent(in), contiguous :: uy(6)  !< du/dy at 6-point stencil
+    real(8), intent(in)             :: d      !< inverse grid spacing
+    real(8), intent(out)            :: t12    !< total shear stress (molecular + SGS)
+    real(8), intent(out)            :: vt12   !< work term v * t_12
     real(8) tmp1(3), tmp2(3)
     tmp1(:) = (1.125d0 * (-v(2:4) + v(3:5)) - (-v(1:3) + v(4:6)) * one_24) * d
     tmp1(:) = tmp1(:) + 0.0625d0 * (-uy(1:3) + 9.d0 * (uy(2:4) + uy(3:5)) - uy(4:6))
@@ -125,16 +125,16 @@ contains
   !> CUDA Fortran kernel for 4th-order viscous flux in x direction
   !> High-order accurate computation of viscous stress and heat flux
   attributes(global) subroutine calc_Ev4(nx, ny, nz, dx, dy, dz, Q, T, mu, E)
-    integer, intent(in), value     :: nx                  !< number of grid points in x direction
-    integer, intent(in), value     :: ny                  !< number of grid points in y direction
-    integer, intent(in), value     :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
-    real(8), intent(in), device    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
-    real(8), intent(in), device    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
-    real(8), intent(in), device    :: Q(5,nx,ny,nz)       !< conservative variables
-    real(8), intent(in), device    :: T(nx,ny,nz)         !< temperature at grid points
-    real(8), intent(in), device    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
-    real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2) !< viscous flux components in x direction
+    integer, intent(in), value                 :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                 :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                 :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device, contiguous    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
+    real(8), intent(in), device, contiguous    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
+    real(8), intent(in), device, contiguous    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
+    real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    real(8), intent(inout), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< viscous flux components in x direction
     real(8), shared ::  u(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
     real(8), shared ::  v(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
     real(8), shared ::  w(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
@@ -171,10 +171,10 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
       block
-        real(8), device :: mu3(3)
+        real(8) :: mu3(3)
         mu3(:) = 0.0625d0 * (9.d0 * (mu(i-1:i+1,j,k) + mu(i:i+2,j,k)) - (mu(i-2:i,j,k) + mu(i+1:i+3,j,k)))
         block ! dQdx
-          real(8), device :: kTx3(3)
+          real(8) :: kTx3(3)
           kTx3(:) = Cp_over_Pr * mu3(:) * &
                     (1.125d0 * (-T(i-1:i+1,j,k) + T(i:i+2,j,k)) - (-T(i-2:i,j,k) + T(i+1:i+3,j,k)) * one_24) * dx(i)
           kTx     = flux4(kTx3(:))
@@ -190,7 +190,7 @@ contains
         mx  = 0.5d0 * (mu(i,j,k) + mu(i+1,j,k))
         kTx = Cp_over_Pr * mx * (-T(i,j,k) + T(i+1,j,k)) * dx(i)
         block
-          real(8), device :: my(2)
+          real(8) :: my(2)
           my(1) = 0.25d0 * (mu(i,j-1,k) + mu(i,j,  k) + mu(i+1,j-1,k) + mu(i+1,j,  k))
           my(2) = 0.25d0 * (mu(i,j,  k) + mu(i,j+1,k) + mu(i+1,j,  k) + mu(i+1,j+1,k))
           muy = 0.25d0 * (my(1) * (-Q(2,i,j-1,k) + Q(2,i,j,k) - Q(2,i+1,j-1,k) + Q(2,i+1,j,k)) &
@@ -199,7 +199,7 @@ contains
                         + my(2) * (-Q(3,i,j,k) + Q(3,i,j+1,k) - Q(3,i+1,j,k) + Q(3,i+1,j+1,k))) * dy(j)
         end block
         block
-          real(8), device :: mz(2)
+          real(8) :: mz(2)
           mz(1) = 0.25d0 * (mu(i,j,k-1) + mu(i,j,k  ) + mu(i+1,j,k-1) + mu(i+1,j,k  ))
           mz(2) = 0.25d0 * (mu(i,j,k  ) + mu(i,j,k+1) + mu(i+1,j,k  ) + mu(i+1,j,k+1))
           muz = 0.25d0 * (mz(1) * (-Q(2,i,j,k-1) + Q(2,i,j,k) - Q(2,i+1,j,k-1) + Q(2,i+1,j,k)) &
@@ -227,18 +227,18 @@ contains
 
   !> CUDA Fortran kernel for 4th-order viscous flux with LES SGS model in x direction
   attributes(global) subroutine calc_Ev_LES4(nx, ny, nz, dx, dy, dz, Q, T, mu, mut, qc2, E)
-    integer, intent(in), value     :: nx                  !< number of grid points in x direction
-    integer, intent(in), value     :: ny                  !< number of grid points in y direction
-    integer, intent(in), value     :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
-    real(8), intent(in), device    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
-    real(8), intent(in), device    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
-    real(8), intent(in), device    :: Q(5,nx,ny,nz)       !< conservative variables
-    real(8), intent(in), device    :: T(nx,ny,nz)         !< temperature at grid points
-    real(8), intent(in), device    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
-    real(8), intent(in), device    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
-    real(8), intent(in), device    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
-    real(8), intent(inout), device :: E(5,nx-1,ny-2,nz-2) !< viscous + SGS flux in x direction
+    integer, intent(in), value                 :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                 :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                 :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device, contiguous    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
+    real(8), intent(in), device, contiguous    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
+    real(8), intent(in), device, contiguous    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
+    real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
+    real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
+    real(8), intent(inout), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< viscous + SGS flux in x direction
     real(8), shared ::  u(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
     real(8), shared ::  v(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
     real(8), shared ::  w(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
@@ -275,11 +275,11 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
       block
-        real(8), device :: mu3(3), mut3(3)
+        real(8) :: mu3(3), mut3(3)
         mu3(:)  = 0.0625d0 * (9.d0 * ( mu(i-1:i+1,j,k)  + mu(i:i+2,j,k)) - ( mu(i-2:i,j,k) +  mu(i+1:i+3,j,k)))
         mut3(:) = 0.0625d0 * (9.d0 * (mut(i-1:i+1,j,k) + mut(i:i+2,j,k)) - (mut(i-2:i,j,k) + mut(i+1:i+3,j,k)))
         block ! dQdx
-          real(8), device :: kTx3(3)
+          real(8) :: kTx3(3)
           kTx3(:) = Cp_over_Pr * mu3(:) * &
                     (1.125d0 * (-T(i-1:i+1,j,k) + T(i:i+2,j,k)) - (-T(i-2:i,j,k) + T(i+1:i+3,j,k)) * one_24) * dx(i)
           kTx     = flux4(kTx3(:))
@@ -296,7 +296,7 @@ contains
     endif
     if (id_bc_x) then
       block
-        real(8), dimension(2), device :: my, mysgs, mz, mzsgs
+        real(8), dimension(2) :: my, mysgs, mz, mzsgs
         real(8) mx, mxsgs, mux, muxsgs, mvx, mvxsgs, mwx, mwxsgs, muy, muysgs, mvy, mvysgs, muz, muzsgs, mwz, mwzsgs
         ! SGS
         mxsgs    = 0.5d0 * (mut(i,j,k) + mut(i+1,j,k))
@@ -307,7 +307,7 @@ contains
         mx  = 0.5d0 * (mu(i,j,k) + mu(i+1,j,k))
         kTx = Cp_over_Pr * mx * (-T(i,j,k) + T(i+1,j,k)) * dx(i)
         block
-          real(8), device :: my(2)
+          real(8) :: my(2)
           my(1)  = 0.25d0 * (mu(i,j-1,k) + mu(i,j,  k) + mu(i+1,j-1,k) + mu(i+1,j,  k))
           my(2)  = 0.25d0 * (mu(i,j,  k) + mu(i,j+1,k) + mu(i+1,j,  k) + mu(i+1,j+1,k))
           muy    = 0.25d0 * (my(1)    * (-Q(2,i,j-1,k) + Q(2,i,j,k) - Q(2,i+1,j-1,k) + Q(2,i+1,j,k)) &
@@ -320,7 +320,7 @@ contains
                            + mysgs(2) * (-Q(3,i,j,k) + Q(3,i,j+1,k) - Q(3,i+1,j,k) + Q(3,i+1,j+1,k))) * dy(j)
         end block
         block
-          real(8), device :: mz(2)
+          real(8) :: mz(2)
           mz(1)  = 0.25d0 * (mu(i,j,k-1) + mu(i,j,k  ) + mu(i+1,j,k-1) + mu(i+1,j,k  ))
           mz(2)  = 0.25d0 * (mu(i,j,k  ) + mu(i,j,k+1) + mu(i+1,j,k  ) + mu(i+1,j,k+1))
           muz    = 0.25d0 * (mz(1)    * (-Q(2,i,j,k-1) + Q(2,i,j,k) - Q(2,i+1,j,k-1) + Q(2,i+1,j,k)) &
@@ -348,7 +348,7 @@ contains
         txy    = txy + muysgs + mvxsgs
         txz    = txz + mwxsgs + muzsgs
         block
-          real(8), device :: H(2)
+          real(8) :: H(2)
           H(:) = Cp * T(i:i+1,j,k) + 0.5d0 * (u(it:it+1,jt,kt)**2 + v(it:it+1,jt,kt)**2 + w(it:it+1,jt,kt)**2) + qc2(i:i+1,j,k)
           Hsgs = -mx * (-H(1) + H(2)) * dx(i) / Prt
         end block
@@ -363,16 +363,16 @@ contains
 
   !> CUDA Fortran kernel for 4th-order viscous flux in y direction
   attributes(global) subroutine calc_Fv4(nx, ny, nz, dy, dx, dz, Q, T, mu, F)
-    integer, intent(in), value     :: nx                  !< number of grid points in x direction
-    integer, intent(in), value     :: ny                  !< number of grid points in y direction
-    integer, intent(in), value     :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
-    real(8), intent(in), device    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
-    real(8), intent(in), device    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
-    real(8), intent(in), device    :: Q(5,nx,ny,nz)       !< conservative variables
-    real(8), intent(in), device    :: T(nx,ny,nz)         !< temperature at grid points
-    real(8), intent(in), device    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
-    real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2) !< viscous flux components in y direction
+    integer, intent(in), value                 :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                 :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                 :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
+    real(8), intent(in), device, contiguous    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device, contiguous    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
+    real(8), intent(in), device, contiguous    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
+    real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    real(8), intent(inout), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< viscous flux components in y direction
     real(8), shared ::  u(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
     real(8), shared ::  v(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
     real(8), shared ::  w(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
@@ -409,10 +409,10 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-2) then
       block
-        real(8), device :: mu3(3)
+        real(8) :: mu3(3)
         mu3(:) = 0.0625d0 * (9.d0 * (mu(i,j-1:j+1,k) + mu(i,j:j+2,k)) - (mu(i,j-2:j,k) + mu(i,j+1:j+3,k)))
         block ! dQdy
-          real(8), device :: kTy3(3)
+          real(8) :: kTy3(3)
           kTy3(:) = Cp_over_Pr * mu3(:) * &
                     (1.125d0 * (-T(i,j-1:j+1,k) + T(i,j:j+2,k)) - (-T(i,j-2:j,k) + T(i,j+1:j+3,k)) * one_24) * dy(j)
           kTy     = flux4(kTy3(:))
@@ -428,7 +428,7 @@ contains
         my  = 0.5d0 * (mu(i,j,k) + mu(i,j+1,k))
         kTy = Cp_over_Pr * my * (-T(i,j,k) + T(i,j+1,k)) * dy(j)
         block
-          real(8), device :: mx(2)
+          real(8) :: mx(2)
           mx(1) = 0.25d0 * (mu(i-1,j,k) + mu(i,  j,k) + mu(i-1,j+1,k) + mu(i,  j+1,k))
           mx(2) = 0.25d0 * (mu(i,  j,k) + mu(i+1,j,k) + mu(i,  j+1,k) + mu(i+1,j+1,k))
           mux = 0.25d0 * (mx(1) * (-Q(2,i-1,j,k) + Q(2,i,j,k) - Q(2,i-1,j+1,k) + Q(2,i,j+1,k)) &
@@ -439,7 +439,7 @@ contains
         my  = 0.5d0 * (mu(i,j,k) + mu(i,j+1,k))
         kTy = Cp_over_Pr * my * (-T(i,j,k) + T(i,j+1,k)) * dy(j)
         block
-          real(8), device :: mz(2)
+          real(8) :: mz(2)
           mz(1) = 0.25d0 * (mu(i,j,k-1) + mu(i,j,k  ) + mu(i,j+1,k-1) + mu(i,j+1,k  ))
           mz(2) = 0.25d0 * (mu(i,j,k  ) + mu(i,j,k+1) + mu(i,j+1,k  ) + mu(i,j+1,k+1))
           mvz = 0.25d0 * (mz(1) * (-Q(3,i,j,k-1) + Q(3,i,j,k) - Q(3,i,j+1,k-1) + Q(3,i,j+1,k)) &
@@ -467,18 +467,18 @@ contains
 
   !> CUDA Fortran kernel for 4th-order viscous flux with LES SGS model in y direction
   attributes(global) subroutine calc_Fv_LES4(nx, ny, nz, dy, dx, dz, Q, T, mu, mut, qc2, F)
-    integer, intent(in), value     :: nx                  !< number of grid points in x direction
-    integer, intent(in), value     :: ny                  !< number of grid points in y direction
-    integer, intent(in), value     :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
-    real(8), intent(in), device    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
-    real(8), intent(in), device    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
-    real(8), intent(in), device    :: Q(5,nx,ny,nz)       !< conservative variables
-    real(8), intent(in), device    :: T(nx,ny,nz)         !< temperature at grid points
-    real(8), intent(in), device    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
-    real(8), intent(in), device    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
-    real(8), intent(in), device    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
-    real(8), intent(inout), device :: F(5,nx-2,ny-1,nz-2) !< viscous + SGS flux in y direction
+    integer, intent(in), value                 :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                 :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                 :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
+    real(8), intent(in), device, contiguous    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device, contiguous    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
+    real(8), intent(in), device, contiguous    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
+    real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
+    real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
+    real(8), intent(inout), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< viscous + SGS flux in y direction
     real(8), shared ::  u(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
     real(8), shared ::  v(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
     real(8), shared ::  w(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
@@ -515,11 +515,11 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-2) then
       block
-        real(8), device :: mu3(3), mut3(3)
+        real(8) :: mu3(3), mut3(3)
         mu3(:)  = 0.0625d0 * (9.d0 * ( mu(i,j-1:j+1,k) +  mu(i,j:j+2,k)) - ( mu(i,j-2:j,k) +  mu(i,j+1:j+3,k)))
         mut3(:) = 0.0625d0 * (9.d0 * (mut(i,j-1:j+1,k) + mut(i,j:j+2,k)) - (mut(i,j-2:j,k) + mut(i,j+1:j+3,k)))
         block ! dQdy
-          real(8), device :: kTy3(3)
+          real(8) :: kTy3(3)
           kTy3(:) = Cp_over_Pr * mu3(:) * &
                     (1.125d0 * (-T(i,j-1:j+1,k) + T(i,j:j+2,k)) - (-T(i,j-2:j,k) + T(i,j+1:j+3,k)) * one_24) * dy(j)
           kTy     = flux4(kTy3(:))
@@ -528,7 +528,7 @@ contains
         call calc_tau_cross_LES(mu3, mut3, u(jt-2:jt+3,it,kt), vx(jt-2:jt+3,it,kt), dy(j), tyx, utyx)
         call calc_tau_cross_LES(mu3, mut3, w(jt-2:jt+3,it,kt), vz(jt-2:jt+3,it,kt), dy(j), tyz, wtyz)
         block
-          real(8), device :: H(4)
+          real(8) :: H(4)
           H(:) = Cp * T(i,j-1:j+2,k) + 0.5d0 * (u(jt-1:jt+2,it,kt)**2 + v(jt-1:jt+2,it,kt)**2 + w(jt-1:jt+2,it,kt)**2) + qc2(i,j-1:j+2,k)
           Hsgs = -flux4(mut) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dy(j) / Prt
         end block
@@ -536,7 +536,7 @@ contains
     endif
     if (id_bc_y) then
       block
-        real(8), dimension(2), device :: u2, v2, w2, mz, mzsgs, mx, mxsgs
+        real(8), dimension(2) :: u2, v2, w2, mz, mzsgs, mx, mxsgs
         real(8) my, mysgs, muy, muysgs, mvy, mvysgs, mwy, mwysgs, mvz, mvzsgs, mwz, mwzsgs, mux, muxsgs, mvx, mvxsgs
         ! SGS
         mysgs    = 0.5d0 * (mut(i,j,k) + mut(i,j+1,k))
@@ -545,7 +545,7 @@ contains
         mxsgs(:) = (/0.25d0 * (mut(i-1,j,k) + mut(i,j,k) + mut(i-1,j+1,k) + mut(i,j+1,k)), &
                      0.25d0 * (mut(i,j,k) + mut(i+1,j,k) + mut(i,j+1,k) + mut(i+1,j+1,k))/)
         block
-          real(8), device :: mx(2)
+          real(8) :: mx(2)
           mx(1)  = 0.25d0 * (mu(i-1,j,k) + mu(i,  j,k) + mu(i-1,j+1,k) + mu(i,  j+1,k))
           mx(2)  = 0.25d0 * (mu(i,  j,k) + mu(i+1,j,k) + mu(i,  j+1,k) + mu(i+1,j+1,k))
           mux    = 0.25d0 * (mx(1)    * (-Q(2,i-1,j,k) + Q(2,i,j,k) - Q(2,i-1,j+1,k) + Q(2,i,j+1,k)) &
@@ -560,7 +560,7 @@ contains
         my  = 0.5d0 * (mu(i,j,k) + mu(i,j+1,k))
         kTy = Cp_over_Pr * my * (-T(i,j,k) + T(i,j+1,k)) * dy(j)
         block
-          real(8), device :: mz(2)
+          real(8) :: mz(2)
           mz(1)  = 0.25d0 * (mu(i,j,k-1) + mu(i,j,k  ) + mu(i,j+1,k-1) + mu(i,j+1,k  ))
           mz(2)  = 0.25d0 * (mu(i,j,k  ) + mu(i,j,k+1) + mu(i,j+1,k  ) + mu(i,j+1,k+1))
           mvz    = 0.25d0 * (mz(1)    * (-Q(3,i,j,k-1) + Q(3,i,j,k) - Q(3,i,j+1,k-1) + Q(3,i,j+1,k)) &
@@ -588,7 +588,7 @@ contains
         tyy    = tyy + two_third * (2.d0 * mvysgs - mwzsgs - muxsgs)
         tyz    = tyz + mvzsgs + mwysgs
         block
-          real(8), device :: H(2)
+          real(8) :: H(2)
           H(:) = Cp * T(i,j:j+1,k) + 0.5d0 * (u(jt:jt+1,it,kt)**2 + v(jt:jt+1,it,kt)**2 + w(jt:jt+1,it,kt)**2) + qc2(i,j:j+1,k)
           Hsgs = -my * (-H(1) + H(2)) * dy(j) / Prt
         end block
@@ -603,16 +603,16 @@ contains
 
   !> CUDA Fortran kernel for 4th-order viscous flux in z direction
   attributes(global) subroutine calc_Gv4(nx, ny, nz, dx, dy, dz, Q, T, mu, G)
-    integer, intent(in), value     :: nx                  !< number of grid points in x direction
-    integer, intent(in), value     :: ny                  !< number of grid points in y direction
-    integer, intent(in), value     :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
-    real(8), intent(in), device    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
-    real(8), intent(in), device    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
-    real(8), intent(in), device    :: Q(5,nx,ny,nz)       !< conservative variables
-    real(8), intent(in), device    :: T(nx,ny,nz)         !< temperature at grid points
-    real(8), intent(in), device    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
-    real(8), intent(inout), device :: G(5,nx-2,ny-2,nz-1) !< viscous flux components in z direction
+    integer, intent(in), value                 :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                 :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                 :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device, contiguous    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
+    real(8), intent(in), device, contiguous    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
+    real(8), intent(in), device, contiguous    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
+    real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< viscous flux components in z direction
     real(8), shared ::  u(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
     real(8), shared ::  v(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
     real(8), shared ::  w(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
@@ -649,10 +649,10 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-3) then
       block
-        real(8), device :: mu3(3)
+        real(8) :: mu3(3)
         mu3(:) = 0.0625d0 * (9.d0 * (mu(i,j,k-1:k+1) + mu(i,j,k:k+2)) - (mu(i,j,k-2:k) + mu(i,j,k+1:k+3)))
         block ! dQdz
-          real(8), device :: kTz3(3)
+          real(8) :: kTz3(3)
           kTz3(:) = Cp_over_Pr * mu3(:) * &
                     (1.125d0 * (-T(i,j,k-1:k+1) + T(i,j,k:k+2)) - (-T(i,j,k-2:k) + T(i,j,k+1:k+3)) * one_24) * dz(k)
           kTz     = flux4(kTz3(:))
@@ -668,7 +668,7 @@ contains
         mz  = 0.5d0 * (mu(i,j,k) + mu(i,j,k+1))
         kTz = Cp_over_Pr * mz * (-T(i,j,k) + T(i,j,k+1)) * dz(k)
         block
-          real(8), device :: mx(2)
+          real(8) :: mx(2)
           mx(1) = 0.25d0 * (mu(i-1,j,k) + mu(i,  j,k) + mu(i-1,j,k+1) + mu(i,  j,k+1))
           mx(2) = 0.25d0 * (mu(i,  j,k) + mu(i+1,j,k) + mu(i,  j,k+1) + mu(i+1,j,k+1))
           mux = 0.25d0 * (mx(1) * (-Q(2,i-1,j,k) + Q(2,i,j,k) - Q(2,i-1,j,k+1) + Q(2,i,j,k+1)) &
@@ -677,7 +677,7 @@ contains
                         + mx(2) * (-Q(4,i,j,k) + Q(4,i+1,j,k) - Q(4,i,j,k+1) + Q(4,i+1,j,k+1))) * dx(i)
         end block
         block
-          real(8), device :: my(2)
+          real(8) :: my(2)
           my(1) = 0.25d0 * (mu(i,j-1,k) + mu(i,j,  k) + mu(i,j-1,k+1) + mu(i,j,  k+1))
           my(2) = 0.25d0 * (mu(i,j,  k) + mu(i,j+1,k) + mu(i,j,  k+1) + mu(i,j+1,k+1))
           mvy = 0.25d0 * (my(1) * (-Q(3,i,j-1,k) + Q(3,i,j,k) - Q(3,i,j-1,k+1) + Q(3,i,j,k+1)) &
@@ -706,13 +706,18 @@ contains
 
 
   attributes(global) subroutine calc_Gv_LES4(nx, ny, nz, dx, dy, dz, Q, T, mu, mut, qc2, G)
-    integer, intent(in), value     :: nx, ny, nz
-    real(8), intent(in), device    :: dx(nx-1) ! 1 / dx
-    real(8), intent(in), device    :: dy(ny-1) ! 1 / dy
-    real(8), intent(in), device    :: dz(nz-1) ! 1 / dz
-    real(8), intent(in), device    :: Q(5,nx,ny,nz), T(nx,ny,nz), mu(nx,ny,nz)
-    real(8), intent(in), device    :: mut(nx,ny,nz), qc2(nx,ny,nz)
-    real(8), intent(inout), device :: G(5,nx-2,ny-2,nz-1)
+    integer, intent(in), value                 :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                 :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                 :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device, contiguous    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
+    real(8), intent(in), device, contiguous    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
+    real(8), intent(in), device, contiguous    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
+    real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient  
+    real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)       !< turbulent viscosity coefficient
+    real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)       !< kinetic energy correction term for total enthalpy (0.5 * (u^2 + v^2 + w^2))
+    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< viscous flux components in z direction
     real(8), shared ::  u(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
     real(8), shared ::  v(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
     real(8), shared ::  w(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
@@ -749,11 +754,11 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-3) then
       block
-        real(8), device :: mu3(3), mut3(3)
+        real(8) :: mu3(3), mut3(3)
         mu3(:)  = 0.0625d0 * (9.d0 * ( mu(i,j,k-1:k+1) +  mu(i,j,k:k+2)) - ( mu(i,j,k-2:k) +  mu(i,j,k+1:k+3)))
         mut3(:) = 0.0625d0 * (9.d0 * (mut(i,j,k-1:k+1) + mut(i,j,k:k+2)) - (mut(i,j,k-2:k) + mut(i,j,k+1:k+3)))
         block ! dQdz
-          real(8), device :: kTz3(3)
+          real(8) :: kTz3(3)
           kTz3(:) = Cp_over_Pr * mu3(:) * &
                     (1.125d0 * (-T(i,j,k-1:k+1) + T(i,j,k:k+2)) - (-T(i,j,k-2:k) + T(i,j,k+1:k+3)) * one_24) * dz(k)
           kTz     = flux4(kTz3(:))
@@ -762,7 +767,7 @@ contains
         call calc_tau_cross_LES(mu3, mut3, u(kt-2:kt+3,jt,it), wx(kt-2:kt+3,jt,it), dz(k), tzx, utzx)
         call calc_tau_cross_LES(mu3, mut3, v(kt-2:kt+3,jt,it), wy(kt-2:kt+3,jt,it), dz(k), tzy, vtzy)
         block
-          real(8), device :: H(4)
+          real(8) :: H(4)
           H(:) = Cp * T(i,j,k-1:k+2) + 0.5d0 * (u(kt-1:kt+2,jt,it)**2 + v(kt-1:kt+2,jt,it)**2 + w(kt-1:kt+2,jt,it)**2) + qc2(i,j,k-1:k+2)
           Hsgs = -flux4(mut) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dz(k) / Prt
         end block
@@ -770,7 +775,7 @@ contains
     endif
     if (id_bc_z) then
       block
-        real(8), dimension(2), device :: mx, mxsgs, my, mysgs
+        real(8), dimension(2) :: mx, mxsgs, my, mysgs
         real(8) mz, mzsgs, muz, muzsgs, mvz, mvzsgs, mwz, mwzsgs, mwx, mwxsgs, mux, muxsgs, mvy, mvysgs, mwy, mwysgs
         ! SGS
         mzsgs    = 0.5d0 * (mut(i,j,k) + mut(i,j,k+1))
@@ -779,7 +784,7 @@ contains
         mysgs(:) = (/0.25d0 * (mut(i,j-1,k) + mut(i,j,k) + mut(i,j-1,k+1) + mut(i,j,k+1)), &
                      0.25d0 * (mut(i,j,k) + mut(i,j+1,k) + mut(i,j,k+1) + mut(i,j+1,k+1))/)
         block
-          real(8), device :: mx(2)
+          real(8) :: mx(2)
           mx(1)  = 0.25d0 * (mu(i-1,j,k) + mu(i,  j,k) + mu(i-1,j,k+1) + mu(i,  j,k+1))
           mx(2)  = 0.25d0 * (mu(i,  j,k) + mu(i+1,j,k) + mu(i,  j,k+1) + mu(i+1,j,k+1))
           mux    = 0.25d0 * (mx(1)    * (-Q(2,i-1,j,k) + Q(2,i,j,k) - Q(2,i-1,j,k+1) + Q(2,i,j,k+1)) &
@@ -792,7 +797,7 @@ contains
                            + mxsgs(2) * (-Q(4,i,j,k) + Q(4,i+1,j,k) - Q(4,i,j,k+1) + Q(4,i+1,j,k+1))) * dx(i)
         end block
         block
-          real(8), device :: my(2)
+          real(8) :: my(2)
           my(1)  = 0.25d0 * (mu(i,j-1,k) + mu(i,j,  k) + mu(i,j-1,k+1) + mu(i,j,  k+1))
           my(2)  = 0.25d0 * (mu(i,j,  k) + mu(i,j+1,k) + mu(i,j,  k+1) + mu(i,j+1,k+1))
           mvy    = 0.25d0 * (my(1)    * (-Q(3,i,j-1,k) + Q(3,i,j,k) - Q(3,i,j-1,k+1) + Q(3,i,j,k+1)) &
@@ -822,7 +827,7 @@ contains
         tzy    = tzy + mvz + mwy
         tzz    = tzz + two_third * (2.d0 * mwz - mux - mvy)
         block
-          real(8), device :: H(2)
+          real(8) :: H(2)
           H(:) = Cp * T(i,j,k:k+1) + 0.5d0 * (u(k:k+1,jt,it)**2 + v(kt:kt+1,jt,it)**2 + w(kt:kt+1,jt,it)**2) + qc2(i,j,k:k+1)
           Hsgs = -mz * (-H(1) + H(2)) * dz(k) / Prt
         end block
