@@ -242,7 +242,7 @@ contains
 
   subroutine make_1d_for_print3(nx, ny, nz, Jacobian, QJ, rho1d, p1d, v1d)
     integer, intent(in)  :: nx, ny, nz
-    real(8), intent(in)  :: Jacobian(nx,ny), QJ(5,nx,ny,nz) ! Q / Jacobian
+    real(8), intent(in)  :: Jacobian(nx,ny), QJ(nx,5,ny,nz) ! Q / Jacobian
     real(4), intent(out), dimension(nx*ny*nz)   :: rho1d, p1d
     real(4), intent(out), dimension(nx*ny*nz*3) :: v1d
     real(8) rho, u, v, w, p
@@ -252,11 +252,11 @@ contains
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
-          rho      = Jacobian(i,j) * QJ(1,i,j,k)
-          u        = QJ(2,i,j,k) / QJ(1,i,j,k)
-          v        = QJ(3,i,j,k) / QJ(1,i,j,k)
-          w        = QJ(4,i,j,k) / QJ(1,i,j,k)
-          p        = (gamma - 1.d0) * (Jacobian(i,j) * QJ(5,i,j,k) - 0.5d0 * rho * (u**2 + v**2 + w**2))
+          rho      = Jacobian(i,j) * QJ(i,1,j,k)
+          u        = QJ(i,2,j,k) / QJ(i,1,j,k)
+          v        = QJ(i,3,j,k) / QJ(i,1,j,k)
+          w        = QJ(i,4,j,k) / QJ(i,1,j,k)
+          p        = (gamma - 1.d0) * (Jacobian(i,j) * QJ(i,5,j,k) - 0.5d0 * rho * (u**2 + v**2 + w**2))
           rho1d(l) = real(rho)
           p1d(l)   = real(p)
           v1d(m)   = real(u)
@@ -288,8 +288,8 @@ contains
   subroutine send_recv_for_print_even3(myrank, nranks, step, nx, ny, nz, x, y, z, Jacobian_cpu, QJ, Q, ke0, entropy0)
     integer, intent(in)         :: myrank, nranks, step, nx, ny, nz
     real(8), intent(in)         :: x(nx), y(ny), z(nz), Jacobian_cpu(nx,ny)
-    real(8), intent(in), device :: QJ(5,nx,ny,nz)
-    real(8), intent(inout)      :: Q(5,nx,ny,nz)
+    real(8), intent(in), device :: QJ(nx,5,ny,nz)
+    real(8), intent(inout)      :: Q(nx,5,ny,nz)
     real(4), intent(inout)      :: ke0, entropy0
     integer ireq3(3), istat3(MPI_STATUS_SIZE,3), ierr
     real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
@@ -320,7 +320,7 @@ contains
   subroutine send_recv_for_print_odd3(myrank, nranks, step, nx, ny, nz, x, y, z, Jacobian_cpu, Q, ke0, entropy0)
     integer, intent(in)         :: myrank, nranks, step, nx, ny, nz
     real(8), intent(in)         :: x(nx), y(ny), z(nz), Jacobian_cpu(nx,ny)
-    real(8), intent(inout)      :: Q(5,nx,ny,nz)
+    real(8), intent(inout)      :: Q(nx,5,ny,nz)
     real(4), intent(inout)      :: ke0, entropy0
     integer ireq3(3), istat3(MPI_STATUS_SIZE,3), ierr
     real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)

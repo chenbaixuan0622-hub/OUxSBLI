@@ -75,10 +75,10 @@ contains
     integer, intent(in), value                :: nx                  !< grid points x
     integer, intent(in), value                :: ny                  !< grid points y
     integer, intent(in), value                :: nz                  !< grid points z
-    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< temperature (for KEEP path)
     real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< Ducros shock sensor
-    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2) !< x-direction flux
+    real(8), intent(out), device, contiguous  :: E(nx-1,5,ny-2,nz-2) !< x-direction flux
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(-(io-1):threadsE%x+io+1, threadsE%y, threadsE%z), shared :: rho, u, v, w, p
     real(8), dimension(threadsE%x, threadsE%y, threadsE%z), shared :: rhor, ur, vr, wr, pr
@@ -91,9 +91,9 @@ contains
     do ii = it-io, threadsE%x+io+1, blockDim%x
       i = i_base + ii
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-        rho(ii,jt,kt) = Q(1,i,j,k);   u(ii,jt,kt) = Q(2,i,j,k)
-          v(ii,jt,kt) = Q(3,i,j,k);   w(ii,jt,kt) = Q(4,i,j,k)
-          p(ii,jt,kt) = Q(5,i,j,k)
+        rho(ii,jt,kt) = Q(i,1,j,k);   u(ii,jt,kt) = Q(i,2,j,k)
+          v(ii,jt,kt) = Q(i,3,j,k);   w(ii,jt,kt) = Q(i,4,j,k)
+          p(ii,jt,kt) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()
@@ -107,7 +107,7 @@ contains
           real(8) tmp(2*io+2)
           tmp = T(i-io:i+io+1, j, k)
           associate(uu => u)
-            E(:,i,j-1,k-1) = KEEP(id_accuracy, &
+            E(i,:,j-1,k-1) = KEEP(id_accuracy, &
                                    rho(it-io:it+io+1,jt,kt), u(it-io:it+io+1,jt,kt), &
                                      v(it-io:it+io+1,jt,kt), w(it-io:it+io+1,jt,kt), &
                                     uu(it-io:it+io+1,jt,kt), p(it-io:it+io+1,jt,kt), tmp, Normal_x)
@@ -131,7 +131,8 @@ contains
         w(it,jt,kt) = wl;     p(it,jt,kt) = pl
       associate(un1 => u(it,jt,kt), un2 => ur(it,jt,kt))
         call SLAU(id_slau, rho(it,jt,kt), rhor(it,jt,kt), u(it,jt,kt), ur(it,jt,kt), v(it,jt,kt), vr(it,jt,kt), &
-                  w(it,jt,kt), wr(it,jt,kt), un1, un2, p(it,jt,kt), pr(it,jt,kt), Normal_x, 1.d0, E(:,i,j-1,k-1))
+                  w(it,jt,kt), wr(it,jt,kt), un1, un2, p(it,jt,kt), pr(it,jt,kt), Normal_x, 1.d0, &
+                  E(i,1,j-1,k-1), E(i,2,j-1,k-1), E(i,3,j-1,k-1), E(i,4,j-1,k-1), E(i,5,j-1,k-1))
       end associate
     endif
   end subroutine calc_hybrid_x_in
@@ -144,10 +145,10 @@ contains
     integer, intent(in), value                :: nx                  !< grid points x
     integer, intent(in), value                :: ny                  !< grid points y
     integer, intent(in), value                :: nz                  !< grid points z
-    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< temperature (for KEEP path)
     real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< Ducros shock sensor
-    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2) !< y-direction flux
+    real(8), intent(out), device, contiguous  :: F(nx-2,5,ny-1,nz-2) !< y-direction flux
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(-(io-1):threadsF%y+io+1, threadsF%x, threadsF%z), shared :: rho, u, v, w, p
     real(8), dimension(threadsF%y, threadsF%x, threadsF%z), shared :: rhor, ur, vr, wr, pr
@@ -160,9 +161,9 @@ contains
     do jj = jt-io, threadsF%y+io+1, blockDim%y
       j = j_base + jj
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-        rho(jj,it,kt) = Q(1,i,j,k);   u(jj,it,kt) = Q(2,i,j,k)
-          v(jj,it,kt) = Q(3,i,j,k);   w(jj,it,kt) = Q(4,i,j,k)
-          p(jj,it,kt) = Q(5,i,j,k)
+        rho(jj,it,kt) = Q(i,1,j,k);   u(jj,it,kt) = Q(i,2,j,k)
+          v(jj,it,kt) = Q(i,3,j,k);   w(jj,it,kt) = Q(i,4,j,k)
+          p(jj,it,kt) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()
@@ -175,7 +176,7 @@ contains
           real(8) tmp(2*io+2)
           tmp = T(i, j-io:j+io+1, k)
           associate(vv => v)
-            F(:,i-1,j,k-1) = KEEP(id_accuracy, &
+            F(i-1,:,j,k-1) = KEEP(id_accuracy, &
                                    rho(jt-io:jt+io+1,it,kt), u(jt-io:jt+io+1,it,kt), &
                                      v(jt-io:jt+io+1,it,kt), w(jt-io:jt+io+1,it,kt), &
                                     vv(jt-io:jt+io+1,it,kt), p(jt-io:jt+io+1,it,kt), tmp, Normal_y)
@@ -195,7 +196,8 @@ contains
         w(jt,it,kt) = wl;     p(jt,it,kt) = pl
       associate(un1 => v(jt,it,kt), un2 => vr(jt,it,kt))
         call SLAU(id_slau, rho(jt,it,kt), rhor(jt,it,kt), u(jt,it,kt), ur(jt,it,kt), v(jt,it,kt), vr(jt,it,kt), &
-                  w(jt,it,kt), wr(jt,it,kt), un1, un2, p(jt,it,kt), pr(jt,it,kt), Normal_y, 1.d0, F(:,i-1,j,k-1))
+                  w(jt,it,kt), wr(jt,it,kt), un1, un2, p(jt,it,kt), pr(jt,it,kt), Normal_y, 1.d0, &
+                  F(i-1,1,j,k-1), F(i-1,2,j,k-1), F(i-1,3,j,k-1), F(i-1,4,j,k-1), F(i-1,5,j,k-1))
       end associate
     endif
   end subroutine calc_hybrid_y_in
@@ -208,10 +210,10 @@ contains
     integer, intent(in), value                :: nx                  !< grid points x
     integer, intent(in), value                :: ny                  !< grid points y
     integer, intent(in), value                :: nz                  !< grid points z
-    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< temperature (for KEEP path)
     real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< Ducros shock sensor
-    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1) !< z-direction flux
+    real(8), intent(out), device, contiguous  :: G(nx-2,5,ny-2,nz-1) !< z-direction flux
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(-(io-1):threadsG%z+io+1, threadsG%y, threadsG%x), shared :: rho, u, v, w, p
     real(8), dimension(threadsG%z, threadsG%y, threadsG%x), shared :: rhor, ur, vr, wr, pr
@@ -224,9 +226,9 @@ contains
     do kk = kt-io, threadsG%z+io+1, blockDim%z
       k = k_base + kk
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-        rho(kk,jt,it) = Q(1,i,j,k);   u(kk,jt,it) = Q(2,i,j,k)
-          v(kk,jt,it) = Q(3,i,j,k);   w(kk,jt,it) = Q(4,i,j,k)
-          p(kk,jt,it) = Q(5,i,j,k)
+        rho(kk,jt,it) = Q(i,1,j,k);   u(kk,jt,it) = Q(i,2,j,k)
+          v(kk,jt,it) = Q(i,3,j,k);   w(kk,jt,it) = Q(i,4,j,k)
+          p(kk,jt,it) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()
@@ -239,7 +241,7 @@ contains
           real(8) tmp(2*io+2)
           tmp = T(i, j, k-io:k+io+1)
           associate(ww => w)
-            G(:,i-1,j-1,k) = KEEP(id_accuracy, &
+            G(i-1,:,j-1,k) = KEEP(id_accuracy, &
                                    rho(kt-io:kt+io+1,jt,it), u(kt-io:kt+io+1,jt,it), &
                                      v(kt-io:kt+io+1,jt,it), w(kt-io:kt+io+1,jt,it), &
                                     ww(kt-io:kt+io+1,jt,it), p(kt-io:kt+io+1,jt,it), tmp, Normal_z)
@@ -259,7 +261,8 @@ contains
         w(kt,jt,it) = wl;     p(kt,jt,it) = pl
       associate(un1 => w(kt,jt,it), un2 => wr(kt,jt,it))
         call SLAU(id_slau, rho(kt,jt,it), rhor(kt,jt,it), u(kt,jt,it), ur(kt,jt,it), v(kt,jt,it), vr(kt,jt,it), &
-                  w(kt,jt,it), wr(kt,jt,it), un1, un2, p(kt,jt,it), pr(kt,jt,it), Normal_z, 1.d0, G(:,i-1,j-1,k))
+                  w(kt,jt,it), wr(kt,jt,it), un1, un2, p(kt,jt,it), pr(kt,jt,it), Normal_z, 1.d0, &
+                  G(i-1,1,j-1,k), G(i-1,2,j-1,k), G(i-1,3,j-1,k), G(i-1,4,j-1,k), G(i-1,5,j-1,k))
       end associate
     endif
   end subroutine calc_hybrid_z_in

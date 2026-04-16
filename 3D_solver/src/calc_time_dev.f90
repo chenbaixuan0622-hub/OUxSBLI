@@ -41,7 +41,7 @@ contains
     real(8), intent(in)    :: z(nz)                             !< z coordinates
     real(8), intent(in)    :: dz_cpu(nz-1)                      !< inverse z spacing (host)
     real(8), intent(in)    :: Jacobian_cpu(nx,ny)               !< Jacobian determinant (host)
-    real(8), intent(inout) :: Q(5,nx,ny,nz)                     !< conservative variables on host
+    real(8), intent(inout) :: Q(nx,5,ny,nz)                     !< conservative variables on host
     integer i, j, k, l, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireq2(2)
     integer istat(MPI_STATUS_SIZE), istat2(MPI_STATUS_SIZE,2)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -58,7 +58,7 @@ contains
     if (mod(myrank,2) == 0) then
       call check_gpu(mygpu)
       call allocate_device_mem(myrank, nx, ny, nz, dx, dy, dz, xix, etay, zetaz, Jacobian, ruvwp, T, mu, mut, qc2, E, F, G)
-      allocate(QJ(5,nx,ny,nz), QJ2(5,nx,ny,nz), stat=ierr)
+      allocate(QJ(nx,5,ny,nz), QJ2(nx,5,ny,nz), stat=ierr)
       if (ierr /= 0) then
         print *, "myrank is ", myrank, " memory allocation failed", ierr
       else
@@ -125,7 +125,7 @@ contains
     real(8), intent(in)    :: x(nx), dx_cpu(nx-1)
     real(8), intent(in)    :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)    :: z(nz), dz_cpu(nz-1), Jacobian_cpu(nx,ny)
-    real(8), intent(inout) :: Q(5,nx,ny,nz)
+    real(8), intent(inout) :: Q(nx,5,ny,nz)
     integer i, j, k, l, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireq2(2)
     integer istat(MPI_STATUS_SIZE), istat2(MPI_STATUS_SIZE,2)
     ! rescal_cpu!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -146,7 +146,7 @@ contains
     if (mod(myrank,2) == 0) then
       call check_gpu(mygpu)
       call allocate_device_mem(myrank, nx, ny, nz, dx, dy, dz, xix, etay, zetaz, Jacobian, ruvwp, T, mu, mut, qc2, E, F, G)
-      allocate(QJ(5,nx,ny,nz), QJ2(5,nx,ny,nz), stat=ierr)
+      allocate(QJ(nx,5,ny,nz), QJ2(nx,5,ny,nz), stat=ierr)
       if (ierr /= 0) then
         print *, "myrank is ", myrank, " memory allocation failed", ierr
       else
@@ -225,7 +225,7 @@ contains
     real(8), intent(in)    :: x(nx), dx_cpu(nx-1)
     real(8), intent(in)    :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)    :: z(nz), dz_cpu(nz-1), Jacobian_cpu(nx,ny)
-    real(8), intent(inout) :: Q(5,nx,ny,nz)
+    real(8), intent(inout) :: Q(nx,5,ny,nz)
     integer i, j, k, l, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireq2(2)
     integer istat(MPI_STATUS_SIZE), istat2(MPI_STATUS_SIZE,2)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -244,7 +244,7 @@ contains
     if (mod(myrank,2) == 0) then
       call check_gpu(mygpu)
       call allocate_device_mem(myrank, nx, ny, nz, dx, dy, dz, xix, etay, zetaz, Jacobian, ruvwp, T, mu, mut, qc2, E, F, G)
-      allocate(QJ(5,nx,ny,nz), QJs(5,nx,ny,nz), Rs(5,nx-2,ny-2,nz-2))
+      allocate(QJ(nx,5,ny,nz), QJs(nx,5,ny,nz), Rs(nx-2,5,ny-2,nz-2))
       print *, "myrank is ", myrank, " memory allocation has completed"
       call pre_calc(nx, ny, nz, myrank, nranks, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q, overlap, &
                     dx, dy, dz, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0)
@@ -307,7 +307,7 @@ contains
     real(8), intent(in)    :: x(nx), dx_cpu(nx-1)
     real(8), intent(in)    :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)    :: z(nz), dz_cpu(nz-1), Jacobian_cpu(nx,ny)
-    real(8), intent(inout) :: Q(5,nx,ny,nz)
+    real(8), intent(inout) :: Q(nx,5,ny,nz)
     integer i, j, k, l, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireq2(2)
     integer istat(MPI_STATUS_SIZE), istat2(MPI_STATUS_SIZE,2)
     ! rescale !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -330,7 +330,7 @@ contains
     if (mod(myrank,2) == 0) then
       call check_gpu(mygpu)
       call allocate_device_mem(myrank, nx, ny, nz, dx, dy, dz, xix, etay, zetaz, Jacobian, ruvwp, T, mu, mut, qc2, E, F, G)
-      allocate(QJ(5,nx,ny,nz), QJs(5,nx,ny,nz), Rs(5,nx-2,ny-2,nz-2))
+      allocate(QJ(nx,5,ny,nz), QJs(nx,5,ny,nz), Rs(nx-2,5,ny-2,nz-2))
       print *, "myrank is ", myrank, " memory allocation has completed"
       call pre_calc(nx, ny, nz, myrank, nranks, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q, overlap, &
                     dx, dy, dz, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0)

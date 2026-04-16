@@ -14,11 +14,11 @@ contains
     real(8), intent(in), device, contiguous  :: dx(nx-1)            !< grid size in x direction
     real(8), intent(in), device, contiguous  :: dy(ny-1)            !< grid size in y direction
     real(8), intent(in), device, contiguous  :: dz(nz-1)            !< grid size in z direction
-    real(8), intent(in), device, contiguous  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
-    real(8), intent(in), device, contiguous  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
-    real(8), intent(in), device, contiguous  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
-    real(8), intent(in), device, contiguous  :: Q(5,nx,ny,nz)       !< present Q(rho, rhou, rhov, rhow, E) / Jacobian
-    real(8), intent(out), device, contiguous :: Q2(5,nx,ny,nz)      !< next    Q(rho, rhou, rhov, rhow, E) / Jacobian
+    real(8), intent(in), device, contiguous  :: E(nx-1,5,ny-2,nz-2) !< Flux in x direction
+    real(8), intent(in), device, contiguous  :: F(nx-2,5,ny-1,nz-2) !< Flux in y direction
+    real(8), intent(in), device, contiguous  :: G(nx-2,5,ny-2,nz-1) !< Flux in z direction
+    real(8), intent(in), device, contiguous  :: Q(nx,5,ny,nz)       !< present Q(rho, rhou, rhov, rhow, E) / Jacobian
+    real(8), intent(out), device, contiguous :: Q2(nx,5,ny,nz)      !< next    Q(rho, rhou, rhov, rhow, E) / Jacobian
     real(8) R, dtdydz, dtdzdx, dtdxdy, dx_next
     integer i, j, k, l, lane
     integer(8) tmp_bits
@@ -47,10 +47,10 @@ contains
     ! ========== Conservative Update via TVD RK3: Stage 1 ==========
     ! Q^(1) = Q^n - (coef) * dt/vol * (Flux_divergence)
     do l = 1, 5  ! Loop over all conserved variables (rho, rhou, rhov, rhow, E)
-      R = dtdydz * (-E(l,i,j,k) + E(l,i+1,j,k)) &
-      & + dtdzdx * (-F(l,i,j,k) + F(l,i,j+1,k)) &
-      & + dtdxdy * (-G(l,i,j,k) + G(l,i,j,k+1))
-      Q2(l,i+1,j+1,k+1) = Q(l,i+1,j+1,k+1) - coef * R
+      R = dtdydz * (-E(i,l,j,k) + E(i+1,l,j,k)) &
+      & + dtdzdx * (-F(i,l,j,k) + F(i,l,j+1,k)) &
+      & + dtdxdy * (-G(i,l,j,k) + G(i,l,j,k+1))
+      Q2(i+1,l,j+1,k+1) = Q(i+1,l,j+1,k+1) - coef * R
     enddo
   end subroutine calc_step1
 
@@ -65,12 +65,12 @@ contains
     real(8), intent(in), device, contiguous    :: dx(nx-1)             !< grid size in x direction
     real(8), intent(in), device, contiguous    :: dy(ny-1)             !< grid size in y direction
     real(8), intent(in), device, contiguous    :: dz(nz-1)             !< grid size in z direction
-    real(8), intent(in), device, contiguous    :: E(5,nx-1,ny-2,nz-2)  !< Flux in x direction
-    real(8), intent(in), device, contiguous    :: F(5,nx-2,ny-1,nz-2)  !< Flux in y direction
-    real(8), intent(in), device, contiguous    :: G(5,nx-2,ny-2,nz-1)  !< Flux in z direction
-    real(8), intent(in), device, contiguous    :: Q(5,nx,ny,nz)        !< present Q(rho, rhou, rhov, rhow, E) / Jacobian
-    real(8), intent(out), device, contiguous   :: Q2(5,nx,ny,nz)       !< next    Q(rho, rhou, rhov, rhow, E) / Jacobian
-    real(8), intent(inout), device, contiguous :: Rs(5,nx-2,ny-2,nz-2) !< accumulation for 4-4 Runge-Kutta
+    real(8), intent(in), device, contiguous    :: E(nx-1,5,ny-2,nz-2)  !< Flux in x direction
+    real(8), intent(in), device, contiguous    :: F(nx-2,5,ny-1,nz-2)  !< Flux in y direction
+    real(8), intent(in), device, contiguous    :: G(nx-2,5,ny-2,nz-1)  !< Flux in z direction
+    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)        !< present Q(rho, rhou, rhov, rhow, E) / Jacobian
+    real(8), intent(out), device, contiguous   :: Q2(nx,5,ny,nz)       !< next    Q(rho, rhou, rhov, rhow, E) / Jacobian
+    real(8), intent(inout), device, contiguous :: Rs(nx-2,5,ny-2,nz-2) !< accumulation for 4-4 Runge-Kutta
     real(8) R, dtdydz, dtdzdx, dtdxdy, dx_next
     integer i, j, k, l, lane
     integer(8) tmp_bits
@@ -96,11 +96,11 @@ contains
     ! For stage 1-3: Q^(s) = Q^(s-1) - coef1 * dt/vol * Flux_div + accumulate in Rs
     ! coef2 applies weighting to residual for final 4th stage assembly
     do l = 1, 5
-      R = dtdydz * (-E(l,i,j,k) + E(l,i+1,j,k)) &
-      & + dtdzdx * (-F(l,i,j,k) + F(l,i,j+1,k)) &
-      & + dtdxdy * (-G(l,i,j,k) + G(l,i,j,k+1))
-      Q2(l,i+1,j+1,k+1) = Q(l,i+1,j+1,k+1) - coef1 * R ! Intermediate Q for next stage
-      Rs(l,i,j,k) = Rs(l,i,j,k) + coef2 * R            ! Accumulate weighted residual
+      R = dtdydz * (-E(i,l,j,k) + E(i+1,l,j,k)) &
+      & + dtdzdx * (-F(i,l,j,k) + F(i,l,j+1,k)) &
+      & + dtdxdy * (-G(i,l,j,k) + G(i,l,j,k+1))
+      Q2(i+1,l,j+1,k+1) = Q(i+1,l,j+1,k+1) - coef1 * R ! Intermediate Q for next stage
+      Rs(i,l,j,k) = Rs(i,l,j,k) + coef2 * R            ! Accumulate weighted residual
     enddo
   end subroutine calc_step
  
@@ -118,11 +118,11 @@ contains
     real(8), intent(in), device, contiguous    :: dx(nx-1)            !< grid size in x direction
     real(8), intent(in), device, contiguous    :: dy(ny-1)            !< grid size in y direction
     real(8), intent(in), device, contiguous    :: dz(nz-1)            !< grid size in z direction
-    real(8), intent(in), device, contiguous    :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
-    real(8), intent(in), device, contiguous    :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
-    real(8), intent(in), device, contiguous    :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
-    real(8), intent(in), device, contiguous    :: Qin(5,nx,ny,nz)     !< Q^n (original from previous step)
-    real(8), intent(inout), device, contiguous :: Qout(5,nx,ny,nz)    !< Q^(*) on input, Q^(n+1) on output
+    real(8), intent(in), device, contiguous    :: E(nx-1,5,ny-2,nz-2) !< Flux in x direction
+    real(8), intent(in), device, contiguous    :: F(nx-2,5,ny-1,nz-2) !< Flux in y direction
+    real(8), intent(in), device, contiguous    :: G(nx-2,5,ny-2,nz-1) !< Flux in z direction
+    real(8), intent(in), device, contiguous    :: Qin(nx,5,ny,nz)     !< Q^n (original from previous step)
+    real(8), intent(inout), device, contiguous :: Qout(nx,5,ny,nz)    !< Q^(*) on input, Q^(n+1) on output
     real(8) R, dtdydz, dtdzdx, dtdxdy, dx_next
     integer i, j, k, l, lane
     integer(8) tmp_bits
@@ -151,11 +151,11 @@ contains
     ! Stage 2: α=3/4, β=1/4 (from Q^n and Q^(1))
     ! Stage 3: α=1/3, β=2/3 (from Q^n and Q^(2)), then multiply by 3 (coef4 = 1/3)
     do l = 1, 5  ! All conserved variables
-      R = dtdydz * (-E(l,i,j,k) + E(l,i+1,j,k)) &
-      & + dtdzdx * (-F(l,i,j,k) + F(l,i,j+1,k)) &
-      & + dtdxdy * (-G(l,i,j,k) + G(l,i,j,k+1))
+      R = dtdydz * (-E(i,l,j,k) + E(i+1,l,j,k)) &
+      & + dtdzdx * (-F(i,l,j,k) + F(i,l,j+1,k)) &
+      & + dtdxdy * (-G(i,l,j,k) + G(i,l,j,k+1))
       ! Convex combination: weighted average of Qin and Qout minus scaled residual
-      Qout(l,i+1,j+1,k+1) = (coef1 * Qin(l,i+1,j+1,k+1) + coef2 * Qout(l,i+1,j+1,k+1) - coef3 * R) / coef4
+      Qout(i+1,l,j+1,k+1) = (coef1 * Qin(i+1,l,j+1,k+1) + coef2 * Qout(i+1,l,j+1,k+1) - coef3 * R) / coef4
     enddo
   end subroutine calc_step2_3
   
@@ -169,11 +169,11 @@ contains
     real(8), intent(in), device, contiguous    :: dx(nx-1)             !< grid size in x direction
     real(8), intent(in), device, contiguous    :: dy(ny-1)             !< grid size in y direction
     real(8), intent(in), device, contiguous    :: dz(nz-1)             !< grid size in z direction
-    real(8), intent(in), device, contiguous    :: E(5,nx-1,ny-2,nz-2)  !< Flux in x direction
-    real(8), intent(in), device, contiguous    :: F(5,nx-2,ny-1,nz-2)  !< Flux in y direction
-    real(8), intent(in), device, contiguous    :: G(5,nx-2,ny-2,nz-1)  !< Flux in z direction
-    real(8), intent(inout), device, contiguous :: Rs(5,nx-2,ny-2,nz-2) !< accumulated residuals from stages 1-3
-    real(8), intent(inout), device, contiguous :: Q(5,nx,ny,nz)        !< Q^n on input, Q^n+1 on output
+    real(8), intent(in), device, contiguous    :: E(nx-1,5,ny-2,nz-2)  !< Flux in x direction
+    real(8), intent(in), device, contiguous    :: F(nx-2,5,ny-1,nz-2)  !< Flux in y direction
+    real(8), intent(in), device, contiguous    :: G(nx-2,5,ny-2,nz-1)  !< Flux in z direction
+    real(8), intent(inout), device, contiguous :: Rs(nx-2,5,ny-2,nz-2) !< accumulated residuals from stages 1-3
+    real(8), intent(inout), device, contiguous :: Q(nx,5,ny,nz)        !< Q^n on input, Q^n+1 on output
     real(8) R, dtdydz, dtdzdx, dtdxdy, dx_next
     integer i, j, k, l, lane
     integer(8) tmp_bits
@@ -203,15 +203,15 @@ contains
     ! one_sixth ≈ 1/6 is the standard RK4 weight
     do l = 1, 5 ! All conserved variables
       ! Compute 4th stage flux divergence
-      R = dtdydz * (-E(l,i,j,k) + E(l,i+1,j,k)) &
-      & + dtdzdx * (-F(l,i,j,k) + F(l,i,j+1,k)) &
-      & + dtdxdy * (-G(l,i,j,k) + G(l,i,j,k+1))
+      R = dtdydz * (-E(i,l,j,k) + E(i+1,l,j,k)) &
+      & + dtdzdx * (-F(i,l,j,k) + F(i,l,j+1,k)) &
+      & + dtdxdy * (-G(i,l,j,k) + G(i,l,j,k+1))
       ! Accumulate 4th stage residual (not multiplied by coefficient yet)
-      Rs(l,i,j,k) = Rs(l,i,j,k) + R
+      Rs(i,l,j,k) = Rs(i,l,j,k) + R
       ! Apply full RK4 update with (1/6) weighting to final solution
-      Q(l,i+1,j+1,k+1) = Q(l,i+1,j+1,k+1) - Rs(l,i,j,k) * one_sixth
+      Q(i+1,l,j+1,k+1) = Q(i+1,l,j+1,k+1) - Rs(i,l,j,k) * one_sixth
       ! Clear residual accumulator for next time step
-      Rs(l,i,j,k) = 0.d0
+      Rs(i,l,j,k) = 0.d0
     enddo
   end subroutine calc_step4
 end module calc_steps

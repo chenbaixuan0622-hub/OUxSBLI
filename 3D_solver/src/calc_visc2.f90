@@ -16,10 +16,10 @@ contains
     real(8), intent(in), device, contiguous    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
     real(8), intent(in), device, contiguous    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
     real(8), intent(in), device, contiguous    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
-    real(8), intent(in), device, contiguous    :: Q(5,nx,ny,nz)       !< conservative variables: rho, rho*u, rho*v, rho*w, E
+    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)       !< conservative variables: rho, rho*u, rho*v, rho*w, E
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
-    real(8), intent(inout), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< viscous flux components in x direction
+    real(8), intent(inout), device, contiguous :: E(nx-1,5,ny-2,nz-2) !< viscous flux components in x direction
     real(8), shared :: u(threadsEv%x+1,0:threadsEv%y+1,0:threadsEv%z+1)
     real(8), shared :: v(threadsEv%x+1,0:threadsEv%y+1,threadsEv%z)
     real(8), shared :: w(threadsEv%x+1,0:threadsEv%z+1,threadsEv%y)
@@ -33,13 +33,13 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    u(it,jt-1:jt+1,kt-1:kt+1) = Q(2,i,j-1:j+1,k-1:k+1)
-    v(it,jt-1:jt+1,kt)        = Q(3,i,j-1:j+1,k)
-    w(it,kt-1:kt+1,jt)        = Q(4,i,j,k-1:k+1)
+    u(it,jt-1:jt+1,kt-1:kt+1) = Q(i,2,j-1:j+1,k-1:k+1)
+    v(it,jt-1:jt+1,kt)        = Q(i,3,j-1:j+1,k)
+    w(it,kt-1:kt+1,jt)        = Q(i,4,j,k-1:k+1)
     if (it == blockDim%x) then
-      u(it+1,jt-1:jt+1,kt-1:kt+1) = Q(2,i+1,j-1:j+1,k-1:k+1)
-      v(it+1,jt-1:jt+1,kt)        = Q(3,i+1,j-1:j+1,k)
-      w(it+1,kt-1:kt+1,jt)        = Q(4,i+1,j,k-1:k+1)
+      u(it+1,jt-1:jt+1,kt-1:kt+1) = Q(i+1,2,j-1:j+1,k-1:k+1)
+      v(it+1,jt-1:jt+1,kt)        = Q(i+1,3,j-1:j+1,k)
+      w(it+1,kt-1:kt+1,jt)        = Q(i+1,4,j,k-1:k+1)
     endif 
     call syncthreads()
 
@@ -91,10 +91,10 @@ contains
     wtxz = 0.5d0 * (w(it,kt,jt) + w(it+1,kt,jt)) * txz
     
     ! Accumulate viscous flux components (note subtraction: fluxes point outward)
-    E(2,i,j-1,k-1) = E(2,i,j-1,k-1) - txx            ! Momentum: -tau_xx in x-flux
-    E(3,i,j-1,k-1) = E(3,i,j-1,k-1) - txy            ! Momentum: -tau_xy in x-flux  
-    E(4,i,j-1,k-1) = E(4,i,j-1,k-1) - txz            ! Momentum: -tau_xz in x-flux
-    E(5,i,j-1,k-1) = E(5,i,j-1,k-1) - (utxx + vtxy + wtxz + kTx)  ! Energy: -(u*tau + q)
+    E(i,2,j-1,k-1) = E(i,2,j-1,k-1) - txx            ! Momentum: -tau_xx in x-flux
+    E(i,3,j-1,k-1) = E(i,3,j-1,k-1) - txy            ! Momentum: -tau_xy in x-flux  
+    E(i,4,j-1,k-1) = E(i,4,j-1,k-1) - txz            ! Momentum: -tau_xz in x-flux
+    E(i,5,j-1,k-1) = E(i,5,j-1,k-1) - (utxx + vtxy + wtxz + kTx)  ! Energy: -(u*tau + q)
   end subroutine calc_Ev2
  
 
@@ -107,12 +107,12 @@ contains
     real(8), intent(in), device, contiguous    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
     real(8), intent(in), device, contiguous    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
     real(8), intent(in), device, contiguous    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
-    real(8), intent(in), device, contiguous    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
-    real(8), intent(inout), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< viscous + SGS flux in x direction
+    real(8), intent(inout), device, contiguous :: E(nx-1,5,ny-2,nz-2) !< viscous + SGS flux in x direction
     integer i, j, k
     real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx, Hsgs
     real(8), dimension(2) :: my, mysgs, mz, mzsgs
@@ -133,52 +133,52 @@ contains
       real(8) :: my(2)
       my(1)  = 0.25d0 * (mu(i,j-1,k) + mu(i,j,  k) + mu(i+1,j-1,k) + mu(i+1,j,  k))
       my(2)  = 0.25d0 * (mu(i,j,  k) + mu(i,j+1,k) + mu(i+1,j,  k) + mu(i+1,j+1,k))
-      muy    = 0.25d0 * (my(1)    * (-Q(2,i,j-1,k) + Q(2,i,j,k) - Q(2,i+1,j-1,k) + Q(2,i+1,j,k)) &
-                       + my(2)    * (-Q(2,i,j,k) + Q(2,i,j+1,k) - Q(2,i+1,j,k) + Q(2,i+1,j+1,k))) * dy(j)
-      muysgs = 0.25d0 * (mysgs(1) * (-Q(2,i,j-1,k) + Q(2,i,j,k) - Q(2,i+1,j-1,k) + Q(2,i+1,j,k)) &
-                       + mysgs(2) * (-Q(2,i,j,k) + Q(2,i,j+1,k) - Q(2,i+1,j,k) + Q(2,i+1,j+1,k))) * dy(j)
-      mvy    = 0.25d0 * (my(1)    * (-Q(3,i,j-1,k) + Q(3,i,j,k) - Q(3,i+1,j-1,k) + Q(3,i+1,j,k)) &
-                       + my(2)    * (-Q(3,i,j,k) + Q(3,i,j+1,k) - Q(3,i+1,j,k) + Q(3,i+1,j+1,k))) * dy(j)
-      mvysgs = 0.25d0 * (mysgs(1) * (-Q(3,i,j-1,k) + Q(3,i,j,k) - Q(3,i+1,j-1,k) + Q(3,i+1,j,k)) &
-                       + mysgs(2) * (-Q(3,i,j,k) + Q(3,i,j+1,k) - Q(3,i+1,j,k) + Q(3,i+1,j+1,k))) * dy(j)
+      muy    = 0.25d0 * (my(1)    * (-Q(i,2,j-1,k) + Q(i,2,j,k) - Q(i+1,2,j-1,k) + Q(i+1,2,j,k)) &
+                       + my(2)    * (-Q(i,2,j,k) + Q(i,2,j+1,k) - Q(i+1,2,j,k) + Q(i+1,2,j+1,k))) * dy(j)
+      muysgs = 0.25d0 * (mysgs(1) * (-Q(i,2,j-1,k) + Q(i,2,j,k) - Q(i+1,2,j-1,k) + Q(i+1,2,j,k)) &
+                       + mysgs(2) * (-Q(i,2,j,k) + Q(i,2,j+1,k) - Q(i+1,2,j,k) + Q(i+1,2,j+1,k))) * dy(j)
+      mvy    = 0.25d0 * (my(1)    * (-Q(i,3,j-1,k) + Q(i,3,j,k) - Q(i+1,3,j-1,k) + Q(i+1,3,j,k)) &
+                       + my(2)    * (-Q(i,3,j,k) + Q(i,3,j+1,k) - Q(i+1,3,j,k) + Q(i+1,3,j+1,k))) * dy(j)
+      mvysgs = 0.25d0 * (mysgs(1) * (-Q(i,3,j-1,k) + Q(i,3,j,k) - Q(i+1,3,j-1,k) + Q(i+1,3,j,k)) &
+                       + mysgs(2) * (-Q(i,3,j,k) + Q(i,3,j+1,k) - Q(i+1,3,j,k) + Q(i+1,3,j+1,k))) * dy(j)
     end block
     block
       real(8) :: mz(2)
       mz(1)  = 0.25d0 * (mu(i,j,k-1) + mu(i,j,k  ) + mu(i+1,j,k-1) + mu(i+1,j,k  ))
       mz(2)  = 0.25d0 * (mu(i,j,k  ) + mu(i,j,k+1) + mu(i+1,j,k  ) + mu(i+1,j,k+1))
-      muz    = 0.25d0 * (mz(1)    * (-Q(2,i,j,k-1) + Q(2,i,j,k) - Q(2,i+1,j,k-1) + Q(2,i+1,j,k)) &
-                       + mz(2)    * (-Q(2,i,j,k) + Q(2,i,j,k+1) - Q(2,i+1,j,k) + Q(2,i+1,j,k+1))) * dz(k)
-      muzsgs = 0.25d0 * (mzsgs(1) * (-Q(2,i,j,k-1) + Q(2,i,j,k) - Q(2,i+1,j,k-1) + Q(2,i+1,j,k)) &
-                       + mzsgs(2) * (-Q(2,i,j,k) + Q(2,i,j,k+1) - Q(2,i+1,j,k) + Q(2,i+1,j,k+1))) * dz(k)
-      mwz    = 0.25d0 * (mz(1)    * (-Q(4,i,j,k-1) + Q(4,i,j,k) - Q(4,i+1,j,k-1) + Q(4,i+1,j,k)) &
-                       + mz(2)    * (-Q(4,i,j,k) + Q(4,i,j,k+1) - Q(4,i+1,j,k) + Q(4,i+1,j,k+1))) * dz(k)
-      mwzsgs = 0.25d0 * (mzsgs(1) * (-Q(4,i,j,k-1) + Q(4,i,j,k) - Q(4,i+1,j,k-1) + Q(4,i+1,j,k)) &
-                       + mzsgs(2) * (-Q(4,i,j,k) + Q(4,i,j,k+1) - Q(4,i+1,j,k) + Q(4,i+1,j,k+1))) * dz(k)
+      muz    = 0.25d0 * (mz(1)    * (-Q(i,2,j,k-1) + Q(i,2,j,k) - Q(i+1,2,j,k-1) + Q(i+1,2,j,k)) &
+                       + mz(2)    * (-Q(i,2,j,k) + Q(i,2,j,k+1) - Q(i+1,2,j,k) + Q(i+1,2,j,k+1))) * dz(k)
+      muzsgs = 0.25d0 * (mzsgs(1) * (-Q(i,2,j,k-1) + Q(i,2,j,k) - Q(i+1,2,j,k-1) + Q(i+1,2,j,k)) &
+                       + mzsgs(2) * (-Q(i,2,j,k) + Q(i,2,j,k+1) - Q(i+1,2,j,k) + Q(i+1,2,j,k+1))) * dz(k)
+      mwz    = 0.25d0 * (mz(1)    * (-Q(i,4,j,k-1) + Q(i,4,j,k) - Q(i+1,4,j,k-1) + Q(i+1,4,j,k)) &
+                       + mz(2)    * (-Q(i,4,j,k) + Q(i,4,j,k+1) - Q(i+1,4,j,k) + Q(i+1,4,j,k+1))) * dz(k)
+      mwzsgs = 0.25d0 * (mzsgs(1) * (-Q(i,4,j,k-1) + Q(i,4,j,k) - Q(i+1,4,j,k-1) + Q(i+1,4,j,k)) &
+                       + mzsgs(2) * (-Q(i,4,j,k) + Q(i,4,j,k+1) - Q(i+1,4,j,k) + Q(i+1,4,j,k+1))) * dz(k)
     end block
-    mux    = mx    * (-Q(2,i,j,k) + Q(2,i+1,j,k)) * dx(i)
-    muxsgs = mxsgs * (-Q(2,i,j,k) + Q(2,i+1,j,k)) * dx(i)
-    mvx    = mx    * (-Q(3,i,j,k) + Q(3,i+1,j,k)) * dx(i)
-    mvxsgs = mxsgs * (-Q(3,i,j,k) + Q(3,i+1,j,k)) * dx(i)
-    mwx    = mx    * (-Q(4,i,j,k) + Q(4,i+1,j,k)) * dx(i)
-    mwxsgs = mxsgs * (-Q(4,i,j,k) + Q(4,i+1,j,k)) * dx(i)
+    mux    = mx    * (-Q(i,2,j,k) + Q(i+1,2,j,k)) * dx(i)
+    muxsgs = mxsgs * (-Q(i,2,j,k) + Q(i+1,2,j,k)) * dx(i)
+    mvx    = mx    * (-Q(i,3,j,k) + Q(i+1,3,j,k)) * dx(i)
+    mvxsgs = mxsgs * (-Q(i,3,j,k) + Q(i+1,3,j,k)) * dx(i)
+    mwx    = mx    * (-Q(i,4,j,k) + Q(i+1,4,j,k)) * dx(i)
+    mwxsgs = mxsgs * (-Q(i,4,j,k) + Q(i+1,4,j,k)) * dx(i)
     txx    = two_third * (2.d0 * mux - mvy - mwz)
     txy    = muy + mvx
     txz    = mwx + muz
-    utxx   = 0.5d0 * (Q(2,i,j,k) + Q(2,i+1,j,k)) * txx
-    vtxy   = 0.5d0 * (Q(3,i,j,k) + Q(3,i+1,j,k)) * txy
-    wtxz   = 0.5d0 * (Q(4,i,j,k) + Q(4,i+1,j,k)) * txz
+    utxx   = 0.5d0 * (Q(i,2,j,k) + Q(i+1,2,j,k)) * txx
+    vtxy   = 0.5d0 * (Q(i,3,j,k) + Q(i+1,3,j,k)) * txy
+    wtxz   = 0.5d0 * (Q(i,4,j,k) + Q(i+1,4,j,k)) * txz
     txx    = txx + two_third * (2.d0 * muxsgs - mvysgs - mwzsgs)
     txy    = txy + muysgs + mvxsgs
     txz    = txz + mwxsgs + muzsgs
     block
       real(8) :: H(2)
-      H(:) = Cp * T(i:i+1,j,k) + 0.5d0 * (Q(2,i:i+1,j,k)**2 + Q(3,i:i+1,j,k)**2 + Q(4,i:i+1,j,k)**2) + qc2(i:i+1,j,k)
+      H(:) = Cp * T(i:i+1,j,k) + 0.5d0 * (Q(i:i+1,2,j,k)**2 + Q(i:i+1,3,j,k)**2 + Q(i:i+1,4,j,k)**2) + qc2(i:i+1,j,k)
       Hsgs = -mxsgs * (-H(1) + H(2)) * dx(i) / Prt
     end block
-    E(2,i,j-1,k-1) = E(2,i,j-1,k-1) - txx
-    E(3,i,j-1,k-1) = E(3,i,j-1,k-1) - txy
-    E(4,i,j-1,k-1) = E(4,i,j-1,k-1) - txz
-    E(5,i,j-1,k-1) = E(5,i,j-1,k-1) - (utxx + vtxy + wtxz + kTx + Hsgs)
+    E(i,2,j-1,k-1) = E(i,2,j-1,k-1) - txx
+    E(i,3,j-1,k-1) = E(i,3,j-1,k-1) - txy
+    E(i,4,j-1,k-1) = E(i,4,j-1,k-1) - txz
+    E(i,5,j-1,k-1) = E(i,5,j-1,k-1) - (utxx + vtxy + wtxz + kTx)
   end subroutine calc_Ev_LES2
  
 
@@ -191,10 +191,10 @@ contains
     real(8), intent(in), device, contiguous    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
     real(8), intent(in), device, contiguous    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
     real(8), intent(in), device, contiguous    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
-    real(8), intent(in), device, contiguous    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
-    real(8), intent(inout), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< viscous flux components in y direction
+    real(8), intent(inout), device, contiguous :: F(nx-2,5,ny-1,nz-2) !< viscous flux components in y direction
     real(8), shared :: u(threadsFv%y+1,0:threadsFv%x+1,threadsFv%z)
     real(8), shared :: v(threadsFv%y+1,0:threadsFv%x+1,0:threadsFv%z+1)
     real(8), shared :: w(threadsFv%y+1,0:threadsFv%z+1,threadsFv%x)
@@ -208,13 +208,13 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    u(jt,it-1:it+1,kt)        = Q(2,i-1:i+1,j,k)
-    v(jt,it-1:it+1,kt-1:kt+1) = Q(3,i-1:i+1,j,k-1:k+1)
-    w(jt,kt-1:kt+1,it)        = Q(4,i,j,k-1:k+1)
+    u(jt,it-1:it+1,kt)        = Q(i-1:i+1,2,j,k)
+    v(jt,it-1:it+1,kt-1:kt+1) = Q(i-1:i+1,3,j,k-1:k+1)
+    w(jt,kt-1:kt+1,it)        = Q(i,4,j,k-1:k+1)
     if (jt == blockDim%y) then
-      u(jt+1,it-1:it+1,kt)        = Q(2,i-1:i+1,j+1,k)
-      v(jt+1,it-1:it+1,kt-1:kt+1) = Q(3,i-1:i+1,j+1,k-1:k+1)
-      w(jt+1,kt-1:kt+1,it)        = Q(4,i,j+1,k-1:k+1)
+      u(jt+1,it-1:it+1,kt)        = Q(i-1:i+1,2,j+1,k)
+      v(jt+1,it-1:it+1,kt-1:kt+1) = Q(i-1:i+1,3,j+1,k-1:k+1)
+      w(jt+1,kt-1:kt+1,it)        = Q(i,4,j+1,k-1:k+1)
     endif 
     call syncthreads()
 
@@ -247,10 +247,10 @@ contains
     utyx = 0.5d0 * (u(jt,it,kt) + u(jt+1,it,kt)) * tyx
     vtyy = 0.5d0 * (v(jt,it,kt) + v(jt+1,it,kt)) * tyy
     wtyz = 0.5d0 * (w(jt,kt,it) + w(jt+1,kt,it)) * tyz
-    F(2,i-1,j,k-1) = F(2,i-1,j,k-1) - tyx
-    F(3,i-1,j,k-1) = F(3,i-1,j,k-1) - tyy
-    F(4,i-1,j,k-1) = F(4,i-1,j,k-1) - tyz
-    F(5,i-1,j,k-1) = F(5,i-1,j,k-1) - (utyx + vtyy + wtyz + kTy)
+    F(i-1,2,j,k-1) = F(i-1,2,j,k-1) - tyx
+    F(i-1,3,j,k-1) = F(i-1,3,j,k-1) - tyy
+    F(i-1,4,j,k-1) = F(i-1,4,j,k-1) - tyz
+    F(i-1,5,j,k-1) = F(i-1,5,j,k-1) - (utyx + vtyy + wtyz + kTy)
   end subroutine calc_Fv2
  
 
@@ -263,12 +263,12 @@ contains
     real(8), intent(in), device, contiguous    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
     real(8), intent(in), device, contiguous    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
     real(8), intent(in), device, contiguous    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
-    real(8), intent(in), device, contiguous    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
-    real(8), intent(inout), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< viscous + SGS flux in y direction
+    real(8), intent(inout), device, contiguous :: F(nx-2,5,ny-1,nz-2) !< viscous + SGS flux in y direction
     integer i, j, k
     real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy, Hsgs
     real(8), dimension(2) :: u2, v2, w2, mz, mzsgs, mx, mxsgs
@@ -287,14 +287,14 @@ contains
       real(8) :: mx(2)
       mx(1)  = 0.25d0 * (mu(i-1,j,k) + mu(i,  j,k) + mu(i-1,j+1,k) + mu(i,  j+1,k))
       mx(2)  = 0.25d0 * (mu(i,  j,k) + mu(i+1,j,k) + mu(i,  j+1,k) + mu(i+1,j+1,k))
-      mux    = 0.25d0 * (mx(1)    * (-Q(2,i-1,j,k) + Q(2,i,j,k) - Q(2,i-1,j+1,k) + Q(2,i,j+1,k)) &
-                       + mx(2)    * (-Q(2,i,j,k) + Q(2,i+1,j,k) - Q(2,i,j+1,k) + Q(2,i+1,j+1,k))) * dx(i)
-      muxsgs = 0.25d0 * (mxsgs(1) * (-Q(2,i-1,j,k) + Q(2,i,j,k) - Q(2,i-1,j+1,k) + Q(2,i,j+1,k)) &
-                       + mxsgs(2) * (-Q(2,i,j,k) + Q(2,i+1,j,k) - Q(2,i,j+1,k) + Q(2,i+1,j+1,k))) * dx(i)
-      mvx    = 0.25d0 * (mx(1)    * (-Q(3,i-1,j,k) + Q(3,i,j,k) - Q(3,i-1,j+1,k) + Q(3,i,j+1,k)) &
-                       + mx(2)    * (-Q(3,i,j,k) + Q(3,i+1,j,k) - Q(3,i,j+1,k) + Q(3,i+1,j+1,k))) * dx(i)
-      mvxsgs = 0.25d0 * (mxsgs(1) * (-Q(3,i-1,j,k) + Q(3,i,j,k) - Q(3,i-1,j+1,k) + Q(3,i,j+1,k)) &
-                       + mxsgs(2) * (-Q(3,i,j,k) + Q(3,i+1,j,k) - Q(3,i,j+1,k) + Q(3,i+1,j+1,k))) * dx(i)
+      mux    = 0.25d0 * (mx(1)    * (-Q(i-1,2,j,k) + Q(i,2,j,k) - Q(i-1,2,j+1,k) + Q(i,2,j+1,k)) &
+                       + mx(2)    * (-Q(i,2,j,k) + Q(i+1,2,j,k) - Q(i,2,j+1,k) + Q(i+1,2,j+1,k))) * dx(i)
+      muxsgs = 0.25d0 * (mxsgs(1) * (-Q(i-1,2,j,k) + Q(i,2,j,k) - Q(i-1,2,j+1,k) + Q(i,2,j+1,k)) &
+                       + mxsgs(2) * (-Q(i,2,j,k) + Q(i+1,2,j,k) - Q(i,2,j+1,k) + Q(i+1,2,j+1,k))) * dx(i)
+      mvx    = 0.25d0 * (mx(1)    * (-Q(i-1,3,j,k) + Q(i,3,j,k) - Q(i-1,3,j+1,k) + Q(i,3,j+1,k)) &
+                       + mx(2)    * (-Q(i,3,j,k) + Q(i+1,3,j,k) - Q(i,3,j+1,k) + Q(i+1,3,j+1,k))) * dx(i)
+      mvxsgs = 0.25d0 * (mxsgs(1) * (-Q(i-1,3,j,k) + Q(i,3,j,k) - Q(i-1,3,j+1,k) + Q(i,3,j+1,k)) &
+                       + mxsgs(2) * (-Q(i,3,j,k) + Q(i+1,3,j,k) - Q(i,3,j+1,k) + Q(i+1,3,j+1,k))) * dx(i)
     end block
     my  = 0.5d0 * (mu(i,j,k) + mu(i,j+1,k))
     kTy = Cp_over_Pr * my * (-T(i,j,k) + T(i,j+1,k)) * dy(j)
@@ -302,39 +302,39 @@ contains
       real(8) :: mz(2)
       mz(1)  = 0.25d0 * (mu(i,j,k-1) + mu(i,j,k  ) + mu(i,j+1,k-1) + mu(i,j+1,k  ))
       mz(2)  = 0.25d0 * (mu(i,j,k  ) + mu(i,j,k+1) + mu(i,j+1,k  ) + mu(i,j+1,k+1))
-      mvz    = 0.25d0 * (mz(1)    * (-Q(3,i,j,k-1) + Q(3,i,j,k) - Q(3,i,j+1,k-1) + Q(3,i,j+1,k)) &
-                       + mz(2)    * (-Q(3,i,j,k) + Q(3,i,j,k+1) - Q(3,i,j+1,k) + Q(3,i,j+1,k+1))) * dz(k)
-      mvzsgs = 0.25d0 * (mzsgs(1) * (-Q(3,i,j,k-1) + Q(3,i,j,k) - Q(3,i,j+1,k-1) + Q(3,i,j+1,k)) &
-                       + mzsgs(2) * (-Q(3,i,j,k) + Q(3,i,j,k+1) - Q(3,i,j+1,k) + Q(3,i,j+1,k+1))) * dz(k)
-      mwz    = 0.25d0 * (mz(1)    * (-Q(4,i,j,k-1) + Q(4,i,j,k) - Q(4,i,j+1,k-1) + Q(4,i,j+1,k)) &
-                       + mz(2)    * (-Q(4,i,j,k) + Q(4,i,j,k+1) - Q(4,i,j+1,k) + Q(4,i,j+1,k+1))) * dz(k)
-      mwzsgs = 0.25d0 * (mzsgs(1) * (-Q(4,i,j,k-1) + Q(4,i,j,k) - Q(4,i,j+1,k-1) + Q(4,i,j+1,k)) &
-                       + mzsgs(2) * (-Q(4,i,j,k) + Q(4,i,j,k+1) - Q(4,i,j+1,k) + Q(4,i,j+1,k+1))) * dz(k)
+      mvz    = 0.25d0 * (mz(1)    * (-Q(i,3,j,k-1) + Q(i,3,j,k) - Q(i,3,j+1,k-1) + Q(i,3,j+1,k)) &
+                       + mz(2)    * (-Q(i,3,j,k) + Q(i,3,j,k+1) - Q(i,3,j+1,k) + Q(i,3,j+1,k+1))) * dz(k)
+      mvzsgs = 0.25d0 * (mzsgs(1) * (-Q(i,3,j,k-1) + Q(i,3,j,k) - Q(i,3,j+1,k-1) + Q(i,3,j+1,k)) &
+                       + mzsgs(2) * (-Q(i,3,j,k) + Q(i,3,j,k+1) - Q(i,3,j+1,k) + Q(i,3,j+1,k+1))) * dz(k)
+      mwz    = 0.25d0 * (mz(1)    * (-Q(i,4,j,k-1) + Q(i,4,j,k) - Q(i,4,j+1,k-1) + Q(i,4,j+1,k)) &
+                       + mz(2)    * (-Q(i,4,j,k) + Q(i,4,j,k+1) - Q(i,4,j+1,k) + Q(i,4,j+1,k+1))) * dz(k)
+      mwzsgs = 0.25d0 * (mzsgs(1) * (-Q(i,4,j,k-1) + Q(i,4,j,k) - Q(i,4,j+1,k-1) + Q(i,4,j+1,k)) &
+                       + mzsgs(2) * (-Q(i,4,j,k) + Q(i,4,j,k+1) - Q(i,4,j+1,k) + Q(i,4,j+1,k+1))) * dz(k)
     end block
-    muy    = my    * (-Q(2,i,j,k) + Q(2,i,j+1,k)) * dy(j)
-    muysgs = mysgs * (-Q(2,i,j,k) + Q(2,i,j+1,k)) * dy(j)
-    mvy    = my    * (-Q(3,i,j,k) + Q(3,i,j+1,k)) * dy(j)
-    mvysgs = mysgs * (-Q(3,i,j,k) + Q(3,i,j+1,k)) * dy(j)
-    mwy    = my    * (-Q(4,i,j,k) + Q(4,i,j+1,k)) * dy(j)
-    mwysgs = mysgs * (-Q(4,i,j,k) + Q(4,i,j+1,k)) * dy(j)
+    muy    = my    * (-Q(i,2,j,k) + Q(i,2,j+1,k)) * dy(j)
+    muysgs = mysgs * (-Q(i,2,j,k) + Q(i,2,j+1,k)) * dy(j)
+    mvy    = my    * (-Q(i,3,j,k) + Q(i,3,j+1,k)) * dy(j)
+    mvysgs = mysgs * (-Q(i,3,j,k) + Q(i,3,j+1,k)) * dy(j)
+    mwy    = my    * (-Q(i,4,j,k) + Q(i,4,j+1,k)) * dy(j)
+    mwysgs = mysgs * (-Q(i,4,j,k) + Q(i,4,j+1,k)) * dy(j)
     tyx    = muy + mvx
     tyy    = two_third * (2.d0 * mvy - mwz - mux)
     tyz    = mvz + mwy
-    utyx   = 0.5d0 * (Q(2,i,j,k) + Q(2,i,j+1,k)) * tyx
-    vtyy   = 0.5d0 * (Q(3,i,j,k) + Q(3,i,j+1,k)) * tyy
-    wtyz   = 0.5d0 * (Q(4,i,j,k) + Q(4,i,j+1,k)) * tyz
+    utyx   = 0.5d0 * (Q(i,2,j,k) + Q(i,2,j+1,k)) * tyx
+    vtyy   = 0.5d0 * (Q(i,3,j,k) + Q(i,3,j+1,k)) * tyy
+    wtyz   = 0.5d0 * (Q(i,4,j,k) + Q(i,4,j+1,k)) * tyz
     tyx    = tyx + muysgs + mvxsgs
     tyy    = tyy + two_third * (2.d0 * mvysgs - mwzsgs - muxsgs)
     tyz    = tyz + mvzsgs + mwysgs
     block
       real(8) :: H(2)
-      H(:) = Cp * T(i,j:j+1,k) + 0.5d0 * (Q(2,i,j:j+1,k)**2 + Q(3,i,j:j+1,k)**2 + Q(4,i,j:j+1,k)**2) + qc2(i,j:j+1,k)
+      H(:) = Cp * T(i,j:j+1,k) + 0.5d0 * (Q(i,2,j:j+1,k)**2 + Q(i,3,j:j+1,k)**2 + Q(i,4,j:j+1,k)**2) + qc2(i,j:j+1,k)
       Hsgs = -mysgs * (-H(1) + H(2)) * dy(j) / Prt
     end block
-    F(2,i-1,j,k-1) = F(2,i-1,j,k-1) - tyx
-    F(3,i-1,j,k-1) = F(3,i-1,j,k-1) - tyy
-    F(4,i-1,j,k-1) = F(4,i-1,j,k-1) - tyz
-    F(5,i-1,j,k-1) = F(5,i-1,j,k-1) - (utyx + vtyy + wtyz + kTy + Hsgs)
+    F(i-1,2,j,k-1) = F(i-1,2,j,k-1) - tyx
+    F(i-1,3,j,k-1) = F(i-1,3,j,k-1) - tyy
+    F(i-1,4,j,k-1) = F(i-1,4,j,k-1) - tyz
+    F(i-1,5,j,k-1) = F(i-1,5,j,k-1) - (utyx + vtyy + wtyz + kTy + Hsgs)
   end subroutine calc_Fv_LES2
  
 
@@ -347,10 +347,10 @@ contains
     real(8), intent(in), device, contiguous    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
     real(8), intent(in), device, contiguous    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
     real(8), intent(in), device, contiguous    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
-    real(8), intent(in), device, contiguous    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
-    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< viscous flux components in z direction
+    real(8), intent(inout), device, contiguous :: G(nx-2,5,ny-2,nz-1) !< viscous flux components in z direction
     real(8), shared :: u(threadsGv%z+1,0:threadsGv%x+1,threadsGv%y)
     real(8), shared :: v(threadsGv%z+1,0:threadsGv%y+1,threadsGv%x)
     real(8), shared :: w(threadsGv%z+1,0:threadsGv%x+1,0:threadsGv%y+1)
@@ -364,13 +364,13 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     k  = (blockIdx%z-1)*blockDim%z + kt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    u(kt,it-1:it+1,jt)        = Q(2,i-1:i+1,j,k)
-    v(kt,jt-1:jt+1,it)        = Q(3,i,j-1:j+1,k)
-    w(kt,it-1:it+1,jt-1:jt+1) = Q(4,i-1:i+1,j-1:j+1,k)
+    u(kt,it-1:it+1,jt)        = Q(i-1:i+1,2,j,k)
+    v(kt,jt-1:jt+1,it)        = Q(i,3,j-1:j+1,k)
+    w(kt,it-1:it+1,jt-1:jt+1) = Q(i-1:i+1,4,j-1:j+1,k)
     if (kt == blockDim%z) then
-      u(kt+1,it-1:it+1,jt)        = Q(2,i-1:i+1,j,k+1)
-      v(kt+1,jt-1:jt+1,it)        = Q(3,i,j-1:j+1,k+1)
-      w(kt+1,it-1:it+1,jt-1:jt+1) = Q(4,i-1:i+1,j-1:j+1,k+1)
+      u(kt+1,it-1:it+1,jt)        = Q(i-1:i+1,2,j,k+1)
+      v(kt+1,jt-1:jt+1,it)        = Q(i,3,j-1:j+1,k+1)
+      w(kt+1,it-1:it+1,jt-1:jt+1) = Q(i-1:i+1,4,j-1:j+1,k+1)
     endif 
     call syncthreads()
 
@@ -403,10 +403,10 @@ contains
     utzx = 0.5d0 * (u(kt,it,jt) + u(kt+1,it,jt)) * tzx
     vtzy = 0.5d0 * (v(kt,jt,it) + v(kt+1,jt,it)) * tzy
     wtzz = 0.5d0 * (w(kt,it,jt) + w(kt+1,it,jt)) * tzz
-    G(2,i-1,j-1,k) = G(2,i-1,j-1,k) - tzx
-    G(3,i-1,j-1,k) = G(3,i-1,j-1,k) - tzy
-    G(4,i-1,j-1,k) = G(4,i-1,j-1,k) - tzz
-    G(5,i-1,j-1,k) = G(5,i-1,j-1,k) - (utzx + vtzy + wtzz + kTz)
+    G(i-1,2,j-1,k) = G(i-1,2,j-1,k) - tzx
+    G(i-1,3,j-1,k) = G(i-1,3,j-1,k) - tzy
+    G(i-1,4,j-1,k) = G(i-1,4,j-1,k) - tzz
+    G(i-1,5,j-1,k) = G(i-1,5,j-1,k) - (utzx + vtzy + wtzz + kTz)
   end subroutine calc_Gv2
 
 
@@ -417,12 +417,12 @@ contains
     real(8), intent(in), device, contiguous    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
     real(8), intent(in), device, contiguous    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
     real(8), intent(in), device, contiguous    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
-    real(8), intent(in), device, contiguous    :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
-    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< viscous + SGS flux in z direction
+    real(8), intent(inout), device, contiguous :: G(nx-2,5,ny-2,nz-1) !< viscous + SGS flux in z direction
     integer i, j, k
     real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz, Hsgs
     real(8), dimension(2) :: mx, mxsgs, my, mysgs
@@ -441,54 +441,54 @@ contains
       real(8) :: mx(2)
       mx(1)  = 0.25d0 * (mu(i-1,j,k) + mu(i,  j,k) + mu(i-1,j,k+1) + mu(i,  j,k+1))
       mx(2)  = 0.25d0 * (mu(i,  j,k) + mu(i+1,j,k) + mu(i,  j,k+1) + mu(i+1,j,k+1))
-      mux    = 0.25d0 * (mx(1)    * (-Q(2,i-1,j,k) + Q(2,i,j,k) - Q(2,i-1,j,k+1) + Q(2,i,j,k+1)) &
-                       + mx(2)    * (-Q(2,i,j,k) + Q(2,i+1,j,k) - Q(2,i,j,k+1) + Q(2,i+1,j,k+1))) * dx(i)
-      muxsgs = 0.25d0 * (mxsgs(1) * (-Q(2,i-1,j,k) + Q(2,i,j,k) - Q(2,i-1,j,k+1) + Q(2,i,j,k+1)) &
-                       + mxsgs(2) * (-Q(2,i,j,k) + Q(2,i+1,j,k) - Q(2,i,j,k+1) + Q(2,i+1,j,k+1))) * dx(i)
-      mwx    = 0.25d0 * (mx(1)    * (-Q(4,i-1,j,k) + Q(4,i,j,k) - Q(4,i-1,j,k+1) + Q(4,i,j,k+1)) &
-                       + mx(2)    * (-Q(4,i,j,k) + Q(4,i+1,j,k) - Q(4,i,j,k+1) + Q(4,i+1,j,k+1))) * dx(i)
-      mwxsgs = 0.25d0 * (mxsgs(1) * (-Q(4,i-1,j,k) + Q(4,i,j,k) - Q(4,i-1,j,k+1) + Q(4,i,j,k+1)) &
-                       + mxsgs(2) * (-Q(4,i,j,k) + Q(4,i+1,j,k) - Q(4,i,j,k+1) + Q(4,i+1,j,k+1))) * dx(i)
+      mux    = 0.25d0 * (mx(1)    * (-Q(i-1,2,j,k) + Q(i,2,j,k) - Q(i-1,2,j,k+1) + Q(i,2,j,k+1)) &
+                       + mx(2)    * (-Q(i,2,j,k) + Q(i+1,2,j,k) - Q(i,2,j,k+1) + Q(i+1,2,j,k+1))) * dx(i)
+      muxsgs = 0.25d0 * (mxsgs(1) * (-Q(i-1,2,j,k) + Q(i,2,j,k) - Q(i-1,2,j,k+1) + Q(i,2,j,k+1)) &
+                       + mxsgs(2) * (-Q(i,2,j,k) + Q(i+1,2,j,k) - Q(i,2,j,k+1) + Q(i+1,2,j,k+1))) * dx(i)
+      mwx    = 0.25d0 * (mx(1)    * (-Q(i-1,4,j,k) + Q(i,4,j,k) - Q(i-1,4,j,k+1) + Q(i,4,j,k+1)) &
+                       + mx(2)    * (-Q(i,4,j,k) + Q(i+1,4,j,k) - Q(i,4,j,k+1) + Q(i+1,4,j,k+1))) * dx(i)
+      mwxsgs = 0.25d0 * (mxsgs(1) * (-Q(i-1,4,j,k) + Q(i,4,j,k) - Q(i-1,4,j,k+1) + Q(i,4,j,k+1)) &
+                       + mxsgs(2) * (-Q(i,4,j,k) + Q(i+1,4,j,k) - Q(i,4,j,k+1) + Q(i+1,4,j,k+1))) * dx(i)
     end block
     block
       real(8) :: my(2)
       my(1)  = 0.25d0 * (mu(i,j-1,k) + mu(i,j,  k) + mu(i,j-1,k+1) + mu(i,j,  k+1))
       my(2)  = 0.25d0 * (mu(i,j,  k) + mu(i,j+1,k) + mu(i,j,  k+1) + mu(i,j+1,k+1))
-      mvy    = 0.25d0 * (my(1)    * (-Q(3,i,j-1,k) + Q(3,i,j,k) - Q(3,i,j-1,k+1) + Q(3,i,j,k+1)) &
-                       + my(2)    * (-Q(3,i,j,k) + Q(3,i,j+1,k) - Q(3,i,j,k+1) + Q(3,i,j+1,k+1))) * dy(j)
-      mvysgs = 0.25d0 * (mysgs(1) * (-Q(3,i,j-1,k) + Q(3,i,j,k) - Q(3,i,j-1,k+1) + Q(3,i,j,k+1)) &
-                       + mysgs(2) * (-Q(3,i,j,k) + Q(3,i,j+1,k) - Q(3,i,j,k+1) + Q(3,i,j+1,k+1))) * dy(j)
-      mwy    = 0.25d0 * (my(1)    * (-Q(4,i,j-1,k) + Q(4,i,j,k) - Q(4,i,j-1,k+1) + Q(4,i,j,k+1)) &
-                       + my(2)    * (-Q(4,i,j,k) + Q(4,i,j+1,k) - Q(4,i,j,k+1) + Q(4,i,j+1,k+1))) * dy(j)
-      mwysgs = 0.25d0 * (mysgs(1) * (-Q(4,i,j-1,k) + Q(4,i,j,k) - Q(4,i,j-1,k+1) + Q(4,i,j,k+1)) &
-                       + mysgs(2) * (-Q(4,i,j,k) + Q(4,i,j+1,k) - Q(4,i,j,k+1) + Q(4,i,j+1,k+1))) * dy(j)
+      mvy    = 0.25d0 * (my(1)    * (-Q(i,3,j-1,k) + Q(i,3,j,k) - Q(i,3,j-1,k+1) + Q(i,3,j,k+1)) &
+                       + my(2)    * (-Q(i,3,j,k) + Q(i,3,j+1,k) - Q(i,3,j,k+1) + Q(i,3,j+1,k+1))) * dy(j)
+      mvysgs = 0.25d0 * (mysgs(1) * (-Q(i,3,j-1,k) + Q(i,3,j,k) - Q(i,3,j-1,k+1) + Q(i,3,j,k+1)) &
+                       + mysgs(2) * (-Q(i,3,j,k) + Q(i,3,j+1,k) - Q(i,3,j,k+1) + Q(i,3,j+1,k+1))) * dy(j)
+      mwy    = 0.25d0 * (my(1)    * (-Q(i,4,j-1,k) + Q(i,4,j,k) - Q(i,4,j-1,k+1) + Q(i,4,j,k+1)) &
+                       + my(2)    * (-Q(i,4,j,k) + Q(i,4,j+1,k) - Q(i,4,j,k+1) + Q(i,4,j+1,k+1))) * dy(j)
+      mwysgs = 0.25d0 * (mysgs(1) * (-Q(i,4,j-1,k) + Q(i,4,j,k) - Q(i,4,j-1,k+1) + Q(i,4,j,k+1)) &
+                       + mysgs(2) * (-Q(i,4,j,k) + Q(i,4,j+1,k) - Q(i,4,j,k+1) + Q(i,4,j+1,k+1))) * dy(j)
     end block
     mz     = 0.5d0 * (mu(i,j,k) + mu(i,j,k+1))
     kTz    = Cp_over_Pr * mz * (-T(i,j,k) + T(i,j,k+1)) * dz(k)
-    muz    = mz    * (-Q(2,i,j,k) + Q(2,i,j,k+1)) * dz(k)
-    muzsgs = mzsgs * (-Q(2,i,j,k) + Q(2,i,j,k+1)) * dz(k)
-    mvz    = mz    * (-Q(3,i,j,k) + Q(3,i,j,k+1)) * dz(k)
-    mvzsgs = mzsgs * (-Q(3,i,j,k) + Q(3,i,j,k+1)) * dz(k)
-    mwz    = mz    * (-Q(4,i,j,k) + Q(4,i,j,k+1)) * dz(k)
-    mwzsgs = mzsgs * (-Q(4,i,j,k) + Q(4,i,j,k+1)) * dz(k)
+    muz    = mz    * (-Q(i,2,j,k) + Q(i,2,j,k+1)) * dz(k)
+    muzsgs = mzsgs * (-Q(i,2,j,k) + Q(i,2,j,k+1)) * dz(k)
+    mvz    = mz    * (-Q(i,3,j,k) + Q(i,3,j,k+1)) * dz(k)
+    mvzsgs = mzsgs * (-Q(i,3,j,k) + Q(i,3,j,k+1)) * dz(k)
+    mwz    = mz    * (-Q(i,4,j,k) + Q(i,4,j,k+1)) * dz(k)
+    mwzsgs = mzsgs * (-Q(i,4,j,k) + Q(i,4,j,k+1)) * dz(k)
     tzx    = mwx + muz
     tzy    = mvz + mwy
     tzz    = two_third * (2.d0 * mwz - mux - mvy)
-    utzx   = 0.5d0 * (Q(2,i,j,k) + Q(2,i,j,k+1)) * tzx
-    vtzy   = 0.5d0 * (Q(3,i,j,k) + Q(3,i,j,k+1)) * tzy
-    wtzz   = 0.5d0 * (Q(4,i,j,k) + Q(4,i,j,k+1)) * tzz
-    tzx    = tzx + mwx + muz
-    tzy    = tzy + mvz + mwy
-    tzz    = tzz + two_third * (2.d0 * mwz - mux - mvy)
+    utzx   = 0.5d0 * (Q(i,2,j,k) + Q(i,2,j,k+1)) * tzx
+    vtzy   = 0.5d0 * (Q(i,3,j,k) + Q(i,3,j,k+1)) * tzy
+    wtzz   = 0.5d0 * (Q(i,4,j,k) + Q(i,4,j,k+1)) * tzz
+    tzx    = tzx + mwxsgs + muzsgs
+    tzy    = tzy + mvzsgs + mwysgs
+    tzz    = tzz + two_third * (2.d0 * mwzsgs - muxsgs - mvysgs)
     block
       real(8) :: H(2)
-      H(:) = Cp * T(i,j,k:k+1) + 0.5d0 * (Q(2,i,j,k:k+1)**2 + Q(3,i,j,k:k+1)**2 + Q(4,i,j,k:k+1)**2) + qc2(i,j,k:k+1)
+      H(:) = Cp * T(i,j,k:k+1) + 0.5d0 * (Q(i,2,j,k:k+1)**2 + Q(i,3,j,k:k+1)**2 + Q(i,4,j,k:k+1)**2) + qc2(i,j,k:k+1)
       Hsgs = -mzsgs * (-H(1) + H(2)) * dz(k) / Prt
     end block
-    G(2,i-1,j-1,k) = G(2,i-1,j-1,k) - tzx
-    G(3,i-1,j-1,k) = G(3,i-1,j-1,k) - tzy
-    G(4,i-1,j-1,k) = G(4,i-1,j-1,k) - tzz
-    G(5,i-1,j-1,k) = G(5,i-1,j-1,k) - (utzx + vtzy + wtzz + kTz + Hsgs)
+    G(i-1,2,j-1,k) = G(i-1,2,j-1,k) - tzx
+    G(i-1,3,j-1,k) = G(i-1,3,j-1,k) - tzy
+    G(i-1,4,j-1,k) = G(i-1,4,j-1,k) - tzz
+    G(i-1,5,j-1,k) = G(i-1,5,j-1,k) - (utzx + vtzy + wtzz + kTz + Hsgs)
   end subroutine calc_Gv_LES2
 end module calc_visc2
 

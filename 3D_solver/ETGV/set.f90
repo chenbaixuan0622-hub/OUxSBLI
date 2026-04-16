@@ -17,7 +17,7 @@ contains
     use mod_globals, only : id_accuracy
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
-    real(8), intent(out) :: Q(5,nx,ny,nz)
+    real(8), intent(out) :: Q(nx,5,ny,nz)
     integer i, j, k, offset
     if (kind(id_accuracy) == 2) then
       offset = 1
@@ -30,16 +30,16 @@ contains
       do j = 1+offset, ny-offset
         do i = 1+offset, nx-offset
           ! rho
-          Q(1,i,j,k) =  RHO0
+          Q(i,1,j,k) =  RHO0
           ! rho u
-          Q(2,i,j,k) =  RHO0 * M0 * sin(x(i)) * cos(y(j)) * cos(z(k))
+          Q(i,2,j,k) =  RHO0 * M0 * sin(x(i)) * cos(y(j)) * cos(z(k))
           ! rho v
-          Q(3,i,j,k) = -RHO0 * M0 * cos(x(i)) * sin(y(j)) * cos(z(k))
+          Q(i,3,j,k) = -RHO0 * M0 * cos(x(i)) * sin(y(j)) * cos(z(k))
           ! rho w0
-          Q(4,i,j,k) = 0.d0
+          Q(i,4,j,k) = 0.d0
           ! p / (gamma - 1) + 0.5 * (rhou ** 2 + rhov ** 2 ) / rho
-          Q(5,i,j,k) = (1.d0/gamma+0.0625d0*RHO0*(M0**2)*(cos(2.d0*x(i))+cos(2.d0*y(j)))*(cos(2.d0*z(k))+2.d0))&
-                       / (gamma - 1.d0) + 0.5d0 * (Q(2,i,j,k)**2 + Q(3,i,j,k)**2 + Q(4,i,j,k)**2) / Q(1,i,j,k)
+          Q(i,5,j,k) = (1.d0/gamma+0.0625d0*RHO0*(M0**2)*(cos(2.d0*x(i))+cos(2.d0*y(j)))*(cos(2.d0*z(k))+2.d0))&
+                       / (gamma - 1.d0) + 0.5d0 * (Q(i,2,j,k)**2 + Q(i,3,j,k)**2 + Q(i,4,j,k)**2) / Q(i,1,j,k)
     enddo;enddo;enddo
     call set_bc_cyclic(id_accuracy, nx, ny, nz, Q)
   end subroutine set_init
@@ -49,7 +49,7 @@ contains
     use mod_globals, only : id_accuracy
     integer, intent(in), value            :: myrank, nx, ny, nz
     real(8), intent(in), device           :: Jacobian(nx,ny)
-    real(8), intent(inout), device        :: Q(5,nx,ny,nz)
+    real(8), intent(inout), device        :: Q(nx,5,ny,nz)
     real(8), intent(in), device, optional :: Qre(ny*(nz-6)*5)
     integer i, j, k, l
     call set_bc_cyclic(id_accuracy, nx, ny, nz, Q)

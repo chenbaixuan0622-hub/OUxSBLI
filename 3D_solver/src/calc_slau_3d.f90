@@ -39,10 +39,10 @@
 
 
   pure attributes(device) subroutine SLAU1(id_slau, rho1, rho2, u1, u2, v1, v2, w1, w2, &
-                                           un1, un2, p1, p2, Norm, HR, F)
+                                           un1, un2, p1, p2, Norm, HR, F1, F2, F3, F4, F5)
     integer(2), intent(in), value :: id_slau
     real(8), intent(in)           :: rho1, rho2, u1, u2, v1, v2, w1, w2, un1, un2, p1, p2, Norm(5), HR
-    real(8), intent(out)          :: F(5)
+    real(8), intent(out)          :: F1, F2, F3, F4, F5
     real(8) c, over_c, Mp, Mm, M, x
     real(8) Vtp, Vtm, dp, bp, bm, mass, mass1, mass2, over_rho1, over_rho2, k1, k2
     over_rho1 = 1.d0 / rho1
@@ -59,20 +59,20 @@
     block
       real(8) pres
       pres = 0.5d0 * (p1 + p2 + (bp - bm) * (-dp) + (1.d0 - x) * (bp + bm - 1.d0) * (p1 + p2))
-      F(1) = mass1                                + mass2
-      F(2) = mass1 * u1                           + mass2 * u2 + pres * Norm(2)
-      F(3) = mass1 * v1                           + mass2 * v2 + pres * Norm(3)
-      F(4) = mass1 * w1                           + mass2 * w2 + pres * Norm(4)
-      F(5) = mass1 * phi(rho1, k1, p1, over_rho1) + mass2 * phi(rho2, k2, p2, over_rho2)
+      F1 = mass1                                + mass2
+      F2 = mass1 * u1                           + mass2 * u2 + pres * Norm(2)
+      F3 = mass1 * v1                           + mass2 * v2 + pres * Norm(3)
+      F4 = mass1 * w1                           + mass2 * w2 + pres * Norm(4)
+      F5 = mass1 * phi(rho1, k1, p1, over_rho1) + mass2 * phi(rho2, k2, p2, over_rho2)
     end block
   end subroutine SLAU1
 
 
   pure attributes(device) subroutine HRSLAU2(id_slau, rho1, rho2, u1, u2, v1, v2, w1, w2, &
-                                             un1, un2, p1, p2, Norm, HR, F)
+                                             un1, un2, p1, p2, Norm, HR, F1, F2, F3, F4, F5)
     integer(4), intent(in), value :: id_slau
     real(8), intent(in)           :: rho1, rho2, u1, u2, v1, v2, w1, w2, un1, un2, p1, p2, Norm(5), HR
-    real(8), intent(out)          :: F(5)
+    real(8), intent(out)          :: F1, F2, F3, F4, F5
     real(8) c, over_c, Mp, Mm
     real(8) Vtp, Vtm, dp, bp, bm, mass, mass1, mass2, Vec2, over_rho1, over_rho2, k1, k2
     over_rho1 = 1.d0 / rho1
@@ -93,11 +93,11 @@
     block
       real(8) pres
       pres = 0.5d0 * (p1 + p2 + (bp - bm) * (-dp) + HR * Vec2 * (bp + bm - 1.d0) * 0.5d0 * (rho1 + rho2) * c)
-      F(1) = mass1                                + mass2
-      F(2) = mass1 * u1                           + mass2 * u2 + pres * Norm(2)
-      F(3) = mass1 * v1                           + mass2 * v2 + pres * Norm(3)
-      F(4) = mass1 * w1                           + mass2 * w2 + pres * Norm(4)
-      F(5) = mass1 * phi(rho1, k1, p1, over_rho1) + mass2 * phi(rho2, k2, p2, over_rho2)
+      F1 = mass1                                + mass2
+      F2 = mass1 * u1                           + mass2 * u2 + pres * Norm(2)
+      F3 = mass1 * v1                           + mass2 * v2 + pres * Norm(3)
+      F4 = mass1 * w1                           + mass2 * w2 + pres * Norm(4)
+      F5 = mass1 * phi(rho1, k1, p1, over_rho1) + mass2 * phi(rho2, k2, p2, over_rho2)
     end block
   end subroutine HRSLAU2
 

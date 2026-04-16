@@ -45,7 +45,7 @@ contains
     real(8), intent(out), allocatable, device :: F(:,:,:,:) !< flux in y direction
     real(8), intent(out), allocatable, device :: G(:,:,:,:) !< flux in z direction
     integer ierr
-    allocate(ruvwp(5,nx,ny,nz), E(5,nx-1,ny-2,nz-2), F(5,nx-2,ny-1,nz-2), G(5,nx-2,ny-2,nz-1), stat=ierr)
+    allocate(ruvwp(5,nx,ny,nz), E(nx-1,5,ny-2,nz-2), F(nx-2,5,ny-1,nz-2), G(nx-2,5,ny-2,nz-1), stat=ierr)
     allocate(dx(nx-1), dy(ny-1), dz(nz-1), xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(nx,ny), stat=ierr)
     if (kind(id_visc) == 2) then
       allocate(T(nx,ny,nz), mu(1,1,1), mut(1,1,1), qc2(1,1,1), stat=ierr)
@@ -79,7 +79,7 @@ contains
     real(8), intent(in)                      :: z(nz)               !< z coordinate array (host)
     real(8), intent(in)                      :: dz_cpu(nz-1)        !< inverse z spacing (host)
     real(8), intent(in)                      :: Jacobian_cpu(nx,ny) !< Jacobian determinant (host)
-    real(8), intent(inout)                   :: Q(5,nx,ny,nz)       !< conservative variables on host
+    real(8), intent(inout)                   :: Q(nx,5,ny,nz)       !< conservative variables on host
     integer, intent(out)                     :: overlap             !< ghost cell width for MPI halo exchange
     real(8), intent(out), device, contiguous :: dx(nx-1)            !< inverse x spacing (device)
     real(8), intent(out), device, contiguous :: dy(ny-1)            !< inverse y spacing (device)
@@ -88,7 +88,7 @@ contains
     real(8), intent(out), device, contiguous :: etay(ny-1)          !< y coordinate metric (device)
     real(8), intent(out), device, contiguous :: zetaz(nz-1)         !< z coordinate metric (device)
     real(8), intent(out), device, contiguous :: Jacobian(nx,ny)     !< Jacobian determinant (device)
-    real(8), intent(out), device, contiguous :: QJ(5,nx,ny,nz)      !< Q divided by Jacobian (device)
+    real(8), intent(out), device, contiguous :: QJ(nx,5,ny,nz)      !< Q divided by Jacobian (device)
     real(4), intent(inout)                   :: ke0                 !< reference kinetic energy
     real(4), intent(inout)                   :: entropy0            !< reference entropy
     real(8) xix_cpu(nx-1), etay_cpu(ny-1), zetaz_cpu(nz-1)
@@ -97,10 +97,13 @@ contains
     ! set Q / Jacobian
     do k = 1, nz
       do j = 1, ny
-        do i = 1, nx
-          do l = 1, 5
-            Q(l,i,j,k) = Q(l,i,j,k) / Jacobian_cpu(i,j)
-    enddo;enddo;enddo;enddo
+        do l = 1, 5
+          do i = 1, nx
+            Q(i,l,j,k) = Q(i,l,j,k) / Jacobian_cpu(i,j)
+          enddo
+        enddo
+      enddo
+    enddo
     ! copy on GPU
     xix_cpu   = 1.d0 / dx_cpu
     etay_cpu  = 1.d0 / dy_cpu

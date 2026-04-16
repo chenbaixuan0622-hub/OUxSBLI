@@ -33,21 +33,21 @@ contains
   subroutine set_init(myrank, nx, ny, nz, x, y, z, Q)
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
-    real(8), intent(out) :: Q(5,nx,ny,nz)
+    real(8), intent(out) :: Q(nx,5,ny,nz)
     integer i, j, k
     do i = 1, nx
       if (i < int(0.5*nx)) then
-        Q(1,i,:,:) = rhol
-        Q(2,i,:,:) = 0.d0
-        Q(3,i,:,:) = 0.d0
-        Q(4,i,:,:) = 0.d0
-        Q(5,i,:,:) = pl / (gamma  - 1.d0)
+        Q(i,1,:,:) = rhol
+        Q(i,2,:,:) = 0.d0
+        Q(i,3,:,:) = 0.d0
+        Q(i,4,:,:) = 0.d0
+        Q(i,5,:,:) = pl / (gamma  - 1.d0)
       else
-        Q(1,i,:,:) = rhor
-        Q(2,i,:,:) = 0.d0
-        Q(3,i,:,:) = 0.d0
-        Q(4,i,:,:) = 0.d0
-        Q(5,i,:,:) = pr / (gamma - 1.d0)
+        Q(i,1,:,:) = rhor
+        Q(i,2,:,:) = 0.d0
+        Q(i,3,:,:) = 0.d0
+        Q(i,4,:,:) = 0.d0
+        Q(i,5,:,:) = pr / (gamma - 1.d0)
       endif
     enddo
   end subroutine set_init
@@ -56,56 +56,56 @@ contains
   subroutine set_bc(myrank, nx, ny, nz, Jacobian, Q, Qre)
     integer, intent(in), value            :: myrank, nx, ny, nz
     real(8), intent(in), device           :: Jacobian(ny)
-    real(8), intent(inout), device        :: Q(5,nx,ny,nz) ! Q / J
+    real(8), intent(inout), device        :: Q(nx,5,ny,nz) ! Q / J
     real(8), intent(in), device, optional :: Qre(ny*(nz-6)*5)
     integer :: i, j, k, l, jc = 4, kc = 4
-    real(8), device :: Qc(5,nx)
+    real(8), device :: Qc(nx,5)
     ! inlet and outlet
     !$cuf kernel do(2) <<<*,*>>>
     do k = 4, 4
       do j = 4, 4
         Q(1,1,j,k)    = rhol / Jacobian(j)
-        Q(2,1,j,k)    = 0.d0
-        Q(3,1,j,k)    = 0.d0
-        Q(4,1,j,k)    = 0.d0
-        Q(5,1,j,k)    = pl / (gamma - 1.d0) / Jacobian(j)
-        Q(1,2,j,k)    = rhol / Jacobian(j)
+        Q(1,2,j,k)    = 0.d0
+        Q(1,3,j,k)    = 0.d0
+        Q(1,4,j,k)    = 0.d0
+        Q(1,5,j,k)    = pl / (gamma - 1.d0) / Jacobian(j)
+        Q(2,1,j,k)    = rhol / Jacobian(j)
         Q(2,2,j,k)    = 0.d0
-        Q(3,2,j,k)    = 0.d0
-        Q(4,2,j,k)    = 0.d0
-        Q(5,2,j,k)    = pl / (gamma - 1.d0) / Jacobian(j)
-        Q(1,3,j,k)    = rhol / Jacobian(j)
         Q(2,3,j,k)    = 0.d0
+        Q(2,4,j,k)    = 0.d0
+        Q(2,5,j,k)    = pl / (gamma - 1.d0) / Jacobian(j)
+        Q(3,1,j,k)    = rhol / Jacobian(j)
+        Q(3,2,j,k)    = 0.d0
         Q(3,3,j,k)    = 0.d0
-        Q(4,3,j,k)    = 0.d0
-        Q(5,3,j,k)    = pl / (gamma - 1.d0) / Jacobian(j)
-        Q(1,nx-2,j,k) = rhor / Jacobian(j)
-        Q(2,nx-2,j,k) = 0.d0
-        Q(3,nx-2,j,k) = 0.d0
-        Q(4,nx-2,j,k) = 0.d0
-        Q(5,nx-2,j,k) = pr / (gamma - 1.d0) / Jacobian(j)
-        Q(1,nx-1,j,k) = rhor / Jacobian(j)
-        Q(2,nx-1,j,k) = 0.d0
-        Q(3,nx-1,j,k) = 0.d0
-        Q(4,nx-1,j,k) = 0.d0
-        Q(5,nx-1,j,k) = pr / (gamma - 1.d0) / Jacobian(j)
-        Q(1,nx,j,k)   = rhor / Jacobian(j)
-        Q(2,nx,j,k)   = 0.d0
-        Q(3,nx,j,k)   = 0.d0
-        Q(4,nx,j,k)   = 0.d0
-        Q(5,nx,j,k)   = pr / (gamma - 1.d0) / Jacobian(j)
+        Q(3,4,j,k)    = 0.d0
+        Q(3,5,j,k)    = pl / (gamma - 1.d0) / Jacobian(j)
+        Q(nx-2,1,j,k) = rhor / Jacobian(j)
+        Q(nx-2,2,j,k) = 0.d0
+        Q(nx-2,3,j,k) = 0.d0
+        Q(nx-2,4,j,k) = 0.d0
+        Q(nx-2,5,j,k) = pr / (gamma - 1.d0) / Jacobian(j)
+        Q(nx-1,1,j,k) = rhor / Jacobian(j)
+        Q(nx-1,2,j,k) = 0.d0
+        Q(nx-1,3,j,k) = 0.d0
+        Q(nx-1,4,j,k) = 0.d0
+        Q(nx-1,5,j,k) = pr / (gamma - 1.d0) / Jacobian(j)
+        Q(nx,1,j,k)   = rhor / Jacobian(j)
+        Q(nx,2,j,k)   = 0.d0
+        Q(nx,3,j,k)   = 0.d0
+        Q(nx,4,j,k)   = 0.d0
+        Q(nx,5,j,k)   = pr / (gamma - 1.d0) / Jacobian(j)
     enddo;enddo
     !$cuf kernel do(2)<<<*,*>>>
-    do i = 1, nx
-      do l = 1, 5
-        Qc(l,i) = Q(l,i,jc,kc)
+    do l = 1, 5
+      do i = 1, nx
+        Qc(i,l) = Q(i,l,jc,kc)
     enddo;enddo
     !$cuf kernel do(4)<<<*,*>>>
     do k = 1, nz
       do j = 1, ny
-        do i = 1, nx
-          do l = 1, 5
-            Q(l,i,j,k) = Qc(l,i)
+        do l = 1, 5
+          do i = 1, nx
+            Q(i,l,j,k) = Qc(i,l)
     enddo;enddo;enddo;enddo
   end subroutine set_bc
 

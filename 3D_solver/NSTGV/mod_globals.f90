@@ -29,7 +29,7 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer, parameter         :: dimension   = 3
   integer(4), parameter      :: id_visc     = 2
-  integer(2), parameter      :: id_scheme   = 0
+  real(2), parameter         :: id_scheme   = 0
   real(8), parameter         :: threshold   = 0.4d0
   integer(kind=8), parameter :: id_accuracy = 0
   integer(kind=8), parameter :: id_tvd      = 0
@@ -44,9 +44,9 @@ module mod_globals
   real(8), parameter :: Lx = 2.d0 * pi * L0
   real(8), parameter :: Ly = 2.d0 * pi * L0
   real(8), parameter :: Lz = 2.d0 * pi * L0
-  integer, parameter :: nx = 66
-  integer, parameter :: ny = 66
-  integer, parameter :: nz = 66
+  integer, parameter :: nx = 513
+  integer, parameter :: ny = 513
+  integer, parameter :: nz = 513
   
   ! boundary condition
   logical, parameter :: id_bc_x = .false.

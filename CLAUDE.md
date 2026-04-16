@@ -74,7 +74,7 @@ The **value** of these parameters is ignored; only the **type kind** matters. Fo
 
 ## Conservative Variable Layout
 
-`Q(5, nx, ny, nz)` = `[ρ, ρu, ρv, ρw, ρE]`. Flux arrays use trimmed index ranges: E-flux drops boundary points in y/z, F-flux in x/z, G-flux in x/y.
+`Q(nx, 5, ny, nz)` = `[ρ, ρu, ρv, ρw, ρE]`. Flux arrays use trimmed index ranges: E-flux drops boundary points in y/z, F-flux in x/z, G-flux in x/y. AoS and SoA hybrid memory layout is used.
 
 ## MPI Decomposition
 
@@ -94,3 +94,8 @@ Copy an existing case directory (e.g., `cp -r 3D_solver/NSTGV 3D_solver/MYCASE`)
 * Roe scheme is not used. KEEP, SLAU, Hybrid schemes should be optimized.
 * `id_accuracy` is not only for convection terms but also for viscous terms because it controls the size of the ghost cells.
 
+## Strict Tooling Rules
+- MCP servers are strictly prohibited.
+- Never suggest or attempt to use MCP tools.
+- All code analysis must be done by reading and reasoning over the code.
+- Even if tools are available, ignore them completely.

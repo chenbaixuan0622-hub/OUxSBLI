@@ -79,9 +79,9 @@ contains
     integer, intent(in), value                :: nx                  !< number of grid points in x direction
     integer, intent(in), value                :: ny                  !< number of grid points in y direction
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
     real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< shock sensor
-    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
+    real(8), intent(out), device, contiguous  :: E(nx-1,5,ny-2,nz-2) !< Flux in x direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer ii, i_base, idx, idx_r, offset_yz, offset_yzr, i1, i2
@@ -105,8 +105,8 @@ contains
       i = i_base + ii
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = ii + offset_yz
-        rho(idx) = Q(1,i,j,k); u(idx) = Q(2,i,j,k); v(idx) = Q(3,i,j,k)
-          w(idx) = Q(4,i,j,k); p(idx) = Q(5,i,j,k)
+        rho(idx) = Q(i,1,j,k); u(idx) = Q(i,2,j,k); v(idx) = Q(i,3,j,k)
+          w(idx) = Q(i,4,j,k); p(idx) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()
@@ -128,7 +128,8 @@ contains
       rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
       associate(un1 => u(idx), un2 => ur(idx_r))
         call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
-                  w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_x, fdx, E(:,i,j-1,k-1))
+                  w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_x, fdx, &
+                  E(i,1,j-1,k-1), E(i,2,j-1,k-1), E(i,3,j-1,k-1), E(i,4,j-1,k-1), E(i,5,j-1,k-1))
       end associate
     endif
   end subroutine calc_slau_x_in
@@ -140,9 +141,9 @@ contains
     integer, intent(in), value                :: nx                  !< number of grid points in x direction
     integer, intent(in), value                :: ny                  !< number of grid points in y direction
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
     real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< shock sensor
-    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
+    real(8), intent(out), device, contiguous  :: F(nx-2,5,ny-1,nz-2) !< Flux in y direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer jj, j_base, idx, idx_r, offset_xz, offset_xzr, i1, i2
@@ -166,8 +167,8 @@ contains
       j = j_base + jj
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = jj + offset_xz
-        rho(idx) = Q(1,i,j,k); u(idx) = Q(2,i,j,k); v(idx) = Q(3,i,j,k)
-          w(idx) = Q(4,i,j,k); p(idx) = Q(5,i,j,k)
+        rho(idx) = Q(i,1,j,k); u(idx) = Q(i,2,j,k); v(idx) = Q(i,3,j,k)
+          w(idx) = Q(i,4,j,k); p(idx) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()
@@ -189,7 +190,8 @@ contains
       rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
       associate(un1 => v(idx), un2 => vr(idx_r))
         call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
-                  w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_y, fdy, F(:,i-1,j,k-1))
+                  w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_y, fdy, &
+                  F(i-1,1,j,k-1), F(i-1,2,j,k-1), F(i-1,3,j,k-1), F(i-1,4,j,k-1), F(i-1,5,j,k-1))
       end associate
     endif
   end subroutine calc_slau_y_in
@@ -201,9 +203,9 @@ contains
     integer, intent(in), value                :: nx                  !< number of grid points in x direction
     integer, intent(in), value                :: ny                  !< number of grid points in y direction
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device, contiguous   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
     real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< shock sensor
-    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
+    real(8), intent(out), device, contiguous  :: G(nx-2,5,ny-2,nz-1) !< Flux in z direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer kk, k_base, idx, idx_r, offset_xy, offset_xyr, i1, i2
@@ -227,8 +229,8 @@ contains
       k = k_base + kk
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = kk + offset_xy
-        rho(idx) = Q(1,i,j,k); u(idx) = Q(2,i,j,k); v(idx) = Q(3,i,j,k)
-          w(idx) = Q(4,i,j,k); p(idx) = Q(5,i,j,k)
+        rho(idx) = Q(i,1,j,k); u(idx) = Q(i,2,j,k); v(idx) = Q(i,3,j,k)
+          w(idx) = Q(i,4,j,k); p(idx) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()
@@ -250,7 +252,8 @@ contains
       rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
       associate(un1 => w(idx), un2 => wr(idx_r))
         call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
-                  w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_z, fdz, G(:,i-1,j-1,k))
+                  w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_z, fdz, &
+                  G(i-1,1,j-1,k), G(i-1,2,j-1,k), G(i-1,3,j-1,k), G(i-1,4,j-1,k), G(i-1,5,j-1,k))
       end associate
     endif
   end subroutine calc_slau_z_in

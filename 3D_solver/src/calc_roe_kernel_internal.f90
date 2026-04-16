@@ -58,9 +58,9 @@ contains
     integer, intent(in), value               :: nx                  !< grid points x
     integer, intent(in), value               :: ny                  !< grid points y
     integer, intent(in), value               :: nz                  !< grid points z
-    real(8), intent(in), device, contiguous  :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous  :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< Ducros shock sensor
-    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< x-direction flux
+    real(8), intent(out), device, contiguous :: E(nx-1,5,ny-2,nz-2) !< x-direction flux
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(-(io-1):threadsE%x+io+1, threadsE%y, threadsE%z), shared :: rho, u, v, w, p
     real(8), dimension(threadsE%x, threadsE%y, threadsE%z), shared :: rhor, ur, vr, wr, pr
@@ -72,11 +72,11 @@ contains
     do ii = it-io, threadsE%x+io+1, blockDim%x
       i = i_base + ii
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-        rho(ii,jt,kt) = Q(1,i,j,k)
-          u(ii,jt,kt) = Q(2,i,j,k)
-          v(ii,jt,kt) = Q(3,i,j,k)
-          w(ii,jt,kt) = Q(4,i,j,k)
-          p(ii,jt,kt) = Q(5,i,j,k)
+        rho(ii,jt,kt) = Q(i,1,j,k)
+          u(ii,jt,kt) = Q(i,2,j,k)
+          v(ii,jt,kt) = Q(i,3,j,k)
+          w(ii,jt,kt) = Q(i,4,j,k)
+          p(ii,jt,kt) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()
@@ -104,7 +104,7 @@ contains
           p(it,jt,kt) = pl
         call Roe(rho(it,jt,kt), rhor(it,jt,kt), u(it,jt,kt), ur(it,jt,kt), v(it,jt,kt), vr(it,jt,kt), &
                  w(it,jt,kt), wr(it,jt,kt), p(it,jt,kt), pr(it,jt,kt), &
-                 E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
+                 E(i,1,j-1,k-1), E(i,2,j-1,k-1), E(i,3,j-1,k-1), E(i,4,j-1,k-1), E(i,5,j-1,k-1))
       endif
     end block
   end subroutine calc_roe_x_in
@@ -116,9 +116,9 @@ contains
     integer, intent(in), value               :: nx                  !< grid points x
     integer, intent(in), value               :: ny                  !< grid points y
     integer, intent(in), value               :: nz                  !< grid points z
-    real(8), intent(in), device, contiguous  :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous  :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< Ducros shock sensor
-    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< y-direction flux
+    real(8), intent(out), device, contiguous :: F(nx-2,5,ny-1,nz-2) !< y-direction flux
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(-(io-1):threadsF%y+io+1, threadsF%x, threadsF%z), shared :: rho, u, v, w, p
     real(8), dimension(threadsF%y, threadsF%x, threadsF%z), shared :: rhor, ur, vr, wr, pr
@@ -129,11 +129,11 @@ contains
     do jj = jt-io, threadsF%y+io+1, blockDim%y
       j = j_base + jj
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-        rho(jj,it,kt) = Q(1,i,j,k)
-          u(jj,it,kt) = Q(2,i,j,k)
-          v(jj,it,kt) = Q(3,i,j,k)
-          w(jj,it,kt) = Q(4,i,j,k)
-          p(jj,it,kt) = Q(5,i,j,k)
+        rho(jj,it,kt) = Q(i,1,j,k)
+          u(jj,it,kt) = Q(i,2,j,k)
+          v(jj,it,kt) = Q(i,3,j,k)
+          w(jj,it,kt) = Q(i,4,j,k)
+          p(jj,it,kt) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()
@@ -157,7 +157,7 @@ contains
           p(jt,it,kt) = pl
         call Roe(rho(jt,it,kt), rhor(jt,it,kt), v(jt,it,kt), vr(jt,it,kt), w(jt,it,kt), wr(jt,it,kt), &
                  u(jt,it,kt), ur(jt,it,kt), p(jt,it,kt), pr(jt,it,kt), &
-                 F(1,i-1,j,k-1), F(3,i-1,j,k-1), F(4,i-1,j,k-1), F(2,i-1,j,k-1), F(5,i-1,j,k-1))
+                 F(i-1,1,j,k-1), F(i-1,3,j,k-1), F(i-1,4,j,k-1), F(i-1,2,j,k-1), F(i-1,5,j,k-1))
       endif
     end block
   end subroutine calc_roe_y_in
@@ -169,9 +169,9 @@ contains
     integer, intent(in), value               :: nx                  !< grid points x
     integer, intent(in), value               :: ny                  !< grid points y
     integer, intent(in), value               :: nz                  !< grid points z
-    real(8), intent(in), device, contiguous  :: Q(5,nx,ny,nz)       !< conservative variables
+    real(8), intent(in), device, contiguous  :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< Ducros shock sensor
-    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< z-direction flux
+    real(8), intent(out), device, contiguous :: G(nx-2,5,ny-2,nz-1) !< z-direction flux
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(-(io-1):threadsG%z+io+1, threadsG%y, threadsG%x), shared :: rho, u, v, w, p
     real(8), dimension(threadsG%z, threadsG%y, threadsG%x), shared :: rhor, ur, vr, wr, pr
@@ -182,11 +182,11 @@ contains
     do kk = kt-io, threadsG%z+io+1, blockDim%z
       k = k_base + kk
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-        rho(kk,jt,it) = Q(1,i,j,k)
-          u(kk,jt,it) = Q(2,i,j,k)
-          v(kk,jt,it) = Q(3,i,j,k)
-          w(kk,jt,it) = Q(4,i,j,k)
-          p(kk,jt,it) = Q(5,i,j,k)
+        rho(kk,jt,it) = Q(i,1,j,k)
+          u(kk,jt,it) = Q(i,2,j,k)
+          v(kk,jt,it) = Q(i,3,j,k)
+          w(kk,jt,it) = Q(i,4,j,k)
+          p(kk,jt,it) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()
@@ -210,7 +210,7 @@ contains
           p(kt,jt,it) = pl
         call Roe(rho(kt,jt,it), rhor(kt,jt,it), w(kt,jt,it), wr(kt,jt,it), u(kt,jt,it), ur(kt,jt,it), &
                  v(kt,jt,it), vr(kt,jt,it), p(kt,jt,it), pr(kt,jt,it), &
-                 G(1,i-1,j-1,k), G(4,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(5,i-1,j-1,k))
+                 G(i-1,1,j-1,k), G(i-1,4,j-1,k), G(i-1,2,j-1,k), G(i-1,3,j-1,k), G(i-1,5,j-1,k))
       endif
     end block
   end subroutine calc_roe_z_in
