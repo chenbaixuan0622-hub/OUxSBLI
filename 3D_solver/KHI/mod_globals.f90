@@ -29,7 +29,7 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer, parameter         :: dimension   = 3
   integer(2), parameter      :: id_visc     = 0
-  integer(2), parameter      :: id_scheme   = 0
+  real(2), parameter         :: id_scheme   = 0
   real(8), parameter         :: threshold   = 0.9d0
   integer(kind=8), parameter :: id_accuracy = 0
   integer(kind=2), parameter :: id_tvd      = 0
@@ -74,6 +74,8 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter  :: id_recal = 0
   integer(kind=4), parameter  :: id_RungeKutta = 0
+  integer, parameter          :: step_offset = 0
+  integer, parameter          :: start_rescale = 0
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0

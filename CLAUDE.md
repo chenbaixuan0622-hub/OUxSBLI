@@ -93,6 +93,7 @@ Copy an existing case directory (e.g., `cp -r 3D_solver/NSTGV 3D_solver/MYCASE`)
 * `calc_flux_base.f90` calls `calc_*_kernel.f90`, `calc_*_kernel_internal.f90`, and `calc_visc*.f90`. They are the main bottleneck.
 * Roe scheme is not used. KEEP, SLAU, Hybrid schemes should be optimized.
 * `id_accuracy` is not only for convection terms but also for viscous terms because it controls the size of the ghost cells.
+* Do not add `contiguous` and `shared` attributes when passing shared memory as an argument.
 
 ## Strict Tooling Rules
 - MCP servers are strictly prohibited.

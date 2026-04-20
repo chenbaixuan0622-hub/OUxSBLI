@@ -4,6 +4,7 @@
 module calc_visc4
   use mod_globals, only : id_visc, id_bc_x, id_bc_y, id_bc_z, gamma, R, Pr, Prt, dt, threadsEv, threadsFv, threadsGv
   use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third, two_third, one_twelfth
+  use load_smem_visc4
   implicit none
   private
   public calc_Ev4, calc_Ev_LES4, calc_Fv4, calc_Fv_LES4, calc_Gv4, calc_Gv_LES4
@@ -24,39 +25,29 @@ contains
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
     real(8), intent(inout), device, contiguous :: E(nx-1,5,ny-2,nz-2) !< viscous flux components in x direction
-    real(8), shared ::  u(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
-    real(8), shared ::  v(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
-    real(8), shared ::  w(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
-    real(8), shared :: uy(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
-    real(8), shared :: vy(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
-    real(8), shared :: uz(-2:threadsEv%x+3,threadsEv%z,threadsEv%y)
-    real(8), shared :: wz(-2:threadsEv%x+3,threadsEv%z,threadsEv%y)
-    integer i, j, k, it, jt, kt, ii, i_base
+    integer, parameter :: io_v = 2
+    integer, parameter :: sx = threadsEv%x + 2*io_v + 1
+    integer, parameter :: sy = threadsEv%y
+    integer, parameter :: sz = threadsEv%z
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  u
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  v
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  w
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: uy
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: vy
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: uz
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: wz
+    integer i, j, k, it, jt, kt, ii, idx, offset_yz
     real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
-    i_base = (blockIdx%x-1)*blockDim%x
-    do ii = it-2, threadsEv%x+3, blockDim%x
-      i = i_base + ii
-      if (1 <= i .and. i <= nx .and. j <= ny .and. k <= nz) then
-        u(ii,jt,kt) = Q(i,2,j,k)
-        v(ii,jt,kt) = Q(i,3,j,k)
-        w(ii,jt,kt) = Q(i,4,j,k)
-      endif
-      if (1 <= i .and. i <= nx .and. 3 <= j .and. j <= ny-2 .and. k <= nz) then
-        uy(ii,jt,kt) = (two_third * (-Q(i,2,j-1,k) + Q(i,2,j+1,k)) - one_twelfth * (-Q(i,2,j-2,k) + Q(i,2,j+2,k))) * dy(j)
-        vy(ii,jt,kt) = (two_third * (-Q(i,3,j-1,k) + Q(i,3,j+1,k)) - one_twelfth * (-Q(i,3,j-2,k) + Q(i,3,j+2,k))) * dy(j)
-      endif
-      if (1 <= i .and. i <= nx .and. j <= ny .and. 3 <= k .and. k <= nz-2) then
-        uz(ii,jt,kt) = (two_third * (-Q(i,2,j,k-1) + Q(i,2,j,k+1)) - one_twelfth * (-Q(i,2,j,k-2) + Q(i,2,j,k+2))) * dz(k)
-        wz(ii,jt,kt) = (two_third * (-Q(i,4,j,k-1) + Q(i,4,j,k+1)) - one_twelfth * (-Q(i,4,j,k-2) + Q(i,4,j,k+2))) * dz(k)
-      endif
-    enddo
+    offset_yz = (jt-1)*sx + (kt-1)*sx*sy
+    call load_smem_visc4_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
     call syncthreads()
     i  = (blockIdx%x-1)*blockDim%x + it
+    idx = it + offset_yz
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
       block
@@ -68,9 +59,9 @@ contains
                     (1.125d0 * (-T(i-1:i+1,j,k) + T(i:i+2,j,k)) - (-T(i-2:i,j,k) + T(i+1:i+3,j,k)) * one_24) * dx(i)
           kTx     = flux4(kTx3(:))
         end block
-        call calc_tau_straight(mu3, u(it-2:it+3,jt,kt), vy(it-2:it+3,jt,kt), wz(it-2:it+3,jt,kt), dx(i), txx, utxx)
-        call calc_tau_cross(mu3, v(it-2:it+3,jt,kt), uy(it-2:it+3,jt,kt), dx(i), txy, vtxy)
-        call calc_tau_cross(mu3, w(it-2:it+3,jt,kt), uz(it-2:it+3,jt,kt), dx(i), txz, wtxz)
+        call calc_tau_straight(mu3, u(idx-2:idx+3), vy(idx-2:idx+3), wz(idx-2:idx+3), dx(i), txx, utxx)
+        call calc_tau_cross(mu3, v(idx-2:idx+3), uy(idx-2:idx+3), dx(i), txy, vtxy)
+        call calc_tau_cross(mu3, w(idx-2:idx+3), uz(idx-2:idx+3), dx(i), txz, wtxz)
       end block
     else
       block
@@ -95,15 +86,15 @@ contains
           mwz = 0.25d0 * (mz(1) * (-Q(i,4,j,k-1) + Q(i,4,j,k) - Q(i+1,4,j,k-1) + Q(i+1,4,j,k)) &
                         + mz(2) * (-Q(i,4,j,k) + Q(i,4,j,k+1) - Q(i+1,4,j,k) + Q(i+1,4,j,k+1))) * dz(k)
         end block
-        mux  = mx * (-u(it,jt,kt) + u(it+1,jt,kt)) * dx(i)
-        mvx  = mx * (-v(it,jt,kt) + v(it+1,jt,kt)) * dx(i)
-        mwx  = mx * (-w(it,jt,kt) + w(it+1,jt,kt)) * dx(i)
+        mux  = mx * (-u(idx) + u(idx+1)) * dx(i)
+        mvx  = mx * (-v(idx) + v(idx+1)) * dx(i)
+        mwx  = mx * (-w(idx) + w(idx+1)) * dx(i)
         txx  = two_third * (2.d0 * mux - mvy - mwz)
         txy  = muy + mvx
         txz  = mwx + muz
-        utxx = 0.5d0 * (u(it,jt,kt) + u(it+1,jt,kt)) * txx
-        vtxy = 0.5d0 * (v(it,jt,kt) + v(it+1,jt,kt)) * txy
-        wtxz = 0.5d0 * (w(it,jt,kt) + w(it+1,jt,kt)) * txz
+        utxx = 0.5d0 * (u(idx) + u(idx+1)) * txx
+        vtxy = 0.5d0 * (v(idx) + v(idx+1)) * txy
+        wtxz = 0.5d0 * (w(idx) + w(idx+1)) * txz
       end block
     endif
     E(i,2,j-1,k-1) = E(i,2,j-1,k-1) - txx
@@ -111,7 +102,7 @@ contains
     E(i,4,j-1,k-1) = E(i,4,j-1,k-1) - txz
     E(i,5,j-1,k-1) = E(i,5,j-1,k-1) - (utxx + vtxy + wtxz + kTx)
   end subroutine calc_Ev4
- 
+
 
   !> CUDA Fortran kernel for 4th-order viscous flux with LES SGS model in x direction
   attributes(global) subroutine calc_Ev_LES4(nx, ny, nz, dx, dy, dz, Q, T, mu, mut, qc2, E)
@@ -127,39 +118,29 @@ contains
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
     real(8), intent(inout), device, contiguous :: E(nx-1,5,ny-2,nz-2) !< viscous + SGS flux in x direction
-    real(8), shared ::  u(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
-    real(8), shared ::  v(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
-    real(8), shared ::  w(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
-    real(8), shared :: uy(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
-    real(8), shared :: vy(-2:threadsEv%x+3,threadsEv%y,threadsEv%z)
-    real(8), shared :: uz(-2:threadsEv%x+3,threadsEv%z,threadsEv%y)
-    real(8), shared :: wz(-2:threadsEv%x+3,threadsEv%z,threadsEv%y)
-    integer i, j, k, it, jt, kt, ii, i_base
+    integer, parameter :: io_v = 2
+    integer, parameter :: sx = threadsEv%x + 2*io_v + 1
+    integer, parameter :: sy = threadsEv%y
+    integer, parameter :: sz = threadsEv%z
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  u
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  v
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  w
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: uy
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: vy
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: uz
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: wz
+    integer i, j, k, it, jt, kt, ii, idx, offset_yz
     real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx, Hsgs
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
-    i_base = (blockIdx%x-1)*blockDim%x
-    do ii = it-2, threadsEv%x+3, blockDim%x
-      i = i_base + ii
-      if (1 <= i .and. i <= nx .and. j <= ny .and. k <= nz) then
-        u(ii,jt,kt) = Q(i,2,j,k)
-        v(ii,jt,kt) = Q(i,3,j,k)
-        w(ii,jt,kt) = Q(i,4,j,k)
-      endif
-      if (1 <= i .and. i <= nx .and. 3 <= j .and. j <= ny-2 .and. k <= nz) then
-        uy(ii,jt,kt) = (two_third * (-Q(i,2,j-1,k) + Q(i,2,j+1,k)) - one_twelfth * (-Q(i,2,j-2,k) + Q(i,2,j+2,k))) * dy(j)
-        vy(ii,jt,kt) = (two_third * (-Q(i,3,j-1,k) + Q(i,3,j+1,k)) - one_twelfth * (-Q(i,3,j-2,k) + Q(i,3,j+2,k))) * dy(j)
-      endif
-      if (1 <= i .and. i <= nx .and. j <= ny .and. 3 <= k .and. k <= nz-2) then
-        uz(ii,jt,kt) = (two_third * (-Q(i,2,j,k-1) + Q(i,2,j,k+1)) - one_twelfth * (-Q(i,2,j,k-2) + Q(i,2,j,k+2))) * dz(k)
-        wz(ii,jt,kt) = (two_third * (-Q(i,4,j,k-1) + Q(i,4,j,k+1)) - one_twelfth * (-Q(i,4,j,k-2) + Q(i,4,j,k+2))) * dz(k)
-      endif
-    enddo
+    offset_yz = (jt-1)*sx + (kt-1)*sx*sy
+    call load_smem_visc4_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
     call syncthreads()
     i  = (blockIdx%x-1)*blockDim%x + it
+    idx = it + offset_yz
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
       block
@@ -172,12 +153,12 @@ contains
                     (1.125d0 * (-T(i-1:i+1,j,k) + T(i:i+2,j,k)) - (-T(i-2:i,j,k) + T(i+1:i+3,j,k)) * one_24) * dx(i)
           kTx     = flux4(kTx3(:))
         end block
-        call calc_tau_straight_LES(mu3, mut3, u(it-2:it+3,jt,kt), vy(it-2:it+3,jt,kt), wz(it-2:it+3,jt,kt), dx(i), txx, utxx)
-        call calc_tau_cross_LES(mu3, mut3, v(it-2:it+3,jt,kt), uy(it-2:it+3,jt,kt), dx(i), txy, vtxy)
-        call calc_tau_cross_LES(mu3, mut3, w(it-2:it+3,jt,kt), uz(it-2:it+3,jt,kt), dx(i), txz, wtxz)
+        call calc_tau_straight_LES(mu3, mut3, u(idx-2:idx+3), vy(idx-2:idx+3), wz(idx-2:idx+3), dx(i), txx, utxx)
+        call calc_tau_cross_LES(mu3, mut3, v(idx-2:idx+3), uy(idx-2:idx+3), dx(i), txy, vtxy)
+        call calc_tau_cross_LES(mu3, mut3, w(idx-2:idx+3), uz(idx-2:idx+3), dx(i), txz, wtxz)
         block
           real(8) :: H(4)
-          H(:) = Cp * T(i-1:i+2,j,k) + 0.5d0 * (u(it-1:it+2,jt,kt)**2 + v(it-1:it+2,jt,kt)**2 + w(it-1:it+2,jt,kt)**2) + qc2(i-1:i+2,j,k)
+          H(:) = Cp * T(i-1:i+2,j,k) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i-1:i+2,j,k)
           Hsgs = -flux4(mut3) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dx(i) / Prt
         end block
       end block
@@ -219,24 +200,24 @@ contains
           mwzsgs = 0.25d0 * (mzsgs(1) * (-Q(i,4,j,k-1) + Q(i,4,j,k) - Q(i+1,4,j,k-1) + Q(i+1,4,j,k)) &
                            + mzsgs(2) * (-Q(i,4,j,k) + Q(i,4,j,k+1) - Q(i+1,4,j,k) + Q(i+1,4,j,k+1))) * dz(k)
         end block
-        mux    = mx    * (-u(it,jt,kt) + u(it+1,jt,kt)) * dx(i)
-        muxsgs = mxsgs * (-u(it,jt,kt) + u(it+1,jt,kt)) * dx(i)
-        mvx    = mx    * (-v(it,jt,kt) + v(it+1,jt,kt)) * dx(i)
-        mvxsgs = mxsgs * (-v(it,jt,kt) + v(it+1,jt,kt)) * dx(i)
-        mwx    = mx    * (-w(it,jt,kt) + w(it+1,jt,kt)) * dx(i)
-        mwxsgs = mxsgs * (-w(it,jt,kt) + w(it+1,jt,kt)) * dx(i)
+        mux    = mx    * (-u(idx) + u(idx+1)) * dx(i)
+        muxsgs = mxsgs * (-u(idx) + u(idx+1)) * dx(i)
+        mvx    = mx    * (-v(idx) + v(idx+1)) * dx(i)
+        mvxsgs = mxsgs * (-v(idx) + v(idx+1)) * dx(i)
+        mwx    = mx    * (-w(idx) + w(idx+1)) * dx(i)
+        mwxsgs = mxsgs * (-w(idx) + w(idx+1)) * dx(i)
         txx    = two_third * (2.d0 * mux - mvy - mwz)
         txy    = muy + mvx
         txz    = mwx + muz
-        utxx   = 0.5d0 * (u(it,jt,kt) + u(it+1,jt,kt)) * txx
-        vtxy   = 0.5d0 * (v(it,jt,kt) + v(it+1,jt,kt)) * txy
-        wtxz   = 0.5d0 * (w(it,jt,kt) + w(it+1,jt,kt)) * txz
+        utxx   = 0.5d0 * (u(idx) + u(idx+1)) * txx
+        vtxy   = 0.5d0 * (v(idx) + v(idx+1)) * txy
+        wtxz   = 0.5d0 * (w(idx) + w(idx+1)) * txz
         txx    = txx + two_third * (2.d0 * muxsgs - mvysgs - mwzsgs)
         txy    = txy + muysgs + mvxsgs
         txz    = txz + mwxsgs + muzsgs
         block
           real(8) :: H(2)
-          H(:) = Cp * T(i:i+1,j,k) + 0.5d0 * (u(it:it+1,jt,kt)**2 + v(it:it+1,jt,kt)**2 + w(it:it+1,jt,kt)**2) + qc2(i:i+1,j,k)
+          H(:) = Cp * T(i:i+1,j,k) + 0.5d0 * (u(idx:idx+1)**2 + v(idx:idx+1)**2 + w(idx:idx+1)**2) + qc2(i:i+1,j,k)
           Hsgs = -mxsgs * (-H(1) + H(2)) * dx(i) / Prt
         end block
       end block
@@ -246,7 +227,7 @@ contains
     E(i,4,j-1,k-1) = E(i,4,j-1,k-1) - txz
     E(i,5,j-1,k-1) = E(i,5,j-1,k-1) - (utxx + vtxy + wtxz + kTx + Hsgs)
   end subroutine calc_Ev_LES4
- 
+
 
   !> CUDA Fortran kernel for 4th-order viscous flux in y direction
   attributes(global) subroutine calc_Fv4(nx, ny, nz, dy, dx, dz, Q, T, mu, F)
@@ -260,39 +241,29 @@ contains
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
     real(8), intent(inout), device, contiguous :: F(nx-2,5,ny-1,nz-2) !< viscous flux components in y direction
-    real(8), shared ::  u(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
-    real(8), shared ::  v(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
-    real(8), shared ::  w(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
-    real(8), shared :: ux(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
-    real(8), shared :: vx(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
-    real(8), shared :: vz(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
-    real(8), shared :: wz(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
-    integer i, j, k, it, jt, kt, jj, j_base
+    integer, parameter :: io_v = 2
+    integer, parameter :: sx = threadsFv%x
+    integer, parameter :: sy = threadsFv%y + 2*io_v + 1
+    integer, parameter :: sz = threadsFv%z
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  u
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  v
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  w
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: ux
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: vx
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: vz
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: wz
+    integer i, j, k, it, jt, kt, jj, idx, offset_xz
     real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
     i  = (blockIdx%x-1)*blockDim%x + it + 1
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
-    j_base = (blockIdx%y-1)*blockDim%y
-    do jj = jt-2, threadsFv%y+3, blockDim%y
-      j = j_base + jj
-      if (i <= nx .and. 1 <= j .and. j <= ny .and. k <= nz) then
-        u(jj,it,kt) = Q(i,2,j,k)
-        v(jj,it,kt) = Q(i,3,j,k)
-        w(jj,it,kt) = Q(i,4,j,k)
-      endif
-      if (3 <= i .and. i <= nx-2 .and. 1 <= j .and. j <= ny .and. k <= nz) then
-        ux(jj,it,kt) = (two_third * (-Q(i-1,2,j,k) + Q(i+1,2,j,k)) - one_twelfth * (-Q(i-2,2,j,k) + Q(i+2,2,j,k))) * dx(i)
-        vx(jj,it,kt) = (two_third * (-Q(i-1,3,j,k) + Q(i+1,3,j,k)) - one_twelfth * (-Q(i-2,3,j,k) + Q(i+2,3,j,k))) * dx(i)
-      endif
-      if (i <= nx .and. 1 <= j .and. j <= ny .and. 3 <= k .and. k <= nz-2) then
-        vz(jj,it,kt) = (two_third * (-Q(i,3,j,k-1) + Q(i,3,j,k+1)) - one_twelfth * (-Q(i,3,j,k-2) + Q(i,3,j,k+2))) * dz(k)
-        wz(jj,it,kt) = (two_third * (-Q(i,4,j,k-1) + Q(i,4,j,k+1)) - one_twelfth * (-Q(i,4,j,k-2) + Q(i,4,j,k+2))) * dz(k)
-      endif
-    enddo
+    offset_xz = (it-1)*sy + (kt-1)*sy*sx
+    call load_smem_visc4_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
     call syncthreads()
     j  = (blockIdx%y-1)*blockDim%y + jt
+    idx = jt + offset_xz
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-2) then
       block
@@ -304,9 +275,9 @@ contains
                     (1.125d0 * (-T(i,j-1:j+1,k) + T(i,j:j+2,k)) - (-T(i,j-2:j,k) + T(i,j+1:j+3,k)) * one_24) * dy(j)
           kTy     = flux4(kTy3(:))
         end block
-        call calc_tau_straight(mu3, v(jt-2:jt+3,it,kt), wz(jt-2:jt+3,it,kt), ux(jt-2:jt+3,it,kt), dy(j), tyy, vtyy)
-        call calc_tau_cross(mu3, u(jt-2:jt+3,it,kt), vx(jt-2:jt+3,it,kt), dy(j), tyx, utyx)
-        call calc_tau_cross(mu3, w(jt-2:jt+3,it,kt), vz(jt-2:jt+3,it,kt), dy(j), tyz, wtyz)
+        call calc_tau_straight(mu3, v(idx-2:idx+3), wz(idx-2:idx+3), ux(idx-2:idx+3), dy(j), tyy, vtyy)
+        call calc_tau_cross(mu3, u(idx-2:idx+3), vx(idx-2:idx+3), dy(j), tyx, utyx)
+        call calc_tau_cross(mu3, w(idx-2:idx+3), vz(idx-2:idx+3), dy(j), tyz, wtyz)
       end block
     else
       block
@@ -333,15 +304,15 @@ contains
           mwz = 0.25d0 * (mz(1) * (-Q(i,4,j,k-1) + Q(i,4,j,k) - Q(i,4,j+1,k-1) + Q(i,4,j+1,k)) &
                         + mz(2) * (-Q(i,4,j,k) + Q(i,4,j,k+1) - Q(i,4,j+1,k) + Q(i,4,j+1,k+1))) * dz(k)
         end block
-        muy  = my * (-u(jt,it,kt) + u(jt+1,it,kt)) * dy(j)
-        mvy  = my * (-v(jt,it,kt) + v(jt+1,it,kt)) * dy(j)
-        mwy  = my * (-w(jt,it,kt) + w(jt+1,it,kt)) * dy(j)
+        muy  = my * (-u(idx) + u(idx+1)) * dy(j)
+        mvy  = my * (-v(idx) + v(idx+1)) * dy(j)
+        mwy  = my * (-w(idx) + w(idx+1)) * dy(j)
         tyx  = muy + mvx
         tyy  = two_third * (2.d0 * mvy - mwz - mux)
         tyz  = mvz + mwy
-        utyx = 0.5d0 * (u(jt,it,kt) + u(jt+1,it,kt)) * tyx
-        vtyy = 0.5d0 * (v(jt,it,kt) + v(jt+1,it,kt)) * tyy
-        wtyz = 0.5d0 * (w(jt,it,kt) + w(jt+1,it,kt)) * tyz
+        utyx = 0.5d0 * (u(idx) + u(idx+1)) * tyx
+        vtyy = 0.5d0 * (v(idx) + v(idx+1)) * tyy
+        wtyz = 0.5d0 * (w(idx) + w(idx+1)) * tyz
       end block
     endif
     F(i-1,2,j,k-1) = F(i-1,2,j,k-1) - tyx
@@ -349,7 +320,7 @@ contains
     F(i-1,4,j,k-1) = F(i-1,4,j,k-1) - tyz
     F(i-1,5,j,k-1) = F(i-1,5,j,k-1) - (utyx + vtyy + wtyz + kTy)
   end subroutine calc_Fv4
- 
+
 
   !> CUDA Fortran kernel for 4th-order viscous flux with LES SGS model in y direction
   attributes(global) subroutine calc_Fv_LES4(nx, ny, nz, dy, dx, dz, Q, T, mu, mut, qc2, F)
@@ -365,39 +336,29 @@ contains
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
     real(8), intent(inout), device, contiguous :: F(nx-2,5,ny-1,nz-2) !< viscous + SGS flux in y direction
-    real(8), shared ::  u(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
-    real(8), shared ::  v(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
-    real(8), shared ::  w(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
-    real(8), shared :: ux(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
-    real(8), shared :: vx(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
-    real(8), shared :: vz(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
-    real(8), shared :: wz(-2:threadsFv%y+3,threadsFv%x,threadsFv%z)
-    integer i, j, k, it, jt, kt, jj, j_base
+    integer, parameter :: io_v = 2
+    integer, parameter :: sx = threadsFv%x
+    integer, parameter :: sy = threadsFv%y + 2*io_v + 1
+    integer, parameter :: sz = threadsFv%z
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  u
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  v
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  w
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: ux
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: vx
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: vz
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: wz
+    integer i, j, k, it, jt, kt, jj, idx, offset_xz
     real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy, Hsgs
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
     i  = (blockIdx%x-1)*blockDim%x + it + 1
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
-    j_base = (blockIdx%y-1)*blockDim%y
-    do jj = jt-2, threadsFv%y+3, blockDim%y
-      j = j_base + jj
-      if (i <= nx .and. 1 <= j .and. j <= ny .and. k <= nz) then
-        u(jj,it,kt) = Q(i,2,j,k)
-        v(jj,it,kt) = Q(i,3,j,k)
-        w(jj,it,kt) = Q(i,4,j,k)
-      endif
-      if (3 <= i .and. i <= nx-2 .and. 1 <= j .and. j <= ny .and. k <= nz) then
-        ux(jj,it,kt) = (two_third * (-Q(i-1,2,j,k) + Q(i+1,2,j,k)) - one_twelfth * (-Q(i-2,2,j,k) + Q(i+2,2,j,k))) * dx(i)
-        vx(jj,it,kt) = (two_third * (-Q(i-1,3,j,k) + Q(i+1,3,j,k)) - one_twelfth * (-Q(i-2,3,j,k) + Q(i+2,3,j,k))) * dx(i)
-      endif
-      if (i <= nx .and. 1 <= j .and. j <= ny .and. 3 <= k .and. k <= nz-2) then
-        vz(jj,it,kt) = (two_third * (-Q(i,3,j,k-1) + Q(i,3,j,k+1)) - one_twelfth * (-Q(i,3,j,k-2) + Q(i,3,j,k+2))) * dz(k)
-        wz(jj,it,kt) = (two_third * (-Q(i,4,j,k-1) + Q(i,4,j,k+1)) - one_twelfth * (-Q(i,4,j,k-2) + Q(i,4,j,k+2))) * dz(k)
-      endif
-    enddo
+    offset_xz = (it-1)*sy + (kt-1)*sy*sx
+    call load_smem_visc4_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
     call syncthreads()
     j  = (blockIdx%y-1)*blockDim%y + jt
+    idx = jt + offset_xz
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-2) then
       block
@@ -410,12 +371,12 @@ contains
                     (1.125d0 * (-T(i,j-1:j+1,k) + T(i,j:j+2,k)) - (-T(i,j-2:j,k) + T(i,j+1:j+3,k)) * one_24) * dy(j)
           kTy     = flux4(kTy3(:))
         end block
-        call calc_tau_straight_LES(mu3, mut3, v(jt-2:jt+3,it,kt), wz(jt-2:jt+3,it,kt), ux(jt-2:jt+3,it,kt), dy(j), tyy, vtyy)
-        call calc_tau_cross_LES(mu3, mut3, u(jt-2:jt+3,it,kt), vx(jt-2:jt+3,it,kt), dy(j), tyx, utyx)
-        call calc_tau_cross_LES(mu3, mut3, w(jt-2:jt+3,it,kt), vz(jt-2:jt+3,it,kt), dy(j), tyz, wtyz)
+        call calc_tau_straight_LES(mu3, mut3, v(idx-2:idx+3), wz(idx-2:idx+3), ux(idx-2:idx+3), dy(j), tyy, vtyy)
+        call calc_tau_cross_LES(mu3, mut3, u(idx-2:idx+3), vx(idx-2:idx+3), dy(j), tyx, utyx)
+        call calc_tau_cross_LES(mu3, mut3, w(idx-2:idx+3), vz(idx-2:idx+3), dy(j), tyz, wtyz)
         block
           real(8) :: H(4)
-          H(:) = Cp * T(i,j-1:j+2,k) + 0.5d0 * (u(jt-1:jt+2,it,kt)**2 + v(jt-1:jt+2,it,kt)**2 + w(jt-1:jt+2,it,kt)**2) + qc2(i,j-1:j+2,k)
+          H(:) = Cp * T(i,j-1:j+2,k) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i,j-1:j+2,k)
           Hsgs = -flux4(mut3) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dy(j) / Prt
         end block
       end block
@@ -457,24 +418,24 @@ contains
           mwzsgs = 0.25d0 * (mzsgs(1) * (-Q(i,4,j,k-1) + Q(i,4,j,k) - Q(i,4,j+1,k-1) + Q(i,4,j+1,k)) &
                            + mzsgs(2) * (-Q(i,4,j,k) + Q(i,4,j,k+1) - Q(i,4,j+1,k) + Q(i,4,j+1,k+1))) * dz(k)
         end block
-        muy    = my    * (-u(jt,it,kt) + u(jt+1,it,kt)) * dy(j)
-        muysgs = mysgs * (-u(jt,it,kt) + u(jt+1,it,kt)) * dy(j)
-        mvy    = my    * (-v(jt,it,kt) + v(jt+1,it,kt)) * dy(j)
-        mvysgs = mysgs * (-v(jt,it,kt) + v(jt+1,it,kt)) * dy(j)
-        mwy    = my    * (-w(jt,it,kt) + w(jt+1,it,kt)) * dy(j)
-        mwysgs = mysgs * (-w(jt,it,kt) + w(jt+1,it,kt)) * dy(j)
+        muy    = my    * (-u(idx) + u(idx+1)) * dy(j)
+        muysgs = mysgs * (-u(idx) + u(idx+1)) * dy(j)
+        mvy    = my    * (-v(idx) + v(idx+1)) * dy(j)
+        mvysgs = mysgs * (-v(idx) + v(idx+1)) * dy(j)
+        mwy    = my    * (-w(idx) + w(idx+1)) * dy(j)
+        mwysgs = mysgs * (-w(idx) + w(idx+1)) * dy(j)
         tyx    = muy + mvx
         tyy    = two_third * (2.d0 * mvy - mwz - mux)
         tyz    = mvz + mwy
-        utyx   = 0.5d0 * (u(jt,it,kt) + u(jt+1,it,kt)) * tyx
-        vtyy   = 0.5d0 * (v(jt,it,kt) + v(jt+1,it,kt)) * tyy
-        wtyz   = 0.5d0 * (w(jt,it,kt) + w(jt+1,it,kt)) * tyz
+        utyx   = 0.5d0 * (u(idx) + u(idx+1)) * tyx
+        vtyy   = 0.5d0 * (v(idx) + v(idx+1)) * tyy
+        wtyz   = 0.5d0 * (w(idx) + w(idx+1)) * tyz
         tyx    = tyx + muysgs + mvxsgs
         tyy    = tyy + two_third * (2.d0 * mvysgs - mwzsgs - muxsgs)
         tyz    = tyz + mvzsgs + mwysgs
         block
           real(8) :: H(2)
-          H(:) = Cp * T(i,j:j+1,k) + 0.5d0 * (u(jt:jt+1,it,kt)**2 + v(jt:jt+1,it,kt)**2 + w(jt:jt+1,it,kt)**2) + qc2(i,j:j+1,k)
+          H(:) = Cp * T(i,j:j+1,k) + 0.5d0 * (u(idx:idx+1)**2 + v(idx:idx+1)**2 + w(idx:idx+1)**2) + qc2(i,j:j+1,k)
           Hsgs = -mysgs * (-H(1) + H(2)) * dy(j) / Prt
         end block
       end block
@@ -484,7 +445,7 @@ contains
     F(i-1,4,j,k-1) = F(i-1,4,j,k-1) - tyz
     F(i-1,5,j,k-1) = F(i-1,5,j,k-1) - (utyx + vtyy + wtyz + kTy + Hsgs)
   end subroutine calc_Fv_LES4
- 
+
 
   !> CUDA Fortran kernel for 4th-order viscous flux in z direction
   attributes(global) subroutine calc_Gv4(nx, ny, nz, dx, dy, dz, Q, T, mu, G)
@@ -498,39 +459,29 @@ contains
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
     real(8), intent(inout), device, contiguous :: G(nx-2,5,ny-2,nz-1) !< viscous flux components in z direction
-    real(8), shared ::  u(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
-    real(8), shared ::  v(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
-    real(8), shared ::  w(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
-    real(8), shared :: wx(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
-    real(8), shared :: wy(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
-    real(8), shared :: ux(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
-    real(8), shared :: vy(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
-    integer i, j, k, it, jt, kt, kk, k_base
+    integer, parameter :: io_v = 2
+    integer, parameter :: sx = threadsGv%x
+    integer, parameter :: sy = threadsGv%y
+    integer, parameter :: sz = threadsGv%z + 2*io_v + 1
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  u
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  v
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  w
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: wx
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: wy
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: ux
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: vy
+    integer i, j, k, it, jt, kt, kk, idx, offset_xy
     real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
     i  = (blockIdx%x-1)*blockDim%x + it + 1
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
-    k_base = (blockIdx%z-1)*blockDim%z
-    do kk = kt-2, threadsGv%z+3, blockDim%z
-      k = k_base + kk
-      if (i <= nx .and. j <= ny .and. 1 <= k .and. k <= nz) then
-        u(kk,jt,it) = Q(i,2,j,k)
-        v(kk,jt,it) = Q(i,3,j,k)
-        w(kk,jt,it) = Q(i,4,j,k)
-      endif
-      if (3 <= i .and. i <= nx-2 .and. j <= ny .and. 1 <= k .and. k <= nz) then
-        ux(kk,jt,it) = (two_third * (-Q(i-1,2,j,k) + Q(i+1,2,j,k)) - one_twelfth * (-Q(i-2,2,j,k) + Q(i+2,2,j,k))) * dx(i)
-        wx(kk,jt,it) = (two_third * (-Q(i-1,4,j,k) + Q(i+1,4,j,k)) - one_twelfth * (-Q(i-2,4,j,k) + Q(i+2,4,j,k))) * dx(i)
-      endif
-      if (i <= nx .and. 3 <= j .and. j <= ny-2 .and. 1 <= k .and. k <= nz) then
-        vy(kk,jt,it) = (two_third * (-Q(i,3,j-1,k) + Q(i,3,j+1,k)) - one_twelfth * (-Q(i,3,j-2,k) + Q(i,3,j+2,k))) * dy(j)
-        wy(kk,jt,it) = (two_third * (-Q(i,4,j-1,k) + Q(i,4,j+1,k)) - one_twelfth * (-Q(i,4,j-2,k) + Q(i,4,j+2,k))) * dy(j)
-      endif
-    enddo
+    offset_xy = (jt-1)*sz + (it-1)*sz*sy
+    call load_smem_visc4_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
     call syncthreads()
     k  = (blockIdx%z-1)*blockDim%z + kt
+    idx = kt + offset_xy
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-3) then
       block
@@ -542,9 +493,9 @@ contains
                     (1.125d0 * (-T(i,j,k-1:k+1) + T(i,j,k:k+2)) - (-T(i,j,k-2:k) + T(i,j,k+1:k+3)) * one_24) * dz(k)
           kTz     = flux4(kTz3(:))
         end block
-        call calc_tau_straight(mu3, w(kt-2:kt+3,jt,it), ux(kt-2:kt+3,jt,it), vy(kt-2:kt+3,jt,it), dz(k), tzz, wtzz)
-        call calc_tau_cross(mu3, u(kt-2:kt+3,jt,it), wx(kt-2:kt+3,jt,it), dz(k), tzx, utzx)
-        call calc_tau_cross(mu3, v(kt-2:kt+3,jt,it), wy(kt-2:kt+3,jt,it), dz(k), tzy, vtzy)
+        call calc_tau_straight(mu3, w(idx-2:idx+3), ux(idx-2:idx+3), vy(idx-2:idx+3), dz(k), tzz, wtzz)
+        call calc_tau_cross(mu3, u(idx-2:idx+3), wx(idx-2:idx+3), dz(k), tzx, utzx)
+        call calc_tau_cross(mu3, v(idx-2:idx+3), wy(idx-2:idx+3), dz(k), tzy, vtzy)
       end block
     else
       block
@@ -571,15 +522,15 @@ contains
         end block
         mz   = 0.5d0 * (mu(i,j,k) + mu(i,j,k+1))
         kTz  = Cp_over_Pr * mz * (-T(i,j,k) + T(i,j,k+1)) * dz(k)
-        muz  = mz * (-u(kt,jt,it) + u(kt+1,jt,it)) * dz(k)
-        mvz  = mz * (-v(kt,jt,it) + v(kt+1,jt,it)) * dz(k)
-        mwz  = mz * (-w(kt,jt,it) + w(kt+1,jt,it)) * dz(k)
+        muz  = mz * (-u(idx) + u(idx+1)) * dz(k)
+        mvz  = mz * (-v(idx) + v(idx+1)) * dz(k)
+        mwz  = mz * (-w(idx) + w(idx+1)) * dz(k)
         tzx  = mwx + muz
         tzy  = mvz + mwy
         tzz  = two_third * (2.d0 * mwz - mux - mvy)
-        utzx = 0.5d0 * (u(kt,jt,it) + u(kt+1,jt,it)) * tzx
-        vtzy = 0.5d0 * (v(kt,jt,it) + v(kt+1,jt,it)) * tzy
-        wtzz = 0.5d0 * (w(kt,jt,it) + w(kt+1,jt,it)) * tzz
+        utzx = 0.5d0 * (u(idx) + u(idx+1)) * tzx
+        vtzy = 0.5d0 * (v(idx) + v(idx+1)) * tzy
+        wtzz = 0.5d0 * (w(idx) + w(idx+1)) * tzz
       end block
     endif
     G(i-1,2,j-1,k) = G(i-1,2,j-1,k) - tzx
@@ -598,43 +549,33 @@ contains
     real(8), intent(in), device, contiguous    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
     real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
-    real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient  
+    real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)       !< turbulent viscosity coefficient
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)       !< kinetic energy correction term for total enthalpy (0.5 * (u^2 + v^2 + w^2))
     real(8), intent(inout), device, contiguous :: G(nx-2,5,ny-2,nz-1) !< viscous flux components in z direction
-    real(8), shared ::  u(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
-    real(8), shared ::  v(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
-    real(8), shared ::  w(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
-    real(8), shared :: wx(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
-    real(8), shared :: wy(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
-    real(8), shared :: ux(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
-    real(8), shared :: vy(-2:threadsGv%z+3,threadsGv%y,threadsGv%x)
-    integer i, j, k, it, jt, kt, kk, k_base
+    integer, parameter :: io_v = 2
+    integer, parameter :: sx = threadsGv%x
+    integer, parameter :: sy = threadsGv%y
+    integer, parameter :: sz = threadsGv%z + 2*io_v + 1
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  u
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  v
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  w
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: wx
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: wy
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: ux
+    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: vy
+    integer i, j, k, it, jt, kt, kk, idx, offset_xy
     real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz, Hsgs
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
     i  = (blockIdx%x-1)*blockDim%x + it + 1
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
-    k_base = (blockIdx%z-1)*blockDim%z
-    do kk = kt-2, threadsGv%z+3, blockDim%z
-      k = k_base + kk
-      if (i <= nx .and. j <= ny .and. 1 <= k .and. k <= nz) then
-        u(kk,jt,it) = Q(i,2,j,k)
-        v(kk,jt,it) = Q(i,3,j,k)
-        w(kk,jt,it) = Q(i,4,j,k)
-      endif
-      if (3 <= i .and. i <= nx-2 .and. j <= ny .and. 1 <= k .and. k <= nz) then
-        ux(kk,jt,it) = (two_third * (-Q(i-1,2,j,k) + Q(i+1,2,j,k)) - one_twelfth * (-Q(i-2,2,j,k) + Q(i+2,2,j,k))) * dx(i)
-        wx(kk,jt,it) = (two_third * (-Q(i-1,4,j,k) + Q(i+1,4,j,k)) - one_twelfth * (-Q(i-2,4,j,k) + Q(i+2,4,j,k))) * dx(i)
-      endif
-      if (i <= nx .and. 3 <= j .and. j <= ny-2 .and. 1 <= k .and. k <= nz) then
-        vy(kk,jt,it) = (two_third * (-Q(i,3,j-1,k) + Q(i,3,j+1,k)) - one_twelfth * (-Q(i,3,j-2,k) + Q(i,3,j+2,k))) * dy(j)
-        wy(kk,jt,it) = (two_third * (-Q(i,4,j-1,k) + Q(i,4,j+1,k)) - one_twelfth * (-Q(i,4,j-2,k) + Q(i,4,j+2,k))) * dy(j)
-      endif
-    enddo
+    offset_xy = (jt-1)*sz + (it-1)*sz*sy
+    call load_smem_visc4_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
     call syncthreads()
     k  = (blockIdx%z-1)*blockDim%z + kt
+    idx = kt + offset_xy
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-3) then
       block
@@ -647,12 +588,12 @@ contains
                     (1.125d0 * (-T(i,j,k-1:k+1) + T(i,j,k:k+2)) - (-T(i,j,k-2:k) + T(i,j,k+1:k+3)) * one_24) * dz(k)
           kTz     = flux4(kTz3(:))
         end block
-        call calc_tau_straight_LES(mu3, mut3, w(kt-2:kt+3,jt,it), ux(kt-2:kt+3,jt,it), vy(kt-2:kt+3,jt,it), dz(k), tzz, wtzz)
-        call calc_tau_cross_LES(mu3, mut3, u(kt-2:kt+3,jt,it), wx(kt-2:kt+3,jt,it), dz(k), tzx, utzx)
-        call calc_tau_cross_LES(mu3, mut3, v(kt-2:kt+3,jt,it), wy(kt-2:kt+3,jt,it), dz(k), tzy, vtzy)
+        call calc_tau_straight_LES(mu3, mut3, w(idx-2:idx+3), ux(idx-2:idx+3), vy(idx-2:idx+3), dz(k), tzz, wtzz)
+        call calc_tau_cross_LES(mu3, mut3, u(idx-2:idx+3), wx(idx-2:idx+3), dz(k), tzx, utzx)
+        call calc_tau_cross_LES(mu3, mut3, v(idx-2:idx+3), wy(idx-2:idx+3), dz(k), tzy, vtzy)
         block
           real(8) :: H(4)
-          H(:) = Cp * T(i,j,k-1:k+2) + 0.5d0 * (u(kt-1:kt+2,jt,it)**2 + v(kt-1:kt+2,jt,it)**2 + w(kt-1:kt+2,jt,it)**2) + qc2(i,j,k-1:k+2)
+          H(:) = Cp * T(i,j,k-1:k+2) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i,j,k-1:k+2)
           Hsgs = -flux4(mut3) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dz(k) / Prt
         end block
       end block
@@ -694,24 +635,24 @@ contains
         end block
         mz     = 0.5d0 * (mu(i,j,k) + mu(i,j,k+1))
         kTz    = Cp_over_Pr * mz * (-T(i,j,k) + T(i,j,k+1)) * dz(k)
-        muz    = mz    * (-u(kt,jt,it) + u(kt+1,jt,it)) * dz(k)
-        muzsgs = mzsgs * (-u(kt,jt,it) + u(kt+1,jt,it)) * dz(k)
-        mvz    = mz    * (-v(kt,jt,it) + v(kt+1,jt,it)) * dz(k)
-        mvzsgs = mzsgs * (-v(kt,jt,it) + v(kt+1,jt,it)) * dz(k)
-        mwz    = mz    * (-w(kt,jt,it) + w(kt+1,jt,it)) * dz(k)
-        mwzsgs = mzsgs * (-w(kt,jt,it) + w(kt+1,jt,it)) * dz(k)
+        muz    = mz    * (-u(idx) + u(idx+1)) * dz(k)
+        muzsgs = mzsgs * (-u(idx) + u(idx+1)) * dz(k)
+        mvz    = mz    * (-v(idx) + v(idx+1)) * dz(k)
+        mvzsgs = mzsgs * (-v(idx) + v(idx+1)) * dz(k)
+        mwz    = mz    * (-w(idx) + w(idx+1)) * dz(k)
+        mwzsgs = mzsgs * (-w(idx) + w(idx+1)) * dz(k)
         tzx    = mwx + muz
         tzy    = mvz + mwy
         tzz    = two_third * (2.d0 * mwz - mux - mvy)
-        utzx   = 0.5d0 * (u(kt,jt,it) + u(kt+1,jt,it)) * tzx
-        vtzy   = 0.5d0 * (v(kt,jt,it) + v(kt+1,jt,it)) * tzy
-        wtzz   = 0.5d0 * (w(kt,jt,it) + w(kt+1,jt,it)) * tzz
+        utzx   = 0.5d0 * (u(idx) + u(idx+1)) * tzx
+        vtzy   = 0.5d0 * (v(idx) + v(idx+1)) * tzy
+        wtzz   = 0.5d0 * (w(idx) + w(idx+1)) * tzz
         tzx    = tzx + mwxsgs + muzsgs
         tzy    = tzy + mvzsgs + mwysgs
         tzz    = tzz + two_third * (2.d0 * mwzsgs - muxsgs - mvysgs)
         block
           real(8) :: H(2)
-          H(:) = Cp * T(i,j,k:k+1) + 0.5d0 * (u(kt:kt+1,jt,it)**2 + v(kt:kt+1,jt,it)**2 + w(kt:kt+1,jt,it)**2) + qc2(i,j,k:k+1)
+          H(:) = Cp * T(i,j,k:k+1) + 0.5d0 * (u(idx:idx+1)**2 + v(idx:idx+1)**2 + w(idx:idx+1)**2) + qc2(i,j,k:k+1)
           Hsgs = -mzsgs * (-H(1) + H(2)) * dz(k) / Prt
         end block
       end block
@@ -722,4 +663,3 @@ contains
     G(i-1,5,j-1,k) = G(i-1,5,j-1,k) - (utzx + vtzy + wtzz + kTz + Hsgs)
   end subroutine calc_Gv_LES4
 end module calc_visc4
-

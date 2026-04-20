@@ -1,6 +1,5 @@
 module calc_steps
   use cudafor
-  use cooperative_groups ! for WarpShuffle
   use mod_globals, only : dt
   use mod_constant, only : one_sixth
   implicit none
@@ -19,31 +18,18 @@ contains
     real(8), intent(in), device, contiguous  :: G(nx-2,5,ny-2,nz-1) !< Flux in z direction
     real(8), intent(in), device, contiguous  :: Q(nx,5,ny,nz)       !< present Q(rho, rhou, rhov, rhow, E) / Jacobian
     real(8), intent(out), device, contiguous :: Q2(nx,5,ny,nz)      !< next    Q(rho, rhou, rhov, rhow, E) / Jacobian
-    real(8) R, dtdydz, dtdzdx, dtdxdy, dx_next
-    integer i, j, k, l, lane
-    integer(8) tmp_bits
+    real(8) R, dtdydz, dtdzdx, dtdxdy
+    integer i, j, k, l
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
     if (nx-2 < i .or. ny-2 < j .or. nz-2 < k) return
-    
-    ! ========== GPU Optimization: Warp Shuffle =========
-    ! Threads within a warp (32 threads) can shuffle data via __shfl_down_sync
-    ! This avoids global memory access when fetching adjacent dx(i+1)
-    lane     = iand(threadIdx%x - 1, 31)                              ! Lane [0..31] in warp
-    tmp_bits = __shfl_down_sync(z'ffffffff', transfer(dx(i), 0_8), 1) ! Shift dx right 1 lane
-    dx_next  = transfer(tmp_bits, 0.0_8)                              ! Get dx(i+1) from shuffle
-    if (lane == 31 .or. i == nx-2) then                               ! Last lane or boundary
-      dx_next = dx(i+1)                                               ! Fallback to global memory
-    endif
-    
     ! ========== Compute Grid Jacobian Volumes ==========
     ! Cell volume at (i, j, k) to (i+1, j+1, k+1) is product of grid spacings
     ! For flux divergence, use average grid spacing between cell centers
     dtdydz = dt * 0.25d0 * (dy(j) + dy(j+1)) * (dz(k) + dz(k+1)) ! dt*dy*dz x-flux divergence
-    dtdzdx = dt * 0.25d0 * (dz(k) + dz(k+1)) * (dx(i) + dx_next) ! dt*dz*dx y-flux divergence
-    dtdxdy = dt * 0.25d0 * (dx(i) + dx_next) * (dy(j) + dy(j+1)) ! dt*dx*dy z-flux divergence
-    
+    dtdzdx = dt * 0.25d0 * (dz(k) + dz(k+1)) * (dx(i) + dx(i+1)) ! dt*dz*dx y-flux divergence
+    dtdxdy = dt * 0.25d0 * (dx(i) + dx(i+1)) * (dy(j) + dy(j+1)) ! dt*dx*dy z-flux divergence
     ! ========== Conservative Update via TVD RK3: Stage 1 ==========
     ! Q^(1) = Q^n - (coef) * dt/vol * (Flux_divergence)
     do l = 1, 5  ! Loop over all conserved variables (rho, rhou, rhov, rhow, E)
@@ -71,27 +57,16 @@ contains
     real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)        !< present Q(rho, rhou, rhov, rhow, E) / Jacobian
     real(8), intent(out), device, contiguous   :: Q2(nx,5,ny,nz)       !< next    Q(rho, rhou, rhov, rhow, E) / Jacobian
     real(8), intent(inout), device, contiguous :: Rs(nx-2,5,ny-2,nz-2) !< accumulation for 4-4 Runge-Kutta
-    real(8) R, dtdydz, dtdzdx, dtdxdy, dx_next
-    integer i, j, k, l, lane
-    integer(8) tmp_bits
+    real(8) R, dtdydz, dtdzdx, dtdxdy
+    integer i, j, k, l
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
     if (nx-2 < i .or. ny-2 < j .or. nz-2 < k) return
-    
-    ! ========== GPU Optimization: Warp Shuffle for Grade Spacing ==========
-    lane     = iand(threadIdx%x - 1, 31)                              ! Thread lane in warp
-    tmp_bits = __shfl_down_sync(z'ffffffff', transfer(dx(i), 0_8), 1) ! Broadcast dx to next lane
-    dx_next  = transfer(tmp_bits, 0.0_8)
-    if (lane == 31 .or. i == nx-2) then
-      dx_next = dx(i+1)
-    endif
-    
     ! ========== Compute Grid Jacobian Volumes ==========
     dtdydz = dt * 0.25d0 * (dy(j) + dy(j+1)) * (dz(k) + dz(k+1))
-    dtdzdx = dt * 0.25d0 * (dz(k) + dz(k+1)) * (dx(i) + dx_next)
-    dtdxdy = dt * 0.25d0 * (dx(i) + dx_next) * (dy(j) + dy(j+1))
-    
+    dtdzdx = dt * 0.25d0 * (dz(k) + dz(k+1)) * (dx(i) + dx(i+1))
+    dtdxdy = dt * 0.25d0 * (dx(i) + dx(i+1)) * (dy(j) + dy(j+1))
     ! ========== Conservative Update via 4-4 RK: Stage 1-3 ==========
     ! For stage 1-3: Q^(s) = Q^(s-1) - coef1 * dt/vol * Flux_div + accumulate in Rs
     ! coef2 applies weighting to residual for final 4th stage assembly
@@ -123,29 +98,17 @@ contains
     real(8), intent(in), device, contiguous    :: G(nx-2,5,ny-2,nz-1) !< Flux in z direction
     real(8), intent(in), device, contiguous    :: Qin(nx,5,ny,nz)     !< Q^n (original from previous step)
     real(8), intent(inout), device, contiguous :: Qout(nx,5,ny,nz)    !< Q^(*) on input, Q^(n+1) on output
-    real(8) R, dtdydz, dtdzdx, dtdxdy, dx_next
-    integer i, j, k, l, lane
-    integer(8) tmp_bits
+    real(8) R, dtdydz, dtdzdx, dtdxdy
+    integer i, j, k, l
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
     if (nx-2 < i .or. ny-2 < j .or. nz-2 < k) return
-    
-    ! ========== GPU Optimization: Warp Shuffle ==========
-    ! Efficient neighboring element access within warp (32 threads)
-    lane     = iand(threadIdx%x - 1, 31)                              ! Thread lane in warp [0..31]
-    tmp_bits = __shfl_down_sync(z'ffffffff', transfer(dx(i), 0_8), 1) ! Shuffle dx to next lane
-    dx_next  = transfer(tmp_bits, 0.0_8)
-    if (lane == 31 .or. i == nx-2) then                               ! Last lane or boundary: use global mem
-      dx_next = dx(i+1)
-    endif
-    
     ! ========== Compute Grid Jacobian Volumes ==========
     ! Averaged grid spacing for flux divergence calculation
     dtdydz = dt * 0.25d0 * (dy(j) + dy(j+1)) * (dz(k) + dz(k+1)) ! dt·Δy·Δz for x-flux
-    dtdzdx = dt * 0.25d0 * (dz(k) + dz(k+1)) * (dx(i) + dx_next) ! dt·Δz·Δx for y-flux
-    dtdxdy = dt * 0.25d0 * (dx(i) + dx_next) * (dy(j) + dy(j+1)) ! dt·Δx·Δy for z-flux
-    
+    dtdzdx = dt * 0.25d0 * (dz(k) + dz(k+1)) * (dx(i) + dx(i+1)) ! dt·Δz·Δx for y-flux
+    dtdxdy = dt * 0.25d0 * (dx(i) + dx(i+1)) * (dy(j) + dy(j+1)) ! dt·Δx·Δy for z-flux
     ! ========== TVD RK3 Stage 2 & 3 Update ==========
     ! Q^(n+1) = (α·Q^n + β·Q^(*) - γ·dt/vol·∇·F) / (α+β)
     ! Stage 2: α=3/4, β=1/4 (from Q^n and Q^(1))
@@ -174,29 +137,17 @@ contains
     real(8), intent(in), device, contiguous    :: G(nx-2,5,ny-2,nz-1)  !< Flux in z direction
     real(8), intent(inout), device, contiguous :: Rs(nx-2,5,ny-2,nz-2) !< accumulated residuals from stages 1-3
     real(8), intent(inout), device, contiguous :: Q(nx,5,ny,nz)        !< Q^n on input, Q^n+1 on output
-    real(8) R, dtdydz, dtdzdx, dtdxdy, dx_next
-    integer i, j, k, l, lane
-    integer(8) tmp_bits
+    real(8) R, dtdydz, dtdzdx, dtdxdy
+    integer i, j, k, l
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
     if (nx-2 < i .or. ny-2 < j .or. nz-2 < k) return
-    
-    ! ========== GPU Optimization: Warp Shuffle ==========
-    ! Efficient in-warp communication for adjacent element access
-    lane     = iand(threadIdx%x - 1, 31)                              ! Lane index in warp
-    tmp_bits = __shfl_down_sync(z'ffffffff', transfer(dx(i), 0_8), 1) ! Broadcast dx rightward
-    dx_next  = transfer(tmp_bits, 0.0_8)
-    if (lane == 31 .or. i == nx-2) then                               ! Last lane uses global memory
-      dx_next = dx(i+1)
-    endif
-    
     ! ========== Compute Grid Jacobian Volumes ==========
     ! Cell volume scaling consistent with stages 1-3
     dtdydz = dt * 0.25d0 * (dy(j) + dy(j+1)) * (dz(k) + dz(k+1))
-    dtdzdx = dt * 0.25d0 * (dz(k) + dz(k+1)) * (dx(i) + dx_next)
-    dtdxdy = dt * 0.25d0 * (dx(i) + dx_next) * (dy(j) + dy(j+1))
-    
+    dtdzdx = dt * 0.25d0 * (dz(k) + dz(k+1)) * (dx(i) + dx(i+1))
+    dtdxdy = dt * 0.25d0 * (dx(i) + dx(i+1)) * (dy(j) + dy(j+1))
     ! ========== 4-4 RK Final Assembly ==========
     ! Compute 4th stage residual and accumulate with previous stages
     ! Final update: Q^(n+1) = Q^n - (one_sixth) * (R1 + 2*R2 + 2*R3 + R4)
