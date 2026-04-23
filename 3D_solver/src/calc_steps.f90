@@ -98,7 +98,7 @@ contains
     real(8), intent(in), device, contiguous    :: G(nx-2,5,ny-2,nz-1) !< Flux in z direction
     real(8), intent(in), device, contiguous    :: Qin(nx,5,ny,nz)     !< Q^n (original from previous step)
     real(8), intent(inout), device, contiguous :: Qout(nx,5,ny,nz)    !< Q^(*) on input, Q^(n+1) on output
-    real(8) R, dtdydz, dtdzdx, dtdxdy
+    real(8) R, dtdydz, dtdzdx, dtdxdy, coef4_inv
     integer i, j, k, l
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
@@ -111,14 +111,15 @@ contains
     dtdxdy = dt * 0.25d0 * (dx(i) + dx(i+1)) * (dy(j) + dy(j+1)) ! dt·Δx·Δy for z-flux
     ! ========== TVD RK3 Stage 2 & 3 Update ==========
     ! Q^(n+1) = (α·Q^n + β·Q^(*) - γ·dt/vol·∇·F) / (α+β)
-    ! Stage 2: α=3/4, β=1/4 (from Q^n and Q^(1))
-    ! Stage 3: α=1/3, β=2/3 (from Q^n and Q^(2)), then multiply by 3 (coef4 = 1/3)
+    ! Stage 2: α=3/4, β=1/4 (from Q^n and Q^(1)), coef4 = 1.d0 (compiler eliminates this division)
+    ! Stage 3: α=1/3, β=2/3 (from Q^n and Q^(2)), coef4 = 3.d0 (requires division or inversion)
+    coef4_inv = 1.d0 / coef4
     do l = 1, 5  ! All conserved variables
       R = dtdydz * (-E(i,l,j,k) + E(i+1,l,j,k)) &
       & + dtdzdx * (-F(i,l,j,k) + F(i,l,j+1,k)) &
       & + dtdxdy * (-G(i,l,j,k) + G(i,l,j,k+1))
       ! Convex combination: weighted average of Qin and Qout minus scaled residual
-      Qout(i+1,l,j+1,k+1) = (coef1 * Qin(i+1,l,j+1,k+1) + coef2 * Qout(i+1,l,j+1,k+1) - coef3 * R) / coef4
+      Qout(i+1,l,j+1,k+1) = (coef1 * Qin(i+1,l,j+1,k+1) + coef2 * Qout(i+1,l,j+1,k+1) - coef3 * R) * coef4_inv
     enddo
   end subroutine calc_step2_3
   

@@ -230,7 +230,8 @@ contains
       call MPI_SENDRECV(Qs_right, 5*overlap*(ny-2)*(nz-6), MPI_REAL8, rank2, 0, &
                         Qr_left,  5*overlap*(ny-2)*(nz-6), MPI_REAL8, rank1, 0, MPI_COMM_WORLD, istat, ierr)
       stat = cudaMemcpyAsync(Qr1d_left,  Qr_left,  5*overlap*(ny-2)*(nz-6), cudaMemcpyHostToDevice, 2)
-      stat = cudaDeviceSynchronize()
+      stat = cudaStreamSynchronize(1)
+      stat = cudaStreamSynchronize(2)
 
       call reconstruct(nx, ny, nz, overlap, Qr1d_left, Qr1d_right, QJ)
     elseif (myrank == 0 .and. 4 <= nranks) then
@@ -244,7 +245,7 @@ contains
       stat = cudaMemcpy(Qs_right, Qs1d_right, 5*overlap*(ny-2)*(nz-6), cudaMemcpyDeviceToHost)
       call MPI_SEND(Qs_right, 5*overlap*(ny-2)*(nz-6), MPI_REAL8, rank2, 0, MPI_COMM_WORLD, ierr)
 
-      stat = cudaDeviceSynchronize()
+      stat = cudaStreamSynchronize(1)
       call reconstruct_right(nx, ny, nz, overlap, Qr1d_right, QJ)
     elseif (myrank == nranks-2 .and. 4 <= nranks) then
       rank1 = myrank-2

@@ -14,7 +14,7 @@ contains
     real(8), intent(in), dimension(nx-1), device       :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device       :: dy ! 1 / dy
     real(8), intent(in), dimension(nz-1), device       :: dz ! 1 / dz
-    real(8), intent(in), dimension(5,nx,ny,nz), device :: Q
+    real(8), intent(in), dimension(nx,5,ny,nz), device :: Q
     real(8), intent(out), dimension(nx,ny,nz), device  :: fd
     integer i, j, k
     real(8) dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz
@@ -28,15 +28,15 @@ contains
     dx_tmp = 0.25d0 * (dx(i-1) + dx(i))
     dy_tmp = 0.25d0 * (dy(j-1) + dy(j))
     dz_tmp = 0.25d0 * (dz(k-1) + dz(k))
-    dudx = (-Q(2,i-1,j,k) + Q(2,i+1,j,k)) * dx_tmp
-    dvdx = (-Q(3,i-1,j,k) + Q(3,i+1,j,k)) * dx_tmp
-    dwdx = (-Q(4,i-1,j,k) + Q(4,i+1,j,k)) * dx_tmp
-    dudy = (-Q(2,i,j-1,k) + Q(2,i,j+1,k)) * dy_tmp
-    dvdy = (-Q(3,i,j-1,k) + Q(3,i,j+1,k)) * dy_tmp
-    dwdy = (-Q(4,i,j-1,k) + Q(4,i,j+1,k)) * dy_tmp
-    dudz = (-Q(2,i,j,k-1) + Q(2,i,j,k+1)) * dz_tmp
-    dvdz = (-Q(3,i,j,k-1) + Q(3,i,j,k+1)) * dz_tmp
-    dwdz = (-Q(4,i,j,k-1) + Q(4,i,j,k+1)) * dz_tmp
+    dudx = (-Q(i-1,2,j,k) + Q(i+1,2,j,k)) * dx_tmp
+    dvdx = (-Q(i-1,3,j,k) + Q(i+1,3,j,k)) * dx_tmp
+    dwdx = (-Q(i-1,4,j,k) + Q(i+1,4,j,k)) * dx_tmp
+    dudy = (-Q(i,2,j-1,k) + Q(i,2,j+1,k)) * dy_tmp
+    dvdy = (-Q(i,3,j-1,k) + Q(i,3,j+1,k)) * dy_tmp
+    dwdy = (-Q(i,4,j-1,k) + Q(i,4,j+1,k)) * dy_tmp
+    dudz = (-Q(i,2,j,k-1) + Q(i,2,j,k+1)) * dz_tmp
+    dvdz = (-Q(i,3,j,k-1) + Q(i,3,j,k+1)) * dz_tmp
+    dwdz = (-Q(i,4,j,k-1) + Q(i,4,j,k+1)) * dz_tmp
     ! Ducros shock sensor: detector based on dilatation vs. vorticity
     div = dudx + dvdy + dwdz           ! Divergence: ∇·u
     

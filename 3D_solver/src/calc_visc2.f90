@@ -178,7 +178,7 @@ contains
     E(i,2,j-1,k-1) = E(i,2,j-1,k-1) - txx
     E(i,3,j-1,k-1) = E(i,3,j-1,k-1) - txy
     E(i,4,j-1,k-1) = E(i,4,j-1,k-1) - txz
-    E(i,5,j-1,k-1) = E(i,5,j-1,k-1) - (utxx + vtxy + wtxz + kTx)
+    E(i,5,j-1,k-1) = E(i,5,j-1,k-1) - (utxx + vtxy + wtxz + kTx + Hsgs)
   end subroutine calc_Ev_LES2
  
 
@@ -207,16 +207,27 @@ contains
     i  = (blockIdx%x-1)*blockDim%x + it + 1
     j  = (blockIdx%y-1)*blockDim%y + jt
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
-    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    u(jt,it-1:it+1,kt)        = Q(i-1:i+1,2,j,k)
-    v(jt,it-1:it+1,kt-1:kt+1) = Q(i-1:i+1,3,j,k-1:k+1)
-    w(jt,kt-1:kt+1,it)        = Q(i,4,j,k-1:k+1)
-    if (jt == blockDim%y) then
-      u(jt+1,it-1:it+1,kt)        = Q(i-1:i+1,2,j+1,k)
-      v(jt+1,it-1:it+1,kt-1:kt+1) = Q(i-1:i+1,3,j+1,k-1:k+1)
-      w(jt+1,kt-1:kt+1,it)        = Q(i,4,j+1,k-1:k+1)
-    endif 
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) then
+      u(jt,it-1:it+1,kt)        = 0.d0
+      v(jt,it-1:it+1,kt-1:kt+1) = 0.d0
+      w(jt,kt-1:kt+1,it)        = 0.d0
+      if (jt == blockDim%y) then
+        u(jt+1,it-1:it+1,kt)        = 0.d0
+        v(jt+1,it-1:it+1,kt-1:kt+1) = 0.d0
+        w(jt+1,kt-1:kt+1,it)        = 0.d0
+      endif
+    else
+      u(jt,it-1:it+1,kt)        = Q(i-1:i+1,2,j,k)
+      v(jt,it-1:it+1,kt-1:kt+1) = Q(i-1:i+1,3,j,k-1:k+1)
+      w(jt,kt-1:kt+1,it)        = Q(i,4,j,k-1:k+1)
+      if (jt == blockDim%y) then
+        u(jt+1,it-1:it+1,kt)        = Q(i-1:i+1,2,j+1,k)
+        v(jt+1,it-1:it+1,kt-1:kt+1) = Q(i-1:i+1,3,j+1,k-1:k+1)
+        w(jt+1,kt-1:kt+1,it)        = Q(i,4,j+1,k-1:k+1)
+      endif
+    endif
     call syncthreads()
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
 
     block
       real(8) mx1, mx2
@@ -363,16 +374,27 @@ contains
     i  = (blockIdx%x-1)*blockDim%x + it + 1
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     k  = (blockIdx%z-1)*blockDim%z + kt
-    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    u(kt,it-1:it+1,jt)        = Q(i-1:i+1,2,j,k)
-    v(kt,jt-1:jt+1,it)        = Q(i,3,j-1:j+1,k)
-    w(kt,it-1:it+1,jt-1:jt+1) = Q(i-1:i+1,4,j-1:j+1,k)
-    if (kt == blockDim%z) then
-      u(kt+1,it-1:it+1,jt)        = Q(i-1:i+1,2,j,k+1)
-      v(kt+1,jt-1:jt+1,it)        = Q(i,3,j-1:j+1,k+1)
-      w(kt+1,it-1:it+1,jt-1:jt+1) = Q(i-1:i+1,4,j-1:j+1,k+1)
-    endif 
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) then
+      u(kt,it-1:it+1,jt)        = 0.d0
+      v(kt,jt-1:jt+1,it)        = 0.d0
+      w(kt,it-1:it+1,jt-1:jt+1) = 0.d0
+      if (kt == blockDim%z) then
+        u(kt+1,it-1:it+1,jt)        = 0.d0
+        v(kt+1,jt-1:jt+1,it)        = 0.d0
+        w(kt+1,it-1:it+1,jt-1:jt+1) = 0.d0
+      endif
+    else
+      u(kt,it-1:it+1,jt)        = Q(i-1:i+1,2,j,k)
+      v(kt,jt-1:jt+1,it)        = Q(i,3,j-1:j+1,k)
+      w(kt,it-1:it+1,jt-1:jt+1) = Q(i-1:i+1,4,j-1:j+1,k)
+      if (kt == blockDim%z) then
+        u(kt+1,it-1:it+1,jt)        = Q(i-1:i+1,2,j,k+1)
+        v(kt+1,jt-1:jt+1,it)        = Q(i,3,j-1:j+1,k+1)
+        w(kt+1,it-1:it+1,jt-1:jt+1) = Q(i-1:i+1,4,j-1:j+1,k+1)
+      endif
+    endif
     call syncthreads()
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
 
     block
       real(8) mx1, mx2

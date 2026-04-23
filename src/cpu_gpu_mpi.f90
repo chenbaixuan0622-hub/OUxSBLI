@@ -74,9 +74,11 @@ contains
     integer, intent(in), value  :: count, dest, tag, comm
     integer, intent(inout)      :: ireq, ierr
     real(8), allocatable :: buf_cpu(:)
+    integer stat(MPI_STATUS_SIZE)
     allocate(buf_cpu(count))
     buf_cpu = buf
     call MPI_ISEND(buf_cpu, count, MPI_REAL8, dest, tag, comm, ireq, ierr)
+    call MPI_WAIT(ireq, stat, ierr)
     deallocate(buf_cpu)
   end subroutine CPU_MPI_ISEND
 
@@ -95,11 +97,11 @@ contains
     real(8), intent(out), device :: buf(count)
     integer, intent(in), value   :: count, dest, tag, comm
     integer, intent(inout)       :: ireq, ierr
-    real(8), allocatable :: buf_cpu(:)
-    allocate(buf_cpu(count))
+    integer stat(MPI_STATUS_SIZE)
+    real(8) buf_cpu(count)
     call MPI_IRECV(buf_cpu, count, MPI_REAL8, dest, tag, comm, ireq, ierr)
+    call MPI_WAIT(ireq, stat, ierr)
     buf = buf_cpu
-    deallocate(buf_cpu)
   end subroutine CPU_MPI_IRECV
 
 

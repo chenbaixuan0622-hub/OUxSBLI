@@ -68,7 +68,7 @@ contains
         block
           real(8) :: H(4)
           H(:) = Cp * T(i-1:i+2,j,k) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i-1:i+2,j,k)
-          Hsgs = -flux4(mut3) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dx(i) / Prt
+          Hsgs = -flux4(mut3) * (1.125d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_24) * dx(i) / Prt
         end block
       end block
       E(i,2,j-1,k-1) = E(i,2,j-1,k-1) - txx
@@ -133,7 +133,7 @@ contains
         block
           real(8) :: H(4)
           H(:) = Cp * T(i,j-1:j+2,k) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i,j-1:j+2,k)
-          Hsgs = -flux4(mut3) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dy(j) / Prt
+          Hsgs = -flux4(mut3) * (1.125d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_24) * dy(j) / Prt
         end block
       end block
       F(i-1,2,j,k-1) = F(i-1,2,j,k-1) - tyx
@@ -198,7 +198,7 @@ contains
         block
           real(8) :: H(4)
           H(:) = Cp * T(i,j,k-1:k+2) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i,j,k-1:k+2)
-          Hsgs = -flux4(mut3) * 0.125d0 * (9.d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_third) * dz(k) / Prt
+          Hsgs = -flux4(mut3) * (1.125d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_24) * dz(k) / Prt
         end block
       end block
       G(i-1,2,j-1,k) = G(i-1,2,j-1,k) - tzx

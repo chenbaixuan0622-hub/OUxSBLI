@@ -658,6 +658,7 @@ contains
     call syncthreads()
     i = (blockIdx%x-1)*blockDim%x + it
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
+    fdx = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
     if (fdx <= threshold) then
       block
         real(8) tmp(2)
@@ -707,6 +708,7 @@ contains
     call syncthreads()
     j = (blockIdx%y-1)*blockDim%y + jt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
+    fdy = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
     if (fdy <= threshold) then
       block
         real(8) tmp(2)
@@ -756,6 +758,7 @@ contains
     call syncthreads()
     k = (blockIdx%z-1)*blockDim%z + kt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
+    fdz = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
     if (fdz <= threshold) then
       block
         real(8) tmp(2)

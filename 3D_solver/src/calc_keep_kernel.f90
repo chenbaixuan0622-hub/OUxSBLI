@@ -398,7 +398,7 @@ contains
     real(8), intent(out), device, contiguous  :: E(nx-1,5,ny-2,nz-2) !< Flux in x direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
-    real(8), dimension(2), device :: rho, u, v, w, p, tmp
+    real(8), dimension(2) :: rho, u, v, w, p, tmp
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -425,7 +425,7 @@ contains
     real(8), intent(out), device, contiguous  :: F(nx-2,5,ny-1,nz-2) !< Flux in y direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
-    real(8), dimension(2), device :: rho, u, v, w, p, tmp
+    real(8), dimension(2) :: rho, u, v, w, p, tmp
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -452,7 +452,7 @@ contains
     real(8), intent(out), device, contiguous  :: G(nx-2,5,ny-2,nz-1) !< Flux in z direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
-    real(8), dimension(2), device :: rho, u, v, w, p, tmp
+    real(8), dimension(2) :: rho, u, v, w, p, tmp
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z

@@ -48,7 +48,7 @@ contains
     ! TMA transfer
     start_i = max(1, i_base + 1 - io_v)
     end_i   = min(nx, i_base + threadsEv%x + io_v +1)
-    coun    = max(0, end_i - start_i + 1)
+    count   = max(0, end_i - start_i + 1)
     start_idx = (start_i - i_base) + offset_yz
     if (tid_linear == 1) then
       if (count > 0 .and. j <= ny .and. k <= nz) then
