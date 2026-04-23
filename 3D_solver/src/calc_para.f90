@@ -175,9 +175,11 @@ contains
     integer, intent(in), value         :: myrank, nranks, overlap, nx, ny, nz
     real(8), intent(inout), device     :: QJ(nx,5,ny,nz) ! Q / Jacobian
     integer rank1, rank2, ierr, ireq4(4), istat(MPI_STATUS_SIZE), istat4(MPI_STATUS_SIZE,4)
-    real(8), dimension(overlap*(ny-2)*(nz-6)*5)         :: Qs_left,   Qs_right,   Qr_left,   Qr_right
+    real(8), allocatable                                 :: Qs_left(:),   Qs_right(:),   Qr_left(:),   Qr_right(:)
     real(8), dimension(overlap*(ny-2)*(nz-6)*5), device :: Qs1d_left, Qs1d_right, Qr1d_left, Qr1d_right
     integer j, k, ni, nj, nk
+    allocate(Qs_left(overlap*(ny-2)*(nz-6)*5), Qs_right(overlap*(ny-2)*(nz-6)*5), &
+             Qr_left(overlap*(ny-2)*(nz-6)*5), Qr_right(overlap*(ny-2)*(nz-6)*5))
 
     if (2 <= myrank .and. myrank <= nranks-4) then
       rank1 = myrank-2
@@ -203,6 +205,7 @@ contains
     Qr1d_left  = Qr_left
 
     call reconstruct(nx, ny, nz, overlap, Qr1d_left, Qr1d_right, QJ)
+    deallocate(Qs_left, Qs_right, Qr_left, Qr_right)
   end subroutine exchange_cyclic
 
 
@@ -211,9 +214,11 @@ contains
     integer, intent(in), value         :: myrank, nranks, overlap, nx, ny, nz
     real(8), intent(inout), device     :: QJ(nx,5,ny,nz) ! Q / Jacobian
     integer rank1, rank2, stat, ierr, ireq4(4), istat(MPI_STATUS_SIZE), istat4(MPI_STATUS_SIZE,4)
-    real(8), dimension(overlap*(ny-2)*(nz-6)*5)         :: Qs_left,   Qs_right,   Qr_left,   Qr_right
+    real(8), allocatable                                 :: Qs_left(:),   Qs_right(:),   Qr_left(:),   Qr_right(:)
     real(8), dimension(overlap*(ny-2)*(nz-6)*5), device :: Qs1d_left, Qs1d_right, Qr1d_left, Qr1d_right
     integer j, k, ni, nj, nk
+    allocate(Qs_left(overlap*(ny-2)*(nz-6)*5), Qs_right(overlap*(ny-2)*(nz-6)*5), &
+             Qr_left(overlap*(ny-2)*(nz-6)*5), Qr_right(overlap*(ny-2)*(nz-6)*5))
 
     if (2 <= myrank .and. myrank <= nranks-4) then
       rank1 = myrank-2
@@ -260,6 +265,7 @@ contains
 
       call reconstruct_left(nx, ny, nz, overlap, Qr1d_left, QJ)
     endif
+    deallocate(Qs_left, Qs_right, Qr_left, Qr_right)
   end subroutine exchange_rescale
 end module calc_para
 

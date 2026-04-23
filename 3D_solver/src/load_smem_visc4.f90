@@ -122,6 +122,7 @@ contains
         wz(idx) = (two_third * (-Q(i,4,j,k-1) + Q(i,4,j,k+1)) - one_twelfth * (-Q(i,4,j,k-2) + Q(i,4,j,k+2))) * inv_dz(k)
       endif
     enddo
+    call syncthreads()
   end subroutine load_smem_visc4_x
   #endif
 
@@ -170,6 +171,7 @@ contains
         wz(idx) = (two_third * (-Q(i,4,j,k-1) + Q(i,4,j,k+1)) - one_twelfth * (-Q(i,4,j,k-2) + Q(i,4,j,k+2))) * inv_dz(k)
       endif
     enddo
+    call syncthreads()
   end subroutine load_smem_visc4_y
 
   
@@ -217,6 +219,7 @@ contains
         wy(idx) = (two_third * (-Q(i,4,j-1,k) + Q(i,4,j+1,k)) - one_twelfth * (-Q(i,4,j-2,k) + Q(i,4,j+2,k))) * inv_dy(j)
       endif
     enddo
+    call syncthreads()
   end subroutine load_smem_visc4_z
 end module load_smem_visc4
 

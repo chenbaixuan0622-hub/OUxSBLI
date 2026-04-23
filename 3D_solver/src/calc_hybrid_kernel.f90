@@ -43,9 +43,8 @@ contains
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: E(nx-1,5,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
-    real(8), dimension(-1:threadsE%x+3,threadsE%y,threadsE%z), shared :: rho,  u,  v,  w,  p
-    real(8), dimension(   threadsE%x,  threadsE%y,threadsE%z), shared :: rhor, ur, vr, wr, pr
-    real(8) fdx
+    real(8), dimension(-1:threadsE%x+3,threadsE%y,threadsE%z), shared :: rho, u, v, w, p
+    real(8) fdx, rho_r, u_r, v_r, w_r, p_r
     integer(kind=4) id_accuracy4
     integer(kind=2) id_accuracy2
     it = threadIdx%x
@@ -83,11 +82,11 @@ contains
             end associate
           end block
         else
-          call delta6(fdx, rho(it-2:it+3,jt,kt), rhol, rhor(it,jt,kt))
-          call delta6(fdx,   u(it-2:it+3,jt,kt),   ul,   ur(it,jt,kt))
-          call delta6(fdx,   v(it-2:it+3,jt,kt),   vl,   vr(it,jt,kt))
-          call delta6(fdx,   w(it-2:it+3,jt,kt),   wl,   wr(it,jt,kt))
-          call delta6(fdx,   p(it-2:it+3,jt,kt),   pl,   pr(it,jt,kt))
+          call delta6(fdx, rho(it-2:it+3,jt,kt), rhol, rho_r)
+          call delta6(fdx,   u(it-2:it+3,jt,kt),   ul,   u_r)
+          call delta6(fdx,   v(it-2:it+3,jt,kt),   vl,   v_r)
+          call delta6(fdx,   w(it-2:it+3,jt,kt),   wl,   w_r)
+          call delta6(fdx,   p(it-2:it+3,jt,kt),   pl,   p_r)
         endif
       elseif (2 <= i .and. i <= nx-2) then
         if (fdx <= threshold) then
@@ -102,11 +101,11 @@ contains
             end associate
           end block
         else
-          call delta4(fdx, rho(it-1:it+2,jt,kt), rhol, rhor(it,jt,kt))
-          call delta4(fdx,   u(it-1:it+2,jt,kt),   ul,   ur(it,jt,kt))
-          call delta4(fdx,   v(it-1:it+2,jt,kt),   vl,   vr(it,jt,kt))
-          call delta4(fdx,   w(it-1:it+2,jt,kt),   wl,   wr(it,jt,kt))
-          call delta4(fdx,   p(it-1:it+2,jt,kt),   pl,   pr(it,jt,kt))
+          call delta4(fdx, rho(it-1:it+2,jt,kt), rhol, rho_r)
+          call delta4(fdx,   u(it-1:it+2,jt,kt),   ul,   u_r)
+          call delta4(fdx,   v(it-1:it+2,jt,kt),   vl,   v_r)
+          call delta4(fdx,   w(it-1:it+2,jt,kt),   wl,   w_r)
+          call delta4(fdx,   p(it-1:it+2,jt,kt),   pl,   p_r)
         endif
       else
         if (fdx <= threshold) then
@@ -121,11 +120,11 @@ contains
             end associate
           end block
         else
-          rhol = rho(it,jt,kt); rhor(it,jt,kt) = rho(it+1,jt,kt)
-            ul =   u(it,jt,kt);   ur(it,jt,kt) =   u(it+1,jt,kt)
-            vl =   v(it,jt,kt);   vr(it,jt,kt) =   v(it+1,jt,kt)
-            wl =   w(it,jt,kt);   wr(it,jt,kt) =   w(it+1,jt,kt)
-            pl =   p(it,jt,kt);   pr(it,jt,kt) =   p(it+1,jt,kt)
+          rhol = rho(it,jt,kt); rho_r = rho(it+1,jt,kt)
+            ul =   u(it,jt,kt);   u_r =   u(it+1,jt,kt)
+            vl =   v(it,jt,kt);   v_r =   v(it+1,jt,kt)
+            wl =   w(it,jt,kt);   w_r =   w(it+1,jt,kt)
+            pl =   p(it,jt,kt);   p_r =   p(it+1,jt,kt)
         endif
       endif
       call syncthreads()
@@ -136,9 +135,9 @@ contains
         p(it,jt,kt) = pl
     end block
     if (fdx > threshold) then
-      associate(un1 => u(it,jt,kt), un2 => ur(it,jt,kt))
-        call SLAU(id_slau, rho(it,jt,kt), rhor(it,jt,kt), u(it,jt,kt), ur(it,jt,kt), v(it,jt,kt), vr(it,jt,kt), &
-                  w(it,jt,kt), wr(it,jt,kt), un1, un2, p(it,jt,kt), pr(it,jt,kt), Normal_x, 1.d0, &
+      associate(un1 => u(it,jt,kt), un2 => u_r)
+        call SLAU(id_slau, rho(it,jt,kt), rho_r, u(it,jt,kt), u_r, v(it,jt,kt), v_r, &
+                  w(it,jt,kt), w_r, un1, un2, p(it,jt,kt), p_r, Normal_x, 1.d0, &
                   E(i,1,j-1,k-1), E(i,2,j-1,k-1), E(i,3,j-1,k-1), E(i,4,j-1,k-1), E(i,5,j-1,k-1))
       end associate
     endif
@@ -152,9 +151,8 @@ contains
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: F(nx-2,5,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
-    real(8), dimension(-1:threadsF%y+3,threadsF%x,threadsF%z), shared :: rho,  u,  v,  w,  p
-    real(8), dimension(   threadsF%y,  threadsF%x,threadsF%z), shared :: rhor, ur, vr, wr, pr
-    real(8) fdy
+    real(8), dimension(-1:threadsF%y+3,threadsF%x,threadsF%z), shared :: rho, u, v, w, p
+    real(8) fdy, rho_r, u_r, v_r, w_r, p_r
     integer(kind=4) id_accuracy4
     integer(kind=2) id_accuracy2
     it = threadIdx%x
@@ -179,7 +177,7 @@ contains
     block
       real(8) rhol, ul, vl, wl, pl
       fdy = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
-      if (3 <= j .and. j <= ny-3 .and. 8 <= kind(id_accuracy)) then
+      if (3 <= j .and. j <= ny-3) then
         if (fdy <= threshold) then
           block
             real(8) tmp(6)
@@ -192,11 +190,11 @@ contains
             end associate
           end block
         else
-          call delta6(fdy, rho(jt-2:jt+3,it,kt), rhol, rhor(jt,it,kt))
-          call delta6(fdy,   u(jt-2:jt+3,it,kt),   ul,   ur(jt,it,kt))
-          call delta6(fdy,   v(jt-2:jt+3,it,kt),   vl,   vr(jt,it,kt))
-          call delta6(fdy,   w(jt-2:jt+3,it,kt),   wl,   wr(jt,it,kt))
-          call delta6(fdy,   p(jt-2:jt+3,it,kt),   pl,   pr(jt,it,kt))
+          call delta6(fdy, rho(jt-2:jt+3,it,kt), rhol, rho_r)
+          call delta6(fdy,   u(jt-2:jt+3,it,kt),   ul,   u_r)
+          call delta6(fdy,   v(jt-2:jt+3,it,kt),   vl,   v_r)
+          call delta6(fdy,   w(jt-2:jt+3,it,kt),   wl,   w_r)
+          call delta6(fdy,   p(jt-2:jt+3,it,kt),   pl,   p_r)
         endif
       elseif (2 <= j .and. j <= ny-2) then
         if (fdy <= threshold) then
@@ -211,11 +209,11 @@ contains
             end associate
           end block
         else
-          call delta4(fdy, rho(jt-1:jt+2,it,kt), rhol, rhor(jt,it,kt))
-          call delta4(fdy,   u(jt-1:jt+2,it,kt),   ul,   ur(jt,it,kt))
-          call delta4(fdy,   v(jt-1:jt+2,it,kt),   vl,   vr(jt,it,kt))
-          call delta4(fdy,   w(jt-1:jt+2,it,kt),   wl,   wr(jt,it,kt))
-          call delta4(fdy,   p(jt-1:jt+2,it,kt),   pl,   pr(jt,it,kt))
+          call delta4(fdy, rho(jt-1:jt+2,it,kt), rhol, rho_r)
+          call delta4(fdy,   u(jt-1:jt+2,it,kt),   ul,   u_r)
+          call delta4(fdy,   v(jt-1:jt+2,it,kt),   vl,   v_r)
+          call delta4(fdy,   w(jt-1:jt+2,it,kt),   wl,   w_r)
+          call delta4(fdy,   p(jt-1:jt+2,it,kt),   pl,   p_r)
         endif
       else
         if (fdy <= threshold) then
@@ -230,11 +228,11 @@ contains
             end associate
           end block
         else
-          rhol = rho(jt,it,kt); rhor(jt,it,kt) = rho(jt+1,it,kt)
-            ul =   u(jt,it,kt);   ur(jt,it,kt) =   u(jt+1,it,kt)
-            vl =   v(jt,it,kt);   vr(jt,it,kt) =   v(jt+1,it,kt)
-            wl =   w(jt,it,kt);   wr(jt,it,kt) =   w(jt+1,it,kt)
-            pl =   p(jt,it,kt);   pr(jt,it,kt) =   p(jt+1,it,kt)
+          rhol = rho(jt,it,kt); rho_r = rho(jt+1,it,kt)
+            ul =   u(jt,it,kt);   u_r =   u(jt+1,it,kt)
+            vl =   v(jt,it,kt);   v_r =   v(jt+1,it,kt)
+            wl =   w(jt,it,kt);   w_r =   w(jt+1,it,kt)
+            pl =   p(jt,it,kt);   p_r =   p(jt+1,it,kt)
         endif
       endif
       call syncthreads()
@@ -245,9 +243,9 @@ contains
         p(jt,it,kt) = pl
     end block
     if (fdy > threshold) then
-      associate(un1 => v(jt,it,kt), un2 => vr(jt,it,kt))
-        call SLAU(id_slau, rho(jt,it,kt), rhor(jt,it,kt), u(jt,it,kt), ur(jt,it,kt), v(jt,it,kt), vr(jt,it,kt), &
-                  w(jt,it,kt), wr(jt,it,kt), un1, un2, p(jt,it,kt), pr(jt,it,kt), Normal_y, 1.d0, &
+      associate(un1 => v(jt,it,kt), un2 => v_r)
+        call SLAU(id_slau, rho(jt,it,kt), rho_r, u(jt,it,kt), u_r, v(jt,it,kt), v_r, &
+                  w(jt,it,kt), w_r, un1, un2, p(jt,it,kt), p_r, Normal_y, 1.d0, &
                   F(i-1,1,j,k-1), F(i-1,2,j,k-1), F(i-1,3,j,k-1), F(i-1,4,j,k-1), F(i-1,5,j,k-1))
       end associate
     endif
@@ -261,9 +259,8 @@ contains
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: G(nx-2,5,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
-    real(8), dimension(-1:threadsG%z+3,threadsG%y,threadsG%x), shared :: rho,  u,  v,  w,  p
-    real(8), dimension(   threadsG%z,  threadsG%y,threadsG%x), shared :: rhor, ur, vr, wr, pr
-    real(8) fdz
+    real(8), dimension(-1:threadsG%z+3,threadsG%y,threadsG%x), shared :: rho, u, v, w, p
+    real(8) fdz, rho_r, u_r, v_r, w_r, p_r
     integer(kind=4) id_accuracy4
     integer(kind=2) id_accuracy2
     it = threadIdx%x
@@ -288,7 +285,7 @@ contains
       block
       real(8) rhol, ul, vl, wl, pl
       fdz = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
-      if (3 <= k .and. k <= nz-3 .and. 8 <= kind(id_accuracy)) then
+      if (3 <= k .and. k <= nz-3) then
         if (fdz <= threshold) then
           block
             real(8) tmp(6)
@@ -301,11 +298,11 @@ contains
             end associate
           end block
         else
-          call delta6(fdz, rho(kt-2:kt+3,jt,it), rhol, rhor(kt,jt,it))
-          call delta6(fdz,   u(kt-2:kt+3,jt,it),   ul,   ur(kt,jt,it))
-          call delta6(fdz,   v(kt-2:kt+3,jt,it),   vl,   vr(kt,jt,it))
-          call delta6(fdz,   w(kt-2:kt+3,jt,it),   wl,   wr(kt,jt,it))
-          call delta6(fdz,   p(kt-2:kt+3,jt,it),   pl,   pr(kt,jt,it))
+          call delta6(fdz, rho(kt-2:kt+3,jt,it), rhol, rho_r)
+          call delta6(fdz,   u(kt-2:kt+3,jt,it),   ul,   u_r)
+          call delta6(fdz,   v(kt-2:kt+3,jt,it),   vl,   v_r)
+          call delta6(fdz,   w(kt-2:kt+3,jt,it),   wl,   w_r)
+          call delta6(fdz,   p(kt-2:kt+3,jt,it),   pl,   p_r)
         endif
       elseif (2 <= k .and. k <= nz-2) then
         if (fdz <= threshold) then
@@ -320,11 +317,11 @@ contains
             end associate
           end block
         else
-          call delta4(fdz, rho(kt-1:kt+2,jt,it), rhol, rhor(kt,jt,it))
-          call delta4(fdz,   u(kt-1:kt+2,jt,it),   ul,   ur(kt,jt,it))
-          call delta4(fdz,   v(kt-1:kt+2,jt,it),   vl,   vr(kt,jt,it))
-          call delta4(fdz,   w(kt-1:kt+2,jt,it),   wl,   wr(kt,jt,it))
-          call delta4(fdz,   p(kt-1:kt+2,jt,it),   pl,   pr(kt,jt,it))
+          call delta4(fdz, rho(kt-1:kt+2,jt,it), rhol, rho_r)
+          call delta4(fdz,   u(kt-1:kt+2,jt,it),   ul,   u_r)
+          call delta4(fdz,   v(kt-1:kt+2,jt,it),   vl,   v_r)
+          call delta4(fdz,   w(kt-1:kt+2,jt,it),   wl,   w_r)
+          call delta4(fdz,   p(kt-1:kt+2,jt,it),   pl,   p_r)
         endif
       else
         if (fdz <= threshold) then
@@ -339,11 +336,11 @@ contains
             end associate
           end block
         else
-          rhol = rho(kt,jt,it); rhor(kt,jt,it) = rho(kt+1,jt,it)
-            ul =   u(kt,jt,it);   ur(kt,jt,it) =   u(kt+1,jt,it)
-            vl =   v(kt,jt,it);   vr(kt,jt,it) =   v(kt+1,jt,it)
-            wl =   w(kt,jt,it);   wr(kt,jt,it) =   w(kt+1,jt,it)
-            pl =   p(kt,jt,it);   pr(kt,jt,it) =   p(kt+1,jt,it)
+          rhol = rho(kt,jt,it); rho_r = rho(kt+1,jt,it)
+            ul =   u(kt,jt,it);   u_r =   u(kt+1,jt,it)
+            vl =   v(kt,jt,it);   v_r =   v(kt+1,jt,it)
+            wl =   w(kt,jt,it);   w_r =   w(kt+1,jt,it)
+            pl =   p(kt,jt,it);   p_r =   p(kt+1,jt,it)
         endif
       endif
       call syncthreads()
@@ -354,9 +351,9 @@ contains
         p(kt,jt,it) = pl
       end block
     if (fdz > threshold) then
-      associate(un1 => w(kt,jt,it), un2 => wr(kt,jt,it))
-        call SLAU(id_slau, rho(kt,jt,it), rhor(kt,jt,it), u(kt,jt,it), ur(kt,jt,it), v(kt,jt,it), vr(kt,jt,it), &
-                  w(kt,jt,it), wr(kt,jt,it), un1, un2, p(kt,jt,it), pr(kt,jt,it), Normal_z, 1.d0, &
+      associate(un1 => w(kt,jt,it), un2 => w_r)
+        call SLAU(id_slau, rho(kt,jt,it), rho_r, u(kt,jt,it), u_r, v(kt,jt,it), v_r, &
+                  w(kt,jt,it), w_r, un1, un2, p(kt,jt,it), p_r, Normal_z, 1.d0, &
                   G(i-1,1,j-1,k), G(i-1,2,j-1,k), G(i-1,3,j-1,k), G(i-1,4,j-1,k), G(i-1,5,j-1,k))
       end associate
     endif
@@ -370,9 +367,8 @@ contains
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: E(nx-1,5,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
-    real(8), dimension(0:threadsE%x+2,threadsE%y,threadsE%z), shared :: rho,  u,  v,  w,  p
-    real(8), dimension(  threadsE%x,  threadsE%y,threadsE%z), shared :: rhor, ur, vr, wr, pr
-    real(8) fdx
+    real(8), dimension(0:threadsE%x+2,threadsE%y,threadsE%z), shared :: rho, u, v, w, p
+    real(8) fdx, rho_r, u_r, v_r, w_r, p_r
     integer(kind=2) id_accuracy2
     it = threadIdx%x
     jt = threadIdx%y
@@ -409,11 +405,11 @@ contains
             end associate
           end block
         else
-          call delta4(fdx, rho(it-1:it+2,jt,kt), rhol, rhor(it,jt,kt))
-          call delta4(fdx,   u(it-1:it+2,jt,kt),   ul,   ur(it,jt,kt))
-          call delta4(fdx,   v(it-1:it+2,jt,kt),   vl,   vr(it,jt,kt))
-          call delta4(fdx,   w(it-1:it+2,jt,kt),   wl,   wr(it,jt,kt))
-          call delta4(fdx,   p(it-1:it+2,jt,kt),   pl,   pr(it,jt,kt))
+          call delta4(fdx, rho(it-1:it+2,jt,kt), rhol, rho_r)
+          call delta4(fdx,   u(it-1:it+2,jt,kt),   ul,   u_r)
+          call delta4(fdx,   v(it-1:it+2,jt,kt),   vl,   v_r)
+          call delta4(fdx,   w(it-1:it+2,jt,kt),   wl,   w_r)
+          call delta4(fdx,   p(it-1:it+2,jt,kt),   pl,   p_r)
         endif
       else
         if (fdx <= threshold) then
@@ -428,11 +424,11 @@ contains
             end associate
           end block
         else
-          rhol = rho(it,jt,kt); rhor(it,jt,kt) = rho(it+1,jt,kt)
-            ul =   u(it,jt,kt);   ur(it,jt,kt) =   u(it+1,jt,kt)
-            vl =   v(it,jt,kt);   vr(it,jt,kt) =   v(it+1,jt,kt)
-            wl =   w(it,jt,kt);   wr(it,jt,kt) =   w(it+1,jt,kt)
-            pl =   p(it,jt,kt);   pr(it,jt,kt) =   p(it+1,jt,kt)
+          rhol = rho(it,jt,kt); rho_r = rho(it+1,jt,kt)
+            ul =   u(it,jt,kt);   u_r =   u(it+1,jt,kt)
+            vl =   v(it,jt,kt);   v_r =   v(it+1,jt,kt)
+            wl =   w(it,jt,kt);   w_r =   w(it+1,jt,kt)
+            pl =   p(it,jt,kt);   p_r =   p(it+1,jt,kt)
         endif
       endif
       call syncthreads()
@@ -443,9 +439,9 @@ contains
         p(it,jt,kt) = pl
     end block
     if (fdx > threshold) then
-      associate(un1 => u(it,jt,kt), un2 => ur(it,jt,kt))
-        call SLAU(id_slau, rho(it,jt,kt), rhor(it,jt,kt), u(it,jt,kt), ur(it,jt,kt), v(it,jt,kt), vr(it,jt,kt), &
-                  w(it,jt,kt), wr(it,jt,kt), un1, un2, p(it,jt,kt), pr(it,jt,kt), Normal_x, 1.d0, &
+      associate(un1 => u(it,jt,kt), un2 => u_r)
+        call SLAU(id_slau, rho(it,jt,kt), rho_r, u(it,jt,kt), u_r, v(it,jt,kt), v_r, &
+                  w(it,jt,kt), w_r, un1, un2, p(it,jt,kt), p_r, Normal_x, 1.d0, &
                   E(i,1,j-1,k-1), E(i,2,j-1,k-1), E(i,3,j-1,k-1), E(i,4,j-1,k-1), E(i,5,j-1,k-1))
       end associate
     endif
@@ -459,9 +455,8 @@ contains
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: F(nx-2,5,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
-    real(8), dimension(0:threadsF%y+2,threadsF%x,threadsF%z), shared :: rho,  u,  v,  w,  p
-    real(8), dimension(  threadsF%y+2,threadsF%x,threadsF%z), shared :: rhor, ur, vr, wr, pr
-    real(8) fdy
+    real(8), dimension(0:threadsF%y+2,threadsF%x,threadsF%z), shared :: rho, u, v, w, p
+    real(8) fdy, rho_r, u_r, v_r, w_r, p_r
     integer(kind=2) id_accuracy2
     it = threadIdx%x
     jt = threadIdx%y
@@ -498,11 +493,11 @@ contains
             end associate
           end block
         else
-          call delta4(fdy, rho(jt-1:jt+2,it,kt), rhol, rhor(jt,it,kt))
-          call delta4(fdy,   u(jt-1:jt+2,it,kt),   ul,   ur(jt,it,kt))
-          call delta4(fdy,   v(jt-1:jt+2,it,kt),   vl,   vr(jt,it,kt))
-          call delta4(fdy,   w(jt-1:jt+2,it,kt),   wl,   wr(jt,it,kt))
-          call delta4(fdy,   p(jt-1:jt+2,it,kt),   pl,   pr(jt,it,kt))
+          call delta4(fdy, rho(jt-1:jt+2,it,kt), rhol, rho_r)
+          call delta4(fdy,   u(jt-1:jt+2,it,kt),   ul,   u_r)
+          call delta4(fdy,   v(jt-1:jt+2,it,kt),   vl,   v_r)
+          call delta4(fdy,   w(jt-1:jt+2,it,kt),   wl,   w_r)
+          call delta4(fdy,   p(jt-1:jt+2,it,kt),   pl,   p_r)
         endif
       else
         if (fdy <= threshold) then
@@ -517,11 +512,11 @@ contains
             end associate
           end block
         else
-          rhol = rho(jt,it,kt); rhor(jt,it,kt) = rho(jt+1,it,kt)
-            ul =   u(jt,it,kt);   ur(jt,it,kt) =   u(jt+1,it,kt)
-            vl =   v(jt,it,kt);   vr(jt,it,kt) =   v(jt+1,it,kt)
-            wl =   w(jt,it,kt);   wr(jt,it,kt) =   w(jt+1,it,kt)
-            pl =   p(jt,it,kt);   pr(jt,it,kt) =   p(jt+1,it,kt)
+          rhol = rho(jt,it,kt); rho_r = rho(jt+1,it,kt)
+            ul =   u(jt,it,kt);   u_r =   u(jt+1,it,kt)
+            vl =   v(jt,it,kt);   v_r =   v(jt+1,it,kt)
+            wl =   w(jt,it,kt);   w_r =   w(jt+1,it,kt)
+            pl =   p(jt,it,kt);   p_r =   p(jt+1,it,kt)
         endif
       endif
       call syncthreads()
@@ -532,9 +527,9 @@ contains
         p(jt,it,kt) = pl
     end block
     if (fdy > threshold) then
-      associate(un1 => v(jt,it,kt), un2 => vr(jt,it,kt))
-        call SLAU(id_slau, rho(jt,it,kt), rhor(jt,it,kt), u(jt,it,kt), ur(jt,it,kt), v(jt,it,kt), vr(jt,it,kt), &
-                  w(jt,it,kt), wr(jt,it,kt), un1, un2, p(jt,it,kt), pr(jt,it,kt), Normal_y, 1.d0, &
+      associate(un1 => v(jt,it,kt), un2 => v_r)
+        call SLAU(id_slau, rho(jt,it,kt), rho_r, u(jt,it,kt), u_r, v(jt,it,kt), v_r, &
+                  w(jt,it,kt), w_r, un1, un2, p(jt,it,kt), p_r, Normal_y, 1.d0, &
                   F(i-1,1,j,k-1), F(i-1,2,j,k-1), F(i-1,3,j,k-1), F(i-1,4,j,k-1), F(i-1,5,j,k-1))
       end associate
     endif
@@ -548,9 +543,8 @@ contains
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: G(nx-2,5,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
-    real(8), dimension(0:threadsG%z+2,threadsG%y,threadsG%x), shared :: rho,  u,  v,  w,  p
-    real(8), dimension(  threadsG%z+2,threadsG%y,threadsG%x), shared :: rhor, ur, vr, wr, pr
-    real(8) fdz
+    real(8), dimension(0:threadsG%z+2,threadsG%y,threadsG%x), shared :: rho, u, v, w, p
+    real(8) fdz, rho_r, u_r, v_r, w_r, p_r
     integer(kind=2) id_accuracy2
     it = threadIdx%x
     jt = threadIdx%y
@@ -587,11 +581,11 @@ contains
             end associate
           end block
         else
-          call delta4(fdz, rho(kt-1:kt+2,jt,it), rhol, rhor(kt,jt,it))
-          call delta4(fdz,   u(kt-1:kt+2,jt,it),   ul,   ur(kt,jt,it))
-          call delta4(fdz,   v(kt-1:kt+2,jt,it),   vl,   vr(kt,jt,it))
-          call delta4(fdz,   w(kt-1:kt+2,jt,it),   wl,   wr(kt,jt,it))
-          call delta4(fdz,   p(kt-1:kt+2,jt,it),   pl,   pr(kt,jt,it))
+          call delta4(fdz, rho(kt-1:kt+2,jt,it), rhol, rho_r)
+          call delta4(fdz,   u(kt-1:kt+2,jt,it),   ul,   u_r)
+          call delta4(fdz,   v(kt-1:kt+2,jt,it),   vl,   v_r)
+          call delta4(fdz,   w(kt-1:kt+2,jt,it),   wl,   w_r)
+          call delta4(fdz,   p(kt-1:kt+2,jt,it),   pl,   p_r)
         endif
       else
         if (fdz <= threshold) then
@@ -606,11 +600,11 @@ contains
             end associate
           end block
         else
-          rhol = rho(kt,jt,it); rhor(kt,jt,it) = rho(kt+1,jt,it)
-            ul =   u(kt,jt,it);   ur(kt,jt,it) =   u(kt+1,jt,it)
-            vl =   v(kt,jt,it);   vr(kt,jt,it) =   v(kt+1,jt,it)
-            wl =   w(kt,jt,it);   wr(kt,jt,it) =   w(kt+1,jt,it)
-            pl =   p(kt,jt,it);   pr(kt,jt,it) =   p(kt+1,jt,it)
+          rhol = rho(kt,jt,it); rho_r = rho(kt+1,jt,it)
+            ul =   u(kt,jt,it);   u_r =   u(kt+1,jt,it)
+            vl =   v(kt,jt,it);   v_r =   v(kt+1,jt,it)
+            wl =   w(kt,jt,it);   w_r =   w(kt+1,jt,it)
+            pl =   p(kt,jt,it);   p_r =   p(kt+1,jt,it)
         endif
       endif
       call syncthreads()
@@ -621,9 +615,9 @@ contains
         p(kt,jt,it) = pl
     end block
     if (fdz > threshold) then
-      associate(un1 => w(kt,jt,it), un2 => wr(kt,jt,it))
-        call SLAU(id_slau, rho(kt,jt,it), rhor(kt,jt,it), u(kt,jt,it), ur(kt,jt,it), v(kt,jt,it), vr(kt,jt,it), &
-                  w(kt,jt,it), wr(kt,jt,it), un1, un2, p(kt,jt,it), pr(kt,jt,it), Normal_z, 1.d0, &
+      associate(un1 => w(kt,jt,it), un2 => w_r)
+        call SLAU(id_slau, rho(kt,jt,it), rho_r, u(kt,jt,it), u_r, v(kt,jt,it), v_r, &
+                  w(kt,jt,it), w_r, un1, un2, p(kt,jt,it), p_r, Normal_z, 1.d0, &
                   G(i-1,1,j-1,k), G(i-1,2,j-1,k), G(i-1,3,j-1,k), G(i-1,4,j-1,k), G(i-1,5,j-1,k))
       end associate
     endif

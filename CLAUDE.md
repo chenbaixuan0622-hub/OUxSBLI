@@ -94,6 +94,7 @@ Copy an existing case directory (e.g., `cp -r 3D_solver/NSTGV 3D_solver/MYCASE`)
 * Roe scheme is not used. KEEP, SLAU, Hybrid schemes should be optimized.
 * `id_accuracy` is not only for convection terms but also for viscous terms because it controls the size of the ghost cells.
 * Do not add `contiguous` and `shared` attributes when passing shared memory as an argument.
+* `cpu_gpu_mpi.f90` will be modified in the future.
 
 ## Strict Tooling Rules
 - MCP servers are strictly prohibited.

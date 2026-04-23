@@ -45,7 +45,6 @@ contains
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     offset_yz = (jt-1)*sx + (kt-1)*sx*sy
     call load_smem_visc4_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
-    call syncthreads()
     i  = (blockIdx%x-1)*blockDim%x + it
     idx = it + offset_yz
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
@@ -138,7 +137,6 @@ contains
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     offset_yz = (jt-1)*sx + (kt-1)*sx*sy
     call load_smem_visc4_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
-    call syncthreads()
     i  = (blockIdx%x-1)*blockDim%x + it
     idx = it + offset_yz
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
@@ -261,7 +259,6 @@ contains
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     offset_xz = (it-1)*sy + (kt-1)*sy*sx
     call load_smem_visc4_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
-    call syncthreads()
     j  = (blockIdx%y-1)*blockDim%y + jt
     idx = jt + offset_xz
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
@@ -356,7 +353,6 @@ contains
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     offset_xz = (it-1)*sy + (kt-1)*sy*sx
     call load_smem_visc4_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
-    call syncthreads()
     j  = (blockIdx%y-1)*blockDim%y + jt
     idx = jt + offset_xz
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
@@ -479,7 +475,6 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     offset_xy = (jt-1)*sz + (it-1)*sz*sy
     call load_smem_visc4_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
-    call syncthreads()
     k  = (blockIdx%z-1)*blockDim%z + kt
     idx = kt + offset_xy
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
@@ -573,7 +568,6 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     offset_xy = (jt-1)*sz + (it-1)*sz*sy
     call load_smem_visc4_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
-    call syncthreads()
     k  = (blockIdx%z-1)*blockDim%z + kt
     idx = kt + offset_xy
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
