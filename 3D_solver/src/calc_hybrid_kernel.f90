@@ -41,7 +41,7 @@ contains
     integer(kind=8), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: E(nx-1,5,ny-2,nz-2)
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(-1:threadsE%x+3,threadsE%y,threadsE%z), shared :: rho, u, v, w, p
     real(8) fdx, rho_r, u_r, v_r, w_r, p_r
@@ -75,7 +75,7 @@ contains
             real(8) tmp(6)
             tmp = T(i-2:i+3,j,k)
             associate(uu => u)
-              E(i,:,j-1,k-1) = KEEP(id_accuracy, &
+              E(:,i,j-1,k-1) = KEEP(id_accuracy, &
                                     rho(it-2:it+3,jt,kt), u(it-2:it+3,jt,kt), &
                                       v(it-2:it+3,jt,kt), w(it-2:it+3,jt,kt), &
                                      uu(it-2:it+3,jt,kt), p(it-2:it+3,jt,kt), tmp, Normal_x)
@@ -94,7 +94,7 @@ contains
             real(8) tmp(4)
             tmp = T(i-1:i+2,j,k)
             associate(uu => u)
-              E(i,:,j-1,k-1) = KEEP(id_accuracy4, &
+              E(:,i,j-1,k-1) = KEEP(id_accuracy4, &
                                     rho(it-1:it+2,jt,kt), u(it-1:it+2,jt,kt), &
                                       v(it-1:it+2,jt,kt), w(it-1:it+2,jt,kt), &
                                      uu(it-1:it+2,jt,kt), p(it-1:it+2,jt,kt), tmp, Normal_x)
@@ -113,7 +113,7 @@ contains
             real(8) tmp(2)
             tmp = T(i:i+1,j,k)
             associate(uu => u)
-              E(i,:,j-1,k-1) = KEEP(id_accuracy2, &
+              E(:,i,j-1,k-1) = KEEP(id_accuracy2, &
                                     rho(it:it+1,jt,kt), u(it:it+1,jt,kt), &
                                       v(it:it+1,jt,kt), w(it:it+1,jt,kt), &
                                      uu(it:it+1,jt,kt), p(it:it+1,jt,kt), tmp, Normal_x)
@@ -138,7 +138,7 @@ contains
       associate(un1 => u(it,jt,kt), un2 => u_r)
         call SLAU(id_slau, rho(it,jt,kt), rho_r, u(it,jt,kt), u_r, v(it,jt,kt), v_r, &
                   w(it,jt,kt), w_r, un1, un2, p(it,jt,kt), p_r, Normal_x, 1.d0, &
-                  E(i,1,j-1,k-1), E(i,2,j-1,k-1), E(i,3,j-1,k-1), E(i,4,j-1,k-1), E(i,5,j-1,k-1))
+                  E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
       end associate
     endif
   end subroutine calc_hybrid_x6
@@ -149,7 +149,7 @@ contains
     integer(kind=8), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: F(nx-2,5,ny-1,nz-2)
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(-1:threadsF%y+3,threadsF%x,threadsF%z), shared :: rho, u, v, w, p
     real(8) fdy, rho_r, u_r, v_r, w_r, p_r
@@ -183,7 +183,7 @@ contains
             real(8) tmp(6)
             tmp = T(i,j-2:j+3,k)
             associate(vv => v)
-              F(i-1,:,j,k-1) = KEEP(id_accuracy, &
+              F(:,i-1,j,k-1) = KEEP(id_accuracy, &
                                     rho(jt-2:jt+3,it,kt), u(jt-2:jt+3,it,kt), &
                                       v(jt-2:jt+3,it,kt), w(jt-2:jt+3,it,kt), &
                                      vv(jt-2:jt+3,it,kt), p(jt-2:jt+3,it,kt), tmp, Normal_y)
@@ -202,7 +202,7 @@ contains
             real(8) tmp(4)
             tmp = T(i,j-1:j+2,k)
             associate(vv => v)
-              F(i-1,:,j,k-1) = KEEP(id_accuracy4, &
+              F(:,i-1,j,k-1) = KEEP(id_accuracy4, &
                                     rho(jt-1:jt+2,it,kt), u(jt-1:jt+2,it,kt), &
                                       v(jt-1:jt+2,it,kt), w(jt-1:jt+2,it,kt), &
                                      vv(jt-1:jt+2,it,kt), p(jt-1:jt+2,it,kt), tmp, Normal_y)
@@ -221,7 +221,7 @@ contains
             real(8) tmp(2)
             tmp = T(i,j:j+1,k)
             associate(vv => v)
-              F(i-1,:,j,k-1) = KEEP(id_accuracy2, &
+              F(:,i-1,j,k-1) = KEEP(id_accuracy2, &
                                     rho(jt:jt+1,it,kt), u(jt:jt+1,it,kt), &
                                       v(jt:jt+1,it,kt), w(jt:jt+1,it,kt), &
                                      vv(jt:jt+1,it,kt), p(jt:jt+1,it,kt), tmp, Normal_y)
@@ -246,7 +246,7 @@ contains
       associate(un1 => v(jt,it,kt), un2 => v_r)
         call SLAU(id_slau, rho(jt,it,kt), rho_r, u(jt,it,kt), u_r, v(jt,it,kt), v_r, &
                   w(jt,it,kt), w_r, un1, un2, p(jt,it,kt), p_r, Normal_y, 1.d0, &
-                  F(i-1,1,j,k-1), F(i-1,2,j,k-1), F(i-1,3,j,k-1), F(i-1,4,j,k-1), F(i-1,5,j,k-1))
+                  F(1,i-1,j,k-1), F(2,i-1,j,k-1), F(3,i-1,j,k-1), F(4,i-1,j,k-1), F(5,i-1,j,k-1))
       end associate
     endif
   end subroutine calc_hybrid_y6
@@ -257,7 +257,7 @@ contains
     integer(kind=8), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: G(nx-2,5,ny-2,nz-1)
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(-1:threadsG%z+3,threadsG%y,threadsG%x), shared :: rho, u, v, w, p
     real(8) fdz, rho_r, u_r, v_r, w_r, p_r
@@ -291,7 +291,7 @@ contains
             real(8) tmp(6)
             tmp = T(i,j,k-2:k+3)
             associate(ww => w)
-              G(i-1,:,j-1,k) = KEEP(id_accuracy, &
+              G(:,i-1,j-1,k) = KEEP(id_accuracy, &
                                     rho(kt-2:kt+3,jt,it), u(kt-2:kt+3,jt,it), &
                                       v(kt-2:kt+3,jt,it), w(kt-2:kt+3,jt,it), &
                                      ww(kt-2:kt+3,jt,it), p(kt-2:kt+3,jt,it), tmp, Normal_z)
@@ -310,7 +310,7 @@ contains
             real(8) tmp(4)
             tmp = T(i,j,k-1:k+2)
             associate(ww => w)
-              G(i-1,:,j-1,k) = KEEP(id_accuracy4, &
+              G(:,i-1,j-1,k) = KEEP(id_accuracy4, &
                                     rho(kt-1:kt+2,jt,it), u(kt-1:kt+2,jt,it), &
                                       v(kt-1:kt+2,jt,it), w(kt-1:kt+2,jt,it), &
                                      ww(kt-1:kt+2,jt,it), p(kt-1:kt+2,jt,it), tmp, Normal_z)
@@ -329,7 +329,7 @@ contains
             real(8) tmp(2)
             tmp = T(i,j,k:k+1)
             associate(ww => w)
-              G(i-1,:,j-1,k) = KEEP(id_accuracy2, &
+              G(:,i-1,j-1,k) = KEEP(id_accuracy2, &
                                     rho(kt:kt+1,jt,it), u(kt:kt+1,jt,it), &
                                       v(kt:kt+1,jt,it), w(kt:kt+1,jt,it), &
                                      ww(kt:kt+1,jt,it), p(kt:kt+1,jt,it), tmp, Normal_z)
@@ -354,7 +354,7 @@ contains
       associate(un1 => w(kt,jt,it), un2 => w_r)
         call SLAU(id_slau, rho(kt,jt,it), rho_r, u(kt,jt,it), u_r, v(kt,jt,it), v_r, &
                   w(kt,jt,it), w_r, un1, un2, p(kt,jt,it), p_r, Normal_z, 1.d0, &
-                  G(i-1,1,j-1,k), G(i-1,2,j-1,k), G(i-1,3,j-1,k), G(i-1,4,j-1,k), G(i-1,5,j-1,k))
+                  G(1,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(4,i-1,j-1,k), G(5,i-1,j-1,k))
       end associate
     endif
   end subroutine calc_hybrid_z6
@@ -365,7 +365,7 @@ contains
     integer(kind=4), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: E(nx-1,5,ny-2,nz-2)
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(0:threadsE%x+2,threadsE%y,threadsE%z), shared :: rho, u, v, w, p
     real(8) fdx, rho_r, u_r, v_r, w_r, p_r
@@ -398,7 +398,7 @@ contains
             real(8) tmp(4)
             tmp = T(i-1:i+2,j,k)
             associate(uu => u)
-              E(i,:,j-1,k-1) = KEEP(id_accuracy, &
+              E(:,i,j-1,k-1) = KEEP(id_accuracy, &
                                     rho(it-1:it+2,jt,kt), u(it-1:it+2,jt,kt), &
                                       v(it-1:it+2,jt,kt), w(it-1:it+2,jt,kt), &
                                      uu(it-1:it+2,jt,kt), p(it-1:it+2,jt,kt), tmp, Normal_x)
@@ -417,7 +417,7 @@ contains
             real(8) tmp(2)
             tmp = T(i:i+1,j,k)
             associate(uu => u)
-              E(i,:,j-1,k-1) = KEEP(id_accuracy2, &
+              E(:,i,j-1,k-1) = KEEP(id_accuracy2, &
                                     rho(it:it+1,jt,kt), u(it:it+1,jt,kt), &
                                       v(it:it+1,jt,kt), w(it:it+1,jt,kt), &
                                      uu(it:it+1,jt,kt), p(it:it+1,jt,kt), tmp, Normal_x)
@@ -442,7 +442,7 @@ contains
       associate(un1 => u(it,jt,kt), un2 => u_r)
         call SLAU(id_slau, rho(it,jt,kt), rho_r, u(it,jt,kt), u_r, v(it,jt,kt), v_r, &
                   w(it,jt,kt), w_r, un1, un2, p(it,jt,kt), p_r, Normal_x, 1.d0, &
-                  E(i,1,j-1,k-1), E(i,2,j-1,k-1), E(i,3,j-1,k-1), E(i,4,j-1,k-1), E(i,5,j-1,k-1))
+                  E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
       end associate
     endif
   end subroutine calc_hybrid_x4
@@ -453,7 +453,7 @@ contains
     integer(kind=4), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: F(nx-2,5,ny-1,nz-2)
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(0:threadsF%y+2,threadsF%x,threadsF%z), shared :: rho, u, v, w, p
     real(8) fdy, rho_r, u_r, v_r, w_r, p_r
@@ -486,7 +486,7 @@ contains
             real(8) tmp(4)
             tmp = T(i,j-1:j+2,k)
             associate(vv => v)
-              F(i-1,:,j,k-1) = KEEP(id_accuracy, &
+              F(:,i-1,j,k-1) = KEEP(id_accuracy, &
                                     rho(jt-1:jt+2,it,kt), u(jt-1:jt+2,it,kt), &
                                       v(jt-1:jt+2,it,kt), w(jt-1:jt+2,it,kt), &
                                      vv(jt-1:jt+2,it,kt), p(jt-1:jt+2,it,kt), tmp, Normal_y)
@@ -505,7 +505,7 @@ contains
             real(8) tmp(2)
             tmp = T(i,j:j+1,k)
             associate(vv => v)
-              F(i-1,:,j,k-1) = KEEP(id_accuracy2, &
+              F(:,i-1,j,k-1) = KEEP(id_accuracy2, &
                                     rho(jt:jt+1,it,kt), u(jt:jt+1,it,kt), &
                                       v(jt:jt+1,it,kt), w(jt:jt+1,it,kt), &
                                      vv(jt:jt+1,it,kt), p(jt:jt+1,it,kt), tmp, Normal_y)
@@ -530,7 +530,7 @@ contains
       associate(un1 => v(jt,it,kt), un2 => v_r)
         call SLAU(id_slau, rho(jt,it,kt), rho_r, u(jt,it,kt), u_r, v(jt,it,kt), v_r, &
                   w(jt,it,kt), w_r, un1, un2, p(jt,it,kt), p_r, Normal_y, 1.d0, &
-                  F(i-1,1,j,k-1), F(i-1,2,j,k-1), F(i-1,3,j,k-1), F(i-1,4,j,k-1), F(i-1,5,j,k-1))
+                  F(1,i-1,j,k-1), F(2,i-1,j,k-1), F(3,i-1,j,k-1), F(4,i-1,j,k-1), F(5,i-1,j,k-1))
       end associate
     endif
   end subroutine calc_hybrid_y4
@@ -541,7 +541,7 @@ contains
     integer(kind=4), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: G(nx-2,5,ny-2,nz-1)
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(0:threadsG%z+2,threadsG%y,threadsG%x), shared :: rho, u, v, w, p
     real(8) fdz, rho_r, u_r, v_r, w_r, p_r
@@ -574,7 +574,7 @@ contains
             real(8) tmp(4)
             tmp = T(i,j,k-1:k+2)
             associate(ww => w)
-              G(i-1,:,j-1,k) = KEEP(id_accuracy, &
+              G(:,i-1,j-1,k) = KEEP(id_accuracy, &
                                     rho(kt-1:kt+2,jt,it), u(kt-1:kt+2,jt,it), &
                                       v(kt-1:kt+2,jt,it), w(kt-1:kt+2,jt,it), &
                                      ww(kt-1:kt+2,jt,it), p(kt-1:kt+2,jt,it), tmp, Normal_z)
@@ -593,7 +593,7 @@ contains
             real(8) tmp(2)
             tmp = T(i,j,k:k+1)
             associate(ww => w)
-              G(i-1,:,j-1,k) = KEEP(id_accuracy2, &
+              G(:,i-1,j-1,k) = KEEP(id_accuracy2, &
                                     rho(kt:kt+1,jt,it), u(kt:kt+1,jt,it), &
                                       v(kt:kt+1,jt,it), w(kt:kt+1,jt,it), &
                                      ww(kt:kt+1,jt,it), p(kt:kt+1,jt,it), tmp, Normal_z)
@@ -618,7 +618,7 @@ contains
       associate(un1 => w(kt,jt,it), un2 => w_r)
         call SLAU(id_slau, rho(kt,jt,it), rho_r, u(kt,jt,it), u_r, v(kt,jt,it), v_r, &
                   w(kt,jt,it), w_r, un1, un2, p(kt,jt,it), p_r, Normal_z, 1.d0, &
-                  G(i-1,1,j-1,k), G(i-1,2,j-1,k), G(i-1,3,j-1,k), G(i-1,4,j-1,k), G(i-1,5,j-1,k))
+                  G(1,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(4,i-1,j-1,k), G(5,i-1,j-1,k))
       end associate
     endif
   end subroutine calc_hybrid_z4
@@ -629,7 +629,7 @@ contains
     integer(kind=2), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: E(nx-1,5,ny-2,nz-2)
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(threadsE%x+1,threadsE%y,threadsE%z), shared :: rho, u, v, w, p
     real(8) fdx
@@ -658,7 +658,7 @@ contains
         real(8) tmp(2)
         tmp = T(i:i+1,j,k)
         associate(uu => u)
-          E(i,:,j-1,k-1) = KEEP(id_accuracy, &
+          E(:,i,j-1,k-1) = KEEP(id_accuracy, &
                                 rho(it:it+1,jt,kt), u(it:it+1,jt,kt), &
                                   v(it:it+1,jt,kt), w(it:it+1,jt,kt), &
                                  uu(it:it+1,jt,kt), p(it:it+1,jt,kt), tmp, Normal_x)
@@ -668,7 +668,7 @@ contains
       associate(un1 => u(it,jt,kt), un2 => u(it+1,jt,kt))
         call SLAU(id_slau, rho(it,jt,kt), rho(it+1,jt,kt), u(it,jt,kt), u(it+1,jt,kt), v(it,jt,kt), v(it+1,jt,kt), &
                   w(it,jt,kt), w(it+1,jt,kt), un1, un2, p(it,jt,kt), p(it+1,jt,kt), Normal_x, 1.d0, &
-                  E(i,1,j-1,k-1), E(i,2,j-1,k-1), E(i,3,j-1,k-1), E(i,4,j-1,k-1), E(i,5,j-1,k-1))
+                  E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
       end associate
     endif
   end subroutine calc_hybrid_x2
@@ -679,7 +679,7 @@ contains
     integer(kind=2), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: F(nx-2,5,ny-1,nz-2)
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(threadsF%y+1,threadsF%x,threadsF%z), shared :: rho, u, v, w, p
     real(8) fdy
@@ -708,7 +708,7 @@ contains
         real(8) tmp(2)
         tmp = T(i,j:j+1,k)
         associate(vv => v)
-          F(i-1,:,j,k-1) = KEEP(id_accuracy, &
+          F(:,i-1,j,k-1) = KEEP(id_accuracy, &
                                 rho(jt:jt+1,it,kt), u(jt:jt+1,it,kt), &
                                   v(jt:jt+1,it,kt), w(jt:jt+1,it,kt), &
                                  vv(jt:jt+1,it,kt), p(jt:jt+1,it,kt), tmp, Normal_y)
@@ -718,7 +718,7 @@ contains
       associate(un1 => v(jt,it,kt), un2 => v(jt+1,it,kt))
         call SLAU(id_slau, rho(jt,it,kt), rho(jt+1,it,kt), u(jt,it,kt), u(jt+1,it,kt), v(jt,it,kt), v(jt+1,it,kt), &
                   w(jt,it,kt), w(jt+1,it,kt), un1, un2, p(jt,it,kt), p(jt+1,it,kt), Normal_y, 1.d0, &
-                  F(i-1,1,j,k-1), F(i-1,2,j,k-1), F(i-1,3,j,k-1), F(i-1,4,j,k-1), F(i-1,5,j,k-1))
+                  F(1,i-1,j,k-1), F(2,i-1,j,k-1), F(3,i-1,j,k-1), F(4,i-1,j,k-1), F(5,i-1,j,k-1))
       end associate
     endif
   end subroutine calc_hybrid_y2
@@ -729,7 +729,7 @@ contains
     integer(kind=2), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: G(nx-2,5,ny-2,nz-1)
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(threadsG%z+1,threadsG%y,threadsG%x), shared :: rho, u, v, w, p
     real(8) fdz
@@ -758,7 +758,7 @@ contains
         real(8) tmp(2)
         tmp = T(i,j,k:k+1)
         associate(ww => w)
-          G(i-1,:,j-1,k) = KEEP(id_accuracy, &
+          G(:,i-1,j-1,k) = KEEP(id_accuracy, &
                                 rho(kt:kt+1,jt,it), u(kt:kt+1,jt,it), &
                                   v(kt:kt+1,jt,it), w(kt:kt+1,jt,it), &
                                  ww(kt:kt+1,jt,it), p(kt:kt+1,jt,it), tmp, Normal_z)
@@ -768,7 +768,7 @@ contains
       associate(un1 => w(kt,jt,it), un2 => w(kt+1,jt,it))
         call SLAU(id_slau, rho(kt,jt,it), rho(kt+1,jt,it), u(kt,jt,it), u(kt+1,jt,it), v(kt,jt,it), v(kt+1,jt,it), &
                   w(kt,jt,it), w(kt+1,jt,it), un1, un2, p(kt,jt,it), p(kt+1,jt,it), Normal_z, 1.d0, &
-                  G(i-1,1,j-1,k), G(i-1,2,j-1,k), G(i-1,3,j-1,k), G(i-1,4,j-1,k), G(i-1,5,j-1,k))
+                  G(1,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(4,i-1,j-1,k), G(5,i-1,j-1,k))
       end associate
     endif
   end subroutine calc_hybrid_z2

@@ -45,7 +45,7 @@ contains
     real(8), intent(out), allocatable, device :: F(:,:,:,:) !< flux in y direction
     real(8), intent(out), allocatable, device :: G(:,:,:,:) !< flux in z direction
     integer ierr
-    allocate(ruvwp(5,nx,ny,nz), E(nx-1,5,ny-2,nz-2), F(nx-2,5,ny-1,nz-2), G(nx-2,5,ny-2,nz-1), stat=ierr)
+    allocate(ruvwp(5,nx,ny,nz), E(5,nx-1,ny-2,nz-2), F(5,nx-2,ny-1,nz-2), G(5,nx-2,ny-2,nz-1), stat=ierr)
     allocate(dtdxdy(nx-2,ny-2), dtdydz(ny-2,nz-2), dtdzdx(nx-2,nz-2), xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(nx,ny), stat=ierr)
     if (kind(id_visc) == 2) then
       allocate(T(nx,ny,nz), mu(1,1,1), mut(1,1,1), qc2(1,1,1), stat=ierr)

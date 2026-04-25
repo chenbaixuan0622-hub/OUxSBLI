@@ -25,7 +25,7 @@ contains
     integer(kind=8), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: E(nx-1,5,ny-2,nz-2)
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(-1:threadsE%x+3,threadsE%y,threadsE%z), shared :: rho,  u,  v,  w,  p
     real(8), dimension(   threadsE%x,  threadsE%y,threadsE%z), shared :: rhor, ur, vr, wr, pr
@@ -79,7 +79,7 @@ contains
     end block
     call Roe(rho(it,jt,kt), rhor(it,jt,kt), u(it,jt,kt), ur(it,jt,kt), v(it,jt,kt), vr(it,jt,kt), &
              w(it,jt,kt), wr(it,jt,kt), p(it,jt,kt), pr(it,jt,kt), &
-             E(i,1,j-1,k-1), E(i,2,j-1,k-1), E(i,3,j-1,k-1), E(i,4,j-1,k-1), E(i,5,j-1,k-1))
+             E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
   end subroutine calc_roe_x6
 
 
@@ -87,7 +87,7 @@ contains
     integer(kind=8), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: F(nx-2,5,ny-1,nz-2)
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(-1:threadsF%y+3,threadsF%x,threadsF%z), shared :: rho,  u,  v,  w,  p
     real(8), dimension(   threadsF%y,  threadsF%x,threadsF%z), shared :: rhor, ur, vr, wr, pr
@@ -141,7 +141,7 @@ contains
     end block
     call Roe(rho(jt,it,kt), rhor(jt,it,kt), v(jt,it,kt), vr(jt,it,kt), w(jt,it,kt), wr(jt,it,kt), &
              u(jt,it,kt), ur(jt,it,kt), p(jt,it,kt), pr(jt,it,kt), &
-             F(i-1,1,j,k-1), F(i-1,3,j,k-1), F(i-1,4,j,k-1), F(i-1,2,j,k-1), F(i-1,5,j,k-1))
+             F(1,i-1,j,k-1), F(3,i-1,j,k-1), F(4,i-1,j,k-1), F(2,i-1,j,k-1), F(5,i-1,j,k-1))
   end subroutine calc_roe_y6
 
 
@@ -149,7 +149,7 @@ contains
     integer(kind=8), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: G(nx-2,5,ny-2,nz-1)
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(-1:threadsG%z+3,threadsG%y,threadsG%x), shared :: rho,  u,  v,  w,  p
     real(8), dimension(   threadsG%z,  threadsG%y,threadsG%x), shared :: rhor, ur, vr, wr, pr
@@ -203,7 +203,7 @@ contains
     end block
     call Roe(rho(kt,jt,it), rhor(kt,jt,it), w(kt,jt,it), wr(kt,jt,it), u(kt,jt,it), ur(kt,jt,it), &
              v(kt,jt,it), vr(kt,jt,it), p(kt,jt,it), pr(kt,jt,it), &
-             G(i-1,1,j-1,k), G(i-1,4,j-1,k), G(i-1,2,j-1,k), G(i-1,3,j-1,k), G(i-1,5,j-1,k))
+             G(1,i-1,j-1,k), G(4,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(5,i-1,j-1,k))
   end subroutine calc_roe_z6
 
 
@@ -211,7 +211,7 @@ contains
     integer(kind=4), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: E(nx-1,5,ny-2,nz-2)
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(0:threadsE%x+2,threadsE%y,threadsE%z), shared :: rho,  u,  v,  w,  p
     real(8), dimension(  threadsE%x,  threadsE%y,threadsE%z), shared :: rhor, ur, vr, wr, pr
@@ -259,7 +259,7 @@ contains
     end block
     call Roe(rho(it,jt,kt), rhor(it,jt,kt), u(it,jt,kt), ur(it,jt,kt), v(it,jt,kt), vr(it,jt,kt), &
              w(it,jt,kt), wr(it,jt,kt), p(it,jt,kt), pr(it,jt,kt), &
-             E(i,1,j-1,k-1), E(i,2,j-1,k-1), E(i,3,j-1,k-1), E(i,4,j-1,k-1), E(i,5,j-1,k-1))
+             E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
   end subroutine calc_roe_x4
 
 
@@ -267,7 +267,7 @@ contains
     integer(kind=4), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: F(nx-2,5,ny-1,nz-2)
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(0:threadsF%y+2,threadsF%x,threadsF%z), shared :: rho,  u,  v,  w,  p
     real(8), dimension(  threadsF%y+2,threadsF%x,threadsF%z), shared :: rhor, ur, vr, wr, pr
@@ -315,7 +315,7 @@ contains
     end block
     call Roe(rho(jt,it,kt), rhor(jt,it,kt), v(jt,it,kt), vr(jt,it,kt), w(jt,it,kt), wr(jt,it,kt), &
              u(jt,it,kt), ur(jt,it,kt), p(jt,it,kt), pr(jt,it,kt), &
-             F(i-1,1,j,k-1), F(i-1,3,j,k-1), F(i-1,4,j,k-1), F(i-1,2,j,k-1), F(i-1,5,j,k-1))
+             F(1,i-1,j,k-1), F(3,i-1,j,k-1), F(4,i-1,j,k-1), F(2,i-1,j,k-1), F(5,i-1,j,k-1))
   end subroutine calc_roe_y4
 
 
@@ -323,7 +323,7 @@ contains
     integer(kind=4), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: G(nx-2,5,ny-2,nz-1)
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(0:threadsG%z+2,threadsG%y,threadsG%x), shared :: rho,  u,  v,  w,  p
     real(8), dimension(  threadsG%z+2,threadsG%y,threadsG%x), shared :: rhor, ur, vr, wr, pr
@@ -370,7 +370,7 @@ contains
     end block
     call Roe(rho(kt,jt,it), rhor(kt,jt,it), w(kt,jt,it), wr(kt,jt,it), u(kt,jt,it), ur(kt,jt,it), &
              v(kt,jt,it), vr(kt,jt,it), p(kt,jt,it), pr(kt,jt,it), &
-             G(i-1,1,j-1,k), G(i-1,4,j-1,k), G(i-1,2,j-1,k), G(i-1,3,j-1,k), G(i-1,5,j-1,k))
+             G(1,i-1,j-1,k), G(4,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(5,i-1,j-1,k))
   end subroutine calc_roe_z4
 
 
@@ -378,7 +378,7 @@ contains
     integer(kind=2), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: E(nx-1,5,ny-2,nz-2)
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(threadsE%x+1,threadsE%y,threadsE%z), shared :: rho, u, v, w, p
     it = threadIdx%x
@@ -402,7 +402,7 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     call Roe(rho(it,jt,kt), rho(it+1,jt,kt), u(it,jt,kt), u(it+1,jt,kt), v(it,jt,kt), v(it+1,jt,kt), &
              w(it,jt,kt), w(it+1,jt,kt), p(it,jt,kt), p(it+1,jt,kt), &
-             E(i,1,j-1,k-1), E(i,2,j-1,k-1), E(i,3,j-1,k-1), E(i,4,j-1,k-1), E(i,5,j-1,k-1))
+             E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
   end subroutine calc_roe_x2
 
 
@@ -410,7 +410,7 @@ contains
     integer(kind=2), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: F(nx-2,5,ny-1,nz-2)
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(threadsF%y+1,threadsF%x,threadsF%z), shared :: rho, u, v, w, p
     it = threadIdx%x
@@ -434,7 +434,7 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     call Roe(rho(jt,it,kt), rho(jt+1,it,kt), v(jt,it,kt), v(jt+1,it,kt), w(jt,it,kt), w(jt+1,it,kt), &
              u(jt,it,kt), u(jt+1,it,kt), p(jt,it,kt), p(jt+1,it,kt), &
-             F(i-1,1,j,k-1), F(i-1,3,j,k-1), F(i-1,4,j,k-1), F(i-1,2,j,k-1), F(i-1,5,j,k-1))
+             F(1,i-1,j,k-1), F(3,i-1,j,k-1), F(4,i-1,j,k-1), F(2,i-1,j,k-1), F(5,i-1,j,k-1))
   end subroutine calc_roe_y2
 
 
@@ -442,7 +442,7 @@ contains
     integer(kind=2), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: G(nx-2,5,ny-2,nz-1)
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(threadsG%z+1,threadsG%y,threadsG%x), shared :: rho, u, v, w, p
     it = threadIdx%x
@@ -466,7 +466,7 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     call Roe(rho(kt,jt,it), rho(kt+1,jt,it), w(kt,jt,it), w(kt+1,jt,it), u(kt,jt,it), u(kt+1,jt,it), &
              v(kt,jt,it), v(kt+1,jt,it), p(kt,jt,it), p(kt+1,jt,it), &
-             G(i-1,1,j-1,k), G(i-1,4,j-1,k), G(i-1,2,j-1,k), G(i-1,3,j-1,k), G(i-1,5,j-1,k))
+             G(1,i-1,j-1,k), G(4,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(5,i-1,j-1,k))
   end subroutine calc_roe_z2
 end module calc_roe_kernel
 

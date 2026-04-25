@@ -58,9 +58,9 @@ contains
     real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !< inverse grid spacing z (1/dz)
     real(8), intent(in), device, contiguous  :: Q(nx,5,ny,nz)       !< conservative variables Q(rho, u, v, w, p)
     real(8), intent(in), device, contiguous  :: T(nx,ny,nz)         !< temperature field
-    real(8), intent(out), device, contiguous :: E(nx-1,5,ny-2,nz-2) !< convective flux in x direction
-    real(8), intent(out), device, contiguous :: F(nx-2,5,ny-1,nz-2) !< convective flux in y direction
-    real(8), intent(out), device, contiguous :: G(nx-2,5,ny-2,nz-1) !< convective flux in z direction
+    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< convective flux in x direction
+    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< convective flux in y direction
+    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
     if (id_bc_x) then
       call calc_keep_x<<<blocksE,threadsE>>>(id_accuracy, nx, ny, nz, Q, T, E)
     else
@@ -94,9 +94,9 @@ contains
     real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !< inverse grid spacing z (1/dz)
     real(8), intent(in), device, contiguous  :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous  :: T(nx,ny,nz)         !< temperature field
-    real(8), intent(out), device, contiguous :: E(nx-1,5,ny-2,nz-2) !< convective flux in x direction
-    real(8), intent(out), device, contiguous :: F(nx-2,5,ny-1,nz-2) !< convective flux in y direction
-    real(8), intent(out), device, contiguous :: G(nx-2,5,ny-2,nz-1) !< convective flux in z direction
+    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< convective flux in x direction
+    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< convective flux in y direction
+    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
     if (id_bc_x) then
       call calc_slau_x<<<blocksE,threadsE>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
@@ -132,9 +132,9 @@ contains
     real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !< inverse grid spacing z (1/dz)
     real(8), intent(in), device, contiguous  :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous  :: T(nx,ny,nz)         !< temperature field
-    real(8), intent(out), device, contiguous :: E(nx-1,5,ny-2,nz-2) !< convective flux in x direction
-    real(8), intent(out), device, contiguous :: F(nx-2,5,ny-1,nz-2) !< convective flux in y direction
-    real(8), intent(out), device, contiguous :: G(nx-2,5,ny-2,nz-1) !< convective flux in z direction
+    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< convective flux in x direction
+    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< convective flux in y direction
+    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
     if (id_bc_x) then
       call calc_roe_x<<<blocksE,threadsE>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
@@ -170,9 +170,9 @@ contains
     real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !> 1 / dz
     real(8), intent(in), device, contiguous  :: Q(nx,5,ny,nz)       !> Q(rho, u, v, w, p)
     real(8), intent(in), device, contiguous  :: T(nx,ny,nz)         !> temperature
-    real(8), intent(out), device, contiguous :: E(nx-1,5,ny-2,nz-2) !> Flux in x direction
-    real(8), intent(out), device, contiguous :: F(nx-2,5,ny-1,nz-2) !> Flux in y direction
-    real(8), intent(out), device, contiguous :: G(nx-2,5,ny-2,nz-1) !> Flux in z direction
+    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !> Flux in x direction
+    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !> Flux in y direction
+    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> Flux in z direction
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
     if (id_bc_x) then
       call calc_hybrid_x<<<blocksE,threadsE>>>(id_accuracy, nx, ny, nz, Q, T, sensor, E)
@@ -209,9 +209,9 @@ contains
     real(8), intent(out), device, contiguous :: mu(1,1,1)           !> viscosity, size is (1,1,1) in case of Euler
     real(8), intent(out), device, contiguous :: mut(1,1,1)          !> SGS viscosity, size is (1,1,1) in case of Euler
     real(8), intent(out), device, contiguous :: qc2(1,1,1)          !> SGS kinetic energy, size is (1,1,1) in case of Euler
-    real(8), intent(out), device, contiguous :: E(nx-1,5,ny-2,nz-2) !> Flux in x direction
-    real(8), intent(out), device, contiguous :: F(nx-2,5,ny-1,nz-2) !> Flux in y direction
-    real(8), intent(out), device, contiguous :: G(nx-2,5,ny-2,nz-1) !> Flux in z direction
+    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !> Flux in x direction
+    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !> Flux in y direction
+    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> Flux in z direction
     integer stat, i, j, k
     call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, Q, T)
     call calc_conv(id_scheme, nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, E, F, G)
@@ -237,9 +237,9 @@ contains
     real(8), intent(out), device, contiguous :: mu(nx,ny,nz)        !> molecular viscosity via Sutherland's law
     real(8), intent(out), device, contiguous :: mut(1,1,1)          !> SGS turbulent viscosity (unused for NS)
     real(8), intent(out), device, contiguous :: qc2(1,1,1)          !> SGS kinetic energy (unused for NS)
-    real(8), intent(out), device, contiguous :: E(nx-1,5,ny-2,nz-2) !> x-direction flux (convective + viscous)
-    real(8), intent(out), device, contiguous :: F(nx-2,5,ny-1,nz-2) !> y-direction flux (convective + viscous)
-    real(8), intent(out), device, contiguous :: G(nx-2,5,ny-2,nz-1) !> z-direction flux (convective + viscous)
+    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !> x-direction flux (convective + viscous)
+    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !> y-direction flux (convective + viscous)
+    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> z-direction flux (convective + viscous)
     integer stat
     ! Step 1: Decode Q and compute T(rho) and mu(T) via Sutherland's formula
     call calc_quantities_T_3D(nx, ny, nz, Jacobian, QJ, Q, T, mu)
@@ -291,9 +291,9 @@ contains
     real(8), intent(out), device, contiguous :: mu(nx,ny,nz)        !> viscosity
     real(8), intent(out), device, contiguous :: mut(nx,ny,nz)       !> SGS viscosity
     real(8), intent(out), device, contiguous :: qc2(nx,ny,nz)       !> SGS kinetic energy
-    real(8), intent(out), device, contiguous :: E(nx-1,5,ny-2,nz-2) !> Flux in x direction
-    real(8), intent(out), device, contiguous :: F(nx-2,5,ny-1,nz-2) !> Flux in y direction
-    real(8), intent(out), device, contiguous :: G(nx-2,5,ny-2,nz-1) !> Flux in z direction
+    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !> Flux in x direction
+    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !> Flux in y direction
+    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> Flux in z direction
     integer stat
     mut = 0.d0
     qc2 = 0.d0

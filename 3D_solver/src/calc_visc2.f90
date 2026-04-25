@@ -19,7 +19,7 @@ contains
     real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)       !< conservative variables: rho, rho*u, rho*v, rho*w, E
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
-    real(8), intent(inout), device, contiguous :: E(nx-1,5,ny-2,nz-2) !< viscous flux components in x direction
+    real(8), intent(inout), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< viscous flux components in x direction
     real(8), shared :: u(threadsEv%x+1,0:threadsEv%y+1,0:threadsEv%z+1)
     real(8), shared :: v(threadsEv%x+1,0:threadsEv%y+1,threadsEv%z)
     real(8), shared :: w(threadsEv%x+1,0:threadsEv%z+1,threadsEv%y)
@@ -91,10 +91,10 @@ contains
     wtxz = 0.5d0 * (w(it,kt,jt) + w(it+1,kt,jt)) * txz
     
     ! Accumulate viscous flux components (note subtraction: fluxes point outward)
-    E(i,2,j-1,k-1) = E(i,2,j-1,k-1) - txx            ! Momentum: -tau_xx in x-flux
-    E(i,3,j-1,k-1) = E(i,3,j-1,k-1) - txy            ! Momentum: -tau_xy in x-flux  
-    E(i,4,j-1,k-1) = E(i,4,j-1,k-1) - txz            ! Momentum: -tau_xz in x-flux
-    E(i,5,j-1,k-1) = E(i,5,j-1,k-1) - (utxx + vtxy + wtxz + kTx)  ! Energy: -(u*tau + q)
+    E(2,i,j-1,k-1) = E(2,i,j-1,k-1) - txx            ! Momentum: -tau_xx in x-flux
+    E(3,i,j-1,k-1) = E(3,i,j-1,k-1) - txy            ! Momentum: -tau_xy in x-flux  
+    E(4,i,j-1,k-1) = E(4,i,j-1,k-1) - txz            ! Momentum: -tau_xz in x-flux
+    E(5,i,j-1,k-1) = E(5,i,j-1,k-1) - (utxx + vtxy + wtxz + kTx)  ! Energy: -(u*tau + q)
   end subroutine calc_Ev2
  
 
@@ -112,7 +112,7 @@ contains
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
-    real(8), intent(inout), device, contiguous :: E(nx-1,5,ny-2,nz-2) !< viscous + SGS flux in x direction
+    real(8), intent(inout), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< viscous + SGS flux in x direction
     integer i, j, k
     real(8) :: txx, txy, txz, utxx, vtxy, wtxz, kTx, Hsgs
     real(8), dimension(2) :: my, mysgs, mz, mzsgs
@@ -175,10 +175,10 @@ contains
       H(:) = Cp * T(i:i+1,j,k) + 0.5d0 * (Q(i:i+1,2,j,k)**2 + Q(i:i+1,3,j,k)**2 + Q(i:i+1,4,j,k)**2) + qc2(i:i+1,j,k)
       Hsgs = -mxsgs * (-H(1) + H(2)) * dx(i) / Prt
     end block
-    E(i,2,j-1,k-1) = E(i,2,j-1,k-1) - txx
-    E(i,3,j-1,k-1) = E(i,3,j-1,k-1) - txy
-    E(i,4,j-1,k-1) = E(i,4,j-1,k-1) - txz
-    E(i,5,j-1,k-1) = E(i,5,j-1,k-1) - (utxx + vtxy + wtxz + kTx + Hsgs)
+    E(2,i,j-1,k-1) = E(2,i,j-1,k-1) - txx
+    E(3,i,j-1,k-1) = E(3,i,j-1,k-1) - txy
+    E(4,i,j-1,k-1) = E(4,i,j-1,k-1) - txz
+    E(5,i,j-1,k-1) = E(5,i,j-1,k-1) - (utxx + vtxy + wtxz + kTx + Hsgs)
   end subroutine calc_Ev_LES2
  
 
@@ -194,7 +194,7 @@ contains
     real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
-    real(8), intent(inout), device, contiguous :: F(nx-2,5,ny-1,nz-2) !< viscous flux components in y direction
+    real(8), intent(inout), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< viscous flux components in y direction
     real(8), shared :: u(threadsFv%y+1,0:threadsFv%x+1,threadsFv%z)
     real(8), shared :: v(threadsFv%y+1,0:threadsFv%x+1,0:threadsFv%z+1)
     real(8), shared :: w(threadsFv%y+1,0:threadsFv%z+1,threadsFv%x)
@@ -258,10 +258,10 @@ contains
     utyx = 0.5d0 * (u(jt,it,kt) + u(jt+1,it,kt)) * tyx
     vtyy = 0.5d0 * (v(jt,it,kt) + v(jt+1,it,kt)) * tyy
     wtyz = 0.5d0 * (w(jt,kt,it) + w(jt+1,kt,it)) * tyz
-    F(i-1,2,j,k-1) = F(i-1,2,j,k-1) - tyx
-    F(i-1,3,j,k-1) = F(i-1,3,j,k-1) - tyy
-    F(i-1,4,j,k-1) = F(i-1,4,j,k-1) - tyz
-    F(i-1,5,j,k-1) = F(i-1,5,j,k-1) - (utyx + vtyy + wtyz + kTy)
+    F(2,i-1,j,k-1) = F(2,i-1,j,k-1) - tyx
+    F(3,i-1,j,k-1) = F(3,i-1,j,k-1) - tyy
+    F(4,i-1,j,k-1) = F(4,i-1,j,k-1) - tyz
+    F(5,i-1,j,k-1) = F(5,i-1,j,k-1) - (utyx + vtyy + wtyz + kTy)
   end subroutine calc_Fv2
  
 
@@ -279,7 +279,7 @@ contains
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
-    real(8), intent(inout), device, contiguous :: F(nx-2,5,ny-1,nz-2) !< viscous + SGS flux in y direction
+    real(8), intent(inout), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< viscous + SGS flux in y direction
     integer i, j, k
     real(8) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy, Hsgs
     real(8), dimension(2) :: u2, v2, w2, mz, mzsgs, mx, mxsgs
@@ -342,10 +342,10 @@ contains
       H(:) = Cp * T(i,j:j+1,k) + 0.5d0 * (Q(i,2,j:j+1,k)**2 + Q(i,3,j:j+1,k)**2 + Q(i,4,j:j+1,k)**2) + qc2(i,j:j+1,k)
       Hsgs = -mysgs * (-H(1) + H(2)) * dy(j) / Prt
     end block
-    F(i-1,2,j,k-1) = F(i-1,2,j,k-1) - tyx
-    F(i-1,3,j,k-1) = F(i-1,3,j,k-1) - tyy
-    F(i-1,4,j,k-1) = F(i-1,4,j,k-1) - tyz
-    F(i-1,5,j,k-1) = F(i-1,5,j,k-1) - (utyx + vtyy + wtyz + kTy + Hsgs)
+    F(2,i-1,j,k-1) = F(2,i-1,j,k-1) - tyx
+    F(3,i-1,j,k-1) = F(3,i-1,j,k-1) - tyy
+    F(4,i-1,j,k-1) = F(4,i-1,j,k-1) - tyz
+    F(5,i-1,j,k-1) = F(5,i-1,j,k-1) - (utyx + vtyy + wtyz + kTy + Hsgs)
   end subroutine calc_Fv_LES2
  
 
@@ -361,7 +361,7 @@ contains
     real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
-    real(8), intent(inout), device, contiguous :: G(nx-2,5,ny-2,nz-1) !< viscous flux components in z direction
+    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< viscous flux components in z direction
     real(8), shared :: u(threadsGv%z+1,0:threadsGv%x+1,threadsGv%y)
     real(8), shared :: v(threadsGv%z+1,0:threadsGv%y+1,threadsGv%x)
     real(8), shared :: w(threadsGv%z+1,0:threadsGv%x+1,0:threadsGv%y+1)
@@ -425,10 +425,10 @@ contains
     utzx = 0.5d0 * (u(kt,it,jt) + u(kt+1,it,jt)) * tzx
     vtzy = 0.5d0 * (v(kt,jt,it) + v(kt+1,jt,it)) * tzy
     wtzz = 0.5d0 * (w(kt,it,jt) + w(kt+1,it,jt)) * tzz
-    G(i-1,2,j-1,k) = G(i-1,2,j-1,k) - tzx
-    G(i-1,3,j-1,k) = G(i-1,3,j-1,k) - tzy
-    G(i-1,4,j-1,k) = G(i-1,4,j-1,k) - tzz
-    G(i-1,5,j-1,k) = G(i-1,5,j-1,k) - (utzx + vtzy + wtzz + kTz)
+    G(2,i-1,j-1,k) = G(2,i-1,j-1,k) - tzx
+    G(3,i-1,j-1,k) = G(3,i-1,j-1,k) - tzy
+    G(4,i-1,j-1,k) = G(4,i-1,j-1,k) - tzz
+    G(5,i-1,j-1,k) = G(5,i-1,j-1,k) - (utzx + vtzy + wtzz + kTz)
   end subroutine calc_Gv2
 
 
@@ -444,7 +444,7 @@ contains
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
-    real(8), intent(inout), device, contiguous :: G(nx-2,5,ny-2,nz-1) !< viscous + SGS flux in z direction
+    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< viscous + SGS flux in z direction
     integer i, j, k
     real(8) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz, Hsgs
     real(8), dimension(2) :: mx, mxsgs, my, mysgs
@@ -507,10 +507,10 @@ contains
       H(:) = Cp * T(i,j,k:k+1) + 0.5d0 * (Q(i,2,j,k:k+1)**2 + Q(i,3,j,k:k+1)**2 + Q(i,4,j,k:k+1)**2) + qc2(i,j,k:k+1)
       Hsgs = -mzsgs * (-H(1) + H(2)) * dz(k) / Prt
     end block
-    G(i-1,2,j-1,k) = G(i-1,2,j-1,k) - tzx
-    G(i-1,3,j-1,k) = G(i-1,3,j-1,k) - tzy
-    G(i-1,4,j-1,k) = G(i-1,4,j-1,k) - tzz
-    G(i-1,5,j-1,k) = G(i-1,5,j-1,k) - (utzx + vtzy + wtzz + kTz + Hsgs)
+    G(2,i-1,j-1,k) = G(2,i-1,j-1,k) - tzx
+    G(3,i-1,j-1,k) = G(3,i-1,j-1,k) - tzy
+    G(4,i-1,j-1,k) = G(4,i-1,j-1,k) - tzz
+    G(5,i-1,j-1,k) = G(5,i-1,j-1,k) - (utzx + vtzy + wtzz + kTz + Hsgs)
   end subroutine calc_Gv_LES2
 end module calc_visc2
 

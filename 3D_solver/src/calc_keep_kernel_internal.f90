@@ -27,7 +27,7 @@ contains
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
     real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device, contiguous  :: E(nx-1,5,ny-2,nz-2) !< Flux in x direction
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer ii, i_base, idx, offset_yz
@@ -56,7 +56,7 @@ contains
     if (io+1 <= i .and. i <= nx-(io+1) .and. j <= ny-1 .and. k <= nz-1) then
       associate(uu => u)
       idx = it + offset_yz
-      E(i,:,j-1,k-1) = KEEP(id_accuracy, &
+      E(:,i,j-1,k-1) = KEEP(id_accuracy, &
                             rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
                               v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
                              uu(idx-io:idx+io+1), p(idx-io:idx+io+1), &
@@ -74,7 +74,7 @@ contains
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
     real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device, contiguous  :: F(nx-2,5,ny-1,nz-2) !< Flux in y direction
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer jj, j_base, idx, offset_xz
@@ -103,7 +103,7 @@ contains
     if (io+1 <= j .and. j <= ny-(io+1) .and. i <= nx-1 .and. k <= nz-1) then
       associate(vv => v)
       idx = jt + offset_xz
-      F(i-1,:,j,k-1) = KEEP(id_accuracy, &
+      F(:,i-1,j,k-1) = KEEP(id_accuracy, &
                             rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
                               v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
                              vv(idx-io:idx+io+1), p(idx-io:idx+io+1), &
@@ -121,7 +121,7 @@ contains
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
     real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device, contiguous  :: G(nx-2,5,ny-2,nz-1) !< Flux in z direction
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer kk, k_base, idx, offset_xy
@@ -150,7 +150,7 @@ contains
     if (io+1 <= k .and. k <= nz-(io+1) .and. i <= nx-1 .and. j <= ny-1) then
       associate(ww => w)
       idx = kt + offset_xy
-      G(i-1,:,j-1,k) = KEEP(id_accuracy, &
+      G(:,i-1,j-1,k) = KEEP(id_accuracy, &
                             rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
                               v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
                              ww(idx-io:idx+io+1), p(idx-io:idx+io+1), &

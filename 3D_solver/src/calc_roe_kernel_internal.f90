@@ -104,7 +104,7 @@ contains
           p(it,jt,kt) = pl
         call Roe(rho(it,jt,kt), rhor(it,jt,kt), u(it,jt,kt), ur(it,jt,kt), v(it,jt,kt), vr(it,jt,kt), &
                  w(it,jt,kt), wr(it,jt,kt), p(it,jt,kt), pr(it,jt,kt), &
-                 E(i,1,j-1,k-1), E(i,2,j-1,k-1), E(i,3,j-1,k-1), E(i,4,j-1,k-1), E(i,5,j-1,k-1))
+                 E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
       endif
     end block
   end subroutine calc_roe_x_in
@@ -157,7 +157,7 @@ contains
           p(jt,it,kt) = pl
         call Roe(rho(jt,it,kt), rhor(jt,it,kt), v(jt,it,kt), vr(jt,it,kt), w(jt,it,kt), wr(jt,it,kt), &
                  u(jt,it,kt), ur(jt,it,kt), p(jt,it,kt), pr(jt,it,kt), &
-                 F(i-1,1,j,k-1), F(i-1,3,j,k-1), F(i-1,4,j,k-1), F(i-1,2,j,k-1), F(i-1,5,j,k-1))
+                 F(1,i-1,j,k-1), F(3,i-1,j,k-1), F(4,i-1,j,k-1), F(2,i-1,j,k-1), F(5,i-1,j,k-1))
       endif
     end block
   end subroutine calc_roe_y_in
@@ -210,7 +210,7 @@ contains
           p(kt,jt,it) = pl
         call Roe(rho(kt,jt,it), rhor(kt,jt,it), w(kt,jt,it), wr(kt,jt,it), u(kt,jt,it), ur(kt,jt,it), &
                  v(kt,jt,it), vr(kt,jt,it), p(kt,jt,it), pr(kt,jt,it), &
-                 G(i-1,1,j-1,k), G(i-1,4,j-1,k), G(i-1,2,j-1,k), G(i-1,3,j-1,k), G(i-1,5,j-1,k))
+                 G(1,i-1,j-1,k), G(4,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(5,i-1,j-1,k))
       endif
     end block
   end subroutine calc_roe_z_in

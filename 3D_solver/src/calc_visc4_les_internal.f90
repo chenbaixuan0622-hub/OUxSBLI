@@ -27,7 +27,7 @@ contains
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
-    real(8), intent(inout), device, contiguous :: E(nx-1,5,ny-2,nz-2) !< viscous + SGS flux in x direction
+    real(8), intent(inout), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< viscous + SGS flux in x direction
     integer, parameter :: io_v = 2
     integer, parameter :: sx = threadsEv%x + 2*io_v + 1
     integer, parameter :: sy = threadsEv%y
@@ -70,10 +70,10 @@ contains
           Hsgs = -flux4(mut3) * (1.125d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_24) * dx(i) / Prt
         end block
       end block
-      E(i,2,j-1,k-1) = E(i,2,j-1,k-1) - txx
-      E(i,3,j-1,k-1) = E(i,3,j-1,k-1) - txy
-      E(i,4,j-1,k-1) = E(i,4,j-1,k-1) - txz
-      E(i,5,j-1,k-1) = E(i,5,j-1,k-1) - (utxx + vtxy + wtxz + kTx + Hsgs)
+      E(2,i,j-1,k-1) = E(2,i,j-1,k-1) - txx
+      E(3,i,j-1,k-1) = E(3,i,j-1,k-1) - txy
+      E(4,i,j-1,k-1) = E(4,i,j-1,k-1) - txz
+      E(5,i,j-1,k-1) = E(5,i,j-1,k-1) - (utxx + vtxy + wtxz + kTx + Hsgs)
     endif
   end subroutine calc_Ev_LES4_in
 
@@ -91,7 +91,7 @@ contains
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
-    real(8), intent(inout), device, contiguous :: F(nx-2,5,ny-1,nz-2) !< viscous + SGS flux in y direction
+    real(8), intent(inout), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< viscous + SGS flux in y direction
     integer, parameter :: io_v = 2
     integer, parameter :: sx = threadsFv%x
     integer, parameter :: sy = threadsFv%y + 2*io_v + 1
@@ -134,10 +134,10 @@ contains
           Hsgs = -flux4(mut3) * (1.125d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_24) * dy(j) / Prt
         end block
       end block
-      F(i-1,2,j,k-1) = F(i-1,2,j,k-1) - tyx
-      F(i-1,3,j,k-1) = F(i-1,3,j,k-1) - tyy
-      F(i-1,4,j,k-1) = F(i-1,4,j,k-1) - tyz
-      F(i-1,5,j,k-1) = F(i-1,5,j,k-1) - (utyx + vtyy + wtyz + kTy + Hsgs)
+      F(2,i-1,j,k-1) = F(2,i-1,j,k-1) - tyx
+      F(3,i-1,j,k-1) = F(3,i-1,j,k-1) - tyy
+      F(4,i-1,j,k-1) = F(4,i-1,j,k-1) - tyz
+      F(5,i-1,j,k-1) = F(5,i-1,j,k-1) - (utyx + vtyy + wtyz + kTy + Hsgs)
     endif
   end subroutine calc_Fv_LES4_in
 
@@ -155,7 +155,7 @@ contains
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)       !< turbulent viscosity coefficient
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)       !< kinetic energy correction term for total enthalpy (0.5 * (u^2 + v^2 + w^2))
-    real(8), intent(inout), device, contiguous :: G(nx-2,5,ny-2,nz-1) !< viscous + SGS flux in z direction
+    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< viscous + SGS flux in z direction
     integer, parameter :: io_v = 2
     integer, parameter :: sx = threadsGv%x
     integer, parameter :: sy = threadsGv%y
@@ -198,10 +198,10 @@ contains
           Hsgs = -flux4(mut3) * (1.125d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_24) * dz(k) / Prt
         end block
       end block
-      G(i-1,2,j-1,k) = G(i-1,2,j-1,k) - tzx
-      G(i-1,3,j-1,k) = G(i-1,3,j-1,k) - tzy
-      G(i-1,4,j-1,k) = G(i-1,4,j-1,k) - tzz
-      G(i-1,5,j-1,k) = G(i-1,5,j-1,k) - (utzx + vtzy + wtzz + kTz + Hsgs)
+      G(2,i-1,j-1,k) = G(2,i-1,j-1,k) - tzx
+      G(3,i-1,j-1,k) = G(3,i-1,j-1,k) - tzy
+      G(4,i-1,j-1,k) = G(4,i-1,j-1,k) - tzz
+      G(5,i-1,j-1,k) = G(5,i-1,j-1,k) - (utzx + vtzy + wtzz + kTz + Hsgs)
     endif
   end subroutine calc_Gv_LES4_in
 end module calc_visc4_les_internal
