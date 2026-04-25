@@ -174,7 +174,7 @@ contains
     integer(kind=2), intent(in), value :: id_rescale
     integer, intent(in), value         :: myrank, nranks, overlap, nx, ny, nz
     real(8), intent(inout), device     :: QJ(nx,5,ny,nz) ! Q / Jacobian
-    integer rank1, rank2, ierr, ireq4(4), istat(MPI_STATUS_SIZE), istat4(MPI_STATUS_SIZE,4)
+    integer rank1, rank2, stat, ierr, ireq4(4), istat(MPI_STATUS_SIZE), istat4(MPI_STATUS_SIZE,4)
     real(8), allocatable                                 :: Qs_left(:),   Qs_right(:),   Qr_left(:),   Qr_right(:)
     real(8), dimension(overlap*(ny-2)*(nz-6)*5), device :: Qs1d_left, Qs1d_right, Qr1d_left, Qr1d_right
     integer j, k, ni, nj, nk
@@ -194,16 +194,18 @@ contains
 
     call flatten(nx, ny, nz, overlap, QJ, Qs1d_left, Qs1d_right)
 
-    Qs_left    = Qs1d_left
+    stat = cudaMemcpy(Qs_left, Qs1d_left, 5*overlap*(ny-2)*(nz-6), cudaMemcpyDeviceToHost)
     call MPI_SENDRECV(Qs_left,  5*overlap*(ny-2)*(nz-6), MPI_REAL8, rank1, 0, &
                       Qr_right, 5*overlap*(ny-2)*(nz-6), MPI_REAL8, rank2, 0, MPI_COMM_WORLD, istat, ierr)
-    Qr1d_right = Qr_right
+    stat = cudaMemcpyAsync(Qr1d_right, Qr_right, 5*overlap*(ny-2)*(nz-6), cudaMemcpyHostToDevice, 1)
 
-    Qs_right   = Qs1d_right
+    stat = cudaMemcpy(Qs_right, Qs1d_right, 5*overlap*(ny-2)*(nz-6), cudaMemcpyDeviceToHost)
     call MPI_SENDRECV(Qs_right, 5*overlap*(ny-2)*(nz-6), MPI_REAL8, rank2, 0, &
                       Qr_left,  5*overlap*(ny-2)*(nz-6), MPI_REAL8, rank1, 0, MPI_COMM_WORLD, istat, ierr)
-    Qr1d_left  = Qr_left
+    stat = cudaMemcpyAsync(Qr1d_left,  Qr_left,  5*overlap*(ny-2)*(nz-6), cudaMemcpyHostToDevice, 2)
 
+    stat = cudaStreamSynchronize(1)
+    stat = cudaStreamSynchronize(2)
     call reconstruct(nx, ny, nz, overlap, Qr1d_left, Qr1d_right, QJ)
     deallocate(Qs_left, Qs_right, Qr_left, Qr_right)
   end subroutine exchange_cyclic

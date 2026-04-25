@@ -22,23 +22,23 @@ contains
 
   !> Allocate GPU device memory for simulation variables
   !> Size and allocation depends on viscosity model selection
-  subroutine allocate_device_mem(myrank, nx, ny, nz, dx, dy, dz, xix, etay, zetaz, Jacobian, ruvwp, T, mu, mut, qc2, E, F, G)
+  subroutine allocate_device_mem(myrank, nx, ny, nz, dtdxdy, dtdydz, dtdzdx, xix, etay, zetaz, Jacobian, ruvwp, T, mu, mut, qc2, E, F, G)
     use mod_globals, only : id_visc
     use calc_flux_base, only : init_sensor
-    integer, intent(in)                       :: myrank   !< MPI rank
-    integer, intent(in)                       :: nx       !< x grid dimension
-    integer, intent(in)                       :: ny       !< y grid dimension
-    integer, intent(in)                       :: nz       !< z grid dimension
-    real(8), intent(out), allocatable, device :: dx(:)    !< inverse grid spacing x
-    real(8), intent(out), allocatable, device :: dy(:)    !< inverse grid spacing y
-    real(8), intent(out), allocatable, device :: dz(:)    !< inverse grid spacing z
-    real(8), intent(out), allocatable, device :: xix(:)   !< coordinate transform metric in x
-    real(8), intent(out), allocatable, device :: etay(:)  !< coordinate transform metric in y
-    real(8), intent(out), allocatable, device :: zetaz(:) !< coordinate transform metric in z
-    real(8), intent(out), allocatable, device :: Jacobian(:,:) !< Jacobian determinant for coordinate transform
+    integer, intent(in)                       :: myrank    !< MPI rank
+    integer, intent(in)                       :: nx        !< x grid dimension
+    integer, intent(in)                       :: ny        !< y grid dimension
+    integer, intent(in)                       :: nz        !< z grid dimension
+    real(8), intent(out), allocatable, device :: dtdxdy(:,:) !< dt * Sxy
+    real(8), intent(out), allocatable, device :: dtdydz(:,:) !< dt * Syz
+    real(8), intent(out), allocatable, device :: dtdzdx(:,:) !< dt * Szx
+    real(8), intent(out), allocatable, device :: xix(:)    !< coordinate transform metric in x
+    real(8), intent(out), allocatable, device :: etay(:)   !< coordinate transform metric in y
+    real(8), intent(out), allocatable, device :: zetaz(:)  !< coordinate transform metric in z
+    real(8), intent(out), allocatable, device :: Jacobian(:,:)  !< Jacobian determinant for coordinate transform
     real(8), intent(out), allocatable, device :: ruvwp(:,:,:,:) !< work array for momentum/velocities
-    real(8), intent(out), allocatable, device :: T(:,:,:) !< temperature field
-    real(8), intent(out), allocatable, device :: mu(:,:,:) !< molecular viscosity
+    real(8), intent(out), allocatable, device :: T(:,:,:)   !< temperature field
+    real(8), intent(out), allocatable, device :: mu(:,:,:)  !< molecular viscosity
     real(8), intent(out), allocatable, device :: mut(:,:,:) !< turbulent viscosity (LES)
     real(8), intent(out), allocatable, device :: qc2(:,:,:) !< quadratic constitutive terms
     real(8), intent(out), allocatable, device :: E(:,:,:,:) !< flux in x direction
@@ -46,7 +46,7 @@ contains
     real(8), intent(out), allocatable, device :: G(:,:,:,:) !< flux in z direction
     integer ierr
     allocate(ruvwp(5,nx,ny,nz), E(nx-1,5,ny-2,nz-2), F(nx-2,5,ny-1,nz-2), G(nx-2,5,ny-2,nz-1), stat=ierr)
-    allocate(dx(nx-1), dy(ny-1), dz(nz-1), xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(nx,ny), stat=ierr)
+    allocate(dtdxdy(nx-2,ny-2), dtdydz(ny-2,nz-2), dtdzdx(nx-2,nz-2), xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(nx,ny), stat=ierr)
     if (kind(id_visc) == 2) then
       allocate(T(nx,ny,nz), mu(1,1,1), mut(1,1,1), qc2(1,1,1), stat=ierr)
     elseif (kind(id_visc) == 4) then
@@ -66,7 +66,8 @@ contains
   !> Preprocessing: compute metrics, initialize Q, transfer to device
   !> Divides computational domain across MPI ranks
   subroutine pre_calc(nx, ny, nz, myrank, nranks, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q, overlap, &
-                      dx, dy, dz, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0)
+                      dtdxdy, dtdydz, dtdzdx, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0)
+    use mod_globals, only : dt
     integer, intent(in)                      :: nx                  !< x grid dimension
     integer, intent(in)                      :: ny                  !< y grid dimension
     integer, intent(in)                      :: nz                  !< z grid dimension
@@ -81,9 +82,9 @@ contains
     real(8), intent(in)                      :: Jacobian_cpu(nx,ny) !< Jacobian determinant (host)
     real(8), intent(inout)                   :: Q(nx,5,ny,nz)       !< conservative variables on host
     integer, intent(out)                     :: overlap             !< ghost cell width for MPI halo exchange
-    real(8), intent(out), device, contiguous :: dx(nx-1)            !< inverse x spacing (device)
-    real(8), intent(out), device, contiguous :: dy(ny-1)            !< inverse y spacing (device)
-    real(8), intent(out), device, contiguous :: dz(nz-1)            !< inverse z spacing (device)
+    real(8), intent(out), device, contiguous :: dtdxdy(nx-2,ny-2)   !< dt * Sxy (device)
+    real(8), intent(out), device, contiguous :: dtdydz(ny-2,nz-2)   !< dt * Syz (device)
+    real(8), intent(out), device, contiguous :: dtdzdx(nx-2,nz-2)   !< dt * Szx (device)
     real(8), intent(out), device, contiguous :: xix(nx-1)           !< x coordinate metric (device)
     real(8), intent(out), device, contiguous :: etay(ny-1)          !< y coordinate metric (device)
     real(8), intent(out), device, contiguous :: zetaz(nz-1)         !< z coordinate metric (device)
@@ -92,6 +93,7 @@ contains
     real(4), intent(inout)                   :: ke0                 !< reference kinetic energy
     real(4), intent(inout)                   :: entropy0            !< reference entropy
     real(8) xix_cpu(nx-1), etay_cpu(ny-1), zetaz_cpu(nz-1)
+    real(8) dtdxdy_cpu(nx-2,ny-2), dtdydz_cpu(ny-2,nz-2), dtdzdx_cpu(nx-2,nz-2)
     real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
     integer i, j, k, l, ierr
     ! set Q / Jacobian
@@ -108,9 +110,21 @@ contains
     xix_cpu   = 1.d0 / dx_cpu
     etay_cpu  = 1.d0 / dy_cpu
     zetaz_cpu = 1.d0 / dz_cpu
-    dx       = dx_cpu
-    dy       = dy_cpu
-    dz       = dz_cpu
+    do j = 1, ny-2
+      do i = 1, nx-2
+        dtdxdy_cpu(i,j) = 0.25d0 * dt * (dx_cpu(i) + dx_cpu(i+1)) * (dy_cpu(j) + dy_cpu(j+1))
+    enddo;enddo
+    do k = 1, nz-2
+      do j = 1, ny-2
+        dtdydz_cpu(j,k) = 0.25d0 * dt * (dy_cpu(j) + dy_cpu(j+1)) * (dz_cpu(k) + dz_cpu(k+1))
+    enddo;enddo
+    do k = 1, nz-2
+      do i = 1, nx-2
+        dtdzdx_cpu(i,k) = 0.25d0 * dt * (dz_cpu(k) + dz_cpu(k+1)) * (dx_cpu(i) + dx_cpu(i+1))
+    enddo;enddo
+    dtdxdy = dtdxdy_cpu
+    dtdydz = dtdydz_cpu
+    dtdzdx = dtdzdx_cpu
     xix      = xix_cpu
     etay     = etay_cpu
     zetaz    = zetaz_cpu
