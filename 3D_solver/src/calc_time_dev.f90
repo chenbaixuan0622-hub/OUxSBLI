@@ -7,6 +7,7 @@ module calc_time_dev
   use mod_globals, only : id_visc, nt, np, nre2, rerank, &
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
   & blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv
+  use mod_constant, only : one_third
   use calc_flux_base
   use calc_steps
   use calc_rescale
@@ -96,7 +97,7 @@ contains
 
           ! Step 2c: TVD RK3 Stage 3 - final solution Q^(n+1), store in QJ (swap arrays)
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, ruvwp, T, mu, mut, qc2, E, F, G)
-          call calc_step2_3<<<blocks,threads>>>(nx, ny, nz, 2.d0, 1.d0, 2.d0, 3.d0, dtdxdy, dtdydz, dtdzdx, E, F, G, QJ2, QJ)
+          call calc_step2_3<<<blocks,threads>>>(nx, ny, nz, 2.d0, 1.d0, 2.d0, one_third, dtdxdy, dtdydz, dtdzdx, E, F, G, QJ2, QJ)
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ)
         enddo
       endif
@@ -187,7 +188,7 @@ contains
         if (mod(myrank,2) == 0) then
           call step_rescale(3, myrank, nx, ny, nz, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJ2, Qm, Qre)
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, ruvwp, T, mu, mut, qc2, E, F, G)
-          call calc_step2_3<<<blocks,threads>>>(nx, ny, nz, 2.d0, 1.d0, 2.d0, 3.d0, dtdxdy, dtdydz, dtdzdx, E, F, G, QJ2, QJ)
+          call calc_step2_3<<<blocks,threads>>>(nx, ny, nz, 2.d0, 1.d0, 2.d0, one_third, dtdxdy, dtdydz, dtdzdx, E, F, G, QJ2, QJ)
           call wait_rescale(myrank, ireq, ireq2, istat, istat2)
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
         elseif (myrank == rerank+1) then

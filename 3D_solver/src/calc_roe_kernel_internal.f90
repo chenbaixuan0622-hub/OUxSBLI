@@ -26,7 +26,7 @@ contains
   !$dir inline
   attributes(device) subroutine delta_r2(id_acc, sensor, a, al, ar)
     integer(2), intent(in), value :: id_acc   !< dispatch key: kind=2 → 1st-order Roe
-    real(8), intent(in), value    :: sensor
+    real(sp), intent(in), value   :: sensor
     real(8), intent(in)           :: a(2)     !< two-point stencil [i, i+1]
     real(8), intent(out)          :: al, ar
     al = a(1); ar = a(2)
@@ -35,7 +35,7 @@ contains
   !$dir inline
   attributes(device) subroutine delta_r4(id_acc, sensor, a, al, ar)
     integer(4), intent(in), value :: id_acc   !< dispatch key: kind=4 → 4th-order (MUSCL3rd)
-    real(8), intent(in), value    :: sensor
+    real(sp), intent(in), value   :: sensor
     real(8), intent(in)           :: a(4)     !< four-point stencil [i-1:i+2]
     real(8), intent(out)          :: al, ar
     call delta4(sensor, a, al, ar)
@@ -44,7 +44,7 @@ contains
   !$dir inline
   attributes(device) subroutine delta_r6(id_acc, sensor, a, al, ar)
     integer(8), intent(in), value :: id_acc   !< dispatch key: kind=8 → 6th-order (MUSCL4th)
-    real(8), intent(in), value    :: sensor
+    real(sp), intent(in), value   :: sensor
     real(8), intent(in)           :: a(6)     !< six-point stencil [i-2:i+3]
     real(8), intent(out)          :: al, ar
     call delta6(sensor, a, al, ar)
@@ -59,7 +59,7 @@ contains
     integer, intent(in), value               :: ny                  !< grid points y
     integer, intent(in), value               :: nz                  !< grid points z
     real(8), intent(in), device, contiguous  :: Q(nx,5,ny,nz)       !< conservative variables
-    real(8), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< Ducros shock sensor
+    real(sp), intent(in), device, contiguous :: sensor(nx,ny,nz)    !< Ducros shock sensor
     real(8), intent(out), device, contiguous :: E(nx-1,5,ny-2,nz-2) !< x-direction flux
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(-(io-1):threadsE%x+io+1, threadsE%y, threadsE%z), shared :: rho, u, v, w, p
@@ -82,10 +82,11 @@ contains
     call syncthreads()
     i = i_base + it
     block
-      real(8) rhol, ul, vl, wl, pl, fdx
+      real(sp) fdx
+      real(8) rhol, ul, vl, wl, pl
       ! Phase 2: compute right states using full-order stencil (interior only)
       if (io+1 <= i .and. i <= nx-(io+1) .and. j <= ny-1 .and. k <= nz-1) then
-        fdx = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
+        fdx = 0.5_sp * (sensor(i,j,k) + sensor(i+1,j,k))
         call delta_r(id_accuracy, fdx, rho(it-io:it+io+1,jt,kt), rhol, rhor(it,jt,kt))
         call delta_r(id_accuracy, fdx,   u(it-io:it+io+1,jt,kt),   ul,   ur(it,jt,kt))
         call delta_r(id_accuracy, fdx,   v(it-io:it+io+1,jt,kt),   vl,   vr(it,jt,kt))
@@ -117,7 +118,7 @@ contains
     integer, intent(in), value               :: ny                  !< grid points y
     integer, intent(in), value               :: nz                  !< grid points z
     real(8), intent(in), device, contiguous  :: Q(nx,5,ny,nz)       !< conservative variables
-    real(8), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< Ducros shock sensor
+    real(sp), intent(in), device, contiguous :: sensor(nx,ny,nz)    !< Ducros shock sensor
     real(8), intent(out), device, contiguous :: F(nx-2,5,ny-1,nz-2) !< y-direction flux
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(-(io-1):threadsF%y+io+1, threadsF%x, threadsF%z), shared :: rho, u, v, w, p
@@ -139,9 +140,10 @@ contains
     call syncthreads()
     j = j_base + jt
     block
-      real(8) rhol, ul, vl, wl, pl, fdy
+      real(sp) fdy
+      real(8) rhol, ul, vl, wl, pl
       if (io+1 <= j .and. j <= ny-(io+1) .and. i <= nx-1 .and. k <= nz-1) then
-        fdy = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
+        fdy = 0.5_sp * (sensor(i,j,k) + sensor(i,j+1,k))
         call delta_r(id_accuracy, fdy, rho(jt-io:jt+io+1,it,kt), rhol, rhor(jt,it,kt))
         call delta_r(id_accuracy, fdy,   u(jt-io:jt+io+1,it,kt),   ul,   ur(jt,it,kt))
         call delta_r(id_accuracy, fdy,   v(jt-io:jt+io+1,it,kt),   vl,   vr(jt,it,kt))
@@ -170,7 +172,7 @@ contains
     integer, intent(in), value               :: ny                  !< grid points y
     integer, intent(in), value               :: nz                  !< grid points z
     real(8), intent(in), device, contiguous  :: Q(nx,5,ny,nz)       !< conservative variables
-    real(8), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< Ducros shock sensor
+    real(sp), intent(in), device, contiguous :: sensor(nx,ny,nz)    !< Ducros shock sensor
     real(8), intent(out), device, contiguous :: G(nx-2,5,ny-2,nz-1) !< z-direction flux
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(-(io-1):threadsG%z+io+1, threadsG%y, threadsG%x), shared :: rho, u, v, w, p
@@ -192,9 +194,10 @@ contains
     call syncthreads()
     k = k_base + kt
     block
-      real(8) rhol, ul, vl, wl, pl, fdz
+      real(sp) fdz
+      real(8) rhol, ul, vl, wl, pl
       if (io+1 <= k .and. k <= nz-(io+1) .and. i <= nx-1 .and. j <= ny-1) then
-        fdz = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
+        fdz = 0.5_sp * (sensor(i,j,k) + sensor(i,j,k+1))
         call delta_r(id_accuracy, fdz, rho(kt-io:kt+io+1,jt,it), rhol, rhor(kt,jt,it))
         call delta_r(id_accuracy, fdz,   u(kt-io:kt+io+1,jt,it),   ul,   ur(kt,jt,it))
         call delta_r(id_accuracy, fdz,   v(kt-io:kt+io+1,jt,it),   vl,   vr(kt,jt,it))

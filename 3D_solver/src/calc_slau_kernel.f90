@@ -33,7 +33,7 @@ contains
     integer, intent(in), value                :: ny                  !< number of grid points in y direction
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< shock sensor
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< shock sensor
     real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
@@ -45,7 +45,7 @@ contains
     real(8), dimension(-1:sx*sy*sz-2), shared :: rho,  u,  v,  w,  p
     real(8), dimension(sxr*sy*sz), shared     :: rhor, ur, vr, wr, pr
     real(8) rhol, ul, vl, wl, pl
-    real(8) fdx !< 1st use: shock sensor, 2nd use: wiggle ditector
+    real(sp) fdx !< 1st use: shock sensor, 2nd use: wiggle ditector
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -70,7 +70,7 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     idx   = it + offset_yz
     idx_r = it + offset_yzr
-    fdx   = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
+    fdx   = 0.5_sp * (sensor(i,j,k) + sensor(i+1,j,k))
     if (3 <= i .and. i <= nx-3) then
       call delta6(fdx, rho(idx-2:idx+3), rhol, rhor(idx_r))
       call delta6(fdx,   u(idx-2:idx+3),   ul,   ur(idx_r))
@@ -91,7 +91,7 @@ contains
         vl =   v(idx);   vr(idx_r) =   v(idx+1)
         wl =   w(idx);   wr(idx_r) =   w(idx+1)
         pl =   p(idx);   pr(idx_r) =   p(idx+1)
-       fdx = 1.d0
+       fdx = 1.0_sp
     endif
     associate(un1 => ul, un2 => ur(idx_r))
       call SLAU(id_slau, rhol, rhor(idx_r), ul, ur(idx_r), vl, vr(idx_r), &
@@ -109,7 +109,7 @@ contains
     integer, intent(in), value                :: ny                  !< number of grid points in y direction
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< shock sensor
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< shock sensor
     real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
@@ -121,7 +121,7 @@ contains
     real(8), dimension(-1:sx*sy*sz-2), shared :: rho,  u,  v,  w,  p
     real(8), dimension(sx*syr*sz), shared     :: rhor, ur, vr, wr, pr
     real(8) rhol, ul, vl, wl, pl
-    real(8) fdy !< 1st use: shock sensor, 2nd use: wiggle ditector
+    real(sp) fdy !< 1st use: shock sensor, 2nd use: wiggle ditector
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -146,7 +146,7 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     idx   = jt + offset_xz
     idx_r = jt + offset_xzr
-    fdy   = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
+    fdy   = 0.5_sp * (sensor(i,j,k) + sensor(i,j+1,k))
     if (3 <= j .and. j <= ny-3) then
       call delta6(fdy, rho(idx-2:idx+3), rhol, rhor(idx_r))
       call delta6(fdy,   u(idx-2:idx+3),   ul,   ur(idx_r))
@@ -167,7 +167,7 @@ contains
         vl =   v(idx);   vr(idx_r) =   v(idx+1)
         wl =   w(idx);   wr(idx_r) =   w(idx+1)
         pl =   p(idx);   pr(idx_r) =   p(idx+1)
-       fdy = 1.d0
+       fdy = 1.0_sp
     endif
     associate(un1 => vl, un2 => vr(idx_r))
       call SLAU(id_slau, rhol, rhor(idx_r), ul, ur(idx_r), vl, vr(idx_r), &
@@ -185,7 +185,7 @@ contains
     integer, intent(in), value                :: ny                  !< number of grid points in y direction
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< shock sensor
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< shock sensor
     real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
@@ -197,7 +197,7 @@ contains
     real(8), dimension(-1:sx*sy*sz-2), shared :: rho,  u,  v,  w,  p
     real(8), dimension(sx*sy*szr), shared     :: rhor, ur, vr, wr, pr
     real(8) rhol, ul, vl, wl, pl
-    real(8) fdz !< 1st use: shock sensor, 2nd use: wiggle ditector
+    real(sp) fdz !< 1st use: shock sensor, 2nd use: wiggle ditector
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -222,7 +222,7 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     idx   = kt + offset_xy
     idx_r = kt + offset_xyr
-    fdz   = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
+    fdz   = 0.5_sp * (sensor(i,j,k) + sensor(i,j,k+1))
     if (3 <= k .and. k <= nz-3) then
       call delta6(fdz, rho(idx-2:idx+3), rhol, rhor(idx_r))
       call delta6(fdz,   u(idx-2:idx+3),   ul,   ur(idx_r))
@@ -243,7 +243,7 @@ contains
         vl =   v(idx);   vr(idx_r) =   v(idx+1)
         wl =   w(idx);   wr(idx_r) =   w(idx+1)
         pl =   p(idx);   pr(idx_r) =   p(idx+1)
-       fdz = 1.d0
+       fdz = 1.0_sp
     endif
     associate(un1 => wl, un2 => wr(idx_r))
       call SLAU(id_slau, rhol, rhor(idx_r), ul, ur(idx_r), vl, vr(idx_r), &
@@ -261,7 +261,7 @@ contains
     integer, intent(in), value                :: ny                  !< number of grid points in y direction
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< shock sensor
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< shock sensor
     real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
@@ -273,7 +273,7 @@ contains
     real(8), dimension(0:sx*sy*sz-1), shared :: rho,  u,  v,  w,  p  !< smem to calc high-order interpolation
     real(8), dimension(sxr*sy*sz), shared    :: rhor, ur, vr, wr, pr !< smem to store the results
     real(8) rhol, ul, vl, wl, pl
-    real(8) fdx !< 1st use: shock sensor, 2nd use: wiggle ditector
+    real(sp) fdx !< 1st use: shock sensor, 2nd use: wiggle ditector
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -298,7 +298,7 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     idx   = it + offset_yz
     idx_r = it + offset_yzr
-    fdx   = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
+    fdx   = 0.5_sp * (sensor(i,j,k) + sensor(i+1,j,k))
     if (2 <= i .and. i <= nx-2) then
       call delta4(fdx, rho(idx-1:idx+2), rhol, rhor(idx_r))
       call delta4(fdx,   u(idx-1:idx+2),   ul,   ur(idx_r))
@@ -312,7 +312,7 @@ contains
         vl =   v(idx);   vr(idx_r) =   v(idx+1)
         wl =   w(idx);   wr(idx_r) =   w(idx+1)
         pl =   p(idx);   pr(idx_r) =   p(idx+1)
-       fdx = 1.d0
+       fdx = 1.0_sp
     endif
     associate(un1 => ul, un2 => ur(idx_r))
       call SLAU(id_slau, rhol, rhor(idx_r), ul, ur(idx_r), vl, vr(idx_r), &
@@ -330,7 +330,7 @@ contains
     integer, intent(in), value                :: ny                  !< number of grid points in y direction
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< shock sensor
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< shock sensor
     real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
@@ -342,7 +342,7 @@ contains
     real(8), dimension(0:sx*sy*sz-1), shared :: rho,  u,  v,  w,  p  !< smem to calc high-order interpolation
     real(8), dimension(sx*syr*sz), shared    :: rhor, ur, vr, wr, pr !< smem to store the results
     real(8) rhol, ul, vl, wl, pl
-    real(8) fdy !< 1st use: shock sensor, 2nd use: wiggle ditector
+    real(sp) fdy !< 1st use: shock sensor, 2nd use: wiggle ditector
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -367,7 +367,7 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     idx   = jt + offset_xz
     idx_r = jt + offset_xzr
-    fdy   = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
+    fdy   = 0.5_sp * (sensor(i,j,k) + sensor(i,j+1,k))
     if (2 <= j .and. j <= ny-2) then
       call delta4(fdy, rho(idx-1:idx+2), rhol, rhor(idx_r))
       call delta4(fdy,   u(idx-1:idx+2),   ul,   ur(idx_r))
@@ -381,7 +381,7 @@ contains
         vl =   v(idx);   vr(idx_r) =   v(idx+1)
         wl =   w(idx);   wr(idx_r) =   w(idx+1)
         pl =   p(idx);   pr(idx_r) =   p(idx+1)
-       fdy = 1.d0
+       fdy = 1.0_sp
     endif
     associate(un1 => vl, un2 => vr(idx_r))
       call SLAU(id_slau, rhol, rhor(idx_r), ul, ur(idx_r), vl, vr(idx_r), &
@@ -399,7 +399,7 @@ contains
     integer, intent(in), value                :: ny                  !< number of grid points in y direction
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< shock sensor
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< shock sensor
     real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
@@ -411,7 +411,7 @@ contains
     real(8), dimension(0:sx*sy*sz-1), shared :: rho,  u,  v,  w,  p  !< smem to calc high-order interpolation
     real(8), dimension(sx*sy*szr), shared    :: rhor, ur, vr, wr, pr !< smem to store the results
     real(8) rhol, ul, vl, wl, pl
-    real(8) fdz !< 1st use: shock sensor, 2nd use: wiggle ditector
+    real(sp) fdz !< 1st use: shock sensor, 2nd use: wiggle ditector
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -436,7 +436,7 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     idx   = kt + offset_xy
     idx_r = kt + offset_xyr
-    fdz   = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
+    fdz   = 0.5_sp * (sensor(i,j,k) + sensor(i,j,k+1))
     if (2 <= k .and. k <= nz-2) then
       call delta4(fdz, rho(idx-1:idx+2), rhol, rhor(idx_r))
       call delta4(fdz,   u(idx-1:idx+2),   ul,   ur(idx_r))
@@ -450,7 +450,7 @@ contains
         vl =   v(idx);   vr(idx_r) =   v(idx+1)
         wl =   w(idx);   wr(idx_r) =   w(idx+1)
         pl =   p(idx);   pr(idx_r) =   p(idx+1)
-       fdz = 1.d0
+       fdz = 1.0_sp
     endif
     associate(un1 => wl, un2 => wr(idx_r))
       call SLAU(id_slau, rhol, rhor(idx_r), ul, ur(idx_r), vl, vr(idx_r), &
@@ -468,7 +468,7 @@ contains
     integer, intent(in), value                :: ny                  !< number of grid points in y direction
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< shock sensor
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< shock sensor
     real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
@@ -501,7 +501,7 @@ contains
     idx = it + offset_yz
     associate(un1 => u(idx), un2 => u(idx+1))
       call SLAU(id_slau, rho(idx), rho(idx+1), u(idx), u(idx+1), v(idx), v(idx+1), &
-                w(idx), w(idx+1), un1, un2, p(idx), p(idx+1), Normal_x, 1.d0, &
+                w(idx), w(idx+1), un1, un2, p(idx), p(idx+1), Normal_x, 1.0_sp, &
                 E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
     end associate
   end subroutine calc_slau_x2
@@ -515,7 +515,7 @@ contains
     integer, intent(in), value                :: ny                  !< number of grid points in y direction
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< shock sensor
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< shock sensor
     real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
@@ -548,7 +548,7 @@ contains
     idx = jt + offset_xz
     associate(un1 => v(idx), un2 => v(idx+1))
       call SLAU(id_slau, rho(idx), rho(idx+1), u(idx), u(idx+1), v(idx), v(idx+1), &
-                w(idx), w(idx+1), un1, un2, p(idx), p(idx+1), Normal_y, 1.d0, &
+                w(idx), w(idx+1), un1, un2, p(idx), p(idx+1), Normal_y, 1.0_sp, &
                 F(1,i-1,j,k-1), F(2,i-1,j,k-1), F(3,i-1,j,k-1), F(4,i-1,j,k-1), F(5,i-1,j,k-1))
     end associate
   end subroutine calc_slau_y2
@@ -562,7 +562,7 @@ contains
     integer, intent(in), value                :: ny                  !< number of grid points in y direction
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< shock sensor
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< shock sensor
     real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
@@ -595,7 +595,7 @@ contains
     idx = kt + offset_xy
     associate(un1 => w(idx), un2 => w(idx+1))
       call SLAU(id_slau, rho(idx), rho(idx+1), u(idx), u(idx+1), v(idx), v(idx+1), &
-                w(idx), w(idx+1), un1, un2, p(idx), p(idx+1), Normal_z, 1.d0, &
+                w(idx), w(idx+1), un1, un2, p(idx), p(idx+1), Normal_z, 1.0_sp, &
                 G(1,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(4,i-1,j-1,k), G(5,i-1,j-1,k))
     end associate
   end subroutine calc_slau_z2

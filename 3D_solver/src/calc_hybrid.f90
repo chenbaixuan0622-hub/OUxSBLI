@@ -2,7 +2,7 @@
 !> Computes Ducros sensor for automatic scheme switching between KEEP and SLAU
 module calc_hybrid
   use cudafor
-  use mod_globals, only : accuracy, offset, gamma
+  use mod_globals, only : accuracy, offset, gamma, sp
   implicit none
 contains
 
@@ -15,12 +15,12 @@ contains
     real(8), intent(in), dimension(ny-1), device       :: dy ! 1 / dy
     real(8), intent(in), dimension(nz-1), device       :: dz ! 1 / dz
     real(8), intent(in), dimension(nx,5,ny,nz), device :: Q
-    real(8), intent(out), dimension(nx,ny,nz), device  :: fd
+    real(sp), intent(out), device                      :: fd(nx,ny,nz)
     integer i, j, k
     real(8) dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz
-    real(8) div, rot(3)
     real(8) dx_tmp, dy_tmp, dz_tmp
-    real(8), parameter :: eps = 1.d-12
+    real(sp) div, rot(3)
+    real(sp), parameter :: eps = 1.0_sp-12
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1 
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
@@ -38,18 +38,18 @@ contains
     dvdz = (-Q(i,3,j,k-1) + Q(i,3,j,k+1)) * dz_tmp
     dwdz = (-Q(i,4,j,k-1) + Q(i,4,j,k+1)) * dz_tmp
     ! Ducros shock sensor: detector based on dilatation vs. vorticity
-    div = dudx + dvdy + dwdz           ! Divergence: ∇·u
+    div = real(dudx + dvdy + dwdz, kind=sp) ! Divergence: ∇·u
     
     ! Vorticity vector: ω = ∇ × u
-    rot(1) = dwdy - dvdz               ! ω_x = dw/dy - dv/dz
-    rot(2) = dudz - dwdx               ! ω_y = du/dz - dw/dx
-    rot(3) = dvdx - dudy               ! ω_z = dv/dx - du/dy
+    rot(1) = real(dwdy - dvdz, kind=sp) ! ω_x = dw/dy - dv/dz
+    rot(2) = real(dudz - dwdx, kind=sp) ! ω_y = du/dz - dw/dx
+    rot(3) = real(dvdx - dudy, kind=sp) ! ω_z = dv/dx - du/dy
     
     ! Sensor: f_d = (∇·u)² / [(∇·u)² + (∇×u)²]
     ! Returns ~1 in shocks (high compression), ~0 in smooth vortical flows
     fd(i,j,k) = (div**2) / (div**2 + (rot(1)**2 + rot(2)**2 + rot(3)**2) + eps)
 
-    fd(i,j,k) = min(1.d0, fd(i,j,k))
+    fd(i,j,k) = min(1.0_sp, fd(i,j,k))
 
     ! boundary
     ! x direction

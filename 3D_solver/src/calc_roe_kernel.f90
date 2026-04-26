@@ -24,7 +24,8 @@ contains
   attributes(global) subroutine calc_roe_x6(id_accuracy, nx, ny, nz, Q, sensor, E)
     integer(kind=8), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(-1:threadsE%x+3,threadsE%y,threadsE%z), shared :: rho,  u,  v,  w,  p
@@ -49,8 +50,9 @@ contains
     i = (blockIdx%x-1)*blockDim%x + it
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     block
-      real(8) rhol, ul, vl, wl, pl, fdx
-      fdx = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
+      real(sp) fdx
+      real(8) rhol, ul, vl, wl, pl
+      fdx = 0.5_sp * (sensor(i,j,k) + sensor(i+1,j,k))
       if (3 <= i .and. i <= nx-3) then
         call delta6(fdx, rho(it-2:it+3,jt,kt), rhol, rhor(it,jt,kt))
         call delta6(fdx,   u(it-2:it+3,jt,kt),   ul,   ur(it,jt,kt))
@@ -86,7 +88,8 @@ contains
   attributes(global) subroutine calc_roe_y6(id_accuracy, nx, ny, nz, Q, sensor, F)
     integer(kind=8), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(-1:threadsF%y+3,threadsF%x,threadsF%z), shared :: rho,  u,  v,  w,  p
@@ -111,8 +114,9 @@ contains
     j = (blockIdx%y-1)*blockDim%y + jt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     block
-      real(8) rhol, ul, vl, wl, pl, fdy
-      fdy = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
+      real(sp) fdy
+      real(8) rhol, ul, vl, wl, pl
+      fdy = 0.5_sp * (sensor(i,j,k) + sensor(i,j+1,k))
       if (3 <= j .and. j <= ny-3 .and. 8 <= kind(id_accuracy)) then
         call delta6(fdy, rho(jt-2:jt+3,it,kt), rhol, rhor(jt,it,kt))
         call delta6(fdy,   u(jt-2:jt+3,it,kt),   ul,   ur(jt,it,kt))
@@ -148,7 +152,8 @@ contains
   attributes(global) subroutine calc_roe_z6(id_accuracy, nx, ny, nz, Q, sensor, G)
     integer(kind=8), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(-1:threadsG%z+3,threadsG%y,threadsG%x), shared :: rho,  u,  v,  w,  p
@@ -173,8 +178,9 @@ contains
     k = (blockIdx%z-1)*blockDim%z + kt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     block
-      real(8) rhol, ul, vl, wl, pl, fdz
-      fdz = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
+      real(sp) fdz
+      real(8) rhol, ul, vl, wl, pl
+      fdz = 0.5_sp * (sensor(i,j,k) + sensor(i,j,k+1))
       if (3 <= k .and. k <= nz-3 .and. 8 <= kind(id_accuracy)) then
         call delta6(fdz, rho(kt-2:kt+3,jt,it), rhol, rhor(kt,jt,it))
         call delta6(fdz,   u(kt-2:kt+3,jt,it),   ul,   ur(kt,jt,it))
@@ -210,7 +216,8 @@ contains
   attributes(global) subroutine calc_roe_x4(id_accuracy, nx, ny, nz, Q, sensor, E)
     integer(kind=4), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(0:threadsE%x+2,threadsE%y,threadsE%z), shared :: rho,  u,  v,  w,  p
@@ -235,8 +242,9 @@ contains
     i = (blockIdx%x-1)*blockDim%x + it
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     block
-      real(8) rhol, ul, vl, wl, pl, fdx
-      fdx = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
+      real(sp) fdx
+      real(8) rhol, ul, vl, wl, pl
+      fdx = 0.5_sp * (sensor(i,j,k) + sensor(i+1,j,k))
       if (2 <= i .and. i <= nx-2) then
         call delta4(fdx, rho(it-1:it+2,jt,kt), rhol, rhor(it,jt,kt))
         call delta4(fdx,   u(it-1:it+2,jt,kt),   ul,   ur(it,jt,kt))
@@ -266,7 +274,8 @@ contains
   attributes(global) subroutine calc_roe_y4(id_accuracy, nx, ny, nz, Q, sensor, F)
     integer(kind=4), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(0:threadsF%y+2,threadsF%x,threadsF%z), shared :: rho,  u,  v,  w,  p
@@ -291,8 +300,9 @@ contains
     j = (blockIdx%y-1)*blockDim%y + jt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     block
-      real(8) rhol, ul, vl, wl, pl, fdy
-      fdy = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
+      real(sp) fdy
+      real(8) rhol, ul, vl, wl, pl
+      fdy = 0.5_sp * (sensor(i,j,k) + sensor(i,j+1,k))
       if (2 <= j .and. j <= ny-2) then
         call delta4(fdy, rho(jt-1:jt+2,it,kt), rhol, rhor(jt,it,kt))
         call delta4(fdy,   u(jt-1:jt+2,it,kt),   ul,   ur(jt,it,kt))
@@ -322,7 +332,8 @@ contains
   attributes(global) subroutine calc_roe_z4(id_accuracy, nx, ny, nz, Q, sensor, G)
     integer(kind=4), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(0:threadsG%z+2,threadsG%y,threadsG%x), shared :: rho,  u,  v,  w,  p
@@ -347,7 +358,8 @@ contains
     k = (blockIdx%z-1)*blockDim%z + kt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     block
-      real(8) rhol, ul, vl, wl, pl, fdz
+      real(sp) fdz
+      real(8) rhol, ul, vl, wl, pl
       if (2 <= k .and. k <= nz-2) then
         call delta4(fdz, rho(kt-1:kt+2,jt,it), rhol, rhor(kt,jt,it))
         call delta4(fdz,   u(kt-1:kt+2,jt,it),   ul,   ur(kt,jt,it))
@@ -377,7 +389,8 @@ contains
   attributes(global) subroutine calc_roe_x2(id_accuracy, nx, ny, nz, Q, sensor, E)
     integer(kind=2), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(threadsE%x+1,threadsE%y,threadsE%z), shared :: rho, u, v, w, p
@@ -409,7 +422,8 @@ contains
   attributes(global) subroutine calc_roe_y2(id_accuracy, nx, ny, nz, Q, sensor, F)
     integer(kind=2), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(threadsF%y+1,threadsF%x,threadsF%z), shared :: rho, u, v, w, p
@@ -441,7 +455,8 @@ contains
   attributes(global) subroutine calc_roe_z2(id_accuracy, nx, ny, nz, Q, sensor, G)
     integer(kind=2), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(threadsG%z+1,threadsG%y,threadsG%x), shared :: rho, u, v, w, p

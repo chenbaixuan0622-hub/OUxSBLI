@@ -27,7 +27,7 @@ contains
     real(8), intent(in), contiguous :: rho(6), u(6), v(6), w(6), p(6)
     real(8), intent(out)            :: rhol, ul, vl, wl, pl
     real(8), intent(out)            :: rhor, ur, vr, wr, pr
-    real(8), intent(inout)          :: fd
+    real(sp), intent(inout)         :: fd
     call delta6(fd, rho(:), rhol, rhor)
     call delta6(fd,   u(:),   ul,   ur)
     call delta6(fd,   v(:),   vl,   vr)
@@ -45,7 +45,7 @@ contains
     real(8), intent(in), contiguous :: rho(4), u(4), v(4), w(4), p(4)
     real(8), intent(out)            :: rhol, ul, vl, wl, pl
     real(8), intent(out)            :: rhor, ur, vr, wr, pr
-    real(8), intent(inout)          :: fd
+    real(sp), intent(inout)         :: fd
     call delta4(fd, rho(:), rhol, rhor)
     call delta4(fd,   u(:),   ul,   ur)
     call delta4(fd,   v(:),   vl,   vr)
@@ -63,13 +63,13 @@ contains
     real(8), intent(in), contiguous :: rho(2), u(2), v(2), w(2), p(2)
     real(8), intent(out)            :: rhol, ul, vl, wl, pl
     real(8), intent(out)            :: rhor, ur, vr, wr, pr
-    real(8), intent(inout)          :: fd
+    real(sp), intent(inout)         :: fd
     rhol = rho(1); rhor = rho(2)
       ul =   u(1);   ur =   u(2)
       vl =   v(1);   vr =   v(2)
       wl =   w(1);   wr =   w(2)
       pl =   p(1);   pr =   p(2)
-      fd = 1.d0
+      fd = 1.0_sp
   end subroutine interp2
 
 
@@ -80,7 +80,7 @@ contains
     integer, intent(in), value                :: ny                  !< number of grid points in y direction
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< shock sensor
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< shock sensor
     real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
@@ -92,7 +92,7 @@ contains
     real(8), dimension(-(io-1):sx*sy*sz-io), shared :: rho,  u,  v,  w,  p  !< 1st use: stensils, 2nd use: left
     real(8), dimension(sxr*sy*sz), shared           :: rhor, ur, vr, wr, pr !< right
     real(8) rhol, ul, vl, wl, pl !< they are 40 bytes stack frame
-    real(8) fdx !< 1st use: shock sensor, 2nd use: wiggle ditector
+    real(sp) fdx !< 1st use: shock sensor, 2nd use: wiggle ditector
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -116,7 +116,7 @@ contains
       idx_r = it + offset_yzr
       i1    = idx - io
       i2    = idx + io + 1
-      fdx   = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
+      fdx   = 0.50_sp * (sensor(i,j,k) + sensor(i+1,j,k))
       call interp(id_accuracy, &
                   rho(i1:i2),  u(i1:i2),  v(i1:i2),  w(i1:i2),  p(i1:i2), &
                   rhol,        ul,        vl,        wl,        pl, &
@@ -142,7 +142,7 @@ contains
     integer, intent(in), value                :: ny                  !< number of grid points in y direction
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< shock sensor
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< shock sensor
     real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
@@ -154,7 +154,7 @@ contains
     real(8), dimension(-(io-1):sx*sy*sz-io), shared :: rho,  u,  v,  w,  p  !< 1st use: stencils, 2nd use: left
     real(8), dimension(sx*syr*sz), shared           :: rhor, ur, vr, wr, pr !< right
     real(8) rhol, ul, vl, wl, pl !< they are 40 bytes stack frame
-    real(8) fdy !< 1st use: shock sensor, 2nd use: wiggle ditector
+    real(sp) fdy !< 1st use: shock sensor, 2nd use: wiggle ditector
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -178,7 +178,7 @@ contains
       idx_r = jt + offset_xzr
       i1    = idx - io
       i2    = idx + io + 1
-      fdy   = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
+      fdy   = 0.50_sp * (sensor(i,j,k) + sensor(i,j+1,k))
       call interp(id_accuracy, &
                   rho(i1:i2),  u(i1:i2),  v(i1:i2),  w(i1:i2),  p(i1:i2), &
                   rhol,        ul,        vl,        wl,        pl, &
@@ -204,7 +204,7 @@ contains
     integer, intent(in), value                :: ny                  !< number of grid points in y direction
     integer, intent(in), value                :: nz                  !< number of grid points in z direction
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< shock sensor
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< shock sensor
     real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
@@ -216,7 +216,7 @@ contains
     real(8), dimension(-(io-1):sx*sy*sz-io), shared :: rho,  u,  v,  w,  p  !< 1st use: stencils, 2nd use: left
     real(8), dimension(sx*sy*szr), shared           :: rhor, ur, vr, wr, pr !< right
     real(8) rhol, ul, vl, wl, pl !< they are 40 bytes stack frame
-    real(8) fdz !< 1st use: shock sensor, 2nd use: wiggle ditector
+    real(sp) fdz !< 1st use: shock sensor, 2nd use: wiggle ditector
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -240,7 +240,7 @@ contains
       idx_r = kt + offset_xyr
       i1    = idx - io
       i2    = idx + io + 1
-      fdz   = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
+      fdz   = 0.50_sp * (sensor(i,j,k) + sensor(i,j,k+1))
       call interp(id_accuracy, &
                   rho(i1:i2),  u(i1:i2),  v(i1:i2),  w(i1:i2),  p(i1:i2), &
                   rhol,        ul,        vl,        wl,        pl, &

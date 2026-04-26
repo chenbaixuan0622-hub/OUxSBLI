@@ -1,4 +1,5 @@
 module load_smem_visc4
+  use wmma
   use mod_globals, only : threadsEv, threadsFv, threadsGv
   use mod_constant, only : two_third, one_twelfth
   implicit none
@@ -109,10 +110,15 @@ contains
       i = i_base + ii
       idx = ii + offset_yz
       if (1 <= i .and. i <= nx .and. j <= ny .and. k <= nz) then
-        u(idx) = Q(i,2,j,k)
-        v(idx) = Q(i,3,j,k)
-        w(idx) = Q(i,4,j,k)
+        call pipelineMemcpyAsync(u(idx), Q(i,2,j,k))
+        call pipelineMemcpyAsync(v(idx), Q(i,3,j,k))
+        call pipelineMemcpyAsync(w(idx), Q(i,4,j,k))
       endif
+    enddo
+    call pipelineCommit()
+    do ii = it-io_v, threadsEv%x+io_v+1, blockDim%x
+      i = i_base + ii
+      idx = ii + offset_yz
       if (1 <= i .and. i <= nx .and. 3 <= j .and. j <= ny-2 .and. k <= nz) then
         uy(idx) = (two_third * (-Q(i,2,j-1,k) + Q(i,2,j+1,k)) - one_twelfth * (-Q(i,2,j-2,k) + Q(i,2,j+2,k))) * inv_dy(j)
         vy(idx) = (two_third * (-Q(i,3,j-1,k) + Q(i,3,j+1,k)) - one_twelfth * (-Q(i,3,j-2,k) + Q(i,3,j+2,k))) * inv_dy(j)
@@ -122,6 +128,7 @@ contains
         wz(idx) = (two_third * (-Q(i,4,j,k-1) + Q(i,4,j,k+1)) - one_twelfth * (-Q(i,4,j,k-2) + Q(i,4,j,k+2))) * inv_dz(k)
       endif
     enddo
+    call pipelineWaitPrior(0)
     call syncthreads()
   end subroutine load_smem_visc4_x
   #endif
@@ -158,10 +165,15 @@ contains
       j = j_base + jj
       idx = jj + offset_xz
       if (i <= nx .and. 1 <= j .and. j <= ny .and. k <= nz) then
-        u(idx) = Q(i,2,j,k)
-        v(idx) = Q(i,3,j,k)
-        w(idx) = Q(i,4,j,k)
+        call pipelineMemcpyAsync(u(idx), Q(i,2,j,k))
+        call pipelineMemcpyAsync(v(idx), Q(i,3,j,k))
+        call pipelineMemcpyAsync(w(idx), Q(i,4,j,k))
       endif
+    enddo
+    call pipelineCommit()
+    do jj = jt-io_v, threadsFv%y+io_v+1, blockDim%y
+      j = j_base + jj
+      idx = jj + offset_xz
       if (3 <= i .and. i <= nx-2 .and. 1 <= j .and. j <= ny .and. k <= nz) then
         ux(idx) = (two_third * (-Q(i-1,2,j,k) + Q(i+1,2,j,k)) - one_twelfth * (-Q(i-2,2,j,k) + Q(i+2,2,j,k))) * inv_dx(i)
         vx(idx) = (two_third * (-Q(i-1,3,j,k) + Q(i+1,3,j,k)) - one_twelfth * (-Q(i-2,3,j,k) + Q(i+2,3,j,k))) * inv_dx(i)
@@ -171,6 +183,7 @@ contains
         wz(idx) = (two_third * (-Q(i,4,j,k-1) + Q(i,4,j,k+1)) - one_twelfth * (-Q(i,4,j,k-2) + Q(i,4,j,k+2))) * inv_dz(k)
       endif
     enddo
+    call pipelineWaitPrior(0)
     call syncthreads()
   end subroutine load_smem_visc4_y
 
@@ -206,10 +219,15 @@ contains
       k = k_base + kk
       idx = kk + offset_xy
       if (i <= nx .and. j <= ny .and. 1 <= k .and. k <= nz) then
-        u(idx) = Q(i,2,j,k)
-        v(idx) = Q(i,3,j,k)
-        w(idx) = Q(i,4,j,k)
+        call pipelineMemcpyAsync(u(idx), Q(i,2,j,k))
+        call pipelineMemcpyAsync(v(idx), Q(i,3,j,k))
+        call pipelineMemcpyAsync(w(idx), Q(i,4,j,k))
       endif
+    enddo
+    call pipelineCommit()
+    do kk = kt-io_v, threadsGv%z+io_v+1, blockDim%z
+      k = k_base + kk
+      idx = kk + offset_xy
       if (3 <= i .and. i <= nx-2 .and. j <= ny .and. 1 <= k .and. k <= nz) then
         ux(idx) = (two_third * (-Q(i-1,2,j,k) + Q(i+1,2,j,k)) - one_twelfth * (-Q(i-2,2,j,k) + Q(i+2,2,j,k))) * inv_dx(i)
         wx(idx) = (two_third * (-Q(i-1,4,j,k) + Q(i+1,4,j,k)) - one_twelfth * (-Q(i-2,4,j,k) + Q(i+2,4,j,k))) * inv_dx(i)
@@ -219,6 +237,7 @@ contains
         wy(idx) = (two_third * (-Q(i,4,j-1,k) + Q(i,4,j+1,k)) - one_twelfth * (-Q(i,4,j-2,k) + Q(i,4,j+2,k))) * inv_dy(j)
       endif
     enddo
+    call pipelineWaitPrior(0)
     call syncthreads()
   end subroutine load_smem_visc4_z
 end module load_smem_visc4

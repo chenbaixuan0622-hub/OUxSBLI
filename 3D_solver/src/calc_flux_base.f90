@@ -2,7 +2,7 @@
 !> Dispatches to different numerical schemes (KEEP, SLAU, Roe, Hybrid)
 !> Groups all GPU kernel calls for computing E, F, G flux components
 module calc_flux_base
-  use mod_globals, only : id_accuracy, id_bc_x, id_bc_y, id_bc_z, &
+  use mod_globals, only : id_accuracy, id_bc_x, id_bc_y, id_bc_z, sp, &
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
   & blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv
   use calc_physical_quantities
@@ -27,7 +27,7 @@ module calc_flux_base
   !> Persistent Ducros shock sensor on device — allocated once in init_sensor,
   !> reused across all calls to calc_conv_slau / calc_conv_roe / calc_conv_hybrid.
   !> Eliminates repeated device heap alloc/free on every RK stage.
-  real(8), allocatable, device, save :: sensor(:,:,:)
+  real(sp), allocatable, device, save :: sensor(:,:,:)
   interface calc_conv
     module procedure calc_conv_keep, calc_conv_slau, calc_conv_roe, calc_conv_hybrid
   end interface calc_conv

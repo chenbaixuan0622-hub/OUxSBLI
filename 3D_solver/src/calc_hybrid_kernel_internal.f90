@@ -42,7 +42,7 @@ contains
   !$dir inline
   attributes(device) subroutine delta_r2(id_acc, sensor, a, al, ar)
     integer(2), intent(in), value :: id_acc   !< dispatch key: kind=2 → 1st-order
-    real(8), intent(in), value    :: sensor
+    real(sp), intent(in), value   :: sensor
     real(8), intent(in)           :: a(2)     !< two-point stencil [i, i+1]
     real(8), intent(out)          :: al, ar
     al = a(1); ar = a(2)
@@ -51,7 +51,7 @@ contains
   !$dir inline
   attributes(device) subroutine delta_r4(id_acc, sensor, a, al, ar)
     integer(4), intent(in), value :: id_acc   !< dispatch key: kind=4 → MUSCL 3rd
-    real(8), intent(in), value    :: sensor
+    real(sp), intent(in), value   :: sensor
     real(8), intent(in)           :: a(4)     !< four-point stencil [i-1:i+2]
     real(8), intent(out)          :: al, ar
     call delta4(sensor, a, al, ar)
@@ -60,7 +60,7 @@ contains
   !$dir inline
   attributes(device) subroutine delta_r6(id_acc, sensor, a, al, ar)
     integer(8), intent(in), value :: id_acc   !< dispatch key: kind=8 → MUSCL 4th
-    real(8), intent(in), value    :: sensor
+    real(sp), intent(in), value   :: sensor
     real(8), intent(in)           :: a(6)     !< six-point stencil [i-2:i+3]
     real(8), intent(out)          :: al, ar
     call delta6(sensor, a, al, ar)
@@ -77,12 +77,13 @@ contains
     integer, intent(in), value                :: nz                  !< grid points z
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< temperature (for KEEP path)
-    real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< Ducros shock sensor
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< Ducros shock sensor
     real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2) !< x-direction flux
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(-(io-1):threadsE%x+io+1, threadsE%y, threadsE%z), shared :: rho, u, v, w, p
     real(8), dimension(threadsE%x, threadsE%y, threadsE%z), shared :: rhor, ur, vr, wr, pr
-    real(8) fdx, rhol, ul, vl, wl, pl
+    real(sp) fdx
+    real(8) rhol, ul, vl, wl, pl
     it = threadIdx%x;  jt = threadIdx%y;  kt = threadIdx%z
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
@@ -100,7 +101,7 @@ contains
     i = i_base + it
     ! Phase 2: interior-only flux (no stencil-order boundary fallback)
     if (io+1 <= i .and. i <= nx-(io+1) .and. j <= ny-1 .and. k <= nz-1) then
-      fdx = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
+      fdx = 0.5_sp * (sensor(i,j,k) + sensor(i+1,j,k))
       if (fdx <= threshold) then
         ! KEEP: entropy/energy preserving flux — reads T from global memory
         block
@@ -131,7 +132,7 @@ contains
         w(it,jt,kt) = wl;     p(it,jt,kt) = pl
       associate(un1 => u(it,jt,kt), un2 => ur(it,jt,kt))
         call SLAU(id_slau, rho(it,jt,kt), rhor(it,jt,kt), u(it,jt,kt), ur(it,jt,kt), v(it,jt,kt), vr(it,jt,kt), &
-                  w(it,jt,kt), wr(it,jt,kt), un1, un2, p(it,jt,kt), pr(it,jt,kt), Normal_x, 1.d0, &
+                  w(it,jt,kt), wr(it,jt,kt), un1, un2, p(it,jt,kt), pr(it,jt,kt), Normal_x, 1.0_sp, &
                   E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
       end associate
     endif
@@ -147,12 +148,13 @@ contains
     integer, intent(in), value                :: nz                  !< grid points z
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< temperature (for KEEP path)
-    real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< Ducros shock sensor
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< Ducros shock sensor
     real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2) !< y-direction flux
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(-(io-1):threadsF%y+io+1, threadsF%x, threadsF%z), shared :: rho, u, v, w, p
     real(8), dimension(threadsF%y, threadsF%x, threadsF%z), shared :: rhor, ur, vr, wr, pr
-    real(8) fdy, rhol, ul, vl, wl, pl
+    real(sp) fdy
+    real(8) rhol, ul, vl, wl, pl
     it = threadIdx%x;  jt = threadIdx%y;  kt = threadIdx%z
     i  = (blockIdx%x-1)*blockDim%x + it + 1
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
@@ -170,7 +172,7 @@ contains
     j = j_base + jt
     ! Phase 2: interior-only flux
     if (io+1 <= j .and. j <= ny-(io+1) .and. i <= nx-1 .and. k <= nz-1) then
-      fdy = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
+      fdy = 0.5_sp * (sensor(i,j,k) + sensor(i,j+1,k))
       if (fdy <= threshold) then
         block
           real(8) tmp(2*io+2)
@@ -196,7 +198,7 @@ contains
         w(jt,it,kt) = wl;     p(jt,it,kt) = pl
       associate(un1 => v(jt,it,kt), un2 => vr(jt,it,kt))
         call SLAU(id_slau, rho(jt,it,kt), rhor(jt,it,kt), u(jt,it,kt), ur(jt,it,kt), v(jt,it,kt), vr(jt,it,kt), &
-                  w(jt,it,kt), wr(jt,it,kt), un1, un2, p(jt,it,kt), pr(jt,it,kt), Normal_y, 1.d0, &
+                  w(jt,it,kt), wr(jt,it,kt), un1, un2, p(jt,it,kt), pr(jt,it,kt), Normal_y, 1.0_sp, &
                   F(1,i-1,j,k-1), F(2,i-1,j,k-1), F(3,i-1,j,k-1), F(4,i-1,j,k-1), F(5,i-1,j,k-1))
       end associate
     endif
@@ -212,12 +214,13 @@ contains
     integer, intent(in), value                :: nz                  !< grid points z
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< temperature (for KEEP path)
-    real(8), intent(in), device, contiguous   :: sensor(nx,ny,nz)    !< Ducros shock sensor
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)    !< Ducros shock sensor
     real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1) !< z-direction flux
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(-(io-1):threadsG%z+io+1, threadsG%y, threadsG%x), shared :: rho, u, v, w, p
     real(8), dimension(threadsG%z, threadsG%y, threadsG%x), shared :: rhor, ur, vr, wr, pr
-    real(8) fdz, rhol, ul, vl, wl, pl
+    real(sp) fdz
+    real(8) rhol, ul, vl, wl, pl
     it = threadIdx%x;  jt = threadIdx%y;  kt = threadIdx%z
     i  = (blockIdx%x-1)*blockDim%x + it + 1
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
@@ -235,7 +238,7 @@ contains
     k = k_base + kt
     ! Phase 2: interior-only flux
     if (io+1 <= k .and. k <= nz-(io+1) .and. i <= nx-1 .and. j <= ny-1) then
-      fdz = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
+      fdz = 0.5_sp * (sensor(i,j,k) + sensor(i,j,k+1))
       if (fdz <= threshold) then
         block
           real(8) tmp(2*io+2)
@@ -261,7 +264,7 @@ contains
         w(kt,jt,it) = wl;     p(kt,jt,it) = pl
       associate(un1 => w(kt,jt,it), un2 => wr(kt,jt,it))
         call SLAU(id_slau, rho(kt,jt,it), rhor(kt,jt,it), u(kt,jt,it), ur(kt,jt,it), v(kt,jt,it), vr(kt,jt,it), &
-                  w(kt,jt,it), wr(kt,jt,it), un1, un2, p(kt,jt,it), pr(kt,jt,it), Normal_z, 1.d0, &
+                  w(kt,jt,it), wr(kt,jt,it), un1, un2, p(kt,jt,it), pr(kt,jt,it), Normal_z, 1.0_sp, &
                   G(1,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(4,i-1,j-1,k), G(5,i-1,j-1,k))
       end associate
     endif

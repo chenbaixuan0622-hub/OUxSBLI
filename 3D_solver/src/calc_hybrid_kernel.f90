@@ -40,11 +40,13 @@ contains
     use mod_constant, only : Normal_x
     integer(kind=8), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(-1:threadsE%x+3,threadsE%y,threadsE%z), shared :: rho, u, v, w, p
-    real(8) fdx, rho_r, u_r, v_r, w_r, p_r
+    real(sp) fdx
+    real(8) rho_r, u_r, v_r, w_r, p_r
     integer(kind=4) id_accuracy4
     integer(kind=2) id_accuracy2
     it = threadIdx%x
@@ -68,7 +70,7 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     block
       real(8) rhol, ul, vl, wl, pl
-      fdx = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
+      fdx = 0.5_sp * (sensor(i,j,k) + sensor(i+1,j,k))
       if (3 <= i .and. i <= nx-3) then
         if (fdx <= threshold) then
           block
@@ -137,7 +139,7 @@ contains
     if (fdx > threshold) then
       associate(un1 => u(it,jt,kt), un2 => u_r)
         call SLAU(id_slau, rho(it,jt,kt), rho_r, u(it,jt,kt), u_r, v(it,jt,kt), v_r, &
-                  w(it,jt,kt), w_r, un1, un2, p(it,jt,kt), p_r, Normal_x, 1.d0, &
+                  w(it,jt,kt), w_r, un1, un2, p(it,jt,kt), p_r, Normal_x, 1.0_sp, &
                   E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
       end associate
     endif
@@ -148,11 +150,13 @@ contains
     use mod_constant, only : Normal_y
     integer(kind=8), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(-1:threadsF%y+3,threadsF%x,threadsF%z), shared :: rho, u, v, w, p
-    real(8) fdy, rho_r, u_r, v_r, w_r, p_r
+    real(sp) fdy
+    real(8) rho_r, u_r, v_r, w_r, p_r
     integer(kind=4) id_accuracy4
     integer(kind=2) id_accuracy2
     it = threadIdx%x
@@ -176,7 +180,7 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     block
       real(8) rhol, ul, vl, wl, pl
-      fdy = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
+      fdy = 0.5_sp * (sensor(i,j,k) + sensor(i,j+1,k))
       if (3 <= j .and. j <= ny-3) then
         if (fdy <= threshold) then
           block
@@ -245,7 +249,7 @@ contains
     if (fdy > threshold) then
       associate(un1 => v(jt,it,kt), un2 => v_r)
         call SLAU(id_slau, rho(jt,it,kt), rho_r, u(jt,it,kt), u_r, v(jt,it,kt), v_r, &
-                  w(jt,it,kt), w_r, un1, un2, p(jt,it,kt), p_r, Normal_y, 1.d0, &
+                  w(jt,it,kt), w_r, un1, un2, p(jt,it,kt), p_r, Normal_y, 1.0_sp, &
                   F(1,i-1,j,k-1), F(2,i-1,j,k-1), F(3,i-1,j,k-1), F(4,i-1,j,k-1), F(5,i-1,j,k-1))
       end associate
     endif
@@ -256,11 +260,13 @@ contains
     use mod_constant, only : Normal_z
     integer(kind=8), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(-1:threadsG%z+3,threadsG%y,threadsG%x), shared :: rho, u, v, w, p
-    real(8) fdz, rho_r, u_r, v_r, w_r, p_r
+    real(sp) fdz
+    real(8) rho_r, u_r, v_r, w_r, p_r
     integer(kind=4) id_accuracy4
     integer(kind=2) id_accuracy2
     it = threadIdx%x
@@ -284,7 +290,7 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
       block
       real(8) rhol, ul, vl, wl, pl
-      fdz = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
+      fdz = 0.5_sp * (sensor(i,j,k) + sensor(i,j,k+1))
       if (3 <= k .and. k <= nz-3) then
         if (fdz <= threshold) then
           block
@@ -353,7 +359,7 @@ contains
     if (fdz > threshold) then
       associate(un1 => w(kt,jt,it), un2 => w_r)
         call SLAU(id_slau, rho(kt,jt,it), rho_r, u(kt,jt,it), u_r, v(kt,jt,it), v_r, &
-                  w(kt,jt,it), w_r, un1, un2, p(kt,jt,it), p_r, Normal_z, 1.d0, &
+                  w(kt,jt,it), w_r, un1, un2, p(kt,jt,it), p_r, Normal_z, 1.0_sp, &
                   G(1,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(4,i-1,j-1,k), G(5,i-1,j-1,k))
       end associate
     endif
@@ -364,11 +370,13 @@ contains
     use mod_constant, only : Normal_x
     integer(kind=4), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(0:threadsE%x+2,threadsE%y,threadsE%z), shared :: rho, u, v, w, p
-    real(8) fdx, rho_r, u_r, v_r, w_r, p_r
+    real(sp) fdx
+    real(8) rho_r, u_r, v_r, w_r, p_r
     integer(kind=2) id_accuracy2
     it = threadIdx%x
     jt = threadIdx%y
@@ -391,7 +399,7 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     block
       real(8) rhol, ul, vl, wl, pl
-      fdx = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
+      fdx = 0.5_sp * (sensor(i,j,k) + sensor(i+1,j,k))
       if (2 <= i .and. i <= nx-2) then
         if (fdx <= threshold) then
           block
@@ -441,7 +449,7 @@ contains
     if (fdx > threshold) then
       associate(un1 => u(it,jt,kt), un2 => u_r)
         call SLAU(id_slau, rho(it,jt,kt), rho_r, u(it,jt,kt), u_r, v(it,jt,kt), v_r, &
-                  w(it,jt,kt), w_r, un1, un2, p(it,jt,kt), p_r, Normal_x, 1.d0, &
+                  w(it,jt,kt), w_r, un1, un2, p(it,jt,kt), p_r, Normal_x, 1.0_sp, &
                   E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
       end associate
     endif
@@ -452,11 +460,13 @@ contains
     use mod_constant, only : Normal_y
     integer(kind=4), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(0:threadsF%y+2,threadsF%x,threadsF%z), shared :: rho, u, v, w, p
-    real(8) fdy, rho_r, u_r, v_r, w_r, p_r
+    real(sp) fdy
+    real(8) rho_r, u_r, v_r, w_r, p_r
     integer(kind=2) id_accuracy2
     it = threadIdx%x
     jt = threadIdx%y
@@ -479,7 +489,7 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     block
       real(8) rhol, ul, vl, wl, pl
-      fdy = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
+      fdy = 0.5_sp * (sensor(i,j,k) + sensor(i,j+1,k))
       if (2 <= j .and. j <= ny-2) then
         if (fdy <= threshold) then
           block
@@ -529,7 +539,7 @@ contains
     if (fdy > threshold) then
       associate(un1 => v(jt,it,kt), un2 => v_r)
         call SLAU(id_slau, rho(jt,it,kt), rho_r, u(jt,it,kt), u_r, v(jt,it,kt), v_r, &
-                  w(jt,it,kt), w_r, un1, un2, p(jt,it,kt), p_r, Normal_y, 1.d0, &
+                  w(jt,it,kt), w_r, un1, un2, p(jt,it,kt), p_r, Normal_y, 1.0_sp, &
                   F(1,i-1,j,k-1), F(2,i-1,j,k-1), F(3,i-1,j,k-1), F(4,i-1,j,k-1), F(5,i-1,j,k-1))
       end associate
     endif
@@ -540,11 +550,13 @@ contains
     use mod_constant, only : Normal_z
     integer(kind=4), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(0:threadsG%z+2,threadsG%y,threadsG%x), shared :: rho, u, v, w, p
-    real(8) fdz, rho_r, u_r, v_r, w_r, p_r
+    real(sp) fdz
+    real(8) rho_r, u_r, v_r, w_r, p_r
     integer(kind=2) id_accuracy2
     it = threadIdx%x
     jt = threadIdx%y
@@ -567,7 +579,7 @@ contains
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     block
       real(8) rhol, ul, vl, wl, pl
-      fdz = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
+      fdz = 0.5_sp * (sensor(i,j,k) + sensor(i,j,k+1))
       if (2 <= k .and. k <= nz-2) then
         if (fdz <= threshold) then
           block
@@ -617,7 +629,7 @@ contains
     if (fdz > threshold) then
       associate(un1 => w(kt,jt,it), un2 => w_r)
         call SLAU(id_slau, rho(kt,jt,it), rho_r, u(kt,jt,it), u_r, v(kt,jt,it), v_r, &
-                  w(kt,jt,it), w_r, un1, un2, p(kt,jt,it), p_r, Normal_z, 1.d0, &
+                  w(kt,jt,it), w_r, un1, un2, p(kt,jt,it), p_r, Normal_z, 1.0_sp, &
                   G(1,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(4,i-1,j-1,k), G(5,i-1,j-1,k))
       end associate
     endif
@@ -628,11 +640,12 @@ contains
     use mod_constant, only : Normal_x
     integer(kind=2), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(threadsE%x+1,threadsE%y,threadsE%z), shared :: rho, u, v, w, p
-    real(8) fdx
+    real(sp) fdx
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -652,7 +665,7 @@ contains
     call syncthreads()
     i = (blockIdx%x-1)*blockDim%x + it
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    fdx = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
+    fdx = 0.5_sp * (sensor(i,j,k) + sensor(i+1,j,k))
     if (fdx <= threshold) then
       block
         real(8) tmp(2)
@@ -667,7 +680,7 @@ contains
     else
       associate(un1 => u(it,jt,kt), un2 => u(it+1,jt,kt))
         call SLAU(id_slau, rho(it,jt,kt), rho(it+1,jt,kt), u(it,jt,kt), u(it+1,jt,kt), v(it,jt,kt), v(it+1,jt,kt), &
-                  w(it,jt,kt), w(it+1,jt,kt), un1, un2, p(it,jt,kt), p(it+1,jt,kt), Normal_x, 1.d0, &
+                  w(it,jt,kt), w(it+1,jt,kt), un1, un2, p(it,jt,kt), p(it+1,jt,kt), Normal_x, 1.0_sp, &
                   E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
       end associate
     endif
@@ -678,11 +691,12 @@ contains
     use mod_constant, only : Normal_y
     integer(kind=2), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(threadsF%y+1,threadsF%x,threadsF%z), shared :: rho, u, v, w, p
-    real(8) fdy
+    real(sp) fdy
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -702,7 +716,7 @@ contains
     call syncthreads()
     j = (blockIdx%y-1)*blockDim%y + jt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    fdy = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
+    fdy = 0.5_sp * (sensor(i,j,k) + sensor(i,j+1,k))
     if (fdy <= threshold) then
       block
         real(8) tmp(2)
@@ -717,7 +731,7 @@ contains
     else
       associate(un1 => v(jt,it,kt), un2 => v(jt+1,it,kt))
         call SLAU(id_slau, rho(jt,it,kt), rho(jt+1,it,kt), u(jt,it,kt), u(jt+1,it,kt), v(jt,it,kt), v(jt+1,it,kt), &
-                  w(jt,it,kt), w(jt+1,it,kt), un1, un2, p(jt,it,kt), p(jt+1,it,kt), Normal_y, 1.d0, &
+                  w(jt,it,kt), w(jt+1,it,kt), un1, un2, p(jt,it,kt), p(jt+1,it,kt), Normal_y, 1.0_sp, &
                   F(1,i-1,j,k-1), F(2,i-1,j,k-1), F(3,i-1,j,k-1), F(4,i-1,j,k-1), F(5,i-1,j,k-1))
       end associate
     endif
@@ -728,11 +742,12 @@ contains
     use mod_constant, only : Normal_z
     integer(kind=2), intent(in), value        :: id_accuracy
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz), sensor(nx,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(threadsG%z+1,threadsG%y,threadsG%x), shared :: rho, u, v, w, p
-    real(8) fdz
+    real(sp) fdz
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -752,7 +767,7 @@ contains
     call syncthreads()
     k = (blockIdx%z-1)*blockDim%z + kt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    fdz = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
+    fdz = 0.5_sp * (sensor(i,j,k) + sensor(i,j,k+1))
     if (fdz <= threshold) then
       block
         real(8) tmp(2)
@@ -767,7 +782,7 @@ contains
     else
       associate(un1 => w(kt,jt,it), un2 => w(kt+1,jt,it))
         call SLAU(id_slau, rho(kt,jt,it), rho(kt+1,jt,it), u(kt,jt,it), u(kt+1,jt,it), v(kt,jt,it), v(kt+1,jt,it), &
-                  w(kt,jt,it), w(kt+1,jt,it), un1, un2, p(kt,jt,it), p(kt+1,jt,it), Normal_z, 1.d0, &
+                  w(kt,jt,it), w(kt+1,jt,it), un1, un2, p(kt,jt,it), p(kt+1,jt,it), Normal_z, 1.0_sp, &
                   G(1,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(4,i-1,j-1,k), G(5,i-1,j-1,k))
       end associate
     endif

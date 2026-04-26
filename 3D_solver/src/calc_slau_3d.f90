@@ -41,7 +41,8 @@
   pure attributes(device) subroutine SLAU1(id_slau, rho1, rho2, u1, u2, v1, v2, w1, w2, &
                                            un1, un2, p1, p2, Norm, HR, F1, F2, F3, F4, F5)
     integer(2), intent(in), value :: id_slau
-    real(8), intent(in)           :: rho1, rho2, u1, u2, v1, v2, w1, w2, un1, un2, p1, p2, Norm(5), HR
+    real(8), intent(in)           :: rho1, rho2, u1, u2, v1, v2, w1, w2, un1, un2, p1, p2, Norm(5)
+    real(sp), intent(in), value   :: HR
     real(8), intent(out)          :: F1, F2, F3, F4, F5
     real(8) c, over_c, Mp, Mm, M, x
     real(8) Vtp, Vtm, dp, bp, bm, mass, mass1, mass2, over_rho1, over_rho2, k1, k2
@@ -71,7 +72,8 @@
   pure attributes(device) subroutine HRSLAU2(id_slau, rho1, rho2, u1, u2, v1, v2, w1, w2, &
                                              un1, un2, p1, p2, Norm, HR, F1, F2, F3, F4, F5)
     integer(4), intent(in), value :: id_slau
-    real(8), intent(in)           :: rho1, rho2, u1, u2, v1, v2, w1, w2, un1, un2, p1, p2, Norm(5), HR
+    real(8), intent(in)           :: rho1, rho2, u1, u2, v1, v2, w1, w2, un1, un2, p1, p2, Norm(5)
+    real(sp), intent(in), value   :: HR
     real(8), intent(out)          :: F1, F2, F3, F4, F5
     real(8) c, over_c, Mp, Mm
     real(8) Vtp, Vtm, dp, bp, bm, mass, mass1, mass2, Vec2, over_rho1, over_rho2, k1, k2

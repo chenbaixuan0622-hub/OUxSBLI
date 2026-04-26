@@ -31,6 +31,7 @@ module mod_globals
   integer(4), parameter      :: id_visc     = 2
   real(2), parameter         :: id_scheme   = 0
   real(8), parameter         :: threshold   = 0.4d0
+  integer, parameter         :: sp          = kind(1.d0)
   integer(kind=8), parameter :: id_accuracy = 0
   integer(kind=8), parameter :: id_tvd      = 0
   integer(kind=4), parameter :: id_slau     = 0
@@ -88,7 +89,7 @@ module mod_globals
 
   ! initial condition
   real(8), parameter :: Re   = 1600.d0
-  real(8), parameter :: M0   = 0.4d0!1.25d0
+  real(8), parameter :: M0   = 1.25d0
   real(8), parameter :: T    = 530.d0 * 5.d0 / 9.d0 
   real(8), parameter :: S    = 111.d0
   real(8), parameter :: mu0  = 1.716d-5 * (273.2d0 + S) / (T + S) * (T / 273.2d0)**1.5d0
