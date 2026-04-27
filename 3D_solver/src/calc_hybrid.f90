@@ -2,7 +2,7 @@
 !> Computes Ducros sensor for automatic scheme switching between KEEP and SLAU
 module calc_hybrid
   use cudafor
-  use mod_globals, only : accuracy, offset, gamma, sp
+  use mod_globals, only : gamma, sp
   implicit none
 contains
 
@@ -20,7 +20,7 @@ contains
     real(8) dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz
     real(8) dx_tmp, dy_tmp, dz_tmp
     real(sp) div, rot(3)
-    real(sp), parameter :: eps = 1.0_sp-12
+    real(sp), parameter :: eps = 1.0e-12_sp
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1 
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1

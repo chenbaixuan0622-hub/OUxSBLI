@@ -360,6 +360,7 @@ contains
     block
       real(sp) fdz
       real(8) rhol, ul, vl, wl, pl
+      fdz = 0.5_sp * (sensor(i,j,k) + sensor(i,j,k+1))
       if (2 <= k .and. k <= nz-2) then
         call delta4(fdz, rho(kt-1:kt+2,jt,it), rhol, rhor(kt,jt,it))
         call delta4(fdz,   u(kt-1:kt+2,jt,it),   ul,   ur(kt,jt,it))
