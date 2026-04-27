@@ -134,9 +134,9 @@ contains
     ! Q^(n+1) = (α·Q^n + β·Q^(*) - γ·dt/vol·∇·F) / (α+β)
     ! Stage 2: α=3/4, β=1/4 (from Q^n and Q^(1)), coef4 = 1.d0 (compiler eliminates this division)
     ! Stage 3: α=1/3, β=2/3 (from Q^n and Q^(2)), coef4 = 3.d0 (requires division or inversion)
-    coef3_dtdxdy = dtdxdy(i,j)
-    coef3_dtdydz = dtdydz(j,k)
-    coef3_dtdzdx = dtdzdx(i,k)
+    coef3_dtdxdy = coef3 * dtdxdy(i,j)
+    coef3_dtdydz = coef3 * dtdydz(j,k)
+    coef3_dtdzdx = coef3 * dtdzdx(i,k)
     call calc_R(nx, ny, nz, i, j, k, coef3_dtdxdy, coef3_dtdydz, coef3_dtdzdx, E, F, G, R)
     do l = 1, 5  ! All conserved variables
       ! Convex combination: weighted average of Qin and Qout minus scaled residual
