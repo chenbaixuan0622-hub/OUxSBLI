@@ -33,7 +33,7 @@ contains
           enddo
           phi(i,j,k) = tmp
     enddo;enddo;enddo
-    deallocate(phi_tmp)
+    deallocate(phi_tmp, wg)
   end subroutine calc_Gaussian_filter_x
 
 

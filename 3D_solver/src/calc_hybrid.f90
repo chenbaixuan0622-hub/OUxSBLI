@@ -9,7 +9,7 @@ contains
   !> Compute Ducros shock sensor for hybrid scheme
   !> Uses ratio of dilatation (divergence) to vorticity to detect shocks
   !> Values closer to 1 indicate shock regions, close to 0 indicates smooth flow
-  pure attributes(global) subroutine calc_Ducros(nx, ny, nz, dx, dy, dz, Q, fd)
+  attributes(global) subroutine calc_Ducros(nx, ny, nz, dx, dy, dz, Q, fd)
     integer, intent(in), value                         :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device       :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device       :: dy ! 1 / dy
