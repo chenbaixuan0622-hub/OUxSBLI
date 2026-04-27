@@ -2,7 +2,7 @@ FC = mpif90
 
 subroutines = name:calc_tau_straight,calc_tau_cross,flux4
 
-OUTPUT_OPTIN = -cuda -acc -fast -Mchkptr -Minline=reshape,$(subroutines) -Minfo=accel,inline -Mchkptr -gpu=ptxinfo,rdc,lto -lnvhpcwrapnvtx 
+OUTPUT_OPTIN = -cuda -acc -fast -Mpreprocess -Mchkptr -Minline=reshape,$(subroutines) -Minfo=accel,inline -Mchkptr -gpu=ptxinfo,rdc,lto -lnvhpcwrapnvtx 
 
 .SUFFIXES : .f90
 
@@ -57,9 +57,9 @@ $(TARGET): $(OBJ)
 
 mod_constant.o: mod_globals.mod
 set_bc_common.o: mod_globals.mod
-set_init_common.o: mod_globals.mod mod_constant.mod set_compressible_bl.mod
 set_compressible_bl.o: mod_globals.mod mod_constant.mod
-set.o: mod_globals.mod mod_constant.mod calc_para.mod set_bc_common.mod set_init_common.mod set_coordinate.mod
+set_init_common.o: mod_globals.mod mod_constant.mod set_compressible_bl.mod
+set.o: mod_globals.mod mod_constant.mod calc_para.mod set_bc_common.mod set_coordinate.mod set_init_common.mod
 calc_physical_quantities.o: mod_globals.mod mod_constant.mod
 load_smem_visc4.o: mod_globals.mod mod_constant.mod
 calc_visc2.o: mod_globals.mod mod_constant.mod
