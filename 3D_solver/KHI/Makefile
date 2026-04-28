@@ -52,7 +52,7 @@ a.out: $(OBJ)
 
 $(TARGET): $(OBJ)
 		$(LINK.f) $^ $(LOADLIBES) $(LDLIBS) -o $@
-
+  
 mod_constant.o: mod_globals.mod
 set_bc_common.o: mod_globals.mod
 set.o: mod_globals.mod mod_constant.mod calc_para.mod set_bc_common.mod set_coordinate.mod
