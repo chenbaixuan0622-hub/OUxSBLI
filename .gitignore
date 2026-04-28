@@ -8,6 +8,7 @@
 *.png
 *.so
 *.err
+*.ncu-rep
 .vscode
 docs/auto_summary.md
 3D_solver/ETGV/data
