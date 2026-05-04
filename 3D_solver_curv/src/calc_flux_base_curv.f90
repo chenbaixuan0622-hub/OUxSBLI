@@ -1,14 +1,16 @@
-!> Curvilinear flux dispatcher (Euler only, 2nd-order).
+!> Curvilinear flux dispatcher (Euler + NS support).
 !> Provides calc_EFG_curv with KEEP/SLAU/Hybrid dispatch via id_scheme kind.
 module calc_flux_base_curv
   use cudafor
   use mod_globals, only : id_scheme, id_accuracy, id_slau, sp, blocks, threads, &
-                          blocksE, blocksF, blocksG, threadsE, threadsF, threadsG
+                          blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
+                          blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv
   use calc_physical_quantities
   use calc_keep_kernel_curv
   use calc_slau_kernel_curv
   use calc_hybrid_kernel_curv
   use calc_hybrid_curv
+  use calc_visc2_curv
   implicit none
   private
   public init_sensor_curv, calc_EFG_curv
@@ -19,6 +21,9 @@ module calc_flux_base_curv
     module procedure calc_conv_curv_keep, calc_conv_curv_slau, calc_conv_curv_hybrid
   end interface calc_conv_curv
 
+  interface calc_EFG_curv
+    module procedure calc_EFG_Euler_curv, calc_EFG_visc_curv
+  end interface calc_EFG_curv
 contains
   subroutine init_sensor_curv(nx, ny, nz)
     integer, intent(in) :: nx, ny, nz
@@ -91,10 +96,10 @@ contains
   end subroutine calc_conv_curv_hybrid
 
 
-  !> Euler curvilinear flux (id_visc kind=2).
-  !> Reconstructs primitive Q from QJ, then dispatches to KEEP/SLAU/Hybrid.
-  subroutine calc_EFG_curv(id_visc, nx, ny, nz, dz, n_xi_x, n_xi_y, n_eta_x, n_eta_y, &
-      xi_x, xi_y, eta_x, eta_y, Jacobian, QJ, Q, T, E, F, G)
+  !> Curvilinear flux with viscosity support.
+  !> Reconstructs primitive Q from QJ, dispatches to KEEP/SLAU/Hybrid, and adds viscous flux if NS.
+  subroutine calc_EFG_Euler_curv(id_visc, nx, ny, nz, dz, n_xi_x, n_xi_y, n_eta_x, n_eta_y, &
+      xi_x, xi_y, eta_x, eta_y, Jacobian, QJ, Q, T, mu, E, F, G)
     integer(2), intent(in), value            :: id_visc
     integer, intent(in), value               :: nx, ny, nz
     real(8), intent(in), value               :: dz
@@ -106,12 +111,45 @@ contains
     real(8), intent(in), device, contiguous  :: QJ(nx,5,ny,nz)
     real(8), intent(out), device, contiguous :: Q(nx,5,ny,nz)
     real(8), intent(out), device, contiguous :: T(nx,ny,nz)
-    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2)
-    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2)
-    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1)
+    real(8), intent(inout), device, contiguous :: mu(1,1,1)
+    real(8), intent(inout), device, contiguous :: E(5,nx-1,ny-2,nz-2)
+    real(8), intent(inout), device, contiguous :: F(5,nx-2,ny-1,nz-2)
+    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1)
     call calc_quantities_3D(nx, ny, nz, Jacobian, QJ, Q, T)
     call calc_conv_curv(id_scheme, nx, ny, nz, dz, &
         n_xi_x, n_xi_y, n_eta_x, n_eta_y, xi_x, xi_y, eta_x, eta_y, &
         Q, T, E, F, G)
-  end subroutine calc_EFG_curv
+  end subroutine calc_EFG_Euler_curv
+
+
+  !> Curvilinear flux with viscosity support.
+  !> Reconstructs primitive Q from QJ, dispatches to KEEP/SLAU/Hybrid, and adds viscous flux if NS.
+  subroutine calc_EFG_visc_curv(id_visc, nx, ny, nz, dz, n_xi_x, n_xi_y, n_eta_x, n_eta_y, &
+      xi_x, xi_y, eta_x, eta_y, Jacobian, QJ, Q, T, mu, E, F, G)
+    integer(4), intent(in), value            :: id_visc
+    integer, intent(in), value               :: nx, ny, nz
+    real(8), intent(in), value               :: dz
+    real(8), intent(in), device, contiguous  :: n_xi_x(nx-1,ny-2), n_xi_y(nx-1,ny-2)
+    real(8), intent(in), device, contiguous  :: n_eta_x(nx-2,ny-1), n_eta_y(nx-2,ny-1)
+    real(8), intent(in), device, contiguous  :: xi_x(nx,ny), xi_y(nx,ny)
+    real(8), intent(in), device, contiguous  :: eta_x(nx,ny), eta_y(nx,ny)
+    real(8), intent(in), device, contiguous  :: Jacobian(nx,ny)
+    real(8), intent(in), device, contiguous  :: QJ(nx,5,ny,nz)
+    real(8), intent(out), device, contiguous :: Q(nx,5,ny,nz)
+    real(8), intent(out), device, contiguous :: T(nx,ny,nz)
+    real(8), intent(inout), device, contiguous :: mu(nx,ny,nz)
+    real(8), intent(inout), device, contiguous :: E(5,nx-1,ny-2,nz-2)
+    real(8), intent(inout), device, contiguous :: F(5,nx-2,ny-1,nz-2)
+    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1)
+    call calc_quantities_T_3D(nx, ny, nz, Jacobian, QJ, Q, T, mu)
+    call calc_conv_curv(id_scheme, nx, ny, nz, dz, &
+        n_xi_x, n_xi_y, n_eta_x, n_eta_y, xi_x, xi_y, eta_x, eta_y, &
+        Q, T, E, F, G)
+    call calc_Ev2_curv<<<blocksEv,threadsEv>>>(nx, ny, nz, dz, xi_x, xi_y, eta_x, eta_y, &
+        n_xi_x, n_xi_y, Q, T, mu, E)
+    call calc_Fv2_curv<<<blocksFv,threadsFv>>>(nx, ny, nz, dz, xi_x, xi_y, eta_x, eta_y, &
+        n_eta_x, n_eta_y, Q, T, mu, F)
+    call calc_Gv2_curv<<<blocksGv,threadsGv>>>(nx, ny, nz, dz, xi_x, xi_y, eta_x, eta_y, &
+        Q, T, mu, G)
+  end subroutine calc_EFG_visc_curv
 end module calc_flux_base_curv

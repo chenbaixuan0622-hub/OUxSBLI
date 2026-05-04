@@ -20,6 +20,8 @@ OBJ = mod_globals.o \
       calc_slau_kernel_curv.o \
       calc_hybrid_kernel_curv.o \
       calc_steps_curv.o \
+      load_smem_visc2_curv.o \
+      calc_visc2_curv.o \
       set_bc_common.o \
       set.o \
       calc_flux_base_curv.o \

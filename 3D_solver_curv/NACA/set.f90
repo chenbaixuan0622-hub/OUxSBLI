@@ -5,26 +5,6 @@ module set
   use set_bc_common
   implicit none
 contains
-  ! Generate NACA 0012 surface points using O-grid parameter phi in [0, 2*pi).
-  ! phi=0: TE lower branch, phi=pi: LE, phi in (pi,2pi): upper surface back to TE.
-  subroutine set_naca0012(npts, chord_in, x_pts, y_pts)
-    integer, intent(in)  :: npts
-    real(8), intent(in)  :: chord_in
-    real(8), intent(out) :: x_pts(npts), y_pts(npts)
-    real(8) :: pi, phi, xn, yt
-    integer :: i
-    pi = 4.d0 * atan(1.d0)
-    do i = 1, npts
-      phi  = 2.d0*pi*dble(i-1)/dble(npts)
-      xn   = 0.5d0*(1.d0 + cos(phi))
-      yt   = (0.12d0/0.2d0) * (0.2969d0*sqrt(max(xn, 1.d-14)) &
-             - 0.1260d0*xn - 0.3516d0*xn**2 + 0.2843d0*xn**3 - 0.1015d0*xn**4)
-      x_pts(i) = xn * chord_in
-      y_pts(i) = merge(-yt*chord_in, yt*chord_in, phi <= pi)
-    enddo
-  end subroutine set_naca0012
-
-
   ! Generate O-grid around NACA 0012.  xi (i) wraps around airfoil (periodic,
   ! i=1 and i=nx are ghost cells), eta (j) is wall-normal (j=1 wall, j=ny far-field),
   ! zeta (k) is uniform spanwise.
@@ -185,16 +165,14 @@ contains
 
   !> Initialize flow to uniform subsonic free-stream.
   subroutine set_init(myrank, nx, ny, nz, x, y, z, Q)
+    use mod_globals, only : Ma_inf, rho_inf, p_inf, T_inf
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
     real(8), intent(out) :: Q(nx,5,ny,nz)
-    real(8) :: rho_inf, u_inf, v_inf, p_inf, E_inf
-    rho_inf = 1.d0
-    u_inf   = Ma_inf * cos(aoa)
-    v_inf   = Ma_inf * sin(aoa)
-    p_inf   = 1.d0 / gamma
+    real(8) u_inf, v_inf, E_inf
+    u_inf   = Ma_inf * sqrt(gamma * R * T_inf)
+    v_inf   = 0.d0
     E_inf   = p_inf / (gamma - 1.d0) + 0.5d0 * rho_inf * (u_inf**2 + v_inf**2)
-    Q = 0.d0
     Q(:,1,:,:) = rho_inf
     Q(:,2,:,:) = rho_inf * u_inf
     Q(:,3,:,:) = rho_inf * v_inf
@@ -213,17 +191,16 @@ contains
   !> (c) eta j=ny:     Dirichlet far-field free-stream
   !> (d) z-periodic:   k=1 and k=nz ghost cells
   subroutine set_bc(myrank, nx, ny, nz, Jacobian, eta_x, eta_y, Q)
+    use mod_globals, only : Ma_inf, rho_inf, p_inf, T_inf
     integer, intent(in) :: myrank, nx, ny, nz
     real(8), intent(in),    device :: Jacobian(nx,ny)
     real(8), intent(in),    device :: eta_x(nx,ny), eta_y(nx,ny)
     real(8), intent(inout), device :: Q(nx,5,ny,nz)
     integer :: i, j, k
-    real(8) :: rho_inf, u_inf, v_inf, p_inf, E_inf
+    real(8) :: u_inf, v_inf, E_inf
     real(8) :: nxw, nyw, nmag, u_int, v_int, u_n, Jratio
-    rho_inf = 1.d0
-    u_inf   = Ma_inf * cos(aoa)
-    v_inf   = Ma_inf * sin(aoa)
-    p_inf   = 1.d0 / gamma
+    u_inf   = Ma_inf * sqrt(gamma * R * T_inf)! * cos(aoa)
+    v_inf   = 0.d0!Ma_inf * sqrt(gamma * R * T_inf) * sin(aoa)
     E_inf   = p_inf / (gamma - 1.d0) + 0.5d0 * rho_inf * (u_inf**2 + v_inf**2)
     ! (a) xi periodic: O-grid seam at trailing edge
     !     Jacobian ratio = 1 exactly since grid is periodic, so direct copy.
@@ -242,21 +219,28 @@ contains
         Q(nx,5,j,k) = Q(2,   5,j,k)
       enddo
     enddo
-    ! (b) eta j=1: Euler slip wall on airfoil (reflect normal velocity component)
+    ! (b) eta j=1: wall on airfoil
     !$cuf kernel do(2) <<<*,(16,16)>>>
     do k = 1, nz
       do i = 1, nx
-        nxw   = eta_x(i,1);  nyw = eta_y(i,1)
-        nmag  = sqrt(nxw*nxw + nyw*nyw)
-        nxw   = nxw / nmag;  nyw = nyw / nmag
-        u_int = Q(i,2,2,k) / Q(i,1,2,k)
-        v_int = Q(i,3,2,k) / Q(i,1,2,k)
-        u_n   = u_int*nxw + v_int*nyw
+        ! Euler slip wall
+        !nxw   = eta_x(i,1);  nyw = eta_y(i,1)
+        !nmag  = sqrt(nxw*nxw + nyw*nyw)
+        !nxw   = nxw / nmag;  nyw = nyw / nmag
+        !u_int = Q(i,2,2,k) / Q(i,1,2,k)
+        !v_int = Q(i,3,2,k) / Q(i,1,2,k)
+        !u_n   = u_int*nxw + v_int*nyw
         Jratio = Jacobian(i,2) / Jacobian(i,1)
+        !Q(i,1,1,k) = Q(i,1,2,k) * Jratio
+        !Q(i,2,1,k) = (Q(i,2,2,k) - 2.d0*u_n*nxw*Q(i,1,2,k)) * Jratio
+        !Q(i,3,1,k) = (Q(i,3,2,k) - 2.d0*u_n*nyw*Q(i,1,2,k)) * Jratio
+        !Q(i,4,1,k) = Q(i,4,2,k) * Jratio
+        !Q(i,5,1,k) = Q(i,5,2,k) * Jratio
+        ! NS no-slip wall
         Q(i,1,1,k) = Q(i,1,2,k) * Jratio
-        Q(i,2,1,k) = (Q(i,2,2,k) - 2.d0*u_n*nxw*Q(i,1,2,k)) * Jratio
-        Q(i,3,1,k) = (Q(i,3,2,k) - 2.d0*u_n*nyw*Q(i,1,2,k)) * Jratio
-        Q(i,4,1,k) = Q(i,4,2,k) * Jratio
+        Q(i,2,1,k) =-Q(i,2,2,k) * Jratio
+        Q(i,3,1,k) =-Q(i,3,2,k) * Jratio
+        Q(i,4,1,k) =-Q(i,4,2,k) * Jratio
         Q(i,5,1,k) = Q(i,5,2,k) * Jratio
       enddo
     enddo

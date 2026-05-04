@@ -32,7 +32,7 @@ module mod_globals
   integer(2), parameter :: id_visc     = 0
   real(8), parameter    :: id_scheme   = 0
   integer, parameter    :: sp          = 4
-  real(4), parameter    :: threshold   = 0.1_sp
+  real(sp), parameter   :: threshold   = 0.1_sp
   integer(2), parameter :: id_accuracy = 0
   integer(2), parameter :: id_tvd      = 0
   integer(2), parameter :: id_slau     = 0

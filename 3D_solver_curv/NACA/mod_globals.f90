@@ -27,8 +27,8 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! Value is IGNORED; only the kind matters for dispatch
   integer, parameter    :: dimension   = 3
-  integer(2), parameter :: id_visc     = 0
-  real(2), parameter    :: id_scheme   = 0
+  integer(4), parameter :: id_visc     = 0
+  real(8), parameter    :: id_scheme   = 0
   integer, parameter    :: sp          = 4
   real(sp), parameter   :: threshold   = 0.1_sp
   integer(2), parameter :: id_accuracy = 0
@@ -36,19 +36,20 @@ module mod_globals
   integer(2), parameter :: id_slau     = 0
   integer(2), parameter :: id_rescale  = 0
   integer(2), parameter :: id_gpumpi   = 0
+  
+  ! NACA 0012 O-grid geometry
+  real(8), parameter :: chord = 0.05d0
+  real(8), parameter :: aoa   = -acos(-1.d0) * 5.d0 / 180.d0 ! angle of attack [radians]
+  real(8), parameter :: far_r = 8.d0 * chord                 ! far-field radius [chords]
 
   ! mesh
-  real(8), parameter :: Lx = 2.0d0    ! dummy (main_curv passes it to set_grid; set_grid ignores it)
-  real(8), parameter :: Ly = 10.0d0   ! dummy (= far_r, for consistency)
-  real(8), parameter :: Lz = 0.5d0    ! quasi-2D spanwise extent
-  integer, parameter :: nx = 194      ! 192 interior cells (i=2..193) wrapping airfoil
-  integer, parameter :: ny = 80       ! wall-normal cells
-  integer, parameter :: nz = 4        ! quasi-2D spanwise
-
-  ! NACA 0012 O-grid geometry
-  real(8), parameter :: chord = 1.d0
-  real(8), parameter :: aoa   = -acos(-1.d0) * 5.d0 / 180.d0 ! angle of attack [radians]
-  real(8), parameter :: far_r = 10.d0                        ! far-field radius [chords]
+  real(8), parameter :: AR = 0.01d0
+  real(8), parameter :: Lx = 1.d0       ! dummy (main_curv passes it to set_grid; set_grid ignores it)
+  real(8), parameter :: Ly = 1.d0       ! dummy (= far_r, for consistency)
+  real(8), parameter :: Lz = AR * chord ! spanwise
+  integer, parameter :: nx = 513        ! interior cells (i=2..nx-1) wrapping airfoil
+  integer, parameter :: ny = 161        ! wall-normal cells
+  integer, parameter :: nz = 17         ! quasi-2D spanwise
 
   real(8), parameter :: beta  = dacos(-1.d0) * 37.2d0 / 180.d0
   ! Boundary condition flags
@@ -80,16 +81,19 @@ module mod_globals
   integer, parameter    :: step_offset   = 0
 
   ! Free-stream flow conditions (non-dimensional)
-  real(8), parameter :: Ma_inf  = 0.8d0   ! Mach number (subsonic)
-  real(8), parameter :: gamma   = 1.4d0   ! heat capacity ratio
-  real(8), parameter :: R       = 1.d0    ! gas constant (non-dimensional)
-  real(8), parameter :: Pr      = 0.72d0  ! Prandtl number
+  real(8), parameter :: gamma   = 1.4d0    ! heat capacity ratio
+  real(8), parameter :: R       = 287.03d0 ! gas constant (non-dimensional)
+  real(8), parameter :: Pr      = 0.72d0   ! Prandtl number
+  real(8), parameter :: Ma_inf  = 0.8d0    ! Mach number (subsonic)
+  real(8), parameter :: p_inf   = 101.3d3
+  real(8), parameter :: T_inf   = 288.15d0
+  real(8), parameter :: rho_inf = p_inf / (R * T_inf)
 
   ! Time stepping parameters
   ! dt=1e-3: CFL estimate with stretch=1.05, ny=80, far_r=10 gives Δη_wall≈0.011,
   ! (|u|+a)=1.5 → dt_max≈7e-3; dt=1e-3 is safely below that.
-  real(8), parameter :: dt = 2.d-4
-  integer, parameter :: nt = 10000
-  integer, parameter :: np = 10
+  real(8), parameter :: dt = 2.d-9
+  integer, parameter :: nt = 1000
+  integer, parameter :: np = 100
   integer, parameter :: rerank = -1
 end module mod_globals

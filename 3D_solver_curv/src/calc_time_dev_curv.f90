@@ -85,7 +85,7 @@ contains
           ! Stage 1: Compute E, F, G from current state QJ
           call calc_EFG_curv(id_visc, nx, ny, nz, dz_val, &
               n_xi_x, n_xi_y, n_eta_x, n_eta_y, xi_x, xi_y, eta_x, eta_y, Jacobian, &
-              QJ, ruvwp, T, E, F, G)
+              QJ, ruvwp, T, mu, E, F, G)
 
           ! TVD RK3 Stage 1: Q(1) = Q^n - (dt/J) * (E_flux_div + F_flux_div + G_flux_div)
           call calc_step1_curv<<<blocks,threads>>>(nx, ny, nz, 1.d0, dt_xi, dt_eta, dt_Szeta, E, F, G, QJ, QJ2)
@@ -94,7 +94,7 @@ contains
           ! Stage 2: Compute E, F, G from Q(1)
           call calc_EFG_curv(id_visc, nx, ny, nz, dz_val, &
               n_xi_x, n_xi_y, n_eta_x, n_eta_y, xi_x, xi_y, eta_x, eta_y, Jacobian, &
-              QJ2, ruvwp, T, E, F, G)
+              QJ2, ruvwp, T, mu, E, F, G)
 
           ! TVD RK3 Stage 2: Q(2) = (3/4)*Q^n + (1/4)*Q(1) - (1/4)*(dt/J)*flux_div
           call calc_step2_3_curv<<<blocks,threads>>>(nx, ny, nz, 0.75d0, 0.25d0, 0.25d0, 1.d0, &
@@ -104,7 +104,7 @@ contains
           ! Stage 3: Compute E, F, G from Q(2)
           call calc_EFG_curv(id_visc, nx, ny, nz, dz_val, &
               n_xi_x, n_xi_y, n_eta_x, n_eta_y, xi_x, xi_y, eta_x, eta_y, Jacobian, &
-              QJ2, ruvwp, T, E, F, G)
+              QJ2, ruvwp, T, mu, E, F, G)
           
           ! TVD RK3 Stage 3: Q^(n+1) = (1/3)*Q^n + (2/3)*Q(2) - (2/3)*(dt/J)*flux_div
           call calc_step2_3_curv<<<blocks,threads>>>(nx, ny, nz, 2.d0, 1.d0, 2.d0, one_third, &
