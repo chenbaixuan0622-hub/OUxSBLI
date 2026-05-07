@@ -1,4 +1,5 @@
 module calc_muscl
+  use mod_globals, only : sp
   use mod_constant, only : one_third, one_sixth, one_twelfth
   implicit none
   private
@@ -42,7 +43,8 @@ contains
 
   pure attributes(device) subroutine MUSCL3rdnonTVD(id_tvd, sensor, a2, a3, d1, d2, d3, al, ar)
     integer(kind=2), intent(in) :: id_tvd
-    real(8), intent(in)         :: sensor, a2, a3, d1, d2, d3
+    real(sp), intent(in)        :: sensor
+    real(8), intent(in)         :: a2, a3, d1, d2, d3
     real(8), intent(out)        :: al, ar
     al = a2 + 0.5d0 * (d1 + 2.d0 * d2) * one_third
     ar = a3 - 0.5d0 * (d3 + 2.d0 * d2) * one_third
@@ -51,7 +53,8 @@ contains
 
   pure attributes(device) subroutine MUSCL3rdMinmod(id_tvd, sensor, a2, a3, d1, d2, d3, al, ar)
     integer(kind=4), intent(in) :: id_tvd
-    real(8), intent(in)         :: sensor, a2, a3, d1, d2, d3
+    real(sp), intent(in)        :: sensor
+    real(8), intent(in)         :: a2, a3, d1, d2, d3
     real(8), intent(out)        :: al, ar
     real(8), constant :: b = (3.d0 - one_third) / (1.d0 - one_third)
     block
@@ -72,7 +75,8 @@ contains
   pure attributes(device) subroutine MUSCL3rdThreshold(id_tvd, sensor, a2, a3, d1, d2, d3, al, ar)
     use mod_globals, only : threshold
     integer(kind=8), intent(in) :: id_tvd
-    real(8), intent(in)         :: sensor, a2, a3, d1, d2, d3
+    real(sp), intent(in)        :: sensor
+    real(8), intent(in)         :: a2, a3, d1, d2, d3
     real(8), intent(out)        :: al, ar
     integer(kind=2) :: id2
     integer(kind=4) :: id4
@@ -86,7 +90,8 @@ contains
 
   pure attributes(device) subroutine MUSCL4thnonTVD(id_tvd, sensor, a2, a3, d1, d2, d3, d4, d5, al, ar)
     integer(kind=2), intent(in) :: id_tvd
-    real(8), intent(in)         :: sensor, a2, a3, d1, d2, d3, d4, d5
+    real(sp), intent(in)        :: sensor
+    real(8), intent(in)         :: a2, a3, d1, d2, d3, d4, d5
     real(8), intent(out)        :: al, ar
     al = a2 + (-0.4d0 * d1 + 2.2d0 * d2 + 4.8d0 * d3 - 0.6d0 * d4) * one_twelfth
     ar = a3 - (-0.6d0 * d2 + 4.8d0 * d3 + 2.2d0 * d4 - 0.4d0 * d5) * one_twelfth
@@ -95,7 +100,8 @@ contains
 
   pure attributes(device) subroutine MUSCL4thTVD(id_tvd, sensor, a2, a3, d1, d2, d3, d4, d5, al, ar)
     integer(kind=4), intent(in) :: id_tvd
-    real(8), intent(in)         :: sensor,a2, a3, d1, d2, d3, d4, d5
+    real(sp), intent(in)        :: sensor
+    real(8), intent(in)         :: a2, a3, d1, d2, d3, d4, d5
     real(8), intent(out)        :: al, ar
     real(8) delta2
     delta2 = d3 - d33(d2, d3, d4) * one_sixth
@@ -119,7 +125,8 @@ contains
   pure attributes(device) subroutine MUSCL4thThreshold(id_tvd, sensor, a2, a3, d1, d2, d3, d4, d5, al, ar)
     use mod_globals, only : threshold
     integer(kind=8), intent(in) :: id_tvd
-    real(8), intent(in)         :: sensor, a2, a3, d1, d2, d3, d4, d5
+    real(sp), intent(in)        :: sensor
+    real(8), intent(in)         :: a2, a3, d1, d2, d3, d4, d5
     real(8), intent(out)        :: al, ar
     real(8) alr(2)
     integer(kind=2) :: id2
@@ -133,8 +140,8 @@ contains
 
 
   pure attributes(device) subroutine delta4(sensor, a, al, ar)
-    use mod_globals, only : id_tvd
-    real(8), intent(in), value      :: sensor
+    use mod_globals, only : id_tvd, sp
+    real(sp), intent(in), value     :: sensor
     real(8), intent(in), contiguous :: a(4)
     real(8), intent(out)            :: al, ar
     real(8) d1, d2, d3
@@ -146,8 +153,8 @@ contains
 
 
   pure attributes(device) subroutine delta6(sensor, a, al, ar)
-    use mod_globals, only : id_tvd
-    real(8), intent(in), value      :: sensor
+    use mod_globals, only : id_tvd, sp
+    real(sp), intent(in), value     :: sensor
     real(8), intent(in), contiguous :: a(6)
     real(8), intent(out)            :: al, ar
     real(8) d1, d2, d3, d4, d5

@@ -2,25 +2,25 @@
 !> Computes Ducros sensor for automatic scheme switching between KEEP and SLAU
 module calc_hybrid
   use cudafor
-  use mod_globals, only : accuracy, offset, gamma
+  use mod_globals, only : gamma, sp
   implicit none
 contains
 
   !> Compute Ducros shock sensor for hybrid scheme
   !> Uses ratio of dilatation (divergence) to vorticity to detect shocks
   !> Values closer to 1 indicate shock regions, close to 0 indicates smooth flow
-  pure attributes(global) subroutine calc_Ducros(nx, ny, nz, dx, dy, dz, Q, fd)
+  attributes(global) subroutine calc_Ducros(nx, ny, nz, dx, dy, dz, Q, fd)
     integer, intent(in), value                         :: nx, ny, nz
     real(8), intent(in), dimension(nx-1), device       :: dx ! 1 / dx
     real(8), intent(in), dimension(ny-1), device       :: dy ! 1 / dy
     real(8), intent(in), dimension(nz-1), device       :: dz ! 1 / dz
-    real(8), intent(in), dimension(5,nx,ny,nz), device :: Q
-    real(8), intent(out), dimension(nx,ny,nz), device  :: fd
+    real(8), intent(in), dimension(nx,5,ny,nz), device :: Q
+    real(sp), intent(out), device                      :: fd(nx,ny,nz)
     integer i, j, k
     real(8) dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz
-    real(8) div, rot(3)
     real(8) dx_tmp, dy_tmp, dz_tmp
-    real(8) :: eps = 1.d-12
+    real(sp) div, rot(3)
+    real(sp), parameter :: eps = 1.0e-12_sp
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1 
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
@@ -28,28 +28,28 @@ contains
     dx_tmp = 0.25d0 * (dx(i-1) + dx(i))
     dy_tmp = 0.25d0 * (dy(j-1) + dy(j))
     dz_tmp = 0.25d0 * (dz(k-1) + dz(k))
-    dudx = (-Q(2,i-1,j,k) + Q(2,i+1,j,k)) * dx_tmp
-    dvdx = (-Q(3,i-1,j,k) + Q(3,i+1,j,k)) * dx_tmp
-    dwdx = (-Q(4,i-1,j,k) + Q(4,i+1,j,k)) * dx_tmp
-    dudy = (-Q(2,i,j-1,k) + Q(2,i,j+1,k)) * dy_tmp
-    dvdy = (-Q(3,i,j-1,k) + Q(3,i,j+1,k)) * dy_tmp
-    dwdy = (-Q(4,i,j-1,k) + Q(4,i,j+1,k)) * dy_tmp
-    dudz = (-Q(2,i,j,k-1) + Q(2,i,j,k+1)) * dz_tmp
-    dvdz = (-Q(3,i,j,k-1) + Q(3,i,j,k+1)) * dz_tmp
-    dwdz = (-Q(4,i,j,k-1) + Q(4,i,j,k+1)) * dz_tmp
+    dudx = (-Q(i-1,2,j,k) + Q(i+1,2,j,k)) * dx_tmp
+    dvdx = (-Q(i-1,3,j,k) + Q(i+1,3,j,k)) * dx_tmp
+    dwdx = (-Q(i-1,4,j,k) + Q(i+1,4,j,k)) * dx_tmp
+    dudy = (-Q(i,2,j-1,k) + Q(i,2,j+1,k)) * dy_tmp
+    dvdy = (-Q(i,3,j-1,k) + Q(i,3,j+1,k)) * dy_tmp
+    dwdy = (-Q(i,4,j-1,k) + Q(i,4,j+1,k)) * dy_tmp
+    dudz = (-Q(i,2,j,k-1) + Q(i,2,j,k+1)) * dz_tmp
+    dvdz = (-Q(i,3,j,k-1) + Q(i,3,j,k+1)) * dz_tmp
+    dwdz = (-Q(i,4,j,k-1) + Q(i,4,j,k+1)) * dz_tmp
     ! Ducros shock sensor: detector based on dilatation vs. vorticity
-    div = dudx + dvdy + dwdz           ! Divergence: ∇·u
+    div = real(dudx + dvdy + dwdz, kind=sp) ! Divergence: ∇·u
     
     ! Vorticity vector: ω = ∇ × u
-    rot(1) = dwdy - dvdz               ! ω_x = dw/dy - dv/dz
-    rot(2) = dudz - dwdx               ! ω_y = du/dz - dw/dx
-    rot(3) = dvdx - dudy               ! ω_z = dv/dx - du/dy
+    rot(1) = real(dwdy - dvdz, kind=sp) ! ω_x = dw/dy - dv/dz
+    rot(2) = real(dudz - dwdx, kind=sp) ! ω_y = du/dz - dw/dx
+    rot(3) = real(dvdx - dudy, kind=sp) ! ω_z = dv/dx - du/dy
     
     ! Sensor: f_d = (∇·u)² / [(∇·u)² + (∇×u)²]
     ! Returns ~1 in shocks (high compression), ~0 in smooth vortical flows
     fd(i,j,k) = (div**2) / (div**2 + (rot(1)**2 + rot(2)**2 + rot(3)**2) + eps)
 
-    fd(i,j,k) = min(1.d0, fd(i,j,k))
+    fd(i,j,k) = min(1.0_sp, fd(i,j,k))
 
     ! boundary
     ! x direction
@@ -75,7 +75,8 @@ contains
 
   pure attributes(device) function Albada(e, rho) result(phi)
     real(8), intent(in), dimension(4), device :: e, rho
-    real(8) :: d1, d2, d3, phim, phip, phi, eps = 1.d-16
+    real(8) :: d1, d2, d3, phim, phip, phi
+    real(8), parameter :: eps = 1.d-16
     d1   = -e(1) / rho(1) + e(2) / rho(2)
     d2   = -e(2) / rho(2) + e(3) / rho(3)
     d3   = -e(3) / rho(3) + e(4) / rho(4)

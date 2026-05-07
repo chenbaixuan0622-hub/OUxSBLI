@@ -8,7 +8,7 @@ contains
   subroutine calc_mean(step, ireq, flag_re, nx, ny, nz, Jacobian, QJ, Qm)
     integer, intent(inout)         :: step, ireq
     integer, intent(in)            :: flag_re, nx, ny, nz
-    real(8), intent(in), device    :: Jacobian(nx,ny), QJ(5,nx,ny,nz)
+    real(8), intent(in), device    :: Jacobian(nx,ny), QJ(nx,5,ny,nz)
     real(8), intent(inout), device :: Qm(ny*5)
     real(8) Q1, Q2, Q3, Q4, Q5, rhoinv, Jacobian_tmp, volinv, step1, step2
     logical arrived
@@ -22,13 +22,13 @@ contains
         do k = 4, nz-3
           do i = nre1, nre2
             Jacobian_tmp = Jacobian(i,j)
-            rhoinv = 1.d0 / QJ(1,i,j,k)
-            Q1 = Q1 + QJ(1,i,j,k) * Jacobian_tmp
-            Q2 = Q2 + QJ(2,i,j,k) * rhoinv
-            Q3 = Q3 + QJ(3,i,j,k) * rhoinv
-            Q4 = Q4 + QJ(4,i,j,k) * rhoinv
-            Q5 = Q5 + gamma_1 * Jacobian_tmp * (QJ(5,i,j,k) &
-                    - 0.5d0 * (QJ(2,i,j,k)**2 + QJ(3,i,j,k)**2 + QJ(4,i,j,k)**2) * rhoinv)
+            rhoinv = 1.d0 / QJ(i,1,j,k)
+            Q1 = Q1 + QJ(i,1,j,k) * Jacobian_tmp
+            Q2 = Q2 + QJ(i,2,j,k) * rhoinv
+            Q3 = Q3 + QJ(i,3,j,k) * rhoinv
+            Q4 = Q4 + QJ(i,4,j,k) * rhoinv
+            Q5 = Q5 + gamma_1 * Jacobian_tmp * (QJ(i,5,j,k) &
+                    - 0.5d0 * (QJ(i,2,j,k)**2 + QJ(i,3,j,k)**2 + QJ(i,4,j,k)**2) * rhoinv)
         enddo;enddo
         Qm(5*(j-1)+1) = Q1 * volinv
         Qm(5*(j-1)+2) = Q2 * volinv
@@ -44,13 +44,13 @@ contains
         do k = 4, nz-3
           do i = nre1, nre2
             Jacobian_tmp = Jacobian(i,j)
-            rhoinv = 1.d0 / QJ(1,i,j,k)
-            Q1 = Q1 + QJ(1,i,j,k) * Jacobian_tmp
-            Q2 = Q2 + QJ(2,i,j,k) * rhoinv
-            Q3 = Q3 + QJ(3,i,j,k) * rhoinv
-            Q4 = Q4 + QJ(4,i,j,k) * rhoinv
-            Q5 = Q5 + gamma_1 * Jacobian_tmp * (QJ(5,i,j,k) &
-                    - 0.5d0 * (QJ(2,i,j,k)**2 + QJ(3,i,j,k)**2 + QJ(4,i,j,k)**2) * rhoinv)
+            rhoinv = 1.d0 / QJ(i,1,j,k)
+            Q1 = Q1 + QJ(i,1,j,k) * Jacobian_tmp
+            Q2 = Q2 + QJ(i,2,j,k) * rhoinv
+            Q3 = Q3 + QJ(i,3,j,k) * rhoinv
+            Q4 = Q4 + QJ(i,4,j,k) * rhoinv
+            Q5 = Q5 + gamma_1 * Jacobian_tmp * (QJ(i,5,j,k) &
+                    - 0.5d0 * (QJ(i,2,j,k)**2 + QJ(i,3,j,k)**2 + QJ(i,4,j,k)**2) * rhoinv)
         enddo;enddo
         Qm(5*(j-1)+1) = (step1 * Qm(5*(j-1)+1) + Q1 * volinv) * step2
         Qm(5*(j-1)+2) = (step1 * Qm(5*(j-1)+2) + Q2 * volinv) * step2
@@ -66,7 +66,7 @@ contains
 
   subroutine copy(nx, ny, nz, QJ, Qre)
     integer, intent(in)          :: nx, ny, nz
-    real(8), intent(in), device  :: QJ(5,nx,ny,nz)
+    real(8), intent(in), device  :: QJ(nx,5,ny,nz)
     real(8), intent(out), device :: Qre(ny*(nz-6)*5)
     integer j, k, l, j_offset, k_offset
     !$cuf kernel do <<<*,*>>>
@@ -75,7 +75,7 @@ contains
       do j = 1, ny
         j_offset = 5 * (j-1)
         do l = 1, 5
-          Qre(k_offset+j_offset+l) = QJ(l,nre2,j,k+3)
+          Qre(k_offset+j_offset+l) = QJ(nre2,l,j,k+3)
     enddo;enddo;enddo
   end subroutine copy
 
@@ -83,7 +83,7 @@ contains
   subroutine step_rescale(num, myrank, nx, ny, nz, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJ, Qm, Qre)
     integer, intent(in)            :: num, myrank, nx, ny, nz
     integer, intent(inout)         :: step, flag_re, flag_req, ireq, ireq2(2)
-    real(8), intent(in), device    :: Jacobian(nx,ny), QJ(5,nx,ny,nz)
+    real(8), intent(in), device    :: Jacobian(nx,ny), QJ(nx,5,ny,nz)
     real(8), intent(inout), device :: Qm(ny*5), Qre(ny*(nz-6)*5)
     integer ierr, istat, j
     if (myrank == rerank) then

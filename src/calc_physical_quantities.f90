@@ -52,7 +52,7 @@ contains
         Q(4,i,j) = p
         temp     = p / (R * rho)
         T(i,j)   = temp
-        mu(i,j)  = mu0_T0_S_over_T0_2_3 / (temp + 111.d0) * temp**1.5d0
+        mu(i,j)  = mu0_T0_S_over_T0_2_3 / (temp + 111.d0) * (temp * sqrt(temp))
     enddo;enddo
   end subroutine calc_quantities_T_2D
 
@@ -60,8 +60,8 @@ contains
   subroutine calc_quantities_3D(nx, ny, nz, Jacobian, QJ, Q, T)
     integer, intent(in), value               :: nx, ny, nz
     real(8), intent(in), device, contiguous  :: Jacobian(nx,ny)
-    real(8), intent(in), device, contiguous  :: QJ(5,nx,ny,nz) ! Q / Jacobian
-    real(8), intent(out), device, contiguous :: Q(5,nx,ny,nz)
+    real(8), intent(in), device, contiguous  :: QJ(nx,5,ny,nz) ! Q / Jacobian
+    real(8), intent(out), device, contiguous :: Q(nx,5,ny,nz)
     real(8), intent(out), device, contiguous :: T(nx,ny,nz)
     integer i, j, k
     real(8) :: over_Q1, rho, u, v, w, p
@@ -69,17 +69,17 @@ contains
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
-          over_Q1    = 1.d0 / QJ(1,i,j,k)
-          rho        = Jacobian(i,j) * QJ(1,i,j,k)
-          u          = QJ(2,i,j,k) * over_Q1
-          v          = QJ(3,i,j,k) * over_Q1
-          w          = QJ(4,i,j,k) * over_Q1
-          p          = gamma_1 * (Jacobian(i,j) * QJ(5,i,j,k) - 0.5d0 * rho * (u*u + v*v + w*w))
-          Q(1,i,j,k) = rho
-          Q(2,i,j,k) = u
-          Q(3,i,j,k) = v
-          Q(4,i,j,k) = w
-          Q(5,i,j,k) = p
+          over_Q1    = 1.d0 / QJ(i,1,j,k)
+          rho        = Jacobian(i,j) * QJ(i,1,j,k)
+          u          = QJ(i,2,j,k) * over_Q1
+          v          = QJ(i,3,j,k) * over_Q1
+          w          = QJ(i,4,j,k) * over_Q1
+          p          = gamma_1 * (Jacobian(i,j) * QJ(i,5,j,k) - 0.5d0 * rho * (u*u + v*v + w*w))
+          Q(i,1,j,k) = rho
+          Q(i,2,j,k) = u
+          Q(i,3,j,k) = v
+          Q(i,4,j,k) = w
+          Q(i,5,j,k) = p
           T(i,j,k)   = p / (R * rho)
     enddo;enddo;enddo
   end subroutine calc_quantities_3D
@@ -88,8 +88,8 @@ contains
   subroutine calc_quantities_T_3D(nx, ny, nz, Jacobian, QJ, Q, T, mu)
     integer, intent(in), value               :: nx, ny, nz
     real(8), intent(in), device, contiguous  :: Jacobian(nx,ny)
-    real(8), intent(in), device, contiguous  :: QJ(5,nx,ny,nz) ! Q / Jacobian
-    real(8), intent(out), device, contiguous :: Q(5,nx,ny,nz)
+    real(8), intent(in), device, contiguous  :: QJ(nx,5,ny,nz) ! Q / Jacobian
+    real(8), intent(out), device, contiguous :: Q(nx,5,ny,nz)
     real(8), intent(out), device, contiguous :: T(nx,ny,nz)
     real(8), intent(out), device, contiguous :: mu(nx,ny,nz)
     integer i, j, k
@@ -98,20 +98,20 @@ contains
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
-          over_Q1    = 1.d0 / QJ(1,i,j,k)
-          rho        = Jacobian(i,j) * QJ(1,i,j,k)
-          u          = QJ(2,i,j,k) * over_Q1
-          v          = QJ(3,i,j,k) * over_Q1
-          w          = QJ(4,i,j,k) * over_Q1
-          p          = gamma_1 * (Jacobian(i,j) * QJ(5,i,j,k) - 0.5d0 * rho * (u*u + v*v + w*w))
-          Q(1,i,j,k) = rho
-          Q(2,i,j,k) = u
-          Q(3,i,j,k) = v
-          Q(4,i,j,k) = w
-          Q(5,i,j,k) = p
+          over_Q1    = 1.d0 / QJ(i,1,j,k)
+          rho        = Jacobian(i,j) * QJ(i,1,j,k)
+          u          = QJ(i,2,j,k) * over_Q1
+          v          = QJ(i,3,j,k) * over_Q1
+          w          = QJ(i,4,j,k) * over_Q1
+          p          = gamma_1 * (Jacobian(i,j) * QJ(i,5,j,k) - 0.5d0 * rho * (u*u + v*v + w*w))
+          Q(i,1,j,k) = rho
+          Q(i,2,j,k) = u
+          Q(i,3,j,k) = v
+          Q(i,4,j,k) = w
+          Q(i,5,j,k) = p
           temp       = p / (R * rho)
           T(i,j,k)   = temp
-          mu(i,j,k)  = mu0_T0_S_over_T0_2_3 / (temp + 111.d0) * temp**1.5d0
+          mu(i,j,k)  = mu0_T0_S_over_T0_2_3 / (temp + 111.d0) * (temp * sqrt(temp))
     enddo;enddo;enddo
   end subroutine calc_quantities_T_3D
 end module calc_physical_quantities

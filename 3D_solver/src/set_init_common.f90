@@ -33,7 +33,7 @@ contains
           enddo
           phi(i,j,k) = tmp
     enddo;enddo;enddo
-    deallocate(phi_tmp)
+    deallocate(phi_tmp, wg)
   end subroutine calc_Gaussian_filter_x
 
 
@@ -190,7 +190,7 @@ contains
     integer, intent(in)  :: nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
     real(8), intent(in)  :: rand, blt0, blt, u0, p0, T0, M0
-    real(8), intent(out) :: Q(5,nx,ny,nz)
+    real(8), intent(out) :: Q(nx,5,ny,nz)
     integer i, j, k
     integer(4) sz
     integer(4), allocatable :: seed(:)
@@ -276,20 +276,20 @@ contains
     do k = 1, nz
       do j = 1, ny
         do i = 1, nx
-          Q(1,i,j,k) = p0 / (R * (T(j) + Tstd(i,j,k)))!rho(j)
-          Q(2,i,j,k) = Q(1,i,j,k) * (u(j) + ustd(i,j,k))
-          Q(3,i,j,k) = Q(1,i,j,k) * (v(j) + vstd(i,j,k))
-          Q(4,i,j,k) = Q(1,i,j,k) * wstd(i,j,k)
-          Q(5,i,j,k) = p0 * over_gamma_1 + 0.5d0 * (Q(2,i,j,k)**2 + Q(3,i,j,k)**2 + Q(4,i,j,k)**2) / Q(1,i,j,k)
+          Q(i,1,j,k) = p0 / (R * (T(j) + Tstd(i,j,k)))!rho(j)
+          Q(i,2,j,k) = Q(i,1,j,k) * (u(j) + ustd(i,j,k))
+          Q(i,3,j,k) = Q(i,1,j,k) * (v(j) + vstd(i,j,k))
+          Q(i,4,j,k) = Q(i,1,j,k) * wstd(i,j,k)
+          Q(i,5,j,k) = p0 * over_gamma_1 + 0.5d0 * (Q(i,2,j,k)**2 + Q(i,3,j,k)**2 + Q(i,4,j,k)**2) / Q(i,1,j,k)
     enddo;enddo;enddo
     deallocate(rho, u, v, T, randum, ustd, vstd, wstd, Tstd, seed)
     ! bottom
-    Q(1,:,1,:) = Q(1,:,2,:)
-    Q(2,:,1,:) = 0.d0
-    Q(3,:,1,:) = 0.d0
-    Q(4,:,1,:) = 0.d0
-    p_wall = gamma_1 * (Q(5,2,2,2) - 0.5d0 * (Q(2,2,2,2)**2 + Q(3,2,2,2)**2 + Q(4,2,2,2)**2) / Q(1,2,2,2))
-    Q(5,:,1,:) = p_wall * over_gamma_1
+    Q(:,1,1,:) = Q(:,1,2,:)
+    Q(:,2,1,:) = 0.d0
+    Q(:,3,1,:) = 0.d0
+    Q(:,4,1,:) = 0.d0
+    p_wall = gamma_1 * (Q(2,5,2,2) - 0.5d0 * (Q(2,2,2,2)**2 + Q(2,3,2,2)**2 + Q(2,4,2,2)**2) / Q(2,1,2,2))
+    Q(:,5,1,:) = p_wall * over_gamma_1
   end subroutine set_init_tbl
 end module set_init_common
 

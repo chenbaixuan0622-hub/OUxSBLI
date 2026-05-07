@@ -1,244 +1,186 @@
 module calc_steps
   use cudafor
-  use cooperative_groups ! for WarpShuffle
   use mod_globals, only : dt
   use mod_constant, only : one_sixth
   implicit none
 contains
+  !$dir inline
+  attributes(device) subroutine calc_R(nx, ny, nz, i, j, k, dtdxdy, dtdydz, dtdzdx, E, F, G, R)
+    integer, intent(in), value              :: nx                  !< number of grid points in x direction
+    integer, intent(in), value              :: ny                  !< number of grid points in y direction
+    integer, intent(in), value              :: nz                  !< number of grid points in z direction
+    integer, intent(in), value              :: i, j, k             !< index
+    real(8), intent(in), value              :: dtdxdy              !< dt * Sxy
+    real(8), intent(in), value              :: dtdydz              !< dt * Syz
+    real(8), intent(in), value              :: dtdzdx              !< dt * Szx
+    real(8), intent(in), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
+    real(8), intent(in), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
+    real(8), intent(in), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
+    real(8), intent(out), contiguous        :: R(5)
+    ! x direction
+    R(1) = dtdydz * (-E(1,i,j,k) + E(1,i+1,j,k)) 
+    R(2) = dtdydz * (-E(2,i,j,k) + E(2,i+1,j,k)) 
+    R(3) = dtdydz * (-E(3,i,j,k) + E(3,i+1,j,k)) 
+    R(4) = dtdydz * (-E(4,i,j,k) + E(4,i+1,j,k)) 
+    R(5) = dtdydz * (-E(5,i,j,k) + E(5,i+1,j,k)) 
+    ! y direction
+    R(1) = R(1) + dtdzdx * (-F(1,i,j,k) + F(1,i,j+1,k))
+    R(2) = R(2) + dtdzdx * (-F(2,i,j,k) + F(2,i,j+1,k))
+    R(3) = R(3) + dtdzdx * (-F(3,i,j,k) + F(3,i,j+1,k))
+    R(4) = R(4) + dtdzdx * (-F(4,i,j,k) + F(4,i,j+1,k))
+    R(5) = R(5) + dtdzdx * (-F(5,i,j,k) + F(5,i,j+1,k))
+    ! z direction
+    R(1) = R(1) + dtdxdy * (-G(1,i,j,k) + G(1,i,j,k+1))
+    R(2) = R(2) + dtdxdy * (-G(2,i,j,k) + G(2,i,j,k+1))
+    R(3) = R(3) + dtdxdy * (-G(3,i,j,k) + G(3,i,j,k+1))
+    R(4) = R(4) + dtdxdy * (-G(4,i,j,k) + G(4,i,j,k+1))
+    R(5) = R(5) + dtdxdy * (-G(5,i,j,k) + G(5,i,j,k+1))
+  end subroutine calc_R
+
+
   !> CUDA Fortran kernel for 1st step of 3-3 TVD Runge-Kutta
-  attributes(global) subroutine calc_step1(nx, ny, nz, coef, dx, dy, dz, E, F, G, Q, Q2)
-    integer, intent(in), value   :: nx                  !< number of grid points in x direction
-    integer, intent(in), value   :: ny                  !< number of grid points in y direction
-    integer, intent(in), value   :: nz                  !< number of grid points in z direction
-    real(8), intent(in), value   :: coef                !< coefficient for Runge-Kutta
-    real(8), intent(in), device  :: dx(nx-1)            !< grid size in x direction
-    real(8), intent(in), device  :: dy(ny-1)            !< grid size in y direction
-    real(8), intent(in), device  :: dz(nz-1)            !< grid size in z direction
-    real(8), intent(in), device  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
-    real(8), intent(in), device  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
-    real(8), intent(in), device  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
-    real(8), intent(in), device  :: Q(5,nx,ny,nz)       !< present Q(rho, rhou, rhov, rhow, E) / Jacobian
-    real(8), intent(out), device :: Q2(5,nx,ny,nz)      !< next    Q(rho, rhou, rhov, rhow, E) / Jacobian
-    real(8) R, dtdydz, dtdzdx, dtdxdy, dx_next, E_curr, E_next
-    integer i, j, k, l, lane
-    integer(8) tmp_bits
+  attributes(global) subroutine calc_step1(nx, ny, nz, coef, dtdxdy, dtdydz, dtdzdx, E, F, G, Q, Q2)
+    integer, intent(in), value               :: nx                  !< number of grid points in x direction
+    integer, intent(in), value               :: ny                  !< number of grid points in y direction
+    integer, intent(in), value               :: nz                  !< number of grid points in z direction
+    real(8), intent(in), value               :: coef                !< coefficient for Runge-Kutta
+    real(8), intent(in), device, contiguous  :: dtdxdy(nx-2,ny-2)   !< dt * Sxy
+    real(8), intent(in), device, contiguous  :: dtdydz(ny-2,nz-2)   !< dt * Syz
+    real(8), intent(in), device, contiguous  :: dtdzdx(nx-2,nz-2)   !< dt * Szx
+    real(8), intent(in), device, contiguous  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
+    real(8), intent(in), device, contiguous  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
+    real(8), intent(in), device, contiguous  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
+    real(8), intent(in), device, contiguous  :: Q(nx,5,ny,nz)       !< present Q(rho, rhou, rhov, rhow, E) / Jacobian
+    real(8), intent(out), device, contiguous :: Q2(nx,5,ny,nz)      !< next    Q(rho, rhou, rhov, rhow, E) / Jacobian
+    real(8) R(5), coef_dtdxdy, coef_dtdydz, coef_dtdzdx
+    integer i, j, k, l
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
     if (nx-2 < i .or. ny-2 < j .or. nz-2 < k) return
-    
-    ! ========== GPU Optimization: Warp Shuffle =========
-    ! Threads within a warp (32 threads) can shuffle data via __shfl_down_sync
-    ! This avoids global memory access when fetching adjacent dx(i+1)
-    lane     = iand(threadIdx%x - 1, 31)                              ! Lane [0..31] in warp
-    tmp_bits = __shfl_down_sync(z'ffffffff', transfer(dx(i), 0_8), 1) ! Shift dx right 1 lane
-    dx_next  = transfer(tmp_bits, 0.0_8)                              ! Get dx(i+1) from shuffle
-    if (lane == 31 .or. i == nx-2) then                               ! Last lane or boundary
-      dx_next = dx(i+1)                                               ! Fallback to global memory
-    endif
-    
-    ! ========== Compute Grid Jacobian Volumes ==========
-    ! Cell volume at (i, j, k) to (i+1, j+1, k+1) is product of grid spacings
-    ! For flux divergence, use average grid spacing between cell centers
-    dtdydz = dt * 0.25d0 * (dy(j) + dy(j+1)) * (dz(k) + dz(k+1)) ! dt*dy*dz x-flux divergence
-    dtdzdx = dt * 0.25d0 * (dz(k) + dz(k+1)) * (dx(i) + dx_next) ! dt*dz*dx y-flux divergence
-    dtdxdy = dt * 0.25d0 * (dx(i) + dx_next) * (dy(j) + dy(j+1)) ! dt*dx*dy z-flux divergence
-    
     ! ========== Conservative Update via TVD RK3: Stage 1 ==========
     ! Q^(1) = Q^n - (coef) * dt/vol * (Flux_divergence)
+    coef_dtdxdy = coef * dtdxdy(i,j)
+    coef_dtdydz = coef * dtdydz(j,k)
+    coef_dtdzdx = coef * dtdzdx(i,k)
+    call calc_R(nx, ny, nz, i, j, k, coef_dtdxdy, coef_dtdydz, coef_dtdzdx, E, F, G, R)
     do l = 1, 5  ! Loop over all conserved variables (rho, rhou, rhov, rhow, E)
-      E_curr   = E(l,i,j,k)
-      tmp_bits = __shfl_down_sync(z'ffffffff', transfer(E_curr, 0_8), 1) ! E(i+1) via shuffle
-      E_next   = transfer(tmp_bits, 0.0_8)
-      if (lane == 31 .or. i == nx-2) then
-        E_next = E(l,i+1,j,k) ! Fallback to global memory
-      endif
-      ! Flux divergence = (E_{i+1} - E_i) + (F_{j+1} - F_j) + (G_{k+1} - G_k)
-      ! with cell volume scaling (dt*dy*dz), (dt*dz*dx), (dt*dx*dy) respectively
-      R = dtdydz * (-E_curr     + E_next) &
-      & + dtdzdx * (-F(l,i,j,k) + F(l,i,j+1,k)) &
-      & + dtdxdy * (-G(l,i,j,k) + G(l,i,j,k+1))
-      Q2(l,i+1,j+1,k+1) = Q(l,i+1,j+1,k+1) - coef * R
+      Q2(i+1,l,j+1,k+1) = Q(i+1,l,j+1,k+1) - R(l)
     enddo
   end subroutine calc_step1
 
 
   !> CUDA Fortran kernel for 1st~3rd step of 4-4 Runge-Kutta
-  attributes(global) subroutine calc_step(nx, ny, nz, coef1, coef2, dx, dy, dz, E, F, G, Q, Q2, Rs)
-    integer, intent(in), value     :: nx                   !< number of grid points in x direction
-    integer, intent(in), value     :: ny                   !< number of grid points in y direction
-    integer, intent(in), value     :: nz                   !< number of grid points in z direction
-    real(8), intent(in), value     :: coef1                !< coefficient for Runge-Kutta
-    real(8), intent(in), value     :: coef2                !< coefficient for Runge-Kutta
-    real(8), intent(in), device    :: dx(nx-1)             !< grid size in x direction
-    real(8), intent(in), device    :: dy(ny-1)             !< grid size in y direction
-    real(8), intent(in), device    :: dz(nz-1)             !< grid size in z direction
-    real(8), intent(in), device    :: E(5,nx-1,ny-2,nz-2)  !< Flux in x direction
-    real(8), intent(in), device    :: F(5,nx-2,ny-1,nz-2)  !< Flux in y direction
-    real(8), intent(in), device    :: G(5,nx-2,ny-2,nz-1)  !< Flux in z direction
-    real(8), intent(in), device    :: Q(5,nx,ny,nz)        !< present Q(rho, rhou, rhov, rhow, E) / Jacobian
-    real(8), intent(out), device   :: Q2(5,nx,ny,nz)       !< next    Q(rho, rhou, rhov, rhow, E) / Jacobian
-    real(8), intent(inout), device :: Rs(5,nx-2,ny-2,nz-2) !< accumulation for 4-4 Runge-Kutta
-    real(8) R, dtdydz, dtdzdx, dtdxdy, dx_next, E_curr, E_next
-    integer i, j, k, l, lane
-    integer(8) tmp_bits
+  attributes(global) subroutine calc_step(nx, ny, nz, coef1, coef2, dtdxdy, dtdydz, dtdzdx, E, F, G, Q, Q2, Rs)
+    integer, intent(in), value                 :: nx                   !< number of grid points in x direction
+    integer, intent(in), value                 :: ny                   !< number of grid points in y direction
+    integer, intent(in), value                 :: nz                   !< number of grid points in z direction
+    real(8), intent(in), value                 :: coef1                !< coefficient for Runge-Kutta
+    real(8), intent(in), value                 :: coef2                !< coefficient for Runge-Kutta
+    real(8), intent(in), device, contiguous    :: dtdxdy(nx-2,ny-2)    !< dt * Sxy
+    real(8), intent(in), device, contiguous    :: dtdydz(ny-2,nz-2)    !< dt * Syz
+    real(8), intent(in), device, contiguous    :: dtdzdx(nx-2,nz-2)    !< dt * Szx
+    real(8), intent(in), device, contiguous    :: E(5,nx-1,ny-2,nz-2)  !< Flux in x direction
+    real(8), intent(in), device, contiguous    :: F(5,nx-2,ny-1,nz-2)  !< Flux in y direction
+    real(8), intent(in), device, contiguous    :: G(5,nx-2,ny-2,nz-1)  !< Flux in z direction
+    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)        !< present Q(rho, rhou, rhov, rhow, E) / Jacobian
+    real(8), intent(out), device, contiguous   :: Q2(nx,5,ny,nz)       !< next    Q(rho, rhou, rhov, rhow, E) / Jacobian
+    real(8), intent(inout), device, contiguous :: Rs(nx-2,5,ny-2,nz-2) !< accumulation for 4-4 Runge-Kutta
+    real(8) R(5), dtdxdy_tmp, dtdydz_tmp, dtdzdx_tmp
+    integer i, j, k, l
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
     if (nx-2 < i .or. ny-2 < j .or. nz-2 < k) return
-    
-    ! ========== GPU Optimization: Warp Shuffle for Grade Spacing ==========
-    lane     = iand(threadIdx%x - 1, 31)                              ! Thread lane in warp
-    tmp_bits = __shfl_down_sync(z'ffffffff', transfer(dx(i), 0_8), 1) ! Broadcast dx to next lane
-    dx_next  = transfer(tmp_bits, 0.0_8)
-    if (lane == 31 .or. i == nx-2) then
-      dx_next = dx(i+1)
-    endif
-    
-    ! ========== Compute Grid Jacobian Volumes ==========
-    dtdydz = dt * 0.25d0 * (dy(j) + dy(j+1)) * (dz(k) + dz(k+1))
-    dtdzdx = dt * 0.25d0 * (dz(k) + dz(k+1)) * (dx(i) + dx_next)
-    dtdxdy = dt * 0.25d0 * (dx(i) + dx_next) * (dy(j) + dy(j+1))
-    
     ! ========== Conservative Update via 4-4 RK: Stage 1-3 ==========
     ! For stage 1-3: Q^(s) = Q^(s-1) - coef1 * dt/vol * Flux_div + accumulate in Rs
     ! coef2 applies weighting to residual for final 4th stage assembly
+    dtdxdy_tmp = dtdxdy(i,j)
+    dtdydz_tmp = dtdydz(j,k)
+    dtdzdx_tmp = dtdzdx(i,k)
+    call calc_R(nx, ny, nz, i, j, k, dtdxdy_tmp, dtdydz_tmp, dtdzdx_tmp, E, F, G, R)
     do l = 1, 5
-      E_curr   = E(l,i,j,k)
-      tmp_bits = __shfl_down_sync(z'ffffffff', transfer(E_curr, 0_8), 1)
-      E_next   = transfer(tmp_bits, 0.0_8)
-      if (lane == 31 .or. i == nx-2) then
-        E_next = E(l,i+1,j,k)
-      endif
-      R = dtdydz * (-E_curr     + E_next) &
-      & + dtdzdx * (-F(l,i,j,k) + F(l,i,j+1,k)) &
-      & + dtdxdy * (-G(l,i,j,k) + G(l,i,j,k+1))
-      Q2(l,i+1,j+1,k+1) = Q(l,i+1,j+1,k+1) - coef1 * R ! Intermediate Q for next stage
-      Rs(l,i,j,k) = Rs(l,i,j,k) + coef2 * R            ! Accumulate weighted residual
+      Q2(i+1,l,j+1,k+1) = Q(i+1,l,j+1,k+1) - coef1 * R(l) ! Intermediate Q for next stage
+      Rs(i,l,j,k) = Rs(i,l,j,k) + coef2 * R(l)            ! Accumulate weighted residual
     enddo
   end subroutine calc_step
  
 
   !> CUDA Fortran kernel for 2nd & 3rd step of 3-3 TVD Runge-Kutta
   !> TVD RK3 Stage 2 & 3: Q^(n+1) = (α*Q^n + β*Q^(*) - γ*R)/(α+β)
-  attributes(global) subroutine calc_step2_3(nx, ny, nz, coef1, coef2, coef3, coef4, dx, dy, dz, E, F, G, Qin, Qout)
-    integer, intent(in), value     :: nx                  !< number of grid points in x direction
-    integer, intent(in), value     :: ny                  !< number of grid points in y direction
-    integer, intent(in), value     :: nz                  !< number of grid points in z direction
-    real(8), intent(in), value     :: coef1               !< α coefficient (weight of original Q^n)
-    real(8), intent(in), value     :: coef2               !< β coefficient (weight of Q^(*))
-    real(8), intent(in), value     :: coef3               !< γ coefficient (weight of flux residual)
-    real(8), intent(in), value     :: coef4               !< 1/(α+β) normalization factor
-    real(8), intent(in), device    :: dx(nx-1)            !< grid size in x direction
-    real(8), intent(in), device    :: dy(ny-1)            !< grid size in y direction
-    real(8), intent(in), device    :: dz(nz-1)            !< grid size in z direction
-    real(8), intent(in), device    :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
-    real(8), intent(in), device    :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
-    real(8), intent(in), device    :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
-    real(8), intent(in), device    :: Qin(5,nx,ny,nz)     !< Q^n (original from previous step)
-    real(8), intent(inout), device :: Qout(5,nx,ny,nz)    !< Q^(*) on input, Q^(n+1) on output
-    real(8) R, dtdydz, dtdzdx, dtdxdy, dx_next, E_curr, E_next
-    integer i, j, k, l, lane
-    integer(8) tmp_bits
+  attributes(global) subroutine calc_step2_3(nx, ny, nz, coef1, coef2, coef3, coef4_inv, dtdxdy, dtdydz, dtdzdx, E, F, G, Qin, Qout)
+    integer, intent(in), value                 :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                 :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                 :: nz                  !< number of grid points in z direction
+    real(8), intent(in), value                 :: coef1               !< α coefficient (weight of original Q^n)
+    real(8), intent(in), value                 :: coef2               !< β coefficient (weight of Q^(*))
+    real(8), intent(in), value                 :: coef3               !< γ coefficient (weight of flux residual)
+    real(8), intent(in), value                 :: coef4_inv           !< 1/(α+β) normalization factor
+    real(8), intent(in), device, contiguous    :: dtdxdy(nx-2,ny-2)   !< dt * Sxy
+    real(8), intent(in), device, contiguous    :: dtdydz(ny-2,nz-2)   !< dt * Syz
+    real(8), intent(in), device, contiguous    :: dtdzdx(nx-2,nz-2)   !< dt * Szx
+    real(8), intent(in), device, contiguous    :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
+    real(8), intent(in), device, contiguous    :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
+    real(8), intent(in), device, contiguous    :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
+    real(8), intent(in), device, contiguous    :: Qin(nx,5,ny,nz)     !< Q^n (original from previous step)
+    real(8), intent(inout), device, contiguous :: Qout(nx,5,ny,nz)    !< Q^(*) on input, Q^(n+1) on output
+    real(8) R(5), coef3_dtdxdy, coef3_dtdydz, coef3_dtdzdx
+    integer i, j, k, l
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
     if (nx-2 < i .or. ny-2 < j .or. nz-2 < k) return
-    
-    ! ========== GPU Optimization: Warp Shuffle ==========
-    ! Efficient neighboring element access within warp (32 threads)
-    lane     = iand(threadIdx%x - 1, 31)                              ! Thread lane in warp [0..31]
-    tmp_bits = __shfl_down_sync(z'ffffffff', transfer(dx(i), 0_8), 1) ! Shuffle dx to next lane
-    dx_next  = transfer(tmp_bits, 0.0_8)
-    if (lane == 31 .or. i == nx-2) then                               ! Last lane or boundary: use global mem
-      dx_next = dx(i+1)
-    endif
-    
-    ! ========== Compute Grid Jacobian Volumes ==========
-    ! Averaged grid spacing for flux divergence calculation
-    dtdydz = dt * 0.25d0 * (dy(j) + dy(j+1)) * (dz(k) + dz(k+1)) ! dt·Δy·Δz for x-flux
-    dtdzdx = dt * 0.25d0 * (dz(k) + dz(k+1)) * (dx(i) + dx_next) ! dt·Δz·Δx for y-flux
-    dtdxdy = dt * 0.25d0 * (dx(i) + dx_next) * (dy(j) + dy(j+1)) ! dt·Δx·Δy for z-flux
-    
     ! ========== TVD RK3 Stage 2 & 3 Update ==========
     ! Q^(n+1) = (α·Q^n + β·Q^(*) - γ·dt/vol·∇·F) / (α+β)
-    ! Stage 2: α=3/4, β=1/4 (from Q^n and Q^(1))
-    ! Stage 3: α=1/3, β=2/3 (from Q^n and Q^(2)), then multiply by 3 (coef4 = 1/3)
+    ! Stage 2: α=3/4, β=1/4 (from Q^n and Q^(1)), coef4 = 1.d0 (compiler eliminates this division)
+    ! Stage 3: α=1/3, β=2/3 (from Q^n and Q^(2)), coef4 = 3.d0 (requires division or inversion)
+    coef3_dtdxdy = coef3 * dtdxdy(i,j)
+    coef3_dtdydz = coef3 * dtdydz(j,k)
+    coef3_dtdzdx = coef3 * dtdzdx(i,k)
+    call calc_R(nx, ny, nz, i, j, k, coef3_dtdxdy, coef3_dtdydz, coef3_dtdzdx, E, F, G, R)
     do l = 1, 5  ! All conserved variables
-      E_curr   = E(l,i,j,k)
-      tmp_bits = __shfl_down_sync(z'ffffffff', transfer(E_curr, 0_8), 1) ! E(i+1) via warp shuffle
-      E_next   = transfer(tmp_bits, 0.0_8)
-      if (lane == 31 .or. i == nx-2) then
-        E_next = E(l,i+1,j,k) ! Fallback to global memory
-      endif
-      ! Flux divergence with consistent volume scaling
-      R = dtdydz * (-E_curr     + E_next) &
-      & + dtdzdx * (-F(l,i,j,k) + F(l,i,j+1,k)) &
-      & + dtdxdy * (-G(l,i,j,k) + G(l,i,j,k+1))
       ! Convex combination: weighted average of Qin and Qout minus scaled residual
-      Qout(l,i+1,j+1,k+1) = (coef1 * Qin(l,i+1,j+1,k+1) + coef2 * Qout(l,i+1,j+1,k+1) - coef3 * R) / coef4
+      Qout(i+1,l,j+1,k+1) = (coef1 * Qin(i+1,l,j+1,k+1) + coef2 * Qout(i+1,l,j+1,k+1) - R(l)) * coef4_inv
     enddo
   end subroutine calc_step2_3
   
  
   !> CUDA Fortran kernel for 4th step of 4-4 Runge-Kutta
   !> Final RK4 Stage: Q^n+1 = Q^n - (1/6)·∑(R_ᵢ) where R_ᵢ indexed over 4 stages
-  attributes(global) subroutine calc_step4(nx, ny, nz, dx, dy, dz, E, F, G, Rs, Q)
-    integer, intent(in), value     :: nx                   !< number of grid points in x direction
-    integer, intent(in), value     :: ny                   !< number of grid points in y direction
-    integer, intent(in), value     :: nz                   !< number of grid points in z direction
-    real(8), intent(in), device    :: dx(nx-1)             !< grid size in x direction
-    real(8), intent(in), device    :: dy(ny-1)             !< grid size in y direction
-    real(8), intent(in), device    :: dz(nz-1)             !< grid size in z direction
-    real(8), intent(in), device    :: E(5,nx-1,ny-2,nz-2)  !< Flux in x direction
-    real(8), intent(in), device    :: F(5,nx-2,ny-1,nz-2)  !< Flux in y direction
-    real(8), intent(in), device    :: G(5,nx-2,ny-2,nz-1)  !< Flux in z direction
-    real(8), intent(inout), device :: Rs(5,nx-2,ny-2,nz-2) !< accumulated residuals from stages 1-3
-    real(8), intent(inout), device :: Q(5,nx,ny,nz)        !< Q^n on input, Q^n+1 on output
-    real(8) R, dtdydz, dtdzdx, dtdxdy, dx_next, E_curr, E_next
-    integer i, j, k, l, lane
-    integer(8) tmp_bits
+  attributes(global) subroutine calc_step4(nx, ny, nz, dtdxdy, dtdydz, dtdzdx, E, F, G, Rs, Q)
+    integer, intent(in), value                 :: nx                   !< number of grid points in x direction
+    integer, intent(in), value                 :: ny                   !< number of grid points in y direction
+    integer, intent(in), value                 :: nz                   !< number of grid points in z direction
+    real(8), intent(in), device, contiguous    :: dtdxdy(nx-2,ny-2)    !< dt * Sxy
+    real(8), intent(in), device, contiguous    :: dtdydz(ny-2,nz-2)    !< dt * Syz
+    real(8), intent(in), device, contiguous    :: dtdzdx(nx-2,nz-2)    !< dt * Szx
+    real(8), intent(in), device, contiguous    :: E(5,nx-1,ny-2,nz-2)  !< Flux in x direction
+    real(8), intent(in), device, contiguous    :: F(5,nx-2,ny-1,nz-2)  !< Flux in y direction
+    real(8), intent(in), device, contiguous    :: G(5,nx-2,ny-2,nz-1)  !< Flux in z direction
+    real(8), intent(inout), device, contiguous :: Rs(nx-2,5,ny-2,nz-2) !< accumulated residuals from stages 1-3
+    real(8), intent(inout), device, contiguous :: Q(nx,5,ny,nz)        !< Q^n on input, Q^n+1 on output
+    real(8) R(5), dtdxdy_tmp, dtdydz_tmp, dtdzdx_tmp
+    integer i, j, k, l
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z
     if (nx-2 < i .or. ny-2 < j .or. nz-2 < k) return
-    
-    ! ========== GPU Optimization: Warp Shuffle ==========
-    ! Efficient in-warp communication for adjacent element access
-    lane     = iand(threadIdx%x - 1, 31)                              ! Lane index in warp
-    tmp_bits = __shfl_down_sync(z'ffffffff', transfer(dx(i), 0_8), 1) ! Broadcast dx rightward
-    dx_next  = transfer(tmp_bits, 0.0_8)
-    if (lane == 31 .or. i == nx-2) then                               ! Last lane uses global memory
-      dx_next = dx(i+1)
-    endif
-    
-    ! ========== Compute Grid Jacobian Volumes ==========
-    ! Cell volume scaling consistent with stages 1-3
-    dtdydz = dt * 0.25d0 * (dy(j) + dy(j+1)) * (dz(k) + dz(k+1))
-    dtdzdx = dt * 0.25d0 * (dz(k) + dz(k+1)) * (dx(i) + dx_next)
-    dtdxdy = dt * 0.25d0 * (dx(i) + dx_next) * (dy(j) + dy(j+1))
-    
     ! ========== 4-4 RK Final Assembly ==========
     ! Compute 4th stage residual and accumulate with previous stages
     ! Final update: Q^(n+1) = Q^n - (one_sixth) * (R1 + 2*R2 + 2*R3 + R4)
     ! one_sixth ≈ 1/6 is the standard RK4 weight
+    dtdxdy_tmp = dtdxdy(i,j)
+    dtdydz_tmp = dtdydz(j,k)
+    dtdzdx_tmp = dtdzdx(i,k)
+    call calc_R(nx, ny, nz, i, j, k, dtdxdy_tmp, dtdydz_tmp, dtdzdx_tmp, E, F, G, R)
     do l = 1, 5 ! All conserved variables
-      E_curr   = E(l,i,j,k)
-      tmp_bits = __shfl_down_sync(z'ffffffff', transfer(E_curr, 0_8), 1) ! E(i+1) via shuffl
-      E_next   = transfer(tmp_bits, 0.0_8)
-      if (lane == 31 .or. i == nx-2) then
-        E_next = E(l,i+1,j,k) ! Global memory fallback
-      endif
-      ! Compute 4th stage flux divergence
-      R = dtdydz * (-E_curr     + E_next) &
-      & + dtdzdx * (-F(l,i,j,k) + F(l,i,j+1,k)) &
-      & + dtdxdy * (-G(l,i,j,k) + G(l,i,j,k+1))
       ! Accumulate 4th stage residual (not multiplied by coefficient yet)
-      Rs(l,i,j,k) = Rs(l,i,j,k) + R
+      R(l) = Rs(i,l,j,k) + R(l)
       ! Apply full RK4 update with (1/6) weighting to final solution
-      Q(l,i+1,j+1,k+1) = Q(l,i+1,j+1,k+1) - Rs(l,i,j,k) * one_sixth
+      Q(i+1,l,j+1,k+1) = Q(i+1,l,j+1,k+1) - R(l) * one_sixth
       ! Clear residual accumulator for next time step
-      Rs(l,i,j,k) = 0.d0
+      Rs(i,l,j,k) = 0.d0
     enddo
   end subroutine calc_step4
 end module calc_steps
+

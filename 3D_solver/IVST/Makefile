@@ -2,7 +2,7 @@ FC = mpif90
 
 subroutines = name:calc_tau_straight,calc_tau_cross,flux4
 
-OUTPUT_OPTIN = -cuda -acc -fast -Mchkptr -Minline=reshape,$(subroutines) -Minfo=accel,inline -Mchkptr -gpu=ptxinfo,rdc,lto -lnvhpcwrapnvtx 
+OUTPUT_OPTIN = -cuda -acc -fast -Mpreprocess -Mchkptr -Minline=reshape,$(subroutines) -Minfo=accel,inline -Mchkptr -gpu=ptxinfo,rdc,lto -lnvhpcwrapnvtx 
 
 .SUFFIXES : .f90
 
@@ -20,8 +20,12 @@ OBJ =	mod_globals.o \
       cpu_gpu_mpi.o \
       set_coordinate.o \
       calc_physical_quantities.o \
+      load_smem_visc2.o \
+      load_smem_visc4.o \
       calc_visc2.o \
       calc_visc4.o \
+      calc_visc4_internal.o \
+      calc_visc4_les_internal.o \
       calc_les.o \
       calc_hybrid.o \
       calc_muscl.o \
@@ -30,7 +34,9 @@ OBJ =	mod_globals.o \
       calc_slau_kernel.o \
       calc_slau_kernel_internal.o \
       calc_roe_kernel.o \
+      calc_roe_kernel_internal.o \
       calc_hybrid_kernel.o \
+      calc_hybrid_kernel_internal.o \
       calc_flux_base.o \
       calc_steps.o \
       calc_rescale.o \
@@ -52,20 +58,26 @@ mod_constant.o: mod_globals.mod
 set_bc_common.o: mod_globals.mod
 set.o: mod_globals.mod mod_constant.mod calc_para.mod set_bc_common.mod set_coordinate.mod
 calc_physical_quantities.o: mod_globals.mod mod_constant.mod
-calc_visc2.o: mod_globals.mod mod_constant.mod
-calc_visc4.o: mod_globals.mod mod_constant.mod
+load_smem_visc2.o: mod_globals.mod
+load_smem_visc4.o: mod_globals.mod mod_constant.mod
+calc_visc2.o: mod_globals.mod mod_constant.mod load_smem_visc2.mod
+calc_visc4.o: mod_globals.mod mod_constant.mod load_smem_visc4.mod calc_visc_me4_base.f90
+calc_visc4_internal.o: mod_globals.mod mod_constant.mod load_smem_visc4.mod calc_visc_me4_base.f90
+calc_visc4_les_internal.o: mod_globals.mod mod_constant.mod load_smem_visc4.mod calc_visc_me4_base.f90
 calc_muscl.o: mod_globals.mod
 calc_keep_kernel.o: mod_globals.mod calc_keep_3d.f90
 calc_keep_kernel_internal.o: mod_globals.mod calc_keep_3d.f90
 calc_slau_kernel.o: mod_globals.mod mod_constant.mod calc_muscl.mod calc_hybrid.mod calc_slau_3d.f90
 calc_slau_kernel_internal.o: mod_globals.mod mod_constant.mod calc_muscl.mod calc_hybrid.mod calc_slau_3d.f90
 calc_roe_kernel.o: mod_globals.mod mod_constant.mod calc_muscl.mod calc_hybrid.mod calc_roe_3d.f90
+calc_roe_kernel_internal.o: mod_globals.mod mod_constant.mod calc_muscl.mod calc_hybrid.mod calc_roe_3d.f90
 calc_hybrid_kernel.o: mod_globals.mod mod_constant.mod calc_keep_3d.f90 calc_muscl.mod calc_hybrid.mod calc_slau_3d.f90
-calc_flux_base.o: mod_globals.mod calc_physical_quantities.mod calc_hybrid.mod calc_visc2.mod calc_visc4.mod calc_les.mod set.mod calc_keep_kernel.mod calc_slau_kernel.mod calc_roe_kernel.mod calc_hybrid.mod
+calc_hybrid_kernel_internal.o: mod_globals.mod mod_constant.mod calc_muscl.mod calc_hybrid.mod calc_keep_3d.f90 calc_slau_3d.f90
+calc_flux_base.o: mod_globals.mod calc_physical_quantities.mod calc_hybrid.mod calc_visc2.mod calc_visc4.mod calc_visc4_internal.mod calc_visc4_les_internal.mod calc_les.mod set.mod calc_keep_kernel.mod calc_slau_kernel.mod calc_roe_kernel.mod calc_hybrid_kernel.mod calc_hybrid.mod
 calc_hybrid.o: mod_globals.mod
 calc_steps.o: mod_globals.mod
 calc_rescale.o: mod_globals.mod mod_constant.mod cpu_gpu_mpi.mod
-preprocess.o: mod_globals.mod print.mod
+preprocess.o: mod_globals.mod print.mod calc_flux_base.mod
 calc_time_dev.o: mod_globals.mod preprocess.mod set.mod calc_flux_base.mod calc_steps.mod calc_rescale.mod calc_para.mod print.mod
 print.o: mod_globals.mod
 main.o: main.f90 mod_globals.mod set_coordinate.mod set.mod calc_time_dev.mod

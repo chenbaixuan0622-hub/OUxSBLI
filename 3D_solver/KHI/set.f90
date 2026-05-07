@@ -17,27 +17,33 @@ contains
     use mod_globals, only : id_accuracy, u1, rho1, u2, rho2, p, amp
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
-    real(8), intent(out) :: Q(5,nx,ny,nz)
+    real(8), intent(out) :: Q(nx,5,ny,nz)
     integer i, j, k, offset
     real(8) :: v, w, pi = acos(-1.d0)
-    offset = 3
+    if (kind(id_accuracy) == 2) then
+      offset = 1
+    elseif (kind(id_accuracy) == 4) then
+      offset = 2
+    elseif (kind(id_accuracy) == 8) then
+      offset = 3
+    endif
     do k = 1+offset, nz-offset
-      w = amp * sin(2.d0 * pi * z(k) / Lz)
+      w = amp * u1 * sin(2.d0 * pi * z(k) / Lz)
       do j = 1+offset, ny-offset
         do i = 1+offset, nx-offset
-          v = amp * sin(2.d0 * pi * x(i) / Lx)
+          v = amp * u1 * sin(2.d0 * pi * x(i) / Lx)
           if (y(j) > 0.75d0 * Lx .or. y(j) < 0.25d0 * Lx) then
-            Q(1,i,j,k) = rho1
-            Q(2,i,j,k) = rho1 * u1
-            Q(3,i,j,k) = rho1 * v
-            Q(4,i,j,k) = rho1 * w
-            Q(5,i,j,k) = p / (gamma - 1.d0) + 0.5d0 * rho1 * (u1**2 + v**2 + w**2)
+            Q(i,1,j,k) = rho1
+            Q(i,2,j,k) = rho1 * u1
+            Q(i,3,j,k) = rho1 * v
+            Q(i,4,j,k) = rho1 * w
+            Q(i,5,j,k) = p / (gamma - 1.d0) + 0.5d0 * rho1 * (u1**2 + v**2 + w**2)
           else
-            Q(1,i,j,k) = rho2
-            Q(2,i,j,k) = rho2 * u2
-            Q(3,i,j,k) = rho2 * v
-            Q(4,i,j,k) = rho2 * w
-            Q(5,i,j,k) = p / (gamma - 1.d0) + 0.5d0 * rho2 * (u2**2 + v**2 + w**2)
+            Q(i,1,j,k) = rho2
+            Q(i,2,j,k) = rho2 * u2
+            Q(i,3,j,k) = rho2 * v
+            Q(i,4,j,k) = rho2 * w
+            Q(i,5,j,k) = p / (gamma - 1.d0) + 0.5d0 * rho2 * (u2**2 + v**2 + w**2)
           endif
     enddo;enddo;enddo
     call set_bc_cyclic(id_accuracy, nx, ny, nz, Q)
@@ -48,7 +54,7 @@ contains
     use mod_globals, only : id_accuracy
     integer, intent(in), value            :: myrank, nx, ny, nz
     real(8), intent(in), device           :: Jacobian(nx,ny,nz)
-    real(8), intent(inout), device        :: Q(5,nx,ny,nz)
+    real(8), intent(inout), device        :: Q(nx,5,ny,nz)
     real(8), intent(in), device, optional :: Qre(ny*(nz-6)*5)
     call set_bc_cyclic(id_accuracy, nx, ny, nz, Q)
   end subroutine set_bc

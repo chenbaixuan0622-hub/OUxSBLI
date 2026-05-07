@@ -22,10 +22,11 @@ contains
   include 'calc_roe_3d.f90'
 
   attributes(global) subroutine calc_roe_x6(id_accuracy, nx, ny, nz, Q, sensor, E)
-    integer(kind=8), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: E(5,nx-1,ny-2,nz-2)
+    integer(kind=8), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(-1:threadsE%x+3,threadsE%y,threadsE%z), shared :: rho,  u,  v,  w,  p
     real(8), dimension(   threadsE%x,  threadsE%y,threadsE%z), shared :: rhor, ur, vr, wr, pr
@@ -38,19 +39,20 @@ contains
     do ii = it-2, threadsE%x+3, blockDim%x
       i = i_base + ii
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-        rho(ii,jt,kt) = Q(1,i,j,k)
-          u(ii,jt,kt) = Q(2,i,j,k)
-          v(ii,jt,kt) = Q(3,i,j,k)
-          w(ii,jt,kt) = Q(4,i,j,k)
-          p(ii,jt,kt) = Q(5,i,j,k)
+        rho(ii,jt,kt) = Q(i,1,j,k)
+          u(ii,jt,kt) = Q(i,2,j,k)
+          v(ii,jt,kt) = Q(i,3,j,k)
+          w(ii,jt,kt) = Q(i,4,j,k)
+          p(ii,jt,kt) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()
     i = (blockIdx%x-1)*blockDim%x + it
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     block
-      real(8) rhol, ul, vl, wl, pl, fdx
-      fdx = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
+      real(sp) fdx
+      real(8) rhol, ul, vl, wl, pl
+      fdx = 0.5_sp * (sensor(i,j,k) + sensor(i+1,j,k))
       if (3 <= i .and. i <= nx-3) then
         call delta6(fdx, rho(it-2:it+3,jt,kt), rhol, rhor(it,jt,kt))
         call delta6(fdx,   u(it-2:it+3,jt,kt),   ul,   ur(it,jt,kt))
@@ -84,10 +86,11 @@ contains
 
 
   attributes(global) subroutine calc_roe_y6(id_accuracy, nx, ny, nz, Q, sensor, F)
-    integer(kind=8), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: F(5,nx-2,ny-1,nz-2)
+    integer(kind=8), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(-1:threadsF%y+3,threadsF%x,threadsF%z), shared :: rho,  u,  v,  w,  p
     real(8), dimension(   threadsF%y,  threadsF%x,threadsF%z), shared :: rhor, ur, vr, wr, pr
@@ -100,19 +103,20 @@ contains
     do jj = jt-2, threadsF%y+3, blockDim%y
       j = j_base + jj
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-        rho(jj,it,kt) = Q(1,i,j,k)
-          u(jj,it,kt) = Q(2,i,j,k)
-          v(jj,it,kt) = Q(3,i,j,k)
-          w(jj,it,kt) = Q(4,i,j,k)
-          p(jj,it,kt) = Q(5,i,j,k)
+        rho(jj,it,kt) = Q(i,1,j,k)
+          u(jj,it,kt) = Q(i,2,j,k)
+          v(jj,it,kt) = Q(i,3,j,k)
+          w(jj,it,kt) = Q(i,4,j,k)
+          p(jj,it,kt) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()
     j = (blockIdx%y-1)*blockDim%y + jt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     block
-      real(8) rhol, ul, vl, wl, pl, fdy
-      fdy = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
+      real(sp) fdy
+      real(8) rhol, ul, vl, wl, pl
+      fdy = 0.5_sp * (sensor(i,j,k) + sensor(i,j+1,k))
       if (3 <= j .and. j <= ny-3 .and. 8 <= kind(id_accuracy)) then
         call delta6(fdy, rho(jt-2:jt+3,it,kt), rhol, rhor(jt,it,kt))
         call delta6(fdy,   u(jt-2:jt+3,it,kt),   ul,   ur(jt,it,kt))
@@ -146,10 +150,11 @@ contains
 
 
   attributes(global) subroutine calc_roe_z6(id_accuracy, nx, ny, nz, Q, sensor, G)
-    integer(kind=8), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: G(5,nx-2,ny-2,nz-1)
+    integer(kind=8), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(-1:threadsG%z+3,threadsG%y,threadsG%x), shared :: rho,  u,  v,  w,  p
     real(8), dimension(   threadsG%z,  threadsG%y,threadsG%x), shared :: rhor, ur, vr, wr, pr
@@ -162,19 +167,20 @@ contains
     do kk = kt-2, threadsG%z+3, blockDim%z
       k = k_base + kk
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-        rho(kk,jt,it) = Q(1,i,j,k)
-          u(kk,jt,it) = Q(2,i,j,k)
-          v(kk,jt,it) = Q(3,i,j,k)
-          w(kk,jt,it) = Q(4,i,j,k)
-          p(kk,jt,it) = Q(5,i,j,k)
+        rho(kk,jt,it) = Q(i,1,j,k)
+          u(kk,jt,it) = Q(i,2,j,k)
+          v(kk,jt,it) = Q(i,3,j,k)
+          w(kk,jt,it) = Q(i,4,j,k)
+          p(kk,jt,it) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()
     k = (blockIdx%z-1)*blockDim%z + kt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     block
-      real(8) rhol, ul, vl, wl, pl, fdz
-      fdz = 0.5d0 * (sensor(i,j,k) + sensor(i,j,k+1))
+      real(sp) fdz
+      real(8) rhol, ul, vl, wl, pl
+      fdz = 0.5_sp * (sensor(i,j,k) + sensor(i,j,k+1))
       if (3 <= k .and. k <= nz-3 .and. 8 <= kind(id_accuracy)) then
         call delta6(fdz, rho(kt-2:kt+3,jt,it), rhol, rhor(kt,jt,it))
         call delta6(fdz,   u(kt-2:kt+3,jt,it),   ul,   ur(kt,jt,it))
@@ -208,10 +214,11 @@ contains
 
 
   attributes(global) subroutine calc_roe_x4(id_accuracy, nx, ny, nz, Q, sensor, E)
-    integer(kind=4), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: E(5,nx-1,ny-2,nz-2)
+    integer(kind=4), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(0:threadsE%x+2,threadsE%y,threadsE%z), shared :: rho,  u,  v,  w,  p
     real(8), dimension(  threadsE%x,  threadsE%y,threadsE%z), shared :: rhor, ur, vr, wr, pr
@@ -224,19 +231,20 @@ contains
     do ii = it-1, threadsE%x+2, blockDim%x
       i = i_base + ii
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-        rho(ii,jt,kt) = Q(1,i,j,k)
-          u(ii,jt,kt) = Q(2,i,j,k)
-          v(ii,jt,kt) = Q(3,i,j,k)
-          w(ii,jt,kt) = Q(4,i,j,k)
-          p(ii,jt,kt) = Q(5,i,j,k)
+        rho(ii,jt,kt) = Q(i,1,j,k)
+          u(ii,jt,kt) = Q(i,2,j,k)
+          v(ii,jt,kt) = Q(i,3,j,k)
+          w(ii,jt,kt) = Q(i,4,j,k)
+          p(ii,jt,kt) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()
     i = (blockIdx%x-1)*blockDim%x + it
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     block
-      real(8) rhol, ul, vl, wl, pl, fdx
-      fdx = 0.5d0 * (sensor(i,j,k) + sensor(i+1,j,k))
+      real(sp) fdx
+      real(8) rhol, ul, vl, wl, pl
+      fdx = 0.5_sp * (sensor(i,j,k) + sensor(i+1,j,k))
       if (2 <= i .and. i <= nx-2) then
         call delta4(fdx, rho(it-1:it+2,jt,kt), rhol, rhor(it,jt,kt))
         call delta4(fdx,   u(it-1:it+2,jt,kt),   ul,   ur(it,jt,kt))
@@ -264,10 +272,11 @@ contains
 
 
   attributes(global) subroutine calc_roe_y4(id_accuracy, nx, ny, nz, Q, sensor, F)
-    integer(kind=4), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: F(5,nx-2,ny-1,nz-2)
+    integer(kind=4), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(0:threadsF%y+2,threadsF%x,threadsF%z), shared :: rho,  u,  v,  w,  p
     real(8), dimension(  threadsF%y+2,threadsF%x,threadsF%z), shared :: rhor, ur, vr, wr, pr
@@ -280,19 +289,20 @@ contains
     do jj = jt-1, threadsF%y+2, blockDim%y
       j = j_base + jj
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-        rho(jj,it,kt) = Q(1,i,j,k)
-          u(jj,it,kt) = Q(2,i,j,k)
-          v(jj,it,kt) = Q(3,i,j,k)
-          w(jj,it,kt) = Q(4,i,j,k)
-          p(jj,it,kt) = Q(5,i,j,k)
+        rho(jj,it,kt) = Q(i,1,j,k)
+          u(jj,it,kt) = Q(i,2,j,k)
+          v(jj,it,kt) = Q(i,3,j,k)
+          w(jj,it,kt) = Q(i,4,j,k)
+          p(jj,it,kt) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()
     j = (blockIdx%y-1)*blockDim%y + jt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     block
-      real(8) rhol, ul, vl, wl, pl, fdy
-      fdy = 0.5d0 * (sensor(i,j,k) + sensor(i,j+1,k))
+      real(sp) fdy
+      real(8) rhol, ul, vl, wl, pl
+      fdy = 0.5_sp * (sensor(i,j,k) + sensor(i,j+1,k))
       if (2 <= j .and. j <= ny-2) then
         call delta4(fdy, rho(jt-1:jt+2,it,kt), rhol, rhor(jt,it,kt))
         call delta4(fdy,   u(jt-1:jt+2,it,kt),   ul,   ur(jt,it,kt))
@@ -320,10 +330,11 @@ contains
 
 
   attributes(global) subroutine calc_roe_z4(id_accuracy, nx, ny, nz, Q, sensor, G)
-    integer(kind=4), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: G(5,nx-2,ny-2,nz-1)
+    integer(kind=4), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(0:threadsG%z+2,threadsG%y,threadsG%x), shared :: rho,  u,  v,  w,  p
     real(8), dimension(  threadsG%z+2,threadsG%y,threadsG%x), shared :: rhor, ur, vr, wr, pr
@@ -336,18 +347,20 @@ contains
     do kk = kt-1, threadsG%z+2, blockDim%z
       k = k_base + kk
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-        rho(kk,jt,it) = Q(1,i,j,k)
-          u(kk,jt,it) = Q(2,i,j,k)
-          v(kk,jt,it) = Q(3,i,j,k)
-          w(kk,jt,it) = Q(4,i,j,k)
-          p(kk,jt,it) = Q(5,i,j,k)
+        rho(kk,jt,it) = Q(i,1,j,k)
+          u(kk,jt,it) = Q(i,2,j,k)
+          v(kk,jt,it) = Q(i,3,j,k)
+          w(kk,jt,it) = Q(i,4,j,k)
+          p(kk,jt,it) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()
     k = (blockIdx%z-1)*blockDim%z + kt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     block
-      real(8) rhol, ul, vl, wl, pl, fdz
+      real(sp) fdz
+      real(8) rhol, ul, vl, wl, pl
+      fdz = 0.5_sp * (sensor(i,j,k) + sensor(i,j,k+1))
       if (2 <= k .and. k <= nz-2) then
         call delta4(fdz, rho(kt-1:kt+2,jt,it), rhol, rhor(kt,jt,it))
         call delta4(fdz,   u(kt-1:kt+2,jt,it),   ul,   ur(kt,jt,it))
@@ -375,10 +388,11 @@ contains
 
 
   attributes(global) subroutine calc_roe_x2(id_accuracy, nx, ny, nz, Q, sensor, E)
-    integer(kind=2), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: E(5,nx-1,ny-2,nz-2)
+    integer(kind=2), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt, ii, i_base
     real(8), dimension(threadsE%x+1,threadsE%y,threadsE%z), shared :: rho, u, v, w, p
     it = threadIdx%x
@@ -390,11 +404,11 @@ contains
     do ii = it, threadsE%x+1, blockDim%x
       i = i_base + ii
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-        rho(ii,jt,kt) = Q(1,i,j,k)
-          u(ii,jt,kt) = Q(2,i,j,k)
-          v(ii,jt,kt) = Q(3,i,j,k)
-          w(ii,jt,kt) = Q(4,i,j,k)
-          p(ii,jt,kt) = Q(5,i,j,k)
+        rho(ii,jt,kt) = Q(i,1,j,k)
+          u(ii,jt,kt) = Q(i,2,j,k)
+          v(ii,jt,kt) = Q(i,3,j,k)
+          w(ii,jt,kt) = Q(i,4,j,k)
+          p(ii,jt,kt) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()
@@ -407,10 +421,11 @@ contains
 
 
   attributes(global) subroutine calc_roe_y2(id_accuracy, nx, ny, nz, Q, sensor, F)
-    integer(kind=2), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: F(5,nx-2,ny-1,nz-2)
+    integer(kind=2), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt, jj, j_base
     real(8), dimension(threadsF%y+1,threadsF%x,threadsF%z), shared :: rho, u, v, w, p
     it = threadIdx%x
@@ -422,11 +437,11 @@ contains
     do jj = jt, threadsF%y+1, blockDim%y
       j = j_base + jj
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-        rho(jj,it,kt) = Q(1,i,j,k)
-          u(jj,it,kt) = Q(2,i,j,k)
-          v(jj,it,kt) = Q(3,i,j,k)
-          w(jj,it,kt) = Q(4,i,j,k)
-          p(jj,it,kt) = Q(5,i,j,k)
+        rho(jj,it,kt) = Q(i,1,j,k)
+          u(jj,it,kt) = Q(i,2,j,k)
+          v(jj,it,kt) = Q(i,3,j,k)
+          w(jj,it,kt) = Q(i,4,j,k)
+          p(jj,it,kt) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()
@@ -439,10 +454,11 @@ contains
 
 
   attributes(global) subroutine calc_roe_z2(id_accuracy, nx, ny, nz, Q, sensor, G)
-    integer(kind=2), intent(in), value :: id_accuracy
-    integer, intent(in), value         :: nx, ny, nz
-    real(8), intent(in), device        :: Q(5,nx,ny,nz), sensor(nx,ny,nz)
-    real(8), intent(out), device       :: G(5,nx-2,ny-2,nz-1)
+    integer(kind=2), intent(in), value        :: id_accuracy
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt, kk, k_base
     real(8), dimension(threadsG%z+1,threadsG%y,threadsG%x), shared :: rho, u, v, w, p
     it = threadIdx%x
@@ -454,11 +470,11 @@ contains
     do kk = kt, threadsG%z+1, blockDim%z
       k = k_base + kk
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-        rho(kk,jt,it) = Q(1,i,j,k)
-          u(kk,jt,it) = Q(2,i,j,k)
-          v(kk,jt,it) = Q(3,i,j,k)
-          w(kk,jt,it) = Q(4,i,j,k)
-          p(kk,jt,it) = Q(5,i,j,k)
+        rho(kk,jt,it) = Q(i,1,j,k)
+          u(kk,jt,it) = Q(i,2,j,k)
+          v(kk,jt,it) = Q(i,3,j,k)
+          w(kk,jt,it) = Q(i,4,j,k)
+          p(kk,jt,it) = Q(i,5,j,k)
       endif
     enddo
     call syncthreads()

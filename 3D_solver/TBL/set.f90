@@ -47,7 +47,7 @@ contains
   subroutine set_init(myrank, nx, ny, nz, xs, ys, zs, Q)
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: xs(nx), ys(ny), zs(nz)
-    real(8), intent(out) :: Q(5,nx,ny,nz)
+    real(8), intent(out) :: Q(nx,5,ny,nz)
     call set_init_tbl(nx, ny, nz, xs, ys, zs, 0.1d0, 0.75d0*blt, blt, u0, p0, T0, M0, Q)
   end subroutine set_init
 
@@ -55,7 +55,7 @@ contains
   subroutine set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
     integer, intent(in), value     :: myrank, nx, ny, nz
     real(8), intent(in), device    :: Jacobian(nx,ny)
-    real(8), intent(inout), device :: QJ(5,nx,ny,nz) ! Q / Jacobian
+    real(8), intent(inout), device :: QJ(nx,5,ny,nz) ! Q / Jacobian
     real(8), intent(in), device, optional :: Qre(ny*(nz-6)*5)
     integer i, j, k, l, ireq, ierr, istat(MPI_STATUS_SIZE)
     real(8) :: p_wall
@@ -74,9 +74,9 @@ contains
         do j = 2, ny-1
           do l = 1, 5
             ! inlet
-            QJ(l,1,j,k+3)  = Qre(ny*5*(k-1)+5*(j-1)+l)
+            QJ(1,l,j,k+3)  = Qre(ny*5*(k-1)+5*(j-1)+l)
             ! outlet
-            QJ(l,nx,j,k+3) = QJ(l,nx-1,j,k+3)
+            QJ(nx,l,j,k+3) = QJ(nx-1,l,j,k+3)
       enddo;enddo;enddo
     else
       !$cuf kernel do(2)<<<*,*>>>
@@ -84,13 +84,13 @@ contains
         do j = 2, ny-1
           do l = 1, 5
             ! inlet
-            QJ(l,1,j,k) = QJ(l,nx-5,j,k)
-            QJ(l,2,j,k) = QJ(l,nx-4,j,k)
-            QJ(l,3,j,k) = QJ(l,nx-3,j,k)
+            QJ(1,l,j,k) = QJ(nx-5,l,j,k)
+            QJ(2,l,j,k) = QJ(nx-4,l,j,k)
+            QJ(3,l,j,k) = QJ(nx-3,l,j,k)
             ! outlet
-            QJ(l,nx-2,j,k) = QJ(l,4,j,k)
-            QJ(l,nx-1,j,k) = QJ(l,5,j,k)
-            QJ(l,nx,j,k)   = QJ(l,6,j,k)
+            QJ(nx-2,l,j,k) = QJ(4,l,j,k)
+            QJ(nx-1,l,j,k) = QJ(5,l,j,k)
+            QJ(nx,l,j,k)   = QJ(6,l,j,k)
       enddo;enddo;enddo
     endif
 
@@ -100,29 +100,29 @@ contains
         ! top
         ! Riemann invariants
         Jacobian_tmp = 1.d0 / Jacobian(i,ny)
-        pin   = gamma_1 * (QJ(5,i,ny-1,k) - 0.5d0 * (QJ(2,i,ny-1,k)**2 + QJ(3,i,ny-1,k)**2 + QJ(4,i,ny-1,k)**2) &
-                / QJ(1,i,ny-1,k)) * Jacobian(i,ny-1)
-        rhoin = QJ(1,i,ny-1,k) * Jacobian(i,ny-1)
+        pin   = gamma_1 * (QJ(i,5,ny-1,k) - 0.5d0 * (QJ(i,2,ny-1,k)**2 + QJ(i,3,ny-1,k)**2 + QJ(i,4,ny-1,k)**2) &
+                / QJ(i,1,ny-1,k)) * Jacobian(i,ny-1)
+        rhoin = QJ(i,1,ny-1,k) * Jacobian(i,ny-1)
         cin   = sqrt(gamma * pin / rhoin)
-        vin   = QJ(3,i,ny-1,k) / QJ(1,i,ny-1,k)
+        vin   = QJ(i,3,ny-1,k) / QJ(i,1,ny-1,k)
         Rp   = vin + 2.d0 * cin * over_gamma_1
         Rm   = v0  - 2.d0 * c0  * over_gamma_1
         vb   = 0.5d0 * (Rp + Rm)
         cb   = 0.25d0 * gamma_1 * (Rp - Rm)
         rhob = (cb * over_c0)**(2.d0 * over_gamma_1) * rho0
         pb   = (rhob * cb**2) * over_gamma
-        QJ(1,i,ny,k) = rhob * Jacobian_tmp
-        QJ(2,i,ny,k) = rhob * u0 * Jacobian_tmp
-        QJ(3,i,ny,k) = rhob * vb * Jacobian_tmp
-        QJ(4,i,ny,k) = 0.d0
-        QJ(5,i,ny,k) = (pb * over_gamma_1 + 0.5d0 * rhob * (u0**2 + vb**2)) * Jacobian_tmp
+        QJ(i,1,ny,k) = rhob * Jacobian_tmp
+        QJ(i,2,ny,k) = rhob * u0 * Jacobian_tmp
+        QJ(i,3,ny,k) = rhob * vb * Jacobian_tmp
+        QJ(i,4,ny,k) = 0.d0
+        QJ(i,5,ny,k) = (pb * over_gamma_1 + 0.5d0 * rhob * (u0**2 + vb**2)) * Jacobian_tmp
         ! NoSlip
-        QJ(1,i,1,k) = QJ(1,i,2,k)
-        QJ(2,i,1,k) = 0.d0
-        QJ(3,i,1,k) = 0.d0
-        QJ(4,i,1,k) = 0.d0
-        p_wall = gamma_1 * (QJ(5,i,2,k) - 0.5d0 * (QJ(2,i,2,k)**2 + QJ(3,i,2,k)**2 + QJ(4,i,2,k)**2) / QJ(1,i,2,k))
-        QJ(5,i,1,k) = p_wall * over_gamma_1
+        QJ(i,1,1,k) = QJ(i,1,2,k)
+        QJ(i,2,1,k) = 0.d0
+        QJ(i,3,1,k) = 0.d0
+        QJ(i,4,1,k) = 0.d0
+        p_wall = gamma_1 * (QJ(i,5,2,k) - 0.5d0 * (QJ(i,2,2,k)**2 + QJ(i,3,2,k)**2 + QJ(i,4,2,k)**2) / QJ(i,1,2,k))
+        QJ(i,5,1,k) = p_wall * over_gamma_1
     enddo;enddo
 
     ! cyclic
@@ -130,12 +130,12 @@ contains
     do j = 1, ny
       do i = 1, nx
         do l = 1, 5
-          QJ(l,i,j,1) = QJ(l,i,j,nz-5)
-          QJ(l,i,j,2) = QJ(l,i,j,nz-4)
-          QJ(l,i,j,3) = QJ(l,i,j,nz-3)
-          QJ(l,i,j,nz-2) = QJ(l,i,j,4)
-          QJ(l,i,j,nz-1) = QJ(l,i,j,5)
-          QJ(l,i,j,nz)   = QJ(l,i,j,6)
+          QJ(i,l,j,1) = QJ(i,l,j,nz-5)
+          QJ(i,l,j,2) = QJ(i,l,j,nz-4)
+          QJ(i,l,j,3) = QJ(i,l,j,nz-3)
+          QJ(i,l,j,nz-2) = QJ(i,l,j,4)
+          QJ(i,l,j,nz-1) = QJ(i,l,j,5)
+          QJ(i,l,j,nz)   = QJ(i,l,j,6)
     enddo;enddo;enddo
   end subroutine set_bc
 

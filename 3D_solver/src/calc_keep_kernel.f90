@@ -33,12 +33,12 @@ contains
   attributes(global) subroutine calc_keep_x6(id_accuracy, nx, ny, nz, Q, T, E)
     use mod_constant, only : Normal_x
     integer(8), intent(in), value :: id_accuracy         !< ID for accuracy, 8 means 6th-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer ii, i_base, idx, offset_yz
@@ -46,6 +46,8 @@ contains
     integer, parameter :: sy = threadsE%y     !< tile size in y direction
     integer, parameter :: sz = threadsE%z     !< tile size in z direction
     real(8), dimension(-1:sx*sy*sz-2), shared :: rho, u, v, w, p, tmp
+    integer(kind=4) id_accuracy4
+    integer(kind=2) id_accuracy2
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -57,9 +59,9 @@ contains
       i = i_base + ii
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = ii + offset_yz
-        rho(idx) = Q(1,i,j,k);   u(idx) = Q(2,i,j,k)
-          v(idx) = Q(3,i,j,k);   w(idx) = Q(4,i,j,k)
-          p(idx) = Q(5,i,j,k); tmp(idx) =   T(i,j,k)
+        rho(idx) = Q(i,1,j,k);   u(idx) = Q(i,2,j,k)
+          v(idx) = Q(i,3,j,k);   w(idx) = Q(i,4,j,k)
+          p(idx) = Q(i,5,j,k); tmp(idx) =   T(i,j,k)
       endif
     enddo
     call syncthreads()
@@ -74,13 +76,13 @@ contains
                              uu(idx-2:idx+3), p(idx-2:idx+3), &
                             tmp(idx-2:idx+3), Normal_x)
     elseif (2 <= i .and. i <= nx-2) then
-      E(:,i,j-1,k-1) = KEEP(id_accuracy, & 
+      E(:,i,j-1,k-1) = KEEP(id_accuracy4, & 
                             rho(idx-1:idx+2), u(idx-1:idx+2), &
                               v(idx-1:idx+2), w(idx-1:idx+2), &
                              uu(idx-1:idx+2), p(idx-1:idx+2), &
                             tmp(idx-1:idx+2), Normal_x)
     else
-      E(:,i,j-1,k-1) = KEEP(id_accuracy, &
+      E(:,i,j-1,k-1) = KEEP(id_accuracy2, &
                             rho(idx:idx+1), u(idx:idx+1), &
                               v(idx:idx+1), w(idx:idx+1), &
                              uu(idx:idx+1), p(idx:idx+1), &
@@ -94,12 +96,12 @@ contains
   attributes(global) subroutine calc_keep_y6(id_accuracy, nx, ny, nz, Q, T, F)
     use mod_constant, only : Normal_y
     integer(8), intent(in), value :: id_accuracy         !< ID for accuracy, 8 means 6th-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer jj, j_base, idx, offset_xz
@@ -107,6 +109,8 @@ contains
     integer, parameter :: sy = threadsF%y + 5 !< tile size in y direction
     integer, parameter :: sz = threadsF%z     !< tile size in z direction
     real(8), dimension(-1:sx*sy*sz-2), shared :: rho, u, v, w, p, tmp
+    integer(kind=4) id_accuracy4
+    integer(kind=2) id_accuracy2
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -118,9 +122,9 @@ contains
       j = j_base + jj
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = jj + offset_xz
-        rho(idx) = Q(1,i,j,k);   u(idx) = Q(2,i,j,k)
-          v(idx) = Q(3,i,j,k);   w(idx) = Q(4,i,j,k)
-          p(idx) = Q(5,i,j,k); tmp(idx) =   T(i,j,k)
+        rho(idx) = Q(i,1,j,k);   u(idx) = Q(i,2,j,k)
+          v(idx) = Q(i,3,j,k);   w(idx) = Q(i,4,j,k)
+          p(idx) = Q(i,5,j,k); tmp(idx) =   T(i,j,k)
       endif
     enddo
     call syncthreads()
@@ -135,13 +139,13 @@ contains
                              vv(idx-2:idx+3), p(idx-2:idx+3), &
                             tmp(idx-2:idx+3), Normal_y)
     elseif (2 <= j .and. j <= ny-2) then
-      F(:,i-1,j,k-1) = KEEP(id_accuracy, &
+      F(:,i-1,j,k-1) = KEEP(id_accuracy4, &
                             rho(idx-1:idx+2), u(idx-1:idx+2), &
                               v(idx-1:idx+2), w(idx-1:idx+2), &
                              vv(idx-1:idx+2), p(idx-1:idx+2), &
                             tmp(idx-1:idx+2), Normal_y)
     else
-      F(:,i-1,j,k-1) = KEEP(id_accuracy, &
+      F(:,i-1,j,k-1) = KEEP(id_accuracy2, &
                             rho(idx:idx+1), u(idx:idx+1), &
                               v(idx:idx+1), w(idx:idx+1), &
                              vv(idx:idx+1), p(idx:idx+1), &
@@ -155,12 +159,12 @@ contains
   attributes(global) subroutine calc_keep_z6(id_accuracy, nx, ny, nz, Q, T, G)
     use mod_constant, only : Normal_z
     integer(8), intent(in), value :: id_accuracy         !< ID for accuracy, 8 means 6th-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer kk, k_base, idx, offset_xy
@@ -168,6 +172,8 @@ contains
     integer, parameter :: sy = threadsG%y     !< tile size in y direction
     integer, parameter :: sz = threadsG%z + 5 !< tile size in z direction
     real(8), dimension(-1:sx*sy*sz-2), shared :: rho, u, v, w, p, tmp
+    integer(kind=4) id_accuracy4
+    integer(kind=2) id_accuracy2
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -179,9 +185,9 @@ contains
       k = k_base + kk
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = kk + offset_xy
-        rho(idx) = Q(1,i,j,k);   u(idx) = Q(2,i,j,k)
-          v(idx) = Q(3,i,j,k);   w(idx) = Q(4,i,j,k)
-          p(idx) = Q(5,i,j,k); tmp(idx) =   T(i,j,k)
+        rho(idx) = Q(i,1,j,k);   u(idx) = Q(i,2,j,k)
+          v(idx) = Q(i,3,j,k);   w(idx) = Q(i,4,j,k)
+          p(idx) = Q(i,5,j,k); tmp(idx) =   T(i,j,k)
       endif
     enddo
     call syncthreads()
@@ -196,13 +202,13 @@ contains
                              ww(idx-2:idx+3), p(idx-2:idx+3), &
                             tmp(idx-2:idx+3), Normal_z)
     elseif (2 <= k .and. k <= nz-2) then
-      G(:,i-1,j-1,k) = KEEP(id_accuracy, &
+      G(:,i-1,j-1,k) = KEEP(id_accuracy4, &
                             rho(idx-1:idx+2), u(idx-1:idx+2), &
                               v(idx-1:idx+2), w(idx-1:idx+2), &
                              ww(idx-1:idx+2), p(idx-1:idx+2), &
                             tmp(idx-1:idx+2), Normal_z)
     else
-      G(:,i-1,j-1,k) = KEEP(id_accuracy, &
+      G(:,i-1,j-1,k) = KEEP(id_accuracy2, &
                             rho(idx:idx+1), u(idx:idx+1), &
                               v(idx:idx+1), w(idx:idx+1), &
                              ww(idx:idx+1), p(idx:idx+1), &
@@ -216,12 +222,12 @@ contains
   attributes(global) subroutine calc_keep_x4(id_accuracy, nx, ny, nz, Q, T, E)
     use mod_constant, only : Normal_x
     integer(4), intent(in), value :: id_accuracy         !< ID for accuracy, 4 means 4th-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer ii, i_base, idx, offset_yz
@@ -229,6 +235,7 @@ contains
     integer, parameter :: sy = threadsE%y     !< tile size in y direction
     integer, parameter :: sz = threadsE%z     !< tile size in z direction
     real(8), dimension(0:sx*sy*sz-1), shared :: rho, u, v, w, p, tmp
+    integer(kind=2) id_accuracy2
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -240,9 +247,9 @@ contains
       i = i_base + ii
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = ii + offset_yz
-        rho(idx) = Q(1,i,j,k);   u(idx) = Q(2,i,j,k)
-          v(idx) = Q(3,i,j,k);   w(idx) = Q(4,i,j,k)
-          p(idx) = Q(5,i,j,k); tmp(idx) =   T(i,j,k)
+        rho(idx) = Q(i,1,j,k);   u(idx) = Q(i,2,j,k)
+          v(idx) = Q(i,3,j,k);   w(idx) = Q(i,4,j,k)
+          p(idx) = Q(i,5,j,k); tmp(idx) =   T(i,j,k)
       endif
     enddo
     call syncthreads()
@@ -257,7 +264,7 @@ contains
                              uu(idx-1:idx+2), p(idx-1:idx+2), &
                             tmp(idx-1:idx+2), Normal_x)
     else
-      E(:,i,j-1,k-1) = KEEP(id_accuracy, &
+      E(:,i,j-1,k-1) = KEEP(id_accuracy2, &
                             rho(idx:idx+1), u(idx:idx+1), &
                               v(idx:idx+1), w(idx:idx+1), &
                              uu(idx:idx+1), p(idx:idx+1), &
@@ -271,12 +278,12 @@ contains
   attributes(global) subroutine calc_keep_y4(id_accuracy, nx, ny, nz, Q, T, F)
     use mod_constant, only : Normal_y
     integer(4), intent(in), value :: id_accuracy         !< ID for accuracy, 4 means 4th-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer jj, j_base, idx, offset_xz
@@ -284,6 +291,7 @@ contains
     integer, parameter :: sy = threadsF%y + 3 !< tile size in y direction
     integer, parameter :: sz = threadsF%z     !< tile size in z direction
     real(8), dimension(0:sx*sy*sz-1), shared :: rho, u, v, w, p, tmp
+    integer(kind=2) id_accuracy2
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -295,9 +303,9 @@ contains
       j = j_base + jj
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = jj + offset_xz
-        rho(idx) = Q(1,i,j,k);   u(idx) = Q(2,i,j,k)
-          v(idx) = Q(3,i,j,k);   w(idx) = Q(4,i,j,k)
-          p(idx) = Q(5,i,j,k); tmp(idx) =   T(i,j,k)
+        rho(idx) = Q(i,1,j,k);   u(idx) = Q(i,2,j,k)
+          v(idx) = Q(i,3,j,k);   w(idx) = Q(i,4,j,k)
+          p(idx) = Q(i,5,j,k); tmp(idx) =   T(i,j,k)
       endif
     enddo
     call syncthreads()
@@ -312,7 +320,7 @@ contains
                              vv(idx-1:idx+2), p(idx-1:idx+2), &
                             tmp(idx-1:idx+2), Normal_y)
     else
-      F(:,i-1,j,k-1) = KEEP(id_accuracy, &
+      F(:,i-1,j,k-1) = KEEP(id_accuracy2, &
                             rho(idx:idx+1), u(idx:idx+1), &
                               v(idx:idx+1), w(idx:idx+1), &
                              vv(idx:idx+1), p(idx:idx+1), &
@@ -326,12 +334,12 @@ contains
   attributes(global) subroutine calc_keep_z4(id_accuracy, nx, ny, nz, Q, T, G)
     use mod_constant, only : Normal_z
     integer(4), intent(in), value :: id_accuracy         !< ID for accuracy, 4 means 4th-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
     integer kk, k_base, idx, offset_xy
@@ -339,6 +347,7 @@ contains
     integer, parameter :: sy = threadsG%y     !< tile size in y direction
     integer, parameter :: sz = threadsG%z + 3 !< tile size in z direction
     real(8), dimension(0:sx*sy*sz-1), shared :: rho, u, v, w, p, tmp
+    integer(kind=2) id_accuracy2
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -350,9 +359,9 @@ contains
       k = k_base + kk
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = kk + offset_xy
-        rho(idx) = Q(1,i,j,k);   u(idx) = Q(2,i,j,k)
-          v(idx) = Q(3,i,j,k);   w(idx) = Q(4,i,j,k)
-          p(idx) = Q(5,i,j,k); tmp(idx) =   T(i,j,k)
+        rho(idx) = Q(i,1,j,k);   u(idx) = Q(i,2,j,k)
+          v(idx) = Q(i,3,j,k);   w(idx) = Q(i,4,j,k)
+          p(idx) = Q(i,5,j,k); tmp(idx) =   T(i,j,k)
       endif
     enddo
     call syncthreads()
@@ -367,7 +376,7 @@ contains
                              ww(idx-1:idx+2), p(idx-1:idx+2), &
                             tmp(idx-1:idx+2), Normal_z)
     else
-      G(:,i-1,j-1,k) = KEEP(id_accuracy, &
+      G(:,i-1,j-1,k) = KEEP(id_accuracy2, &
                             rho(idx:idx+1), u(idx:idx+1), &
                               v(idx:idx+1), w(idx:idx+1), &
                              ww(idx:idx+1), p(idx:idx+1), &
@@ -381,15 +390,15 @@ contains
   attributes(global) subroutine calc_keep_x2(id_accuracy, nx, ny, nz, Q, T, E)
     use mod_constant, only : Normal_x
     integer(2), intent(in), value :: id_accuracy         !< ID for accuracy, 2 means 2nd-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2) !< Flux in x direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
-    real(8), dimension(2), device :: rho, u, v, w, p, tmp
+    real(8), dimension(2) :: rho, u, v, w, p, tmp
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -397,9 +406,9 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    rho = Q(1,i:i+1,j,k); u   = Q(2,i:i+1,j,k)
-    v   = Q(3,i:i+1,j,k); w   = Q(4,i:i+1,j,k)
-    p   = Q(5,i:i+1,j,k); tmp = T(i:i+1,j,k)
+    rho = Q(i:i+1,1,j,k); u   = Q(i:i+1,2,j,k)
+    v   = Q(i:i+1,3,j,k); w   = Q(i:i+1,4,j,k)
+    p   = Q(i:i+1,5,j,k); tmp = T(i:i+1,j,k)
     E(:,i,j-1,k-1) = KEEP(id_accuracy, rho, u, v, w, u, p, tmp, Normal_x)
   end subroutine calc_keep_x2
 
@@ -408,15 +417,15 @@ contains
   attributes(global) subroutine calc_keep_y2(id_accuracy, nx, ny, nz, Q, T, F)
     use mod_constant, only : Normal_y
     integer(2), intent(in), value :: id_accuracy         !< ID for accuracy, 2 means 2nd-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2) !< Flux in y direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
-    real(8), dimension(2), device :: rho, u, v, w, p, tmp
+    real(8), dimension(2) :: rho, u, v, w, p, tmp
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -424,9 +433,9 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    rho = Q(1,i,j:j+1,k); u   = Q(2,i,j:j+1,k)
-    v   = Q(3,i,j:j+1,k); w   = Q(4,i,j:j+1,k)
-    p   = Q(5,i,j:j+1,k); tmp = T(i,j:j+1,k)
+    rho = Q(i,1,j:j+1,k); u   = Q(i,2,j:j+1,k)
+    v   = Q(i,3,j:j+1,k); w   = Q(i,4,j:j+1,k)
+    p   = Q(i,5,j:j+1,k); tmp = T(i,j:j+1,k)
     F(:,i-1,j,k-1) = KEEP(id_accuracy, rho, u, v, w, v, p, tmp, Normal_y)
   end subroutine calc_keep_y2
 
@@ -435,15 +444,15 @@ contains
   attributes(global) subroutine calc_keep_z2(id_accuracy, nx, ny, nz, Q, T, G)
     use mod_constant, only : Normal_z
     integer(2), intent(in), value :: id_accuracy         !< ID for accuracy, 2 means 2nd-order
-    integer, intent(in), value    :: nx                  !< number of grid points in x direction
-    integer, intent(in), value    :: ny                  !< number of grid points in y direction
-    integer, intent(in), value    :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device   :: Q(5,nx,ny,nz)       !< Q(rho, u, v, w, p)
-    real(8), intent(in), device   :: T(nx,ny,nz)         !< Temperature
-    real(8), intent(out), device  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
+    integer, intent(in), value                :: nx                  !< number of grid points in x direction
+    integer, intent(in), value                :: ny                  !< number of grid points in y direction
+    integer, intent(in), value                :: nz                  !< number of grid points in z direction
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)         !< Temperature
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1) !< Flux in z direction
     integer i,  j,  k  !< global index in physical space
     integer it, jt, kt !< local index in a block
-    real(8), dimension(2), device :: rho, u, v, w, p, tmp
+    real(8), dimension(2) :: rho, u, v, w, p, tmp
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -451,9 +460,9 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     k  = (blockIdx%z-1)*blockDim%z + kt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
-    rho = Q(1,i,j,k:k+1); u   = Q(2,i,j,k:k+1)
-    v   = Q(3,i,j,k:k+1); w   = Q(4,i,j,k:k+1)
-    p   = Q(5,i,j,k:k+1); tmp = T(i,j,k:k+1)
+    rho = Q(i,1,j,k:k+1); u   = Q(i,2,j,k:k+1)
+    v   = Q(i,3,j,k:k+1); w   = Q(i,4,j,k:k+1)
+    p   = Q(i,5,j,k:k+1); tmp = T(i,j,k:k+1)
     G(:,i-1,j-1,k) = KEEP(id_accuracy, rho, u, v, w, w, p, tmp, Normal_z)
   end subroutine calc_keep_z2
 end module calc_keep_kernel
