@@ -708,7 +708,7 @@ contains
     ! Heat flux SGS
     H1 = Cp*T(i,j,k) + 0.5d0*(u(idx)**2+v(idx)**2+w(idx)**2) + qc2(i,j,k)
     H2 = Cp*T(i,j,k+1) + 0.5d0*(u(idx+1)**2+v(idx+1)**2+w(idx+1)**2) + qc2(i,j,k+1)
-    Hsgs = -0.5d0*(mut(i,j,k)+mut(i,j,k+1))*(H2-H1)/Prt
+    Hsgs = -0.5d0*(mut(i,j,k)+mut(i,j,k+1))*(H2-H1) / (dz * Prt)
 
     ! Stress tensor (z-face, no projection since nz=(0,0,1))
     tzx = mwx + duz_dz
