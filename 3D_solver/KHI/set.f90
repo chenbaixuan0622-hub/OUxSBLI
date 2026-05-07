@@ -20,12 +20,18 @@ contains
     real(8), intent(out) :: Q(nx,5,ny,nz)
     integer i, j, k, offset
     real(8) :: v, w, pi = acos(-1.d0)
-    offset = 3
+    if (kind(id_accuracy) == 2) then
+      offset = 1
+    elseif (kind(id_accuracy) == 4) then
+      offset = 2
+    elseif (kind(id_accuracy) == 8) then
+      offset = 3
+    endif
     do k = 1+offset, nz-offset
-      w = amp * sin(2.d0 * pi * z(k) / Lz)
+      w = amp * u1 * sin(2.d0 * pi * z(k) / Lz)
       do j = 1+offset, ny-offset
         do i = 1+offset, nx-offset
-          v = amp * sin(2.d0 * pi * x(i) / Lx)
+          v = amp * u1 * sin(2.d0 * pi * x(i) / Lx)
           if (y(j) > 0.75d0 * Lx .or. y(j) < 0.25d0 * Lx) then
             Q(i,1,j,k) = rho1
             Q(i,2,j,k) = rho1 * u1

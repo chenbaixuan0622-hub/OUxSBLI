@@ -20,6 +20,7 @@ OBJ =	mod_globals.o \
       cpu_gpu_mpi.o \
       set_coordinate.o \
       calc_physical_quantities.o \
+      load_smem_visc2.o \
       load_smem_visc4.o \
       calc_visc2.o \
       calc_visc4.o \
@@ -63,8 +64,9 @@ set_init_common.o: mod_globals.mod mod_constant.mod set_compressible_bl.mod
 set_compressible_bl.o: mod_globals.mod mod_constant.mod
 set.o: mod_globals.mod mod_constant.mod calc_para.mod set_bc_common.mod set_bc_tbl_sbli.mod set_init_common.mod set_coordinate.mod
 calc_physical_quantities.o: mod_globals.mod mod_constant.mod
+load_smem_visc2.o: mod_globals.mod
 load_smem_visc4.o: mod_globals.mod mod_constant.mod
-calc_visc2.o: mod_globals.mod mod_constant.mod
+calc_visc2.o: mod_globals.mod mod_constant.mod load_smem_visc2.mod
 calc_visc4.o: mod_globals.mod mod_constant.mod load_smem_visc4.mod calc_visc_me4_base.f90
 calc_visc4_internal.o: mod_globals.mod mod_constant.mod load_smem_visc4.mod calc_visc_me4_base.f90
 calc_visc4_les_internal.o: mod_globals.mod mod_constant.mod load_smem_visc4.mod calc_visc_me4_base.f90
