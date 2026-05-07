@@ -4,6 +4,7 @@ module preprocess
   use cudafor
   use mpi
   use print
+  use calc_flux_base, only : init_sensor
   implicit none
 contains
 
@@ -24,7 +25,6 @@ contains
   !> Size and allocation depends on viscosity model selection
   subroutine allocate_device_mem(myrank, nx, ny, nz, dtdxdy, dtdydz, dtdzdx, xix, etay, zetaz, Jacobian, ruvwp, T, mu, mut, qc2, E, F, G)
     use mod_globals, only : id_visc
-    use calc_flux_base, only : init_sensor
     integer, intent(in)                       :: myrank    !< MPI rank
     integer, intent(in)                       :: nx        !< x grid dimension
     integer, intent(in)                       :: ny        !< y grid dimension

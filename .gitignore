@@ -1,6 +1,7 @@
 *.d
 *.dat
 *.vtr
+*.vts
 *.vtk
 *.mod
 *.o

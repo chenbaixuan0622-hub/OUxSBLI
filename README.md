@@ -90,6 +90,12 @@ The results are consistent with Lusher's results.
   <img src="./img/sbli_2d.png" alt="SBLI" width="900">  
 </div>
 
+### NACA0012
+
+<div align="center">
+  <img src="./img/naca_p.gif" alt="NACA" width="900">
+</div>
+
 ## Related Publication
 This repository contains the implementation used in the following publication:
 
