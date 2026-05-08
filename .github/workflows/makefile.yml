@@ -13,7 +13,7 @@ jobs:
 
     # Use Nvidia's container
     container:
-      image: nvcr.io/nvidia/nvhpc:24.3-devel-cuda12.3-ubuntu22.04
+      image: nvcr.io/nvidia/nvhpc:25.3-devel-cuda_multi-ubuntu22.04
 
     steps:
       - name: Checkout code
