@@ -11,7 +11,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # 1. HPC SDKがインストール済みの公式コンテナを使用
+    # Use Nvidia's container
     container:
       image: nvcr.io/nvidia/nvhpc:24.3-devel-cuda12.3-ubuntu22.04
 
@@ -19,25 +19,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. 3D_solver のビルド
+      - name: Setup MPI path
+        run: |
+          MPI_DIR=$(find /opt/nvidia/hpc_sdk -type d -path "*/comm_libs/mpi/bin" | head -n 1)
+          echo "MPI_DIR=$MPI_DIR"
+
+          echo "$MPI_DIR" >> $GITHUB_PATH
+
+          which mpif90
+          mpif90 --version
+
       - name: Build 3D_solver
         shell: bash
         run: |
-          # Environment Modulesを有効化するためにsourceが必要
-          . /etc/profile.d/modules.sh
-          module load nvhpc-hpcx
-          
-          # 指定のディレクトリに移動してビルド
           cd 3D_solver/NSTGV
           make
 
-      # 3. 3D_solver_curv のビルド
       - name: Build 3D_solver_curv
         shell: bash
         run: |
-          . /etc/profile.d/modules.sh
-          module load nvhpc-hpcx
-          
-          # 指定のディレクトリに移動してビルド
           cd 3D_solver_curv/NACA
           make
