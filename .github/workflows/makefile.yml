@@ -28,7 +28,7 @@ jobs:
           module load nvhpc-hpcx
           
           # 指定のディレクトリに移動してビルド
-          cd 3D_solver
+          cd 3D_solver/NSTGV
           make
 
       # 3. 3D_solver_curv のビルド
@@ -39,5 +39,5 @@ jobs:
           module load nvhpc-hpcx
           
           # 指定のディレクトリに移動してビルド
-          cd 3D_solver_curv
+          cd 3D_solver_curv/NACA
           make
