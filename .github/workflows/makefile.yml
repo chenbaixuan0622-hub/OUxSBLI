@@ -8,12 +8,24 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-3d-solver:
     runs-on: ubuntu-latest
 
-    # Use Nvidia's container
     container:
       image: nvcr.io/nvidia/nvhpc:25.11-devel-cuda13.0-ubuntu24.04
+
+    strategy:
+      matrix:
+        case:
+          - CICD_KEEP2
+          - CICD_KEEP4
+          - CICD_KEEP6
+          - CICD_SLAU2
+          - CICD_SLAU4
+          - CICD_SLAU6
+          - CICD_Hybrid2
+          - CICD_Hybrid4
+          - CICD_Hybrid6
 
     steps:
       - name: Checkout code
@@ -23,20 +35,44 @@ jobs:
         run: |
           MPI_DIR=$(find /opt/nvidia/hpc_sdk -type d -path "*/comm_libs/mpi/bin" | head -n 1)
           echo "MPI_DIR=$MPI_DIR"
-
           echo "$MPI_DIR" >> $GITHUB_PATH
-
           which mpif90
           mpif90 --version
 
-      - name: Build 3D_solver
+      - name: Build ${{ matrix.case }}
         shell: bash
         run: |
-          cd 3D_solver/NSTGV
+          cd 3D_solver/CICD/${{ matrix.case }}
           make
 
-      - name: Build 3D_solver_curv
+  build-3d-solver-curv:
+    runs-on: ubuntu-latest
+
+    container:
+      image: nvcr.io/nvidia/nvhpc:25.11-devel-cuda13.0-ubuntu24.04
+
+    strategy:
+      matrix:
+        case:
+          - CICD_KEEP2
+          - CICD_SLAU2
+          - CICD_Hybrid2
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup MPI path
+        run: |
+          MPI_DIR=$(find /opt/nvidia/hpc_sdk -type d -path "*/comm_libs/mpi/bin" | head -n 1)
+          echo "MPI_DIR=$MPI_DIR"
+          echo "$MPI_DIR" >> $GITHUB_PATH
+          which mpif90
+          mpif90 --version
+
+      - name: Build ${{ matrix.case }}
         shell: bash
         run: |
-          cd 3D_solver_curv/NACA
+          cd 3D_solver_curv/CICD/${{ matrix.case }}
           make
+
