@@ -377,5 +377,52 @@ contains
       yc(j) = 0.5d0 * (y(j) + y(j+1))
     enddo
   end subroutine set_grid_cyclic6_2D
-end module set_coordinate
 
+
+  ! Compute curvilinear metric arrays from 2-D physical coordinates.
+  ! n_xi_x/y  (nx-1, ny-2): area-scaled xi-face normals  (S_xi_x  = +dy/deta, S_xi_y  = -dx/deta)
+  ! n_eta_x/y (nx-2, ny-1): area-scaled eta-face normals (S_eta_x = -dy/dxi,  S_eta_y = +dx/dxi)
+  ! xi_x/y, eta_x/y (nx,ny): inverse metric coefficients at cell centres (interior only)
+  ! Jac (nx,ny): 2-D Jacobian J2D = dx/dxi*dy/deta - dx/deta*dy/dxi  (positive for CCW xi)
+  ! Boundary and ghost cells (i=1, i=nx, j=1, j=ny) are left uninitialised;
+  ! the caller's set_metrics in set.f90 must fill them according to the case BCs.
+  subroutine set_metrics_curv(nx, ny, x_phys, y_phys, n_xi_x, n_xi_y, n_eta_x, n_eta_y, &
+                              xi_x, xi_y, eta_x, eta_y, Jac)
+    integer, intent(in)  :: nx, ny
+    real(8), intent(in)  :: x_phys(nx,ny), y_phys(nx,ny)
+    real(8), intent(out) :: n_xi_x(nx-1,ny-2),  n_xi_y(nx-1,ny-2)
+    real(8), intent(out) :: n_eta_x(nx-2,ny-1), n_eta_y(nx-2,ny-1)
+    real(8), intent(out) :: xi_x(nx,ny),  xi_y(nx,ny)
+    real(8), intent(out) :: eta_x(nx,ny), eta_y(nx,ny)
+    real(8), intent(out) :: Jac(nx,ny)
+    real(8) :: xxi, yxi, xeta, yeta, J2
+    integer :: m, n
+    ! xi-face normals: face (m+1/2, n+1) for m=1..nx-1, n=1..ny-2
+    do n = 1, ny-2
+      do m = 1, nx-1
+        n_xi_x(m,n) =  0.25d0*(y_phys(m,n+2)+y_phys(m+1,n+2)-y_phys(m,n)  -y_phys(m+1,n))
+        n_xi_y(m,n) = -0.25d0*(x_phys(m,n+2)+x_phys(m+1,n+2)-x_phys(m,n)  -x_phys(m+1,n))
+      enddo
+    enddo
+    ! eta-face normals: face (m+1, n+1/2) for m=1..nx-2, n=1..ny-1
+    do n = 1, ny-1
+      do m = 1, nx-2
+        n_eta_x(m,n) = -0.25d0*(y_phys(m+2,n)+y_phys(m+2,n+1)-y_phys(m,n)-y_phys(m,n+1))
+        n_eta_y(m,n) =  0.25d0*(x_phys(m+2,n)+x_phys(m+2,n+1)-x_phys(m,n)-x_phys(m,n+1))
+      enddo
+    enddo
+    ! Interior cell centres (2nd-order centred)
+    do n = 2, ny-1
+      do m = 2, nx-1
+        xxi  = 0.5d0*(x_phys(m+1,n)-x_phys(m-1,n))
+        yxi  = 0.5d0*(y_phys(m+1,n)-y_phys(m-1,n))
+        xeta = 0.5d0*(x_phys(m,n+1)-x_phys(m,n-1))
+        yeta = 0.5d0*(y_phys(m,n+1)-y_phys(m,n-1))
+        J2        = xxi*yeta - xeta*yxi
+        Jac(m,n)  = J2
+        xi_x(m,n) =  yeta/J2;  xi_y(m,n) = -xeta/J2
+        eta_x(m,n)= -yxi /J2; eta_y(m,n) =  xxi /J2
+      enddo
+    enddo
+  end subroutine set_metrics_curv
+end module set_coordinate

@@ -1,6 +1,11 @@
 [![DOI](https://zenodo.org/badge/761651757.svg)](https://doi.org/10.5281/zenodo.19396475)
+![CUDA Fortran](https://img.shields.io/badge/CUDA_Fortran-GPU_Accelerated-76B900)
+![Modern Fortran](https://img.shields.io/badge/Modern_Fortran-yes-success)
 
-# OUxSBLI
+<div align="center">
+  <img src="./img/OUxSBLI.png" alt="OUxSBLI">  
+</div>
+
 OUxSBLI is a GPU-accelerated CFD code written in CUDA Fortran. It employs explicit high-order finite-difference schemes on a rectilinear grid.
 
 ## Dependency
@@ -88,6 +93,12 @@ The results are consistent with Lusher's results.
 
 <div align="center">
   <img src="./img/sbli_2d.png" alt="SBLI" width="900">  
+</div>
+
+### NACA0012
+
+<div align="center">
+  <img src="./img/naca_p.gif" alt="NACA" width="900">
 </div>
 
 ## Related Publication
