@@ -2,7 +2,7 @@ FC = mpif90
 
 subroutines = name:calc_tau_straight,calc_tau_cross,flux4
 
-OUTPUT_OPTIN = -cuda -acc -fast -Mpreprocess -Mchkptr -Minline=reshape,$(subroutines) -Minfo=accel,inline -Mchkptr -gpu=ptxinfo,rdc, -lnvhpcwrapnvtx 
+OUTPUT_OPTIN = -cuda -acc -fast -Mpreprocess -Mchkptr -Minline=reshape,$(subroutines) -Minfo=accel,inline -Mchkptr -gpu=ptxinfo,rdc,lto -lnvhpcwrapnvtx
 
 .SUFFIXES : .f90
 
@@ -49,7 +49,7 @@ OBJ =	mod_globals.o \
       main.o
 
 a.out: $(OBJ)
-		$(FC) -cuda -acc -fast -Minfo -gpu=rdc -lnvhpcwrapnvtx -I./ $^
+		$(FC) -cuda -acc -fast -Minfo -gpu=rdc,lto -lnvhpcwrapnvtx -I./ $^
 
 $(TARGET): $(OBJ)
 		$(LINK.f) $^ $(LOADLIBES) $(LDLIBS) -o $@

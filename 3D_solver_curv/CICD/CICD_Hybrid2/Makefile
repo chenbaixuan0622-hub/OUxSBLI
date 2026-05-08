@@ -1,5 +1,5 @@
 FC = mpif90
-OUTPUT_OPTIN = -cuda -acc -fast -Mpreprocess -Mchkptr -Minfo=accel,inline -gpu=ptxinfo,rdc -lnvhpcwrapnvtx
+OUTPUT_OPTIN = -cuda -acc -fast -Mpreprocess -Mchkptr -Minfo=accel,inline -gpu=ptxinfo,rdc,lto -lnvhpcwrapnvtx
 
 .SUFFIXES : .f90
 %.o: %.f90
@@ -32,7 +32,7 @@ OBJ = mod_globals.o \
       main_curv.o
 
 $(TARGET): $(OBJ)
-	$(FC) -cuda -acc -fast -Minfo -gpu=rdc -lnvhpcwrapnvtx -I./ $^
+	$(FC) -cuda -acc -fast -Minfo -gpu=rdc,lto -lnvhpcwrapnvtx -I./ $^
 
 mod_constant.o: mod_globals.mod
 set_coordinate.o: mod_globals.mod

@@ -27,7 +27,7 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! Value is IGNORED; only the kind matters for dispatch
   integer, parameter    :: dimension   = 3
-  integer(2), parameter :: id_visc     = 0
+  integer(4), parameter :: id_visc     = 0
   integer(2), parameter :: id_scheme   = 0
   integer, parameter    :: sp          = 4
   real(sp), parameter   :: threshold   = 0.1_sp
