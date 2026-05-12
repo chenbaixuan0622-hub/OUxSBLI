@@ -3,7 +3,7 @@ module calc_keep_kernel_internal
   use mod_constant, only : R_over_gamma_1, one_third, one_sixth, one_twelfth, two_third
   implicit none
   private
-  public calc_keep_x_in, calc_keep_y_in, calc_keep_z_in
+  public calc_keep_x_in, calc_keep_y_in !, calc_keep_z_in
   real(8), parameter :: one_24        = 1.d0 / 24.d0
   real(8), parameter :: one_48        = 1.d0 / 48.d0
   real(8), parameter :: one_60        = 1.d0 / 60.d0
@@ -34,7 +34,7 @@ contains
     integer, parameter :: sx = threadsE%x + 2*io + 1 !< tile size in x direction
     integer, parameter :: sy = threadsE%y            !< tile size in y direction
     !integer, parameter :: sz = threadsE%z            !< tile size in z direction
-    real(8), dimension(-(io-1):sx*sy*sz-io), shared :: rho, u, v, p, tmp
+    real(8), dimension(-(io-1):sx*sy-io), shared :: rho, u, v, p, tmp
     it = threadIdx%x
     jt = threadIdx%y
     !kt = threadIdx%z
@@ -81,7 +81,7 @@ contains
     integer, parameter :: sx = threadsF%x            !< tile size in x direction
     integer, parameter :: sy = threadsF%y + 2*io + 1 !< tile size in y direction
     !integer, parameter :: sz = threadsF%z            !< tile size in z direction
-    real(8), dimension(-(io-1):sx*sy*sz-io), shared :: rho, u, v, w, p, tmp
+    real(8), dimension(-(io-1):sx*sy-io), shared :: rho, u, v, w, p, tmp
     it = threadIdx%x
     jt = threadIdx%y
     !kt = threadIdx%z

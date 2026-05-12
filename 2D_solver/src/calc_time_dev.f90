@@ -115,103 +115,103 @@ contains
   end subroutine RungeKutta_3rd
 
 
-  !> 3rd-order TVD Runge-Kutta with re-scaling for density clipping/limiting
-  !> Combines TVD RK3 time stepping with optional density-based re-scaling for stability
-  !> When density becomes negative or too small, re-scale conserved variables at marker plane
-  !> Similar TVD RK3 stages as above, plus calls to step_rescale() for non-conservative correction
-  subroutine RungeKutta_3rd_rescale(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q)
-    integer(2), intent(in) :: id_RungeKutta
-    integer(4), intent(in) :: id_rescale
-    integer, intent(in)    :: myrank, mygpu, nx, ny
-    real(8), intent(in)    :: x(nx), dx_cpu(nx-1)
-    real(8), intent(in)    :: y(ny), dy_cpu(ny-1)
-    real(8), intent(in)    :: Jacobian_cpu(nx,ny)
-    real(8), intent(inout) :: Q(nx,4,ny)
-    integer i, j, k, l, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireq2(2)
-    integer istat(MPI_STATUS_SIZE), istat2(MPI_STATUS_SIZE,2)
-    ! rescal_cpu!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    integer :: step = 1, flag_re = 0, flag_req
-    real(8), allocatable, device :: Qre(:), Qm(:)
-    real(8), allocatable, pinned :: Qm_cpu(:)
-    ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: ruvwp(:,:,:,:), QJ(:,:,:,:), QJ2(:,:,:,:), E(:,:,:,:), F(:,:,:,:)
-    real(8), allocatable, device :: T(:,:,:), mu(:,:,:), mut(:,:,:), qc2(:,:,:)
-    real(8), allocatable, device :: xix(:), etay(:), Jacobian(:,:), dtdxdy(:,:)
-    ! for plot
-    real(4) :: ke0 = 1.d0, entropy0 = 1.d0
+  ! !> 3rd-order TVD Runge-Kutta with re-scaling for density clipping/limiting
+  ! !> Combines TVD RK3 time stepping with optional density-based re-scaling for stability
+  ! !> When density becomes negative or too small, re-scale conserved variables at marker plane
+  ! !> Similar TVD RK3 stages as above, plus calls to step_rescale() for non-conservative correction
+  ! subroutine RungeKutta_3rd_rescale(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q)
+  !   integer(2), intent(in) :: id_RungeKutta
+  !   integer(4), intent(in) :: id_rescale
+  !   integer, intent(in)    :: myrank, mygpu, nx, ny
+  !   real(8), intent(in)    :: x(nx), dx_cpu(nx-1)
+  !   real(8), intent(in)    :: y(ny), dy_cpu(ny-1)
+  !   real(8), intent(in)    :: Jacobian_cpu(nx,ny)
+  !   real(8), intent(inout) :: Q(nx,4,ny)
+  !   integer i, j, k, l, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireq2(2)
+  !   integer istat(MPI_STATUS_SIZE), istat2(MPI_STATUS_SIZE,2)
+  !   ! rescal_cpu!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !   integer :: step = 1, flag_re = 0, flag_req
+  !   real(8), allocatable, device :: Qre(:), Qm(:)
+  !   real(8), allocatable, pinned :: Qm_cpu(:)
+  !   ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !   real(8), allocatable, device :: ruvwp(:,:,:,:), QJ(:,:,:,:), QJ2(:,:,:,:), E(:,:,:,:), F(:,:,:,:)
+  !   real(8), allocatable, device :: T(:,:,:), mu(:,:,:), mut(:,:,:), qc2(:,:,:)
+  !   real(8), allocatable, device :: xix(:), etay(:), Jacobian(:,:), dtdxdy(:,:)
+  !   ! for plot
+  !   real(4) :: ke0 = 1.d0, entropy0 = 1.d0
 
-    call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
-    ! count GPU
-    stat = cudaGetDeviceCount(ndevices)
-    print *, "rank", myrank, " has found ", ndevices, " GPU devices"
-    if (mod(myrank,2) == 0) then
-      call check_gpu(mygpu)
-      call allocate_device_mem(myrank, nx, ny, dtdxdy, xix, etay, Jacobian, ruvwp, T, mu, mut, qc2, E, F)
-      allocate(QJ(nx,4,ny), QJ2(nx,4,ny), stat=ierr)
-      if (ierr /= 0) then
-        print *, "myrank is ", myrank, " memory allocation failed", ierr
-      else
-        print *, "myrank is ", myrank, " memory allocation has completed"
-      endif
-      call pre_calc(nx, ny, myrank, nranks, x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q, overlap, &
-                    dtdxdy, xix, etay, Jacobian, QJ, ke0, entropy0)
-    else
-      call MPI_RECV(ke0,      1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
-      call MPI_RECV(entropy0, 1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
-    endif
-    call pre_rescale(myrank, flag_re, flag_req, ny, Qre, Qm, Qm_cpu)
+  !   call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
+  !   ! count GPU
+  !   stat = cudaGetDeviceCount(ndevices)
+  !   print *, "rank", myrank, " has found ", ndevices, " GPU devices"
+  !   if (mod(myrank,2) == 0) then
+  !     call check_gpu(mygpu)
+  !     call allocate_device_mem(myrank, nx, ny, dtdxdy, xix, etay, Jacobian, ruvwp, T, mu, mut, qc2, E, F)
+  !     allocate(QJ(nx,4,ny), QJ2(nx,4,ny), stat=ierr)
+  !     if (ierr /= 0) then
+  !       print *, "myrank is ", myrank, " memory allocation failed", ierr
+  !     else
+  !       print *, "myrank is ", myrank, " memory allocation has completed"
+  !     endif
+  !     call pre_calc(nx, ny, myrank, nranks, x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q, overlap, &
+  !                   dtdxdy, xix, etay, Jacobian, QJ, ke0, entropy0)
+  !   else
+  !     call MPI_RECV(ke0,      1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
+  !     call MPI_RECV(entropy0, 1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
+  !   endif
+  !   call pre_rescale(myrank, flag_re, flag_req, ny, Qre, Qm, Qm_cpu)
 
-    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-    print *, "myrank is ", myrank, " start Runge-Kutta"
-    do t2 = 1, np
-      do t1 = 1, nt
-        if (mod(myrank,2) == 0) then
-          call step_rescale(1, myrank, nx, ny step, flag_re, flag_req, ireq, ireq2, Jacobian, QJ, Qm, Qre)
-          call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJ, ruvwp, T, mu, mut, qc2, E, F, G)
-          call calc_step1<<<blocks,threads>>>(nx, ny,1.d0, dtdxdy, E, F, QJ, QJ2)
-          call wait_rescale(myrank, ireq, ireq2, istat, istat2)
-          call set_bc(myrank, nx, ny, Jacobian, QJ2, Qre)
-        elseif (myrank == rerank+1) then
-          call rescale_recv_send(1, flag_re, nx, ny, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
-        endif
+  !   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  !   print *, "myrank is ", myrank, " start Runge-Kutta"
+  !   do t2 = 1, np
+  !     do t1 = 1, nt
+  !       if (mod(myrank,2) == 0) then
+  !         call step_rescale(1, myrank, nx, ny step, flag_re, flag_req, ireq, ireq2, Jacobian, QJ, Qm, Qre)
+  !         call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJ, ruvwp, T, mu, mut, qc2, E, F, G)
+  !         call calc_step1<<<blocks,threads>>>(nx, ny,1.d0, dtdxdy, E, F, QJ, QJ2)
+  !         call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+  !         call set_bc(myrank, nx, ny, Jacobian, QJ2, Qre)
+  !       elseif (myrank == rerank+1) then
+  !         call rescale_recv_send(1, flag_re, nx, ny, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
+  !       endif
 
-        if (mod(myrank,2) == 0) then
-          call step_rescale(2, myrank, nx, ny, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJ2, Qm, Qre)
-          call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJ2, ruvwp, T, mu, mut, qc2, E, F)
-          call calc_step2_3<<<blocks,threads>>>(nx, ny, 0.75d0, 0.25d0, 0.25d0, 1.d0, dtdxdy, E, F, QJ, QJ2)
-          call wait_rescale(myrank, ireq, ireq2, istat, istat2)
-          call set_bc(myrank, nx, ny, Jacobian, QJ2, Qre)
-        elseif (myrank == rerank+1) then
-          call rescale_recv_send(2, flag_re, nx, ny, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
-        endif
+  !       if (mod(myrank,2) == 0) then
+  !         call step_rescale(2, myrank, nx, ny, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJ2, Qm, Qre)
+  !         call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJ2, ruvwp, T, mu, mut, qc2, E, F)
+  !         call calc_step2_3<<<blocks,threads>>>(nx, ny, 0.75d0, 0.25d0, 0.25d0, 1.d0, dtdxdy, E, F, QJ, QJ2)
+  !         call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+  !         call set_bc(myrank, nx, ny, Jacobian, QJ2, Qre)
+  !       elseif (myrank == rerank+1) then
+  !         call rescale_recv_send(2, flag_re, nx, ny, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
+  !       endif
 
-        if (mod(myrank,2) == 0) then
-          call step_rescale(3, myrank, nx, ny, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJ2, Qm, Qre)
-          call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJ2, ruvwp, T, mu, mut, qc2, E, F)
-          call calc_step2_3<<<blocks,threads>>>(nx, ny, 2.d0, 1.d0, 2.d0, one_third, dtdxdy, E, F, QJ2, QJ)
-          call wait_rescale(myrank, ireq, ireq2, istat, istat2)
-          call set_bc(myrank, nx, ny, Jacobian, QJ, Qre)
-        elseif (myrank == rerank+1) then
-          call rescale_recv_send(3, flag_re, nx, ny, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
-        endif
-      enddo
-      if (mod(myrank, 2) == 0) then
-        call send_recv_for_print_even(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, QJ, Q, ke0, entropy0)
-      else
-        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, Q, ke0, entropy0)
-      endif
-    enddo
+  !       if (mod(myrank,2) == 0) then
+  !         call step_rescale(3, myrank, nx, ny, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJ2, Qm, Qre)
+  !         call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJ2, ruvwp, T, mu, mut, qc2, E, F)
+  !         call calc_step2_3<<<blocks,threads>>>(nx, ny, 2.d0, 1.d0, 2.d0, one_third, dtdxdy, E, F, QJ2, QJ)
+  !         call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+  !         call set_bc(myrank, nx, ny, Jacobian, QJ, Qre)
+  !       elseif (myrank == rerank+1) then
+  !         call rescale_recv_send(3, flag_re, nx, ny, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
+  !       endif
+  !     enddo
+  !     if (mod(myrank, 2) == 0) then
+  !       call send_recv_for_print_even(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, QJ, Q, ke0, entropy0)
+  !     else
+  !       call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, Q, ke0, entropy0)
+  !     endif
+  !   enddo
 
-    if (mod(myrank,2) == 0) then
-      deallocate(ruvwp, T, mu, mut, qc2, QJ, QJ2, E, F, xix, etay,  Jacobian, dtdxdy)
-    endif
-    if (myrank == 0 .or. myrank == rerank) then
-      deallocate(Qre, Qm)
-    elseif (myrank == rerank+1) then
-      deallocate(Qm_cpu)
-    endif
-    print *, "myrank is ", myrank, " deallocate GPU memory"
-  end subroutine RungeKutta_3rd_rescale
+  !   if (mod(myrank,2) == 0) then
+  !     deallocate(ruvwp, T, mu, mut, qc2, QJ, QJ2, E, F, xix, etay,  Jacobian, dtdxdy)
+  !   endif
+  !   if (myrank == 0 .or. myrank == rerank) then
+  !     deallocate(Qre, Qm)
+  !   elseif (myrank == rerank+1) then
+  !     deallocate(Qm_cpu)
+  !   endif
+  !   print *, "myrank is ", myrank, " deallocate GPU memory"
+  ! end subroutine RungeKutta_3rd_rescale
 
 
   !> 4th-order classical Runge-Kutta time stepping without rescaling
@@ -298,112 +298,112 @@ contains
   end subroutine RungeKutta_4th
 
 
-  !> 4th-order Runge-Kutta with re-scaling for density clipping at monitoring plane
-  !> Combines high-order 4-4 RK accuracy with non-conservative re-scaling correction
-  !> Step-rescale calls handle inter-rank communication for marking critical planes
-  subroutine RungeKutta_4th_rescale(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q)
-    integer(4), intent(in) :: id_RungeKutta
-    integer(4), intent(in) :: id_rescale
-    integer, intent(in)    :: myrank, mygpu, nx, ny
-    real(8), intent(in)    :: x(nx), dx_cpu(nx-1)
-    real(8), intent(in)    :: y(ny), dy_cpu(ny-1)
-    real(8), intent(in)    ::  Jacobian_cpu(nx,ny)
-    real(8), intent(inout) :: Q(nx,4,ny)
-    integer i, j, k, l, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireq2(2)
-    integer istat(MPI_STATUS_SIZE), istat2(MPI_STATUS_SIZE,2)
-    ! rescale !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    integer :: step = 1, flag_re = 0, flag_req
-    real(8), allocatable, device :: Qre(:), Qm(:)
-    real(8), allocatable, pinned :: Qm_cpu(:)
-    ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: ruvwp(:,:,:,:), QJ(:,:,:,:), QJs(:,:,:,:), Rs(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
-    real(8), allocatable, device :: T(:,:,:), mu(:,:,:), mut(:,:,:), qc2(:,:,:)
-    real(8), allocatable, device :: xix(:), etay(:), Jacobian(:,:), dtdxdy(:,:)
-    ! for plot
-    real(4) :: ke0 = 1.d0, entropy0 = 1.d0
+  ! !> 4th-order Runge-Kutta with re-scaling for density clipping at monitoring plane
+  ! !> Combines high-order 4-4 RK accuracy with non-conservative re-scaling correction
+  ! !> Step-rescale calls handle inter-rank communication for marking critical planes
+  ! subroutine RungeKutta_4th_rescale(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q)
+  !   integer(4), intent(in) :: id_RungeKutta
+  !   integer(4), intent(in) :: id_rescale
+  !   integer, intent(in)    :: myrank, mygpu, nx, ny
+  !   real(8), intent(in)    :: x(nx), dx_cpu(nx-1)
+  !   real(8), intent(in)    :: y(ny), dy_cpu(ny-1)
+  !   real(8), intent(in)    ::  Jacobian_cpu(nx,ny)
+  !   real(8), intent(inout) :: Q(nx,4,ny)
+  !   integer i, j, k, l, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireq2(2)
+  !   integer istat(MPI_STATUS_SIZE), istat2(MPI_STATUS_SIZE,2)
+  !   ! rescale !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !   integer :: step = 1, flag_re = 0, flag_req
+  !   real(8), allocatable, device :: Qre(:), Qm(:)
+  !   real(8), allocatable, pinned :: Qm_cpu(:)
+  !   ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !   real(8), allocatable, device :: ruvwp(:,:,:,:), QJ(:,:,:,:), QJs(:,:,:,:), Rs(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
+  !   real(8), allocatable, device :: T(:,:,:), mu(:,:,:), mut(:,:,:), qc2(:,:,:)
+  !   real(8), allocatable, device :: xix(:), etay(:), Jacobian(:,:), dtdxdy(:,:)
+  !   ! for plot
+  !   real(4) :: ke0 = 1.d0, entropy0 = 1.d0
 
-    call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
-    ! count GPU
-    stat = cudaGetDeviceCount(ndevices)
-    if (myrank == 0) then
-      print '(2x, i2, a)', ndevices, " GPU devices are found"
-    endif
-    if (mod(myrank,2) == 0) then
-      call check_gpu(mygpu)
-      call allocate_device_mem(myrank, nx, ny, dtdxdy, xix, etay, Jacobian, ruvwp, T, mu, mut, qc2, E, F)
-      allocate(QJ(nx,4,ny), QJs(nx,4,ny), Rs(nx-2,4,ny-2))
-      print *, "myrank is ", myrank, " memory allocation has completed"
-      call pre_calc(nx, ny, myrank, nranks, x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q, overlap, &
-                    dtdxdy, xix, etay, Jacobian, QJ, ke0, entropy0)
-      Rs = 0.d0
-    else
-      call MPI_RECV(ke0,      1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
-      call MPI_RECV(entropy0, 1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
-    endif
-    if (kind(id_rescale) == 4) then
-      call pre_rescale(myrank, flag_re, flag_req, ny, Qre, Qm, Qm_cpu)
-    endif
+  !   call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
+  !   ! count GPU
+  !   stat = cudaGetDeviceCount(ndevices)
+  !   if (myrank == 0) then
+  !     print '(2x, i2, a)', ndevices, " GPU devices are found"
+  !   endif
+  !   if (mod(myrank,2) == 0) then
+  !     call check_gpu(mygpu)
+  !     call allocate_device_mem(myrank, nx, ny, dtdxdy, xix, etay, Jacobian, ruvwp, T, mu, mut, qc2, E, F)
+  !     allocate(QJ(nx,4,ny), QJs(nx,4,ny), Rs(nx-2,4,ny-2))
+  !     print *, "myrank is ", myrank, " memory allocation has completed"
+  !     call pre_calc(nx, ny, myrank, nranks, x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q, overlap, &
+  !                   dtdxdy, xix, etay, Jacobian, QJ, ke0, entropy0)
+  !     Rs = 0.d0
+  !   else
+  !     call MPI_RECV(ke0,      1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
+  !     call MPI_RECV(entropy0, 1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
+  !   endif
+  !   if (kind(id_rescale) == 4) then
+  !     call pre_rescale(myrank, flag_re, flag_req, ny, Qre, Qm, Qm_cpu)
+  !   endif
     
-    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-    print *, "myrank is ", myrank, " start Runge-Kutta"
-    do t2 = 1, np
-      do t1 = 1, nt
-        if (mod(myrank,2) == 0) then
-          call step_rescale(1, myrank, nx, ny, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJ, Qm, Qre)
-          call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJ, ruvwp, T, mu, mut, qc2, E, F)
-          call calc_step<<<blocks,threads>>>(nx, ny, 0.5d0, 1.d0, dtdxdy, E, F, QJ, QJs, Rs) ! QJs = Q2
-          call wait_rescale(myrank, ireq, ireq2, istat, istat2)
-          call set_bc(myrank, nx, ny, Jacobian, QJs, Qre)
-        elseif (myrank == rerank+1) then
-          call rescale_recv_send(1, flag_re, nx, ny, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
-        endif
+  !   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  !   print *, "myrank is ", myrank, " start Runge-Kutta"
+  !   do t2 = 1, np
+  !     do t1 = 1, nt
+  !       if (mod(myrank,2) == 0) then
+  !         call step_rescale(1, myrank, nx, ny, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJ, Qm, Qre)
+  !         call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJ, ruvwp, T, mu, mut, qc2, E, F)
+  !         call calc_step<<<blocks,threads>>>(nx, ny, 0.5d0, 1.d0, dtdxdy, E, F, QJ, QJs, Rs) ! QJs = Q2
+  !         call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+  !         call set_bc(myrank, nx, ny, Jacobian, QJs, Qre)
+  !       elseif (myrank == rerank+1) then
+  !         call rescale_recv_send(1, flag_re, nx, ny, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
+  !       endif
 
-        if (mod(myrank,2) == 0) then
-          call step_rescale(2, myrank, nx, ny, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJs, Qm, Qre)
-          call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJs, ruvwp, T, mu, mut, qc2, E, F)
-          call calc_step<<<blocks,threads>>>(nx, ny, 0.5d0, 2.d0, dtdxdy, E, F, QJ, QJs, Rs) ! QJs = Q3
-          call wait_rescale(myrank, ireq, ireq2, istat, istat2)
-          call set_bc(myrank, nx, ny, Jacobian, QJs, Qre)
-        elseif (myrank == rerank+1) then
-          call rescale_recv_send(2, flag_re, nx, ny, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
-        endif
+  !       if (mod(myrank,2) == 0) then
+  !         call step_rescale(2, myrank, nx, ny, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJs, Qm, Qre)
+  !         call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJs, ruvwp, T, mu, mut, qc2, E, F)
+  !         call calc_step<<<blocks,threads>>>(nx, ny, 0.5d0, 2.d0, dtdxdy, E, F, QJ, QJs, Rs) ! QJs = Q3
+  !         call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+  !         call set_bc(myrank, nx, ny, Jacobian, QJs, Qre)
+  !       elseif (myrank == rerank+1) then
+  !         call rescale_recv_send(2, flag_re, nx, ny, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
+  !       endif
 
-        if (mod(myrank,2) == 0) then
-          call step_rescale(3, myrank, nx, ny, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJs, Qm, Qre)
-          call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJs, ruvwp, T, mu, mut, qc2, E, F)
-          call calc_step<<<blocks,threads>>>(nx, ny, 1.0d0, 2.d0, dtdxdy, E, F, QJ, QJs, Rs) ! QJs = Q4
-          call wait_rescale(myrank, ireq, ireq2, istat, istat2)
-          call set_bc(myrank, nx, ny, Jacobian, QJs, Qre)
-        elseif (myrank == rerank+1) then
-          call rescale_recv_send(3, flag_re, nx, ny, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
-        endif
+  !       if (mod(myrank,2) == 0) then
+  !         call step_rescale(3, myrank, nx, ny, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJs, Qm, Qre)
+  !         call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJs, ruvwp, T, mu, mut, qc2, E, F)
+  !         call calc_step<<<blocks,threads>>>(nx, ny, 1.0d0, 2.d0, dtdxdy, E, F, QJ, QJs, Rs) ! QJs = Q4
+  !         call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+  !         call set_bc(myrank, nx, ny, Jacobian, QJs, Qre)
+  !       elseif (myrank == rerank+1) then
+  !         call rescale_recv_send(3, flag_re, nx, ny, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
+  !       endif
 
-        if (mod(myrank,2) == 0) then
-          call step_rescale(4, myrank, nx, ny, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJs, Qm, Qre)
-          call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJs, ruvwp, T, mu, mut, qc2, E, F)
-          call calc_step4<<<blocks,threads>>>(nx, ny, dtdxdy, E, F, Rs, QJ)
-          call wait_rescale(myrank, ireq, ireq2, istat, istat2)
-          call set_bc(myrank, nx, ny, Jacobian, QJ, Qre)
-        elseif (myrank == rerank+1) then
-          call rescale_recv_send(4, flag_re, nx, ny, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
-        endif
-      enddo
-      if (mod(myrank, 2) == 0) then
-        call send_recv_for_print_even(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, QJ, Q, ke0, entropy0)
-      else
-        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, Q, ke0, entropy0)
-      endif
-    enddo
+  !       if (mod(myrank,2) == 0) then
+  !         call step_rescale(4, myrank, nx, ny, step, flag_re, flag_req, ireq, ireq2, Jacobian, QJs, Qm, Qre)
+  !         call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJs, ruvwp, T, mu, mut, qc2, E, F)
+  !         call calc_step4<<<blocks,threads>>>(nx, ny, dtdxdy, E, F, Rs, QJ)
+  !         call wait_rescale(myrank, ireq, ireq2, istat, istat2)
+  !         call set_bc(myrank, nx, ny, Jacobian, QJ, Qre)
+  !       elseif (myrank == rerank+1) then
+  !         call rescale_recv_send(4, flag_re, nx, ny, np*(t2-1)+t1, y, Jacobian_cpu, Qm_cpu)
+  !       endif
+  !     enddo
+  !     if (mod(myrank, 2) == 0) then
+  !       call send_recv_for_print_even(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, QJ, Q, ke0, entropy0)
+  !     else
+  !       call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, Q, ke0, entropy0)
+  !     endif
+  !   enddo
 
-    if (mod(myrank,2) == 0) then
-      deallocate(ruvwp, T, mu, mut, qc2, QJ, QJs, Rs, E, F, xix, etay, Jacobian, dtdxdy)
-    endif
-    if (myrank == 0 .or. myrank == rerank) then
-      deallocate(Qre, Qm)
-    elseif (myrank == rerank+1) then
-      deallocate(Qm_cpu)
-    endif
-    print *, "myrank is ", myrank, " deallocate GPU memory"
-  end subroutine RungeKutta_4th_rescale
+  !   if (mod(myrank,2) == 0) then
+  !     deallocate(ruvwp, T, mu, mut, qc2, QJ, QJs, Rs, E, F, xix, etay, Jacobian, dtdxdy)
+  !   endif
+  !   if (myrank == 0 .or. myrank == rerank) then
+  !     deallocate(Qre, Qm)
+  !   elseif (myrank == rerank+1) then
+  !     deallocate(Qm_cpu)
+  !   endif
+  !   print *, "myrank is ", myrank, " deallocate GPU memory"
+  ! end subroutine RungeKutta_4th_rescale
 end module calc_time_dev
 

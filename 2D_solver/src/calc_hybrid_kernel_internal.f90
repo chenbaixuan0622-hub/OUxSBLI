@@ -185,11 +185,11 @@ contains
           end associate
         end block
       else
-        call delta_r(id_accuracy, fdy, rho(jt-io:jt+io+1,it,kt), rhol, rhor(jt,it))
-        call delta_r(id_accuracy, fdy,   u(jt-io:jt+io+1,it,kt),   ul,   ur(jt,it))
-        call delta_r(id_accuracy, fdy,   v(jt-io:jt+io+1,it,kt),   vl,   vr(jt,it))
+        call delta_r(id_accuracy, fdy, rho(jt-io:jt+io+1,it), rhol, rhor(jt,it))
+        call delta_r(id_accuracy, fdy,   u(jt-io:jt+io+1,it),   ul,   ur(jt,it))
+        call delta_r(id_accuracy, fdy,   v(jt-io:jt+io+1,it),   vl,   vr(jt,it))
         !call delta_r(id_accuracy, fdy,   w(jt-io:jt+io+1,it,kt),   wl,   wr(jt,it,kt))
-        call delta_r(id_accuracy, fdy,   p(jt-io:jt+io+1,it,kt),   pl,   pr(jt,it))
+        call delta_r(id_accuracy, fdy,   p(jt-io:jt+io+1,it),   pl,   pr(jt,it))
       endif
     endif
     call syncthreads()

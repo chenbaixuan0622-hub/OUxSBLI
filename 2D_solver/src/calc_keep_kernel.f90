@@ -3,7 +3,7 @@ module calc_keep_kernel
   use mod_constant, only : R_over_gamma_1, one_third, one_sixth, one_twelfth, two_third
   implicit none
   private
-  public calc_keep_x, calc_keep_y ! calc_keep_z
+  public calc_keep_x, calc_keep_y    !, calc_keep_z
   real(8), parameter :: one_24        = 1.d0 / 24.d0
   real(8), parameter :: one_48        = 1.d0 / 48.d0
   real(8), parameter :: one_60        = 1.d0 / 60.d0
@@ -117,7 +117,7 @@ contains
     i  = (blockIdx%x-1)*blockDim%x + it + 1
     !k  = (blockIdx%z-1)*blockDim%z + kt + 1
     j_base = (blockIdx%y-1)*blockDim%y
-    offset_xz = (it-1) * sy +! (kt-1) * sy * sx
+    offset_xz = (it-1) * sy ! (kt-1) * sy * sx
     do jj = jt-2, threadsF%y+3, blockDim%y
       j = j_base + jj
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny ) then
@@ -166,7 +166,7 @@ contains
     real(8), intent(in), device, contiguous   :: Q(nx,4,ny)       !< Q(rho, u, v, w, p)
     real(8), intent(in), device, contiguous   :: T(nx,ny)         !< Temperature
     real(8), intent(out), device, contiguous  :: E(4,nx-1,ny-2) !< Flux in x direction
-    integer i,  j,!  k  !< global index in physical space
+    integer i,  j !  k  !< global index in physical space
     integer it, jt!, kt !< local index in a block
     integer ii, i_base, idx, offset_yz
     integer, parameter :: sx = threadsE%x + 3 !< tile size in x direction
@@ -198,13 +198,13 @@ contains
     if (2 <= i .and. i <= nx-2) then
       E(:,i,j-1) = KEEP(id_accuracy, &
                             rho(idx-1:idx+2), u(idx-1:idx+2), &
-                              v(idx-1:idx+2),  &
+                              v(idx-1:idx+2), &
                              uu(idx-1:idx+2), p(idx-1:idx+2), &
                             tmp(idx-1:idx+2), Normal_x)
     else
       E(:,i,j-1) = KEEP(id_accuracy2, &
                             rho(idx:idx+1), u(idx:idx+1), &
-                              v(idx:idx+1),  &
+                              v(idx:idx+1), &
                              uu(idx:idx+1), p(idx:idx+1), &
                             tmp(idx:idx+1), Normal_x)
     endif

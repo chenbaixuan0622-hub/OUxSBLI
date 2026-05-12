@@ -28,7 +28,7 @@ contains
       Q(nx,:,1)  = Q(2,:,ny-1)
       Q(1,:,ny)  = Q(nx-1,:,2)
       Q(nx,:,ny) = Q(2,:,2)
-    enddo
+   ! enddo
    ! do j = 1, ny
    !   do i = 1, nx
    !     Q(i,:,j,1)  = Q(i,:,j,nz-1)
@@ -38,7 +38,7 @@ contains
 
   !> Cyclic boundary condition initialization for 4th-order accuracy
   !> Executed on CPU before main time-stepping loop
-  subroutine set_bc_cyclic4_init(id_accuracy, nx, ny,, Q)
+  subroutine set_bc_cyclic4_init(id_accuracy, nx, ny, Q)
     integer(kind=4), intent(in), value :: id_accuracy
     integer, intent(in), value         :: nx, ny
     real(8), intent(inout)             :: Q(nx,4,ny)
@@ -103,14 +103,14 @@ contains
     integer, intent(in), value         :: nx, ny
     real(8), intent(inout), device     :: Q(nx,4,ny)
     integer i, j, l
-    !$cuf kernel do(2)<<<*,*>>>
+    !$cuf kernel do(1)<<<*,*>>>
     !do k = 2, nz-1
       do j = 2, ny-1
         do l = 1, 4
           Q(1,l,j)  = Q(nx-1,l,j)
           Q(nx,l,j) = Q(2,l,j)
       enddo;enddo
-    !$cuf kernel do(2)<<<*,*>>>
+    !$cuf kernel do(1)<<<*,*>>>
     !do k = 2, nz-1
       do i = 2, nx-1
         do l = 1, 4
@@ -125,7 +125,7 @@ contains
         Q(1,l,ny)  = Q(nx-1,l,2)
         Q(nx,l,ny) = Q(2,l,2)
       enddo
-    !$cuf kernel do(2)<<<*,*>>>
+    !cuf kernel do(2)<<<*,*>>>
     !do j = 1, ny
     !  do i = 1, nx
     !    do l = 1, 5
@@ -141,7 +141,7 @@ contains
     integer, intent(in), value         :: nx, ny
     real(8), intent(inout), device     :: Q(nx,4,ny)
     integer i, j, l
-    !$cuf kernel do(2) <<<*,*>>>
+    !$cuf kernel do(1) <<<*,*>>>
     !do k = 3, nz-2
       do j = 3, ny-2
         do l = 1, 4
@@ -150,7 +150,7 @@ contains
           Q(nx-1,l,j) = Q(3,l,j)
           Q(nx,l,j) = Q(4,l,j)
       enddo;enddo
-    !$cuf kernel do(2) <<<*,*>>>
+    !$cuf kernel do(1) <<<*,*>>>
     !do k = 3, nz-2
       do i = 3, nx-2
         do l = 1, 4
@@ -179,7 +179,7 @@ contains
         Q(nx,l,ny-1)   = Q(4,l,3)
         Q(nx,l,ny)     = Q(4,l,4)
       enddo
-    !$cuf kernel do(2) <<<*,*>>>
+    !cuf kernel do(2) <<<*,*>>>
     !do j = 1, ny
     !  do i = 1, nx
     !    do l = 1, 5
@@ -197,7 +197,7 @@ contains
     integer, intent(in), value         :: nx, ny
     real(8), intent(inout), device     :: Q(nx,4,ny)
     integer i, j, l
-    !$cuf kernel do(2)<<<*,*>>>
+    !$cuf kernel do(1)<<<*,*>>>
     !do k = 4, nz-3
       do j = 4, ny-3
         do l = 1, 4
@@ -208,7 +208,7 @@ contains
           Q(nx-1,l,j) = Q(5,l,j)
           Q(nx,l,j)   = Q(6,l,j)
       enddo;enddo
-    !$cuf kernel do(2)<<<*,*>>>
+    !$cuf kernel do(1)<<<*,*>>>
     !do k = 4, nz-3
       do i = 4, nx-3
         do l = 1, 4
@@ -259,7 +259,7 @@ contains
         Q(nx,l,ny-1)   = Q(6,l,5)
         Q(nx,l,ny)     = Q(6,l,6)
       enddo
-    !$cuf kernel do(2)<<<*,*>>>
+    !cuf kernel do(2)<<<*,*>>>
     !do j = 1, ny
     !  do i = 1, nx
     !    do l = 1, 5
@@ -291,47 +291,6 @@ contains
   !  enddo;enddo;enddo
   !end subroutine set_bc_cyclic_z
 
-  !> Boundary condition for SGS viscosity and turbulent kinetic energy
-  !> Executed on GPU during main time-stepping loop
-  subroutine set_bc_mut_common(nx, ny, mut, qc2)
-    integer, intent(in), value     :: nx, ny
-    real(8), intent(inout), device :: mut(nx,ny), qc2(nx,ny)
-    integer i, j
-    !$cuf kernel do(2) <<<*,*>>>
-    !do k = 2, nz-1
-      do j = 2, ny-1
-        mut(1,j) = mut(nx-1,j)
-        mut(nx,j) = mut(2,j)
-        qc2(1,j) = qc2(nx-1,j)
-        qc2(nx,j) = qc2(2,j)
-      enddo
-    !$cuf kernel do(2) <<<*,*>>>
-    !do k = 2, nz-1
-      do i = 2, nx-1
-        mut(i,1) = mut(i,ny-1)
-        mut(i,ny) = mut(i,2)
-        qc2(i,1) = qc2(i,ny-1)
-        qc2(i,ny) = qc2(i,2)
-      enddo
-    !$cuf kernel do(1) <<<*,*>>>
-    !do k = 2, nz-1
-      mut(1,1) = mut(nx-1,ny-1)
-      mut(nx,1) = mut(2,ny-1)
-      mut(1,ny) = mut(nx-1,2)
-      mut(nx,ny) = mut(2,2)
-      qc2(1,1) = qc2(nx-1,ny-1)
-      qc2(nx,1) = qc2(2,ny-1)
-      qc2(1,ny) = qc2(nx-1,2)
-      qc2(nx,ny) = qc2(2,2)
-    !enddo
-    !$cuf kernel do(2) <<<*,*>>>
-    !do j = 1, ny
-    !  do i = 1, nx
-    !    mut(i,j,1) = mut(i,j,nz-1)
-    !    mut(i,j,nz) = mut(i,j,2)
-    !    qc2(i,j,1) = qc2(i,j,nz-1)
-    !    qc2(i,j,nz) = qc2(i,j,2)
-    !enddo;enddo
-  end subroutine set_bc_mut_common
+
 end module set_bc_common
 

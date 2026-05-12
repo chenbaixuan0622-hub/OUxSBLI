@@ -92,9 +92,9 @@ contains
     real(8), intent(out), device, contiguous :: QJ(nx,4,ny)      !< Q divided by Jacobian (device)
     real(4), intent(inout)                   :: ke0                 !< reference kinetic energy
     real(4), intent(inout)                   :: entropy0            !< reference entropy
-    real(8) xix_cpu(nx-1), etay_cpu(ny-1), zetaz_cpu(nz-1)
-    real(8) dtdxdy_cpu(nx-2,ny-2), dtdydz_cpu(ny-2,nz-2), dtdzdx_cpu(nx-2,nz-2)
-    real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
+    real(8) xix_cpu(nx-1), etay_cpu(ny-1)
+    real(8) dtdxdy_cpu(nx-2,ny-2)
+    real(4) rho1d(nx*ny), p1d(nx*ny), v1d(nx*ny*3)
     integer i, j, k, l, ierr
     ! set Q / Jacobian
     !do k = 1, nz

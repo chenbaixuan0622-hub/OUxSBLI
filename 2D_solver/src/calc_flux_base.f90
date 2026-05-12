@@ -15,11 +15,11 @@ module calc_flux_base
   use calc_roe_kernel_internal
   use calc_hybrid_kernel
   use calc_hybrid_kernel_internal
-  use calc_visc2
-  use calc_visc4
-  use calc_visc4_internal
-  use calc_visc4_les_internal
-  use calc_les
+  ! use calc_visc2
+  ! use calc_visc4
+  ! use calc_visc4_internal
+  ! use calc_visc4_les_internal
+  !use calc_les
   use set
   implicit none
   private
@@ -83,36 +83,36 @@ contains
   !> Low-dissipation scheme with shock-capturing capability via Ducros sensor
   !> Algorithm: F = (F_L + F_R)/2 + |A|(Q_L - Q_R)/2 where A is weighted Jacobian
   !> Dissipation modulated by Ducros sensor: f_d controls blend ratio
-  subroutine calc_conv_slau(id_scheme, nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, E, F, G)
+  subroutine calc_conv_slau(id_scheme, nx, ny,  inv_dx, inv_dy, Q, T, E, F)
     use mod_globals, only : id_accuracy
     real(2), intent(in), value               :: id_scheme           !< ID for scheme: real 2 means SLAU
     integer, intent(in), value               :: nx                  !< number of grid points in x direction
     integer, intent(in), value               :: ny                  !< number of grid points in y direction
-    integer, intent(in), value               :: nz                  !< number of grid points in z direction
+    !integer, intent(in), value               :: nz                  !< number of grid points in z direction
     real(8), intent(in), device, contiguous  :: inv_dx(nx-1)        !< inverse grid spacing x (1/dx)
     real(8), intent(in), device, contiguous  :: inv_dy(ny-1)        !< inverse grid spacing y (1/dy)
-    real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !< inverse grid spacing z (1/dz)
-    real(8), intent(in), device, contiguous  :: Q(nx,5,ny,nz)       !< conservative variables
-    real(8), intent(in), device, contiguous  :: T(nx,ny,nz)         !< temperature field
-    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< convective flux in x direction
-    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< convective flux in y direction
-    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
-    call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
+    !real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !< inverse grid spacing z (1/dz)
+    real(8), intent(in), device, contiguous  :: Q(nx,4,ny)       !< conservative variables
+    real(8), intent(in), device, contiguous  :: T(nx,ny)         !< temperature field
+    real(8), intent(out), device, contiguous :: E(4,nx-1,ny-2) !< convective flux in x direction
+    real(8), intent(out), device, contiguous :: F(4,nx-2,ny-1) !< convective flux in y direction
+    !real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2) !< convective flux in z direction
+    call calc_Ducros<<<blocks,threads>>>(nx, ny, inv_dx, inv_dy, Q, sensor)
     if (id_bc_x) then
-      call calc_slau_x<<<blocksE,threadsE>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
+      call calc_slau_x<<<blocksE,threadsE>>>(id_accuracy, nx, ny,  Q, sensor, E)
     else
-      call calc_slau_x_in<<<blocksE,threadsE>>>(nx, ny, nz, Q, sensor, E)
+      call calc_slau_x_in<<<blocksE,threadsE>>>(nx, ny,  Q, sensor, E)
     endif
     if (id_bc_y) then
-      call calc_slau_y<<<blocksF,threadsF>>>(id_accuracy, nx, ny, nz, Q, sensor, F)
+      call calc_slau_y<<<blocksF,threadsF>>>(id_accuracy, nx, ny,Q, sensor, F)
     else
-      call calc_slau_y_in<<<blocksF,threadsF>>>(nx, ny, nz, Q, sensor, F)
+      call calc_slau_y_in<<<blocksF,threadsF>>>(nx, ny, Q, sensor, F)
     endif
-    if (id_bc_z) then
-      call calc_slau_z<<<blocksG,threadsG>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
-    else
-      call calc_slau_z_in<<<blocksG,threadsG>>>(nx, ny, nz, Q, sensor, G)
-    endif
+    ! if (id_bc_z) then
+    !   call calc_slau_z<<<blocksG,threadsG>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
+    ! else
+    !   call calc_slau_z_in<<<blocksG,threadsG>>>(nx, ny, nz, Q, sensor, G)
+    ! endif
   end subroutine calc_conv_slau
 
 
@@ -121,37 +121,37 @@ contains
   !> Algorithm: F = (F_L + F_R)/2 - (1/2)Σ|λ_i|*(p_i·r_i) wave reconstruction
   !> Where λ_i are Roe eigenvalues, p_i are wave strengths, r_i are eigenvectors
   !> Entropy fix via sensor prevents expansion shocks at sonic points
-  subroutine calc_conv_roe(id_scheme, nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, E, F, G)
-    use mod_globals, only : id_accuracy
-    real(4), intent(in), value               :: id_scheme           !< ID for scheme: real 4 means Roe
-    integer, intent(in), value               :: nx                  !< number of grid points in x direction
-    integer, intent(in), value               :: ny                  !< number of grid points in y direction
-    integer, intent(in), value               :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device, contiguous  :: inv_dx(nx-1)        !< inverse grid spacing x (1/dx)
-    real(8), intent(in), device, contiguous  :: inv_dy(ny-1)        !< inverse grid spacing y (1/dy)
-    real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !< inverse grid spacing z (1/dz)
-    real(8), intent(in), device, contiguous  :: Q(nx,5,ny,nz)       !< conservative variables
-    real(8), intent(in), device, contiguous  :: T(nx,ny,nz)         !< temperature field
-    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< convective flux in x direction
-    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< convective flux in y direction
-    real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
-    call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
-    if (id_bc_x) then
-      call calc_roe_x<<<blocksE,threadsE>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
-    else
-      call calc_roe_x_in<<<blocksE,threadsE>>>(nx, ny, nz, Q, sensor, E)
-    endif
-    if (id_bc_y) then
-      call calc_roe_y<<<blocksF,threadsF>>>(id_accuracy, nx, ny, nz, Q, sensor, F)
-    else
-      call calc_roe_y_in<<<blocksF,threadsF>>>(nx, ny, nz, Q, sensor, F)
-    endif
-    if (id_bc_z) then
-      call calc_roe_z<<<blocksG,threadsG>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
-    else
-      call calc_roe_z_in<<<blocksG,threadsG>>>(nx, ny, nz, Q, sensor, G)
-    endif
-  end subroutine calc_conv_roe
+  ! subroutine calc_conv_roe(id_scheme, nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, E, F, G)
+  !   use mod_globals, only : id_accuracy
+  !   real(4), intent(in), value               :: id_scheme           !< ID for scheme: real 4 means Roe
+  !   integer, intent(in), value               :: nx                  !< number of grid points in x direction
+  !   integer, intent(in), value               :: ny                  !< number of grid points in y direction
+  !   integer, intent(in), value               :: nz                  !< number of grid points in z direction
+  !   real(8), intent(in), device, contiguous  :: inv_dx(nx-1)        !< inverse grid spacing x (1/dx)
+  !   real(8), intent(in), device, contiguous  :: inv_dy(ny-1)        !< inverse grid spacing y (1/dy)
+  !   real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !< inverse grid spacing z (1/dz)
+  !   real(8), intent(in), device, contiguous  :: Q(nx,5,ny,nz)       !< conservative variables
+  !   real(8), intent(in), device, contiguous  :: T(nx,ny,nz)         !< temperature field
+  !   real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< convective flux in x direction
+  !   real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< convective flux in y direction
+  !   real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< convective flux in z direction
+  !   call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
+  !   if (id_bc_x) then
+  !     call calc_roe_x<<<blocksE,threadsE>>>(id_accuracy, nx, ny, nz, Q, sensor, E)
+  !   else
+  !     call calc_roe_x_in<<<blocksE,threadsE>>>(nx, ny, nz, Q, sensor, E)
+  !   endif
+  !   if (id_bc_y) then
+  !     call calc_roe_y<<<blocksF,threadsF>>>(id_accuracy, nx, ny, nz, Q, sensor, F)
+  !   else
+  !     call calc_roe_y_in<<<blocksF,threadsF>>>(nx, ny, nz, Q, sensor, F)
+  !   endif
+  !   if (id_bc_z) then
+  !     call calc_roe_z<<<blocksG,threadsG>>>(id_accuracy, nx, ny, nz, Q, sensor, G)
+  !   else
+  !     call calc_roe_z_in<<<blocksG,threadsG>>>(nx, ny, nz, Q, sensor, G)
+  !   endif
+  ! end subroutine calc_conv_roe
 
 
   !> Compute convective fluxes using hybrid KEEP/SLAU scheme  
@@ -159,7 +159,7 @@ contains
   !> Blending formula: F_hybrid = (1-f_d)·F_keep + f_d·F_slau where f_d ∈ [0,1]
   !> Preserves vortex structures (f_d≈0) and captures shocks accurately (f_d≈1)
   !> Ducros shock sensor: f_d = (∇·u)²/[(∇·u)² + (∇×u)² + ε]
-  subroutine calc_conv_hybrid(id_scheme, nx, ny,  inv_dx, inv_dy,  Q, T, E, F, G)
+  subroutine calc_conv_hybrid(id_scheme, nx, ny,  inv_dx, inv_dy,  Q, T, E, F)
     use mod_globals, only : id_accuracy
     real(8), intent(in), value               :: id_scheme           !< ID for scheme: real 8 means Hybrid
     integer, intent(in), value               :: nx                  !< number of grid points in x direction
@@ -213,7 +213,8 @@ contains
     real(8), intent(out), device, contiguous :: F(4,nx-2,ny-1) !> Flux in y direction
     !real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> Flux in z direction
     integer stat, i, j, k
-    call calc_quantities_3D(nx, ny,  Jacobian, QJ, Q, T)
+    call calc_quantities_2D(nx, ny,  Jacobian, QJ, Q, T)
+    !call calc_quantities_3D(nx, ny,  Jacobian, QJ, Q, T)
     call calc_conv(id_scheme, nx, ny, inv_dx, inv_dy, Q, T, E, F)
   end subroutine calc_EFG_Euler
 
@@ -242,7 +243,7 @@ contains
     !real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> z-direction flux (convective + viscous)
     integer stat
     ! Step 1: Decode Q and compute T(rho) and mu(T) via Sutherland's formula
-    call calc_quantities_T_3D(nx, ny, Jacobian, QJ, Q, T, mu)
+    call calc_quantities_T_2D(nx, ny, Jacobian, QJ, Q, T, mu)   !call calc_quantities_T_3D(nx, ny, Jacobian, QJ, Q, T, mu)
     ! Step 2: Compute convective fluxes (KEEP/SLAU/Roe/Hybrid depending on id_scheme)
     call calc_conv(id_scheme, nx, ny, inv_dx, inv_dy, Q, T, E, F)
     ! Step 3: Add viscous fluxes (choose 2nd or 4th-order stencils)
@@ -297,7 +298,7 @@ contains
     integer stat
     mut = 0.d0
     qc2 = 0.d0
-    call calc_quantities_T_3D(nx, ny, Jacobian, QJ, Q, T, mu)
+    call calc_quantities_T_2D(nx, ny, Jacobian, QJ, Q, T, mu) !    call calc_quantities_T_3D(nx, ny, Jacobian, QJ, Q, T, mu)
     call calc_conv(id_scheme, nx, ny, inv_dx, inv_dy, Q, T, E, F)
     call calc_mut<<<blocks,threads>>>(nx, ny, inv_dx, inv_dy, Q, mut, qc2)
     call set_bc_mut(nx, ny, mut, qc2)

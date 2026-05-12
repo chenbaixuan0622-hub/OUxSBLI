@@ -43,8 +43,8 @@
       ene  = (-RV3 * T(1) + RV1_RV2 * T(2) + RV1_RV3 * T(3) - RV2 * T(4)) * R_over_gamma_1
       ! kinetic energy
       ene  = ene + ((RV1 * (u2*u3 + v2*v3 )) &
-                  - (RV2 * (u2*u4 + v2*v4 ) &
-                   + RV3 * (u1*u3 + v1*v3 )))
+                  - (RV2 * (u2*u4 + v2*v4 ) + &
+                    RV3 * (u1*u3 + v1*v3 )))
       ! pressure diffusion
       F(4) = ene + (two_third * (uu(2)*p(3)+uu(3)*p(2)) &
                 - one_twelfth * (uu(2)*p(4)+uu(4)*p(2) &
@@ -52,8 +52,8 @@
     end block
   end function KEEP4
 
-
-  pure attributes(device) function KEEP6(id_accuracy, rho, u, v, uu, p, T, Normal) result(F)
+ 
+ pure attributes(device) function KEEP6(id_accuracy, rho, u, v, uu, p, T, Normal) result(F)
     integer(8), intent(in), value     :: id_accuracy
     real(8), intent(in), dimension(6) :: rho, u, v, uu, p, T
     real(8), intent(in), dimension(5) :: Normal
@@ -91,19 +91,19 @@
       ! internal energy
       ene = (RV6 * T(1) + RV3_RV5 * T(2) + RV1_RV2_RV4 * T(3) + RV1_RV3_RV6 * T(4) + RV2_RV5 * T(5) + RV4 * T(6)) * R_over_gamma_1
       ! kinetic energy
-      ene = ene + RV1 * (u(3)*u(4) + v(3)*v(4) ) &
-               - (RV2 * (u(3)*u(5) + v(3)*v(5) ) &
-                + RV3 * (u(2)*u(4) + v(2)*v(4) )) &
-               + (RV4 * (u(3)*u(6) + v(3)*v(6) ) &
-                + RV5 * (u(2)*u(5) + v(2)*v(5) ) &
-                + RV6 * (u(1)*u(4) + v(1)*v(4) ))
+      ene = ene + RV1 * (u(3)*u(4) + v(3)*v(4) )- (RV2 * (u(3)*u(5) + v(3)*v(5) )+ RV3 * (u(2)*u(4) + v(2)*v(4) ))+ (RV4 * (u(3)*u(6) + v(3)*v(6) )+ RV5 * (u(2)*u(5) + v(2)*v(5) )+ RV6 * (u(1)*u(4) + v(1)*v(4) ))
+               !- (RV2 * (u(3)*u(5) + v(3)*v(5) ) &
+                !+ RV3 * (u(2)*u(4) + v(2)*v(4) )) &
+               !+ (RV4 * (u(3)*u(6) + v(3)*v(6) ) &
+                !+ RV5 * (u(2)*u(5) + v(2)*v(5) ) &
+                !+ RV6 * (u(1)*u(4) + v(1)*v(4) ))
       ! pressure diffusion
-      F(4) = ene + (0.75d0 * (uu(3)*p(4) + uu(4)*p(3)) &
-                  - 0.15d0 * (uu(3)*p(5) + uu(5)*p(3) &
-                            + uu(2)*p(4) + uu(4)*p(2)) &
-                           + (uu(3)*p(6) + uu(6)*p(3) &
-                            + uu(2)*p(5) + uu(5)*p(2) &
-                            + uu(1)*p(4) + uu(4)*p(1)) * one_60)
-    end block
+      F(4) = ene + (0.75d0 * (uu(3)*p(4) + uu(4)*p(3))- 0.15d0 * (uu(3)*p(5) + uu(5)*p(3) +uu(2)*p(4) + uu(4)*p(2))+ (uu(3)*p(6) + uu(6)*p(3)+uu(2)*p(5) + uu(5)*p(2)+uu(1)*p(4) + uu(4)*p(1)) * one_60)
+                  !- 0.15d0 * (uu(3)*p(5) + uu(5)*p(3) + &
+                            ! uu(2)*p(4) + uu(4)*p(2)) &
+                           !+ (uu(3)*p(6) + uu(6)*p(3)+ &
+                             !uu(2)*p(5) + uu(5)*p(2)+&
+                             !uu(1)*p(4) + uu(4)*p(1)) * one_60)
+   end block
   end function KEEP6
 
