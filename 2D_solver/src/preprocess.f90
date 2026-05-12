@@ -36,21 +36,21 @@ contains
     real(8), intent(out), allocatable, device :: etay(:)   !< coordinate transform metric in y
    ! real(8), intent(out), allocatable, device :: zetaz(:)  !< coordinate transform metric in z
     real(8), intent(out), allocatable, device :: Jacobian(:,:)  !< Jacobian determinant for coordinate transform
-    real(8), intent(out), allocatable, device :: ruvwp(:,:,:,:) !< work array for momentum/velocities
-    real(8), intent(out), allocatable, device :: T(:,:,:)   !< temperature field
-    real(8), intent(out), allocatable, device :: mu(:,:,:)  !< molecular viscosity
-    real(8), intent(out), allocatable, device :: mut(:,:,:) !< turbulent viscosity (LES)
-    real(8), intent(out), allocatable, device :: qc2(:,:,:) !< quadratic constitutive terms
-    real(8), intent(out), allocatable, device :: E(:,:,:,:) !< flux in x direction
-    real(8), intent(out), allocatable, device :: F(:,:,:,:) !< flux in y direction
+    real(8), intent(out), allocatable, device :: ruvwp(:,:,:) !< work array for momentum/velocities
+    real(8), intent(out), allocatable, device :: T(:,:)   !< temperature field
+    real(8), intent(out), allocatable, device :: mu(:,:)  !< molecular viscosity
+    real(8), intent(out), allocatable, device :: mut(:,:) !< turbulent viscosity (LES)
+    real(8), intent(out), allocatable, device :: qc2(:,:) !< quadratic constitutive terms
+    real(8), intent(out), allocatable, device :: E(:,:,:) !< flux in x direction
+    real(8), intent(out), allocatable, device :: F(:,:,:) !< flux in y direction
     !real(8), intent(out), allocatable, device :: G(:,:,:,:) !< flux in z direction
     integer ierr
-    allocate(ruvwp(5,nx,ny), E(5,nx-1,ny-2), F(5,nx-2,ny-1),  stat=ierr)
+    allocate(ruvwp(4,nx,ny), E(4,nx-1,ny-2), F(4,nx-2,ny-1),  stat=ierr)
     allocate(dtdxdy(nx-2,ny-2),  xix(nx-1), etay(ny-1), Jacobian(nx,ny), stat=ierr)
     if (kind(id_visc) == 2) then
-      allocate(T(nx,ny), mu(1,1,1), mut(1,1,1), qc2(1,1,1), stat=ierr)
+      allocate(T(nx,ny), mu(1,1), mut(1,1), qc2(1,1), stat=ierr)
     elseif (kind(id_visc) == 4) then
-      allocate(T(nx,ny), mu(nx,ny), mut(1,1,1), qc2(1,1,1), stat=ierr)
+      allocate(T(nx,ny), mu(nx,ny), mut(1,1), qc2(1,1), stat=ierr)
     elseif (kind(id_visc) == 8) then
       allocate(T(nx,ny), mu(nx,ny), mut(nx,ny), qc2(nx,ny), stat=ierr)
     endif
@@ -139,7 +139,7 @@ contains
       overlap = 1
     endif
     call make_1d_for_print(nx, ny, Jacobian_cpu, Q, rho1d, p1d, v1d)
-    call print_vtk(0, nx, ny,  myrank+1, nranks, x, y, rho1d, p1d, v1d, ke0, entropy0)
+    call print_vtk(0, nx, ny, x, y, rho1d, p1d, v1d)     !(0, nx, ny,  myrank+1, nranks, x, y, rho1d, p1d, v1d, ke0, entropy0)
     call MPI_SEND(ke0,      1, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
     call MPI_SEND(entropy0, 1, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
   end subroutine pre_calc
