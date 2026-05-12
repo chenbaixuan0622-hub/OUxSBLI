@@ -34,7 +34,8 @@ contains
     integer, intent(in)    :: mygpu                             !< GPU index for this rank
     integer, intent(in)    :: nx                                !< x grid dimension
     integer, intent(in)    :: ny                                !< y grid dimension
-   !integer    :: nz=1, z(nz)                                !< z grid dimension
+   integer    :: nz=1
+   real(8)    ::z(nz)                                !< z grid dimension
     real(8), intent(in)    :: x(nx)                             !< x coordinates
     real(8), intent(in)    :: dx_cpu(nx-1)                      !< inverse x spacing (host)
     real(8), intent(in)    :: y(ny)                             !< y coordinates
@@ -102,10 +103,43 @@ contains
         enddo
       endif
       if (mod(myrank, 2) == 0) then
-        call send_recv_for_print_even(myrank, nranks, t2, nx, ny,  x, y, Jacobian_cpu, QJ, Q, ke0, entropy0)
+
+        do j = 1, ny
+          do i = 1, nx
+            do l = 1, 4
+              Q(l, i, j) = Q(i, l, j)
+            end do
+          end do
+        end do
+
+           do j = 1, ny
+          do i = 1, nx
+            do l = 1, 4
+              QJ(l, i, j) = QJ(i, l, j)
+            end do
+          end do
+        end do
+
+        call send_recv_for_print_even(myrank, nranks, t2, nx, ny,nz,  x, y,z, Jacobian_cpu, QJ, Q, ke0, entropy0)
       else
-        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny,  x, y,  Jacobian_cpu, Q, ke0, entropy0)
+        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny,nz,  x, y,z,  Jacobian_cpu, Q, ke0, entropy0)
       endif
+
+        do j = 1, ny
+          do i = 1, nx
+            do l = 1, 4
+              Q(i, l, j) = Q(l, i, j)
+            end do
+          end do
+        end do
+
+         do j = 1, ny
+          do i = 1, nx
+            do l = 1, 4
+              QJ(i, l, j) = QJ(l, i, j)
+            end do
+          end do
+        end do
     enddo
 
     if (mod(myrank,2) == 0) then
