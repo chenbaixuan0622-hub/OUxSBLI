@@ -11,8 +11,8 @@ module calc_flux_base
   use calc_keep_kernel_internal
   use calc_slau_kernel
   use calc_slau_kernel_internal
-  use calc_roe_kernel
-  use calc_roe_kernel_internal
+  !use calc_roe_kernel
+  !use calc_roe_kernel_internal
   use calc_hybrid_kernel
   use calc_hybrid_kernel_internal
   ! use calc_visc2
@@ -29,7 +29,7 @@ module calc_flux_base
   !> Eliminates repeated device heap alloc/free on every RK stage.
   real(sp), allocatable, device, save :: sensor(:,:)
   interface calc_conv
-    module procedure calc_conv_keep, calc_conv_slau, calc_conv_roe, calc_conv_hybrid
+    module procedure calc_conv_keep, calc_conv_slau, calc_conv_hybrid ! calc_conv_roe
   end interface calc_conv
 
   interface calc_EFG

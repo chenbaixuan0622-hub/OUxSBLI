@@ -10,15 +10,16 @@ module calc_time_dev
   use mod_constant, only : one_third
   use calc_flux_base
   use calc_steps
-  use calc_rescale
+  !use calc_rescale
   use calc_para
   use set
   use preprocess
   use print
   implicit none
   interface RungeKutta
-    module procedure RungeKutta_3rd, RungeKutta_3rd_rescale, RungeKutta_4th, RungeKutta_4th_rescale
+    module procedure RungeKutta_3rd  !RungeKutta_4th
   end interface
+
 contains 
 
   !> 3rd-order TVD Runge-Kutta time stepping without rescaling
@@ -34,8 +35,8 @@ contains
     integer, intent(in)    :: mygpu                             !< GPU index for this rank
     integer, intent(in)    :: nx                                !< x grid dimension
     integer, intent(in)    :: ny                                !< y grid dimension
-   integer    :: nz=1
-   real(8)    ::z(nz)                                !< z grid dimension
+    integer    :: nz=1
+    real(8)    :: z(nz)                                !< z grid dimension
     real(8), intent(in)    :: x(nx)                             !< x coordinates
     real(8), intent(in)    :: dx_cpu(nx-1)                      !< inverse x spacing (host)
     real(8), intent(in)    :: y(ny)                             !< y coordinates
@@ -52,6 +53,10 @@ contains
     real(8), allocatable, device :: xix(:), etay(:), Jacobian(:,:), dtdx(:,:), dtdy(:,:) !, dtdydz(:,:), dtdzdx(:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
+
+    real(8) tmpQ(4,nx,ny) 
+    real(8), allocatable, device :: tmpQJ(:,:,:)
+    allocate(tmpQJ(4,nx,ny))
 
     call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
     ! count GPU
@@ -102,44 +107,31 @@ contains
           call set_bc(myrank, nx, ny, Jacobian, QJ)
         enddo
       endif
+
+      do j = 1, ny
+          do i = 1, nx
+            do l = 1, 4
+              tmpQ(l, i, j) = Q(i, l, j)   !Q(l, i, j) = Q(i, l, j)
+              tmpQJ(l, i, j) = QJ(i, l, j) !QJ(l, i, j) = QJ(i, l, j)
+            end do
+          end do
+      end do
+
       if (mod(myrank, 2) == 0) then
-
-        do j = 1, ny
-          do i = 1, nx
-            do l = 1, 4
-              Q(l, i, j) = Q(i, l, j)
-            end do
-          end do
-        end do
-
-           do j = 1, ny
-          do i = 1, nx
-            do l = 1, 4
-              QJ(l, i, j) = QJ(i, l, j)
-            end do
-          end do
-        end do
-
-        call send_recv_for_print_even(myrank, nranks, t2, nx, ny,nz,  x, y,z, Jacobian_cpu, QJ, Q, ke0, entropy0)
+        call send_recv_for_print_even(myrank, nranks, t2, nx, ny, nz,  x, y, z, Jacobian_cpu, tmpQJ, tmpQ, ke0, entropy0)
       else
-        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny,nz,  x, y,z,  Jacobian_cpu, Q, ke0, entropy0)
+        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, nz,  x, y, z,  Jacobian_cpu, tmpQ, ke0, entropy0)
       endif
 
-        do j = 1, ny
-          do i = 1, nx
-            do l = 1, 4
-              Q(i, l, j) = Q(l, i, j)
-            end do
+      do j = 1, ny
+        do i = 1, nx
+          do l = 1, 4
+            Q(i, l, j) = tmpQ(l, i, j)
+            QJ(i, l, j) = tmpQJ(l, i, j)
           end do
         end do
+      end do
 
-         do j = 1, ny
-          do i = 1, nx
-            do l = 1, 4
-              QJ(i, l, j) = QJ(l, i, j)
-            end do
-          end do
-        end do
     enddo
 
     if (mod(myrank,2) == 0) then
@@ -257,7 +249,8 @@ contains
     integer(4), intent(in) :: id_RungeKutta
     integer(2), intent(in) :: id_rescale
     integer, intent(in)    :: myrank, mygpu, nx, ny
-   ! integer :: nz =1, z(nz)
+    integer :: nz =1
+    real(8) z(nz)
     real(8), intent(in)    :: x(nx), dx_cpu(nx-1)
     real(8), intent(in)    :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)    ::  Jacobian_cpu(nx,ny)
@@ -270,6 +263,10 @@ contains
     real(8), allocatable, device :: xix(:), etay(:), Jacobian(:,:), dtdx(:,:), dtdy(:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
+
+    real(8) tmpQ(4,nx,ny) 
+    real(8), allocatable, device :: tmpQJ(:,:,:)
+    allocate(tmpQJ(4,nx,ny))
 
     call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
     ! count GPU
@@ -319,11 +316,31 @@ contains
           call set_bc(myrank, nx, ny, Jacobian, QJ)
         enddo
       endif
+
+      do j = 1, ny
+          do i = 1, nx
+            do l = 1, 4
+              tmpQ(l, i, j) = Q(i, l, j)
+              tmpQJ(l, i, j) = QJ(i, l, j)
+            end do
+          end do
+      end do
+
       if (mod(myrank, 2) == 0) then
-        call send_recv_for_print_even(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, QJ, Q, ke0, entropy0)
+        call send_recv_for_print_even(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, tmpQJ, tmpQ, ke0, entropy0)
       else
-        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, Q, ke0, entropy0)
+        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, tmpQ, ke0, entropy0)
       endif
+
+      do j = 1, ny
+          do i = 1, nx
+            do l = 1, 4
+              Q(i, l, j) = tmpQ(l, i, j)
+              QJ(i, l, j) = tmpQJ(l, i, j)
+            end do
+          end do
+      end do
+
     enddo
 
     if (mod(myrank,2) == 0) then
@@ -440,5 +457,5 @@ contains
   !   endif
   !   print *, "myrank is ", myrank, " deallocate GPU memory"
   ! end subroutine RungeKutta_4th_rescale
-end module calc_time_dev
 
+end module calc_time_dev
