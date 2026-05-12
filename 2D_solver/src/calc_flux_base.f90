@@ -206,9 +206,9 @@ contains
     real(8), intent(in), device, contiguous  :: QJ(nx,4,ny)      !> Q(rho, rhou, rhov, rhow, E) / Jacobian
     real(8), intent(out), device, contiguous :: Q(nx,4,ny)       !> Q(rho, u, v, w, p)
     real(8), intent(out), device, contiguous :: T(nx,ny)         !> temperature
-    real(8), intent(out), device, contiguous :: mu(1,1,1)           !> viscosity, size is (1,1,1) in case of Euler
-    real(8), intent(out), device, contiguous :: mut(1,1,1)          !> SGS viscosity, size is (1,1,1) in case of Euler
-    real(8), intent(out), device, contiguous :: qc2(1,1,1)          !> SGS kinetic energy, size is (1,1,1) in case of Euler
+    real(8), intent(out), device, contiguous :: mu(1,1)           !> viscosity, size is (1,1,1) in case of Euler
+    real(8), intent(out), device, contiguous :: mut(1,1)          !> SGS viscosity, size is (1,1,1) in case of Euler
+    real(8), intent(out), device, contiguous :: qc2(1,1)          !> SGS kinetic energy, size is (1,1,1) in case of Euler
     real(8), intent(out), device, contiguous :: E(4,nx-1,ny-2) !> Flux in x direction
     real(8), intent(out), device, contiguous :: F(4,nx-2,ny-1) !> Flux in y direction
     !real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> Flux in z direction
@@ -236,8 +236,8 @@ contains
     real(8), intent(out), device, contiguous :: Q(nx,4,ny)       !> Q(rho, u, v, w, p) primitive variables
     real(8), intent(out), device, contiguous :: T(nx,ny)         !> temperature field (for viscosity & heat flux)
     real(8), intent(out), device, contiguous :: mu(nx,ny)        !> molecular viscosity via Sutherland's law
-    real(8), intent(out), device, contiguous :: mut(1,1,1)          !> SGS turbulent viscosity (unused for NS)
-    real(8), intent(out), device, contiguous :: qc2(1,1,1)          !> SGS kinetic energy (unused for NS)
+    real(8), intent(out), device, contiguous :: mut(1,1)          !> SGS turbulent viscosity (unused for NS)
+    real(8), intent(out), device, contiguous :: qc2(1,1)          !> SGS kinetic energy (unused for NS)
     real(8), intent(out), device, contiguous :: E(4,nx-1,ny-2) !> x-direction flux (convective + viscous)
     real(8), intent(out), device, contiguous :: F(4,nx-2,ny-1) !> y-direction flux (convective + viscous)
     !real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> z-direction flux (convective + viscous)

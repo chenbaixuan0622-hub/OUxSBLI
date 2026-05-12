@@ -5,7 +5,7 @@ module calc_hybrid_kernel
   use calc_hybrid
   implicit none
   private
-  public calc_hybrid_x, calc_hybrid_y, calc_hybrid_z
+  public calc_hybrid_x, calc_hybrid_y !, calc_hybrid_z
   real(8), parameter :: one_24        = 1.d0 / 24.d0
   real(8), parameter :: one_48        = 1.d0 / 48.d0
   real(8), parameter :: one_60        = 1.d0 / 60.d0

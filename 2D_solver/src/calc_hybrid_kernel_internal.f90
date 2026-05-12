@@ -12,7 +12,7 @@ module calc_hybrid_kernel_internal
   use calc_hybrid
   implicit none
   private
-  public calc_hybrid_x_in, calc_hybrid_y_in, calc_hybrid_z_in
+  public calc_hybrid_x_in, calc_hybrid_y_in !, calc_hybrid_z_in
   !> io = 0, 1, 2 for 2nd, 4th, 6th order — compile-time stencil half-width.
   !> Derived from id_accuracy kind: kind=2 → io=0, kind=4 → io=1, kind=8 → io=2.
   integer, parameter :: io = kind(id_accuracy) / 3

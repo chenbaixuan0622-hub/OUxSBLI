@@ -34,7 +34,7 @@ contains
     integer, intent(in)    :: mygpu                             !< GPU index for this rank
     integer, intent(in)    :: nx                                !< x grid dimension
     integer, intent(in)    :: ny                                !< y grid dimension
-    !integer, intent(in)    :: nz                                !< z grid dimension
+   !integer    :: nz=1, z(nz)                                !< z grid dimension
     real(8), intent(in)    :: x(nx)                             !< x coordinates
     real(8), intent(in)    :: dx_cpu(nx-1)                      !< inverse x spacing (host)
     real(8), intent(in)    :: y(ny)                             !< y coordinates
@@ -46,9 +46,9 @@ contains
     integer i, j, k, l, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireq2(2)
     integer istat(MPI_STATUS_SIZE), istat2(MPI_STATUS_SIZE,2)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: ruvwp(:,:,:,:), QJ(:,:,:,:), QJ2(:,:,:,:), E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
-    real(8), allocatable, device :: T(:,:,:), mu(:,:,:), mut(:,:,:), qc2(:,:,:)
-    real(8), allocatable, device :: xix(:), etay(:), Jacobian(:,:), dtdxdy(:,:) !, dtdydz(:,:), dtdzdx(:,:)
+    real(8), allocatable, device :: ruvwp(:,:,:), QJ(:,:,:), QJ2(:,:,:), E(:,:,:), F(:,:,:)
+    real(8), allocatable, device :: T(:,:), mu(:,:), mut(:,:), qc2(:,:)
+    real(8), allocatable, device :: xix(:), etay(:), Jacobian(:,:), dtdx(:,:), dtdy(:,:) !, dtdydz(:,:), dtdzdx(:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
 
@@ -58,7 +58,7 @@ contains
     print *, "rank", myrank, " has found ", ndevices, " GPU devices"
     if (mod(myrank,2) == 0) then
       call check_gpu(mygpu)
-      call allocate_device_mem(myrank, nx, ny, dtdxdy, xix, etay, Jacobian, ruvwp, T, mu, mut, qc2, E, F)
+      call allocate_device_mem(myrank, nx, ny, dtdx,dtdy, xix, etay, Jacobian, ruvwp, T, mu, mut, qc2, E, F)
       allocate(QJ(nx,4,ny), QJ2(nx,4,ny), stat=ierr)
       if (ierr /= 0) then
         print *, "myrank is ", myrank, " memory allocation failed", ierr
@@ -66,7 +66,7 @@ contains
         print *, "myrank is ", myrank, " memory allocation has completed"
       endif
       call pre_calc(nx, ny,  myrank, nranks, x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q, overlap, &
-                    dtdxdy, xix, etay, Jacobian, QJ, ke0, entropy0)
+                    dtdx,dtdy, xix, etay, Jacobian, QJ, ke0, entropy0)
     else
       call MPI_RECV(ke0,      1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
       call MPI_RECV(entropy0, 1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
@@ -86,30 +86,30 @@ contains
           ! Step 1: Compute fluxes E, F, G from current state QJ
           call calc_EFG(id_visc, nx, ny, xix, etay,  Jacobian, QJ, ruvwp, T, mu, mut, qc2, E, F)
           ! Step 2a: TVD RK3 Stage 1 - compute Q(1), store in QJ2
-          call calc_step1<<<blocks,threads>>>(nx, ny, 1.d0, dtdxdy, E, F, QJ, QJ2)
+          call calc_step1<<<blocks,threads>>>(nx, ny, 1.d0, dtdx,dtdy, E, F, QJ, QJ2)
           ! Enforce boundary conditions at cell interfaces (extrapolation or characteristic-based)
           call set_bc(myrank, nx, ny, Jacobian, QJ2)
 
           ! Step 2b: TVD RK3 Stage 2 - blend Q(1) with Q^n, store in QJ2
           call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJ2, ruvwp, T, mu, mut, qc2, E, F)
-          call calc_step2_3<<<blocks,threads>>>(nx, ny, 0.75d0, 0.25d0, 0.25d0, 1.d0, dtdxdy, E, F, QJ, QJ2)
+          call calc_step2_3<<<blocks,threads>>>(nx, ny, 0.75d0, 0.25d0, 0.25d0, 1.d0, dtdx,dtdy, E, F, QJ, QJ2)
           call set_bc(myrank, nx, ny, Jacobian, QJ2)
 
           ! Step 2c: TVD RK3 Stage 3 - final solution Q^(n+1), store in QJ (swap arrays)
           call calc_EFG(id_visc, nx, ny,  xix, etay, Jacobian, QJ2, ruvwp, T, mu, mut, qc2, E, F)
-          call calc_step2_3<<<blocks,threads>>>(nx, ny, 2.d0, 1.d0, 2.d0, one_third, dtdxdy, E, F, QJ2, QJ)
+          call calc_step2_3<<<blocks,threads>>>(nx, ny, 2.d0, 1.d0, 2.d0, one_third, dtdx,dtdy, E, F, QJ2, QJ)
           call set_bc(myrank, nx, ny, Jacobian, QJ)
         enddo
       endif
       if (mod(myrank, 2) == 0) then
         call send_recv_for_print_even(myrank, nranks, t2, nx, ny,  x, y, Jacobian_cpu, QJ, Q, ke0, entropy0)
       else
-        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, Q, ke0, entropy0)
+        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny,  x, y,  Jacobian_cpu, Q, ke0, entropy0)
       endif
     enddo
 
     if (mod(myrank,2) == 0) then
-      deallocate(ruvwp, T, mu, mut, qc2, QJ, QJ2, E, F, xix, etay, Jacobian, dtdxdy)
+      deallocate(ruvwp, T, mu, mut, qc2, QJ, QJ2, E, F, xix, etay, Jacobian, dtdx,dtdy)
     endif
     print *, "myrank is ", myrank, " deallocate GPU memory"
   end subroutine RungeKutta_3rd
@@ -223,6 +223,7 @@ contains
     integer(4), intent(in) :: id_RungeKutta
     integer(2), intent(in) :: id_rescale
     integer, intent(in)    :: myrank, mygpu, nx, ny
+   ! integer :: nz =1, z(nz)
     real(8), intent(in)    :: x(nx), dx_cpu(nx-1)
     real(8), intent(in)    :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)    ::  Jacobian_cpu(nx,ny)
@@ -230,9 +231,9 @@ contains
     integer i, j, k, l, t1, t2, overlap, ierr, nranks, ndevices, stat, ireq, ireq2(2)
     integer istat(MPI_STATUS_SIZE), istat2(MPI_STATUS_SIZE,2)
     ! GPU !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    real(8), allocatable, device :: ruvwp(:,:,:,:), QJ(:,:,:,:), QJs(:,:,:,:), Rs(:,:,:,:), E(:,:,:,:), F(:,:,:,:)
-    real(8), allocatable, device :: T(:,:,:), mu(:,:,:), mut(:,:,:), qc2(:,:,:)
-    real(8), allocatable, device :: xix(:), etay(:), Jacobian(:,:), dtdxdy(:,:)
+    real(8), allocatable, device :: ruvwp(:,:,:), QJ(:,:,:), QJs(:,:,:), Rs(:,:,:), E(:,:,:), F(:,:,:)
+    real(8), allocatable, device :: T(:,:), mu(:,:), mut(:,:), qc2(:,:)
+    real(8), allocatable, device :: xix(:), etay(:), Jacobian(:,:), dtdx(:,:), dtdy(:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
 
@@ -244,11 +245,11 @@ contains
     endif
     if (mod(myrank,2) == 0) then
       call check_gpu(mygpu)
-      call allocate_device_mem(myrank, nx, ny, dtdxdy, xix, etay, Jacobian, ruvwp, T, mu, mut, qc2, E, F)
+      call allocate_device_mem(myrank, nx, ny, dtdx,dtdy, xix, etay, Jacobian, ruvwp, T, mu, mut, qc2, E, F)
       allocate(QJ(nx,4,ny), QJs(nx,4,ny), Rs(nx-2,4,ny-2))
       print *, "myrank is ", myrank, " memory allocation has completed"
       call pre_calc(nx, ny, myrank, nranks, x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q, overlap, &
-                    dtdxdy, xix, etay, Jacobian, QJ, ke0, entropy0)
+                    dtdx,dtdy, xix, etay, Jacobian, QJ, ke0, entropy0)
       Rs = 0.d0
     else
       call MPI_RECV(ke0,      1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
@@ -265,22 +266,22 @@ contains
         do t1 = 1, nt
           ! Stage 1: k1 = RHS(Q^n), coefficients: 0.5*dt applied, weight 1.0 to Rs
           call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJ, ruvwp, T, mu, mut, qc2, E, F)
-          call calc_step<<<blocks,threads>>>(nx, ny, 0.5d0, 1.d0, dtdxdy, E, F, QJ, QJs, Rs) ! QJs = Q2 = Q^n + 0.5*dt*k1
+          call calc_step<<<blocks,threads>>>(nx, ny, 0.5d0, 1.d0, dtdx,dtdy, E, F, QJ, QJs, Rs) ! QJs = Q2 = Q^n + 0.5*dt*k1
           call set_bc(myrank, nx, ny, Jacobian, QJs)
 
           ! Stage 2: k2 = RHS(Q^n + 0.5*dt*k1), weight 2.0 to Rs for (2*k2 term)
           call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJs, ruvwp, T, mu, mut, qc2, E, F)
-          call calc_step<<<blocks,threads>>>(nx, ny, 0.5d0, 2.d0, dtdxdy, E, F, QJ, QJs, Rs) ! QJs = Q3 = Q^n + 0.5*dt*k2
+          call calc_step<<<blocks,threads>>>(nx, ny, 0.5d0, 2.d0, dtdx,dtdy, E, F, QJ, QJs, Rs) ! QJs = Q3 = Q^n + 0.5*dt*k2
           call set_bc(myrank, nx, ny, Jacobian, QJs)
 
           ! Stage 3: k3 = RHS(Q^n + 0.5*dt*k2), weight 2.0 for (2*k3 term)
           call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJs, ruvwp, T, mu, mut, qc2, E, F)
-          call calc_step<<<blocks,threads>>>(nx, ny, 1.0d0, 2.d0, dtdxdy, E, F, QJ, QJs, Rs) ! QJs = Q4 = Q^n + dt*k3
+          call calc_step<<<blocks,threads>>>(nx, ny, 1.0d0, 2.d0, dtdx,dtdy, E, F, QJ, QJs, Rs) ! QJs = Q4 = Q^n + dt*k3
           call set_bc(myrank, nx, ny, Jacobian, QJs)
 
           ! Stage 4: k4 = RHS(Q^n + dt*k3), weight 1.0, assemble final Q^(n+1)
           call calc_EFG(id_visc, nx, ny, xix, etay, Jacobian, QJs, ruvwp, T, mu, mut, qc2, E, F)
-          call calc_step4<<<blocks,threads>>>(nx, ny, dtdxdy, E, F, Rs, QJ)  ! QJ = Q^(n+1)
+          call calc_step4<<<blocks,threads>>>(nx, ny, dtdx,dtdy, E, F, Rs, QJ)  ! QJ = Q^(n+1)
           call set_bc(myrank, nx, ny, Jacobian, QJ)
         enddo
       endif
@@ -292,7 +293,7 @@ contains
     enddo
 
     if (mod(myrank,2) == 0) then
-      deallocate(ruvwp, T, mu, mut, qc2, QJ, QJs, Rs, E, F, xix, etay, Jacobian, dtdxdy)
+      deallocate(ruvwp, T, mu, mut, qc2, QJ, QJs, Rs, E, F, xix, etay, Jacobian, dtdx, dtdy)
     endif
     print *, "myrank is ", myrank, " deallocate GPU memory"
   end subroutine RungeKutta_4th
