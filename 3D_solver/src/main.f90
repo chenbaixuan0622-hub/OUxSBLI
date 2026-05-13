@@ -21,27 +21,17 @@ program main
   call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
   call MPI_COMM_RANK(MPI_COMM_WORLD, myrank, ierr)
   mygpu = myrank / 2
+  
+  call execute_command_line('mkdir -p recal', wait=.true., exitstat=ierr)
 
   print *, "my rank is", myrank
   if (mod(myrank,2) == 0) then
-    if (dimension == 3) then
-      call set_block3(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, threadsG, threadsGv, &
+    call set_block3(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, threadsG, threadsGv, &
                       blocks, blocksE, blocksEv, blocksF, blocksFv, blocksG, blocksGv)
-    else
-      call set_block2(nx, ny, threads, threadsE, threadsEv, threadsF, threadsFv, &
-                      blocks, blocksE, blocksEv, blocksF, blocksFv)
-    endif
   endif
-  if (dimension == 3) then
-    allocate(Q(dimension+2,nx,ny,nz), x(nx), dx(nx-1), y(ny), dy(ny-1), z(nz), dz(nz-1), Jacobian(nx,ny))
-    call set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
-    call set_Jacobian_xy3(nx, ny, nz, dx, dy, dz, Jacobian)
-  else
-    allocate(Q(dimension+2,nx,ny, 1), x(nx), dx(nx-1), y(ny), dy(ny-1), z(1),  dz(1), Jacobian(nx,ny))
-    z(1) = 0.d0; dz(1) = 1.d0
-    call set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
-    call set_Jacobian_xy2(nx, ny, dx, dy, Jacobian)
-  endif
+  allocate(Q(nx,dimension+2,ny,nz), x(nx), dx(nx-1), y(ny), dy(ny-1), z(nz), dz(nz-1), Jacobian(nx,ny))
+  call set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
+  call set_Jacobian_xy3(nx, ny, nz, dx, dy, dz, Jacobian)
 
   if (mod(myrank,2) == 0) then
     if (kind(id_recal) == 4) then
@@ -92,15 +82,14 @@ program main
     ! save data
     do l = 1, nz
       do j = 1, ny
-        do i = 1, nx
-          do m = 1, dimension+2
-            Q(m,i,j,l) = Jacobian(i,j) * Q(m,i,j,l)
+        do m = 1, dimension+2
+          do i = 1, nx
+            Q(i,m,j,l) = Jacobian(i,j) * Q(i,m,j,l)
     enddo;enddo;enddo;enddo
     call cpu_time(t_start)
+    
     write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream")
-    !header = 'SEQFMT01'
-    !write(10) header
     write(10) Q
     close(10)
     call cpu_time(t_end)

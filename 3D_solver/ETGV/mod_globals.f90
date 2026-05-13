@@ -77,9 +77,9 @@ module mod_globals
   ! id_recal      ! kind=2 ! set 0   !
   !               ! kind=4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=2), parameter  :: id_recal = 0
+  integer(kind=2), parameter  :: id_recal      = 0
   integer(kind=4), parameter  :: id_RungeKutta = 0
-  integer, parameter          :: step_offset = 0
+  integer, parameter          :: step_offset   = 0
   integer, parameter          :: start_rescale = 0
   integer, parameter          :: nt = 200
   integer, parameter          :: np = 100
