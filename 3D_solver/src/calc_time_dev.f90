@@ -14,6 +14,9 @@ module calc_time_dev
   use calc_para
   use set
   use preprocess
+#ifdef USE_FORCING
+  use calc_forcing
+#endif
   use print
   implicit none
   interface RungeKutta
@@ -67,6 +70,9 @@ contains
       endif
       call pre_calc(nx, ny, nz, myrank, nranks, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q, overlap, &
                     dtdxdy, dtdydz, dtdzdx, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0)
+#ifdef USE_FORCING
+      call init_forcing()
+#endif
     else
       call MPI_RECV(ke0,      1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
       call MPI_RECV(entropy0, 1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
@@ -86,18 +92,39 @@ contains
           ! Step 1: Compute fluxes E, F, G from current state QJ
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ, ruvwp, T, mu, mut, qc2, E, F, G)
           ! Step 2a: TVD RK3 Stage 1 - compute Q(1), store in QJ2
+#ifdef USE_FORCING
+          call calc_forcing_rhs(nx, ny, nz, QJ)
+#endif
           call calc_step1<<<blocks,threads>>>(nx, ny, nz, 1.d0, dtdxdy, dtdydz, dtdzdx, E, F, G, QJ, QJ2)
+#ifdef USE_FORCING
+          call add_forcing<<<blocks,threads>>>(nx, ny, nz, 1.d0, QJ, QJ2, fx_d, fy_d, fz_d)
+          call apply_cooling(nx, ny, nz, 1.d0, QJ2)
+#endif
           ! Enforce boundary conditions at cell interfaces (extrapolation or characteristic-based)
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ2)
 
           ! Step 2b: TVD RK3 Stage 2 - blend Q(1) with Q^n, store in QJ2
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, ruvwp, T, mu, mut, qc2, E, F, G)
+#ifdef USE_FORCING
+          call calc_forcing_rhs(nx, ny, nz, QJ2)
+#endif
           call calc_step2_3<<<blocks,threads>>>(nx, ny, nz, 0.75d0, 0.25d0, 0.25d0, 1.d0, dtdxdy, dtdydz, dtdzdx, E, F, G, QJ, QJ2)
+#ifdef USE_FORCING
+          call add_forcing<<<blocks,threads>>>(nx, ny, nz, 0.25d0, QJ2, QJ2, fx_d, fy_d, fz_d)
+          call apply_cooling(nx, ny, nz, 0.25d0, QJ2)
+#endif
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ2)
 
           ! Step 2c: TVD RK3 Stage 3 - final solution Q^(n+1), store in QJ (swap arrays)
           call calc_EFG(id_visc, nx, ny, nz, xix, etay, zetaz, Jacobian, QJ2, ruvwp, T, mu, mut, qc2, E, F, G)
+#ifdef USE_FORCING
+          call calc_forcing_rhs(nx, ny, nz, QJ2)
+#endif
           call calc_step2_3<<<blocks,threads>>>(nx, ny, nz, 2.d0, 1.d0, 2.d0, one_third, dtdxdy, dtdydz, dtdzdx, E, F, G, QJ2, QJ)
+#ifdef USE_FORCING
+          call add_forcing<<<blocks,threads>>>(nx, ny, nz, 2.d0*one_third, QJ, QJ, fx_d, fy_d, fz_d)
+          call apply_cooling(nx, ny, nz, 2.d0*one_third, QJ)
+#endif
           call set_bc(myrank, nx, ny, nz, Jacobian, QJ)
         enddo
       endif
@@ -109,6 +136,9 @@ contains
     enddo
 
     if (mod(myrank,2) == 0) then
+#ifdef USE_FORCING
+      call finalize_forcing()
+#endif
       deallocate(ruvwp, T, mu, mut, qc2, QJ, QJ2, E, F, G, xix, etay, zetaz, Jacobian, dtdxdy, dtdydz, dtdzdx)
     endif
     print *, "myrank is ", myrank, " deallocate GPU memory"

@@ -1,9 +1,10 @@
 module set_init_dhit
   use cufft
+  use mod_globals, only : id_accuracy, gamma, RHO0, p0, urms, pi, Re_lambda, &
+                          pope_L, pope_eta, pope_cL, pope_p0, pope_beta, pope_ceta
   implicit none
 contains
   subroutine init_spectral_velocity(nx, ny, nz, Q)
-    use mod_globals, only : id_accuracy, gamma, RHO0, p0, V0, kp, pi
     integer, intent(in)  :: nx, ny, nz
     real(8), intent(out) :: Q(nx,5,ny,nz)
     integer   :: offset, Nf, plan, istat, icomp, seed_size
@@ -11,6 +12,7 @@ contains
     integer   :: kxi, kyi, kzi, kxc, kyc, kzc, i, j, k
     integer(8) :: ikx, iky, ikz
     real(8)   :: kmag2, kmag, amp, r(2), ph, kdu_re, kdu_im
+    real(8)   :: kL, keta, fL, feta, kmax_dealias
     real(8)   :: norm, urms_sq, uscale, u, v, w
     complex(8), allocatable        :: uk(:,:,:,:)    ! (Nf,Nf,Nf,3) host spectral field
     complex(8), allocatable        :: vel_c(:,:,:,:) ! (Nf,Nf,Nf,3) host IFFT output
@@ -32,6 +34,7 @@ contains
     seed_arr = 42
     call random_seed(put=seed_arr)
     uk = cmplx(0.d0, 0.d0, kind=8)
+    kmax_dealias = dble(Nf) / 3.d0   ! (2/3) * k_Nyquist = (2/3) * (Nf/2) = Nf/3
 
     do kzi = 1, Nf
       ikz = kzi - 1; if (ikz > Nf/2) ikz = ikz - Nf
@@ -42,8 +45,14 @@ contains
           kmag2 = dble(ikx*ikx + iky*iky + ikz*ikz)
           if (kmag2 < 0.5d0) cycle
           kmag = sqrt(kmag2)
-          ! amplitude proportional to sqrt(E(k)/k^2) where E(k) = k^4 exp(-2(k/kp)^2)
-          amp = kmag**2 * exp(-(kmag/kp)**2)
+          if (kmag > kmax_dealias) cycle
+          ! Pope (2000): E(k) = k^(-5/3) * f_L(kL) * f_eta(k*eta)
+          ! amp = sqrt(E(k)/k^2) = k^(-11/6) * sqrt(f_L * f_eta)
+          kL   = kmag * pope_L
+          keta = kmag * pope_eta
+          fL   = (kL / sqrt(kL**2 + pope_cL))**(5.d0/3.d0 + pope_p0)
+          feta = exp(-pope_beta * (((keta)**4 + pope_ceta**4)**0.25d0 - pope_ceta))
+          amp  = kmag**(-11.d0/6.d0) * sqrt(fL * feta)
           do icomp = 1, 3
             call random_number(r)
             ph = 2.d0 * pi * r(2)
@@ -60,6 +69,7 @@ contains
           ikx = kxi - 1; if (ikx > Nf/2) ikx = ikx - Nf
           kmag2 = dble(ikx*ikx + iky*iky + ikz*ikz)
           if (kmag2 < 0.5d0) cycle
+          if (sqrt(kmag2) > kmax_dealias) cycle
           kdu_re = dble(ikx)*real(uk(kxi,kyi,kzi,1)) &
                  + dble(iky)*real(uk(kxi,kyi,kzi,2)) &
                  + dble(ikz)*real(uk(kxi,kyi,kzi,3))
@@ -98,7 +108,7 @@ contains
     enddo
     istat = cufftDestroy(plan)
 
-    ! Step 5: compute actual u_rms and rescale to V0, then pack conservative Q
+    ! Step 5: compute actual u_rms and rescale to urms, then pack conservative Q
     urms_sq = 0.d0
     do icomp = 1, 3
       do k = 1, Nf
@@ -107,7 +117,10 @@ contains
             urms_sq = urms_sq + (real(vel_c(i,j,k,icomp)) * norm)**2
     enddo;enddo;enddo;enddo
     urms_sq = urms_sq / dble(3 * Nf**3)
-    uscale  = V0 / sqrt(urms_sq)
+    uscale  = urms / sqrt(urms_sq)
+    print *, '[DHIT init] Re_lambda =', Re_lambda, &
+             '  pope_eta =', pope_eta, '  1/pope_eta =', 1.d0/pope_eta, &
+             '  kmax*eta =', dble(Nf)/3.d0 * pope_eta
 
     do k = 1, Nf
       do j = 1, Nf

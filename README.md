@@ -119,5 +119,11 @@ Jun Hatayama, Kento Tanaka, and Toshinori Kouchi. "Nonlinear causal relationship
 
 The repository was made publicly available after publication to improve reproducibility. However, this version may differ slightly from the version used in the paper.
 
+## AI-Assisted Development
+Development during 2024 and 2025 was primarily conducted by the project owner.  
+Starting in 2026, the project expanded its contributor base and introduced AI-assisted "vibe coding" workflows using Claude Code.
+
+To maintain transparency, we aim to clearly distinguish which parts of the codebase and development workflow involve AI-generated content or AI-assisted modifications. In addition, as part of our effort to share practical knowledge on AI-assisted development in the HPC community, we provide Claude Code plan files under `./docs/plans`.
+
 ## License
 This project is under BSD 3-Clause License
