@@ -34,12 +34,12 @@ program main
   endif
   if (dimension == 3) then
     allocate(Q(dimension+2,nx,ny,nz), x(nx), dx(nx-1), y(ny), dy(ny-1), z(nz), dz(nz-1), Jacobian(nx,ny))
-    call set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
+    call set_grid_cyclic(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
     call set_Jacobian_xy3(nx, ny, nz, dx, dy, dz, Jacobian)
   else
     allocate(Q(dimension+2,nx,ny, 1), x(nx), dx(nx-1), y(ny), dy(ny-1), z(1),  dz(1), Jacobian(nx,ny))
     z(1) = 0.d0; dz(1) = 1.d0
-    call set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
+    call set_grid_cyclic(myrank, nx, ny, Lx, Ly, x, y, dx, dy)
     call set_Jacobian_xy2(nx, ny, dx, dy, Jacobian)
   endif
 
@@ -69,14 +69,14 @@ program main
       close(10)
     elseif (kind(id_recal) == 2) then
       write(*,*) "set initial condition"
-      call set_init(myrank, nx, ny, nz, x, y, z, Q)
+      call set_init(myrank, nx, ny, x, y, Q)
     else
       write(*,*) "wrong paramater was found"
     endif
   endif
 
   call cpu_time(t_start)
-  call RungeKutta(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, nz, x, dx, y, dy, z, dz, Jacobian, Q)
+  call RungeKutta_3rd(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, x, dx, y, dy, Jacobian, Q)
   call cpu_time(t_end)
 
   if (mod(myrank,2) == 0) then
