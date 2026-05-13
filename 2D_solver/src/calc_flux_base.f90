@@ -33,7 +33,7 @@ module calc_flux_base
   end interface calc_conv
 
   interface calc_EFG
-    module procedure calc_EFG_Euler, calc_EFG_visc, calc_EFG_LES
+     module procedure calc_EFG_Euler !calc_EFG_visc, calc_EFG_LES
   end interface calc_EFG
 contains
   !> Allocate the persistent Ducros sensor array on the device.
@@ -195,7 +195,7 @@ contains
   !< calc Flux of Euler equation
   subroutine calc_EFG_Euler(id_visc, nx, ny, inv_dx, inv_dy, Jacobian, QJ, Q, T, mu, mut, qc2, E, F)
     use mod_globals, only : id_scheme
-    integer(2), intent(in), value            :: id_visc             !> ID for equation, int 2 means Euler
+    integer(4), intent(in), value            :: id_visc             !> ID for equation, int 2 means Euler
     integer, intent(in), value               :: nx                  !> number of grid points in x direction
     integer, intent(in), value               :: ny                  !> number of grid points in y direction
     !integer, intent(in), value               :: nz                  !> number of grid points in z direction
@@ -222,107 +222,107 @@ contains
   !> Compute fluxes for viscous (Navier-Stokes) flow - convective + viscous components
   !> Computes stress tensor tau_ij = mu*(du_i/dx_j + du_j/dx_i) - (2/3)*mu*delta_ij*(div u)
   !> and heat flux via Fourier's law: q = -k*dT/dx where k depends on Prandtl number
-  subroutine calc_EFG_visc(id_visc, nx, ny, inv_dx, inv_dy,  Jacobian, QJ, Q, T, mu, mut, qc2, E, F)
-    use mod_globals, only : id_scheme
-    integer(4), intent(in), value            :: id_visc             !> ID for equation, int 4 means NS
-    integer, intent(in), value               :: nx                  !> number of grid points in x direction
-    integer, intent(in), value               :: ny                  !> number of grid points in y direction
-    !integer, intent(in), value               :: nz                  !> number of grid points in z direction
-    real(8), intent(in), device, contiguous  :: inv_dx(nx-1)        !> 1 / dx (for finite differences)
-    real(8), intent(in), device, contiguous  :: inv_dy(ny-1)        !> 1 / dy
-    !real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !> 1 / dz
-    real(8), intent(in), device, contiguous  :: Jacobian(nx,ny)     !> Jacobian determinant for scaling
-    real(8), intent(in), device, contiguous  :: QJ(nx,4,ny)      !> Q/Jacobian (scaled conserved variables)
-    real(8), intent(out), device, contiguous :: Q(nx,4,ny)       !> Q(rho, u, v, w, p) primitive variables
-    real(8), intent(out), device, contiguous :: T(nx,ny)         !> temperature field (for viscosity & heat flux)
-    real(8), intent(out), device, contiguous :: mu(nx,ny)        !> molecular viscosity via Sutherland's law
-    real(8), intent(out), device, contiguous :: mut(1,1)          !> SGS turbulent viscosity (unused for NS)
-    real(8), intent(out), device, contiguous :: qc2(1,1)          !> SGS kinetic energy (unused for NS)
-    real(8), intent(out), device, contiguous :: E(4,nx-1,ny-2) !> x-direction flux (convective + viscous)
-    real(8), intent(out), device, contiguous :: F(4,nx-2,ny-1) !> y-direction flux (convective + viscous)
-    !real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> z-direction flux (convective + viscous)
-    integer stat
-    ! Step 1: Decode Q and compute T(rho) and mu(T) via Sutherland's formula
-    call calc_quantities_T_2D(nx, ny, Jacobian, QJ, Q, T, mu)   !call calc_quantities_T_3D(nx, ny, Jacobian, QJ, Q, T, mu)
-    ! Step 2: Compute convective fluxes (KEEP/SLAU/Roe/Hybrid depending on id_scheme)
-    call calc_conv(id_scheme, nx, ny, inv_dx, inv_dy, Q, T, E, F)
-    ! Step 3: Add viscous fluxes (choose 2nd or 4th-order stencils)
-    if (id_visc == 2) then
-      ! 4th-order compact finite differences (higher accuracy, larger stencil)
-      if (id_bc_x == .false. .and. kind(id_accuracy) == 8) then
-        call calc_Ev4_in<<<blocksEv,threadsEv>>>(nx, ny, inv_dx, inv_dy, Q, T, mu, E)
-      else
-        call calc_Ev4<<<blocksEv,threadsEv>>>(nx, ny, inv_dx, inv_dy, Q, T, mu, E)
-      endif
-      if (id_bc_y == .false. .and. kind(id_accuracy) == 8) then
-        call calc_Fv4_in<<<blocksFv,threadsFv>>>(nx, ny, inv_dy, inv_dx, Q, T, mu, F)
-      else
-        call calc_Fv4<<<blocksFv,threadsFv>>>(nx, ny, inv_dy, inv_dx, Q, T, mu, F)
-      endif
-      !if (id_bc_z == .false. .and. kind(id_accuracy) == 8) then
-      !  call calc_Gv4_in<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
-      !else
-        !call calc_Gv4<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
-      !endif
-    else
-      ! 2nd-order centered differences (standard, 3-point stencil)
-      call calc_Ev2<<<blocksEv,threadsEv>>>(nx, ny,inv_dx, inv_dy,  Q, T, mu, E)
-      call calc_Fv2<<<blocksFv,threadsFv>>>(nx, ny,inv_dy, inv_dx,  Q, T, mu, F)
-      !call calc_Gv2<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
-    endif
-  end subroutine calc_EFG_visc
+  ! subroutine calc_EFG_visc(id_visc, nx, ny, inv_dx, inv_dy,  Jacobian, QJ, Q, T, mu, mut, qc2, E, F)
+  !   use mod_globals, only : id_scheme
+  !   integer(4), intent(in), value            :: id_visc             !> ID for equation, int 4 means NS
+  !   integer, intent(in), value               :: nx                  !> number of grid points in x direction
+  !   integer, intent(in), value               :: ny                  !> number of grid points in y direction
+  !   !integer, intent(in), value               :: nz                  !> number of grid points in z direction
+  !   real(8), intent(in), device, contiguous  :: inv_dx(nx-1)        !> 1 / dx (for finite differences)
+  !   real(8), intent(in), device, contiguous  :: inv_dy(ny-1)        !> 1 / dy
+  !   !real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !> 1 / dz
+  !   real(8), intent(in), device, contiguous  :: Jacobian(nx,ny)     !> Jacobian determinant for scaling
+  !   real(8), intent(in), device, contiguous  :: QJ(nx,4,ny)      !> Q/Jacobian (scaled conserved variables)
+  !   real(8), intent(out), device, contiguous :: Q(nx,4,ny)       !> Q(rho, u, v, w, p) primitive variables
+  !   real(8), intent(out), device, contiguous :: T(nx,ny)         !> temperature field (for viscosity & heat flux)
+  !   real(8), intent(out), device, contiguous :: mu(nx,ny)        !> molecular viscosity via Sutherland's law
+  !   real(8), intent(out), device, contiguous :: mut(1,1)          !> SGS turbulent viscosity (unused for NS)
+  !   real(8), intent(out), device, contiguous :: qc2(1,1)          !> SGS kinetic energy (unused for NS)
+  !   real(8), intent(out), device, contiguous :: E(4,nx-1,ny-2) !> x-direction flux (convective + viscous)
+  !   real(8), intent(out), device, contiguous :: F(4,nx-2,ny-1) !> y-direction flux (convective + viscous)
+  !   !real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> z-direction flux (convective + viscous)
+  !   integer stat
+  !   ! Step 1: Decode Q and compute T(rho) and mu(T) via Sutherland's formula
+  !   call calc_quantities_T_2D(nx, ny, Jacobian, QJ, Q, T, mu)   !call calc_quantities_T_3D(nx, ny, Jacobian, QJ, Q, T, mu)
+  !   ! Step 2: Compute convective fluxes (KEEP/SLAU/Roe/Hybrid depending on id_scheme)
+  !   call calc_conv(id_scheme, nx, ny, inv_dx, inv_dy, Q, T, E, F)
+  !   ! Step 3: Add viscous fluxes (choose 2nd or 4th-order stencils)
+  !   if (id_visc == 2) then
+  !     ! 4th-order compact finite differences (higher accuracy, larger stencil)
+  !     if (id_bc_x == .false. .and. kind(id_accuracy) == 8) then
+  !       call calc_Ev4_in<<<blocksEv,threadsEv>>>(nx, ny, inv_dx, inv_dy, Q, T, mu, E)
+  !     else
+  !       call calc_Ev4<<<blocksEv,threadsEv>>>(nx, ny, inv_dx, inv_dy, Q, T, mu, E)
+  !     endif
+  !     if (id_bc_y == .false. .and. kind(id_accuracy) == 8) then
+  !       call calc_Fv4_in<<<blocksFv,threadsFv>>>(nx, ny, inv_dy, inv_dx, Q, T, mu, F)
+  !     else
+  !       call calc_Fv4<<<blocksFv,threadsFv>>>(nx, ny, inv_dy, inv_dx, Q, T, mu, F)
+  !     endif
+  !     !if (id_bc_z == .false. .and. kind(id_accuracy) == 8) then
+  !     !  call calc_Gv4_in<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
+  !     !else
+  !       !call calc_Gv4<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
+  !     !endif
+  !   else
+  !     ! 2nd-order centered differences (standard, 3-point stencil)
+  !     call calc_Ev2<<<blocksEv,threadsEv>>>(nx, ny,inv_dx, inv_dy,  Q, T, mu, E)
+  !     call calc_Fv2<<<blocksFv,threadsFv>>>(nx, ny,inv_dy, inv_dx,  Q, T, mu, F)
+  !     !call calc_Gv2<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
+  !   endif
+  ! end subroutine calc_EFG_visc
 
  
   !> Compute fluxes for Large-Eddy Simulation (LES) with subgrid-scale modeling
   !> Combines molecular viscosity (Navier-Stokes) with turbulent viscosity (from Smagorinsky model)
   !> Filters out subgrid scales: nu_t = (C_s * Delta)^2 * |S_ij| where Delta is grid filter width
-  subroutine calc_EFG_LES(id_visc, nx, ny, inv_dx, inv_dy, Jacobian, QJ, Q, T, mu, mut, qc2, E, F)
-    use mod_globals, only : id_scheme
-    integer(8), intent(in), value            :: id_visc             !> ID for equation, int 8 means LES
-    integer, intent(in), value               :: nx                  !> number of grid points in x direction
-    integer, intent(in), value               :: ny                  !> number of grid points in y direction
-    !integer, intent(in), value               :: nz                  !> number of grid points in z direction
-    real(8), intent(in), device, contiguous  :: inv_dx(nx-1)        !> 1 / dx
-    real(8), intent(in), device, contiguous  :: inv_dy(ny-1)        !> 1 / dy
-   ! real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !> 1 / dz
-    real(8), intent(in), device, contiguous  :: Jacobian(nx,ny)     !> Jacobian
-    real(8), intent(in), device, contiguous  :: QJ(nx,4,ny)      !> Q(rho, rhou, rhov, rhow, E) / Jacobian
-    real(8), intent(out), device, contiguous :: Q(nx,4,ny)       !> Q(rho, u, v, w, p)
-    real(8), intent(out), device, contiguous :: T(nx,ny)         !> temperature
-    real(8), intent(out), device, contiguous :: mu(nx,ny)        !> viscosity
-    real(8), intent(out), device, contiguous :: mut(nx,ny)       !> SGS viscosity
-    real(8), intent(out), device, contiguous :: qc2(nx,ny)       !> SGS kinetic energy
-    real(8), intent(out), device, contiguous :: E(4,nx-1,ny-2) !> Flux in x direction
-    real(8), intent(out), device, contiguous :: F(4,nx-2,ny-1) !> Flux in y direction
-    !real(8), intent(out), device, contiguous :: G(4,nx-2,ny-2,) !> Flux in z direction
-    integer stat
-    mut = 0.d0
-    qc2 = 0.d0
-    call calc_quantities_T_2D(nx, ny, Jacobian, QJ, Q, T, mu) !    call calc_quantities_T_3D(nx, ny, Jacobian, QJ, Q, T, mu)
-    call calc_conv(id_scheme, nx, ny, inv_dx, inv_dy, Q, T, E, F)
-    call calc_mut<<<blocks,threads>>>(nx, ny, inv_dx, inv_dy, Q, mut, qc2)
-    call set_bc_mut(nx, ny, mut, qc2)
-    if (id_visc == 2) then
-      if (id_bc_x == .false. .and. kind(id_accuracy) == 8) then
-        call calc_Ev_LES4_in<<<blocksEv,threadsEv>>>(nx, ny, inv_dx, inv_dy, Q, T, mu, mut, qc2, E)
-      else
-        call calc_Ev_LES4<<<blocksEv,threadsEv>>>(nx, ny, inv_dx, inv_dy,  Q, T, mu, mut, qc2, E)
-      endif
-      if (id_bc_y == .false. .and. kind(id_accuracy) == 8) then
-        call calc_Fv_LES4_in<<<blocksFv,threadsFv>>>(nx, ny, inv_dy, inv_dx,  Q, T, mu, mut, qc2, F)
-      else
-        call calc_Fv_LES4<<<blocksFv,threadsFv>>>(nx, ny, inv_dy, inv_dx, Q, T, mu, mut, qc2, F)
-      endif
-      !if (id_bc_z == .false. .and. kind(id_accuracy) == 8) then
-      !  call calc_Gv_LES4_in<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, G)
-      !else
-      !  call calc_Gv_LES4<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, G)
-      !endif
-    else
-      call calc_Ev_LES2<<<blocksEv,threadsEv>>>(nx, ny,  inv_dx, inv_dy, Q, T, mu, mut, qc2, E)
-      call calc_Fv_LES2<<<blocksFv,threadsFv>>>(nx, ny,  inv_dy, inv_dx, Q, T, mu, mut, qc2, F)
-      !call calc_Gv_LES2<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, G)
-    endif
-  end subroutine calc_EFG_LES
+  ! subroutine calc_EFG_LES(id_visc, nx, ny, inv_dx, inv_dy, Jacobian, QJ, Q, T, mu, mut, qc2, E, F)
+  !   use mod_globals, only : id_scheme
+  !   integer(8), intent(in), value            :: id_visc             !> ID for equation, int 8 means LES
+  !   integer, intent(in), value               :: nx                  !> number of grid points in x direction
+  !   integer, intent(in), value               :: ny                  !> number of grid points in y direction
+  !   !integer, intent(in), value               :: nz                  !> number of grid points in z direction
+  !   real(8), intent(in), device, contiguous  :: inv_dx(nx-1)        !> 1 / dx
+  !   real(8), intent(in), device, contiguous  :: inv_dy(ny-1)        !> 1 / dy
+  !  ! real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !> 1 / dz
+  !   real(8), intent(in), device, contiguous  :: Jacobian(nx,ny)     !> Jacobian
+  !   real(8), intent(in), device, contiguous  :: QJ(nx,4,ny)      !> Q(rho, rhou, rhov, rhow, E) / Jacobian
+  !   real(8), intent(out), device, contiguous :: Q(nx,4,ny)       !> Q(rho, u, v, w, p)
+  !   real(8), intent(out), device, contiguous :: T(nx,ny)         !> temperature
+  !   real(8), intent(out), device, contiguous :: mu(nx,ny)        !> viscosity
+  !   real(8), intent(out), device, contiguous :: mut(nx,ny)       !> SGS viscosity
+  !   real(8), intent(out), device, contiguous :: qc2(nx,ny)       !> SGS kinetic energy
+  !   real(8), intent(out), device, contiguous :: E(4,nx-1,ny-2) !> Flux in x direction
+  !   real(8), intent(out), device, contiguous :: F(4,nx-2,ny-1) !> Flux in y direction
+  !   !real(8), intent(out), device, contiguous :: G(4,nx-2,ny-2,) !> Flux in z direction
+  !   integer stat
+  !   mut = 0.d0
+  !   qc2 = 0.d0
+  !   call calc_quantities_T_2D(nx, ny, Jacobian, QJ, Q, T, mu) !    call calc_quantities_T_3D(nx, ny, Jacobian, QJ, Q, T, mu)
+  !   call calc_conv(id_scheme, nx, ny, inv_dx, inv_dy, Q, T, E, F)
+  !   call calc_mut<<<blocks,threads>>>(nx, ny, inv_dx, inv_dy, Q, mut, qc2)
+  !   call set_bc_mut(nx, ny, mut, qc2)
+  !   if (id_visc == 2) then
+  !     if (id_bc_x == .false. .and. kind(id_accuracy) == 8) then
+  !       call calc_Ev_LES4_in<<<blocksEv,threadsEv>>>(nx, ny, inv_dx, inv_dy, Q, T, mu, mut, qc2, E)
+  !     else
+  !       call calc_Ev_LES4<<<blocksEv,threadsEv>>>(nx, ny, inv_dx, inv_dy,  Q, T, mu, mut, qc2, E)
+  !     endif
+  !     if (id_bc_y == .false. .and. kind(id_accuracy) == 8) then
+  !       call calc_Fv_LES4_in<<<blocksFv,threadsFv>>>(nx, ny, inv_dy, inv_dx,  Q, T, mu, mut, qc2, F)
+  !     else
+  !       call calc_Fv_LES4<<<blocksFv,threadsFv>>>(nx, ny, inv_dy, inv_dx, Q, T, mu, mut, qc2, F)
+  !     endif
+  !     !if (id_bc_z == .false. .and. kind(id_accuracy) == 8) then
+  !     !  call calc_Gv_LES4_in<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, G)
+  !     !else
+  !     !  call calc_Gv_LES4<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, G)
+  !     !endif
+  !   else
+  !     call calc_Ev_LES2<<<blocksEv,threadsEv>>>(nx, ny,  inv_dx, inv_dy, Q, T, mu, mut, qc2, E)
+  !     call calc_Fv_LES2<<<blocksFv,threadsFv>>>(nx, ny,  inv_dy, inv_dx, Q, T, mu, mut, qc2, F)
+  !     !call calc_Gv_LES2<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, mut, qc2, G)
+  !   endif
+  ! end subroutine calc_EFG_LES
 end module calc_flux_base
 

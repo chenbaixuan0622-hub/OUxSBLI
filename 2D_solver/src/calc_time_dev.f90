@@ -17,7 +17,7 @@ module calc_time_dev
   use print
   implicit none
   interface RungeKutta
-    module procedure RungeKutta_3rd  !RungeKutta_4th
+    module procedure RungeKutta_3rd !RungeKutta_4rd
   end interface
 
 contains 
@@ -30,7 +30,7 @@ contains
   !> GPU computation: Each rank manages one GPU asynchronously; MPI sync only for I/O
   subroutine RungeKutta_3rd(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny,  x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q)
     integer(2), intent(in) :: id_RungeKutta                     !< time integration method ID
-    integer(2), intent(in) :: id_rescale                        !< rescaling method ID
+    integer(4), intent(in) :: id_rescale                        !< rescaling method ID
     integer, intent(in)    :: myrank                            !< MPI rank
     integer, intent(in)    :: mygpu                             !< GPU index for this rank
     integer, intent(in)    :: nx                                !< x grid dimension
@@ -90,7 +90,7 @@ contains
         ! GPU-accelerated ranks perform time integration
         do t1 = 1, nt
           ! Step 1: Compute fluxes E, F, G from current state QJ
-          call calc_EFG(id_visc, nx, ny, xix, etay,  Jacobian, QJ, ruvwp, T, mu, mut, qc2, E, F)
+          call calc_EFG(id_visc, nx, ny, xix, etay,  Jacobian, QJ, ruvwp, T, mu, mut, qc2, E, F) !call calc_EFG
           ! Step 2a: TVD RK3 Stage 1 - compute Q(1), store in QJ2
           call calc_step1<<<blocks,threads>>>(nx, ny, 1.d0, dtdx,dtdy, E, F, QJ, QJ2)
           ! Enforce boundary conditions at cell interfaces (extrapolation or characteristic-based)
