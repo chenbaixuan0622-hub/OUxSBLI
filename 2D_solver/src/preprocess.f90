@@ -99,7 +99,7 @@ contains
     ! set Q / Jacobian
     !do k = 1, nz
       do j = 1, ny
-        do l = 1, 5
+        do l = 1, 4
           do i = 1, nx
             Q(i,l,j) = Q(i,l,j) / Jacobian_cpu(i,j)
           enddo
