@@ -117,6 +117,18 @@ The **value** of these parameters is ignored; only the **type kind** matters. Fo
 
 1D decomposition in the x-direction via `calc_para.f90`. Default is 2 MPI ranks (`mpirun -n 2 a.out`), with `mygpu = myrank / 2` (2 ranks per GPU). GPU-aware MPI is optional via `id_gpumpi`.
 
+## Compile Testing (AI Agent)
+
+After modifying any solver source or CICD configuration, verify that all build targets still compile by running from the repository root:
+
+```bash
+bash test_cicd.sh
+```
+
+This script builds all 12 targets (9 Cartesian × scheme/accuracy combinations + 3 curvilinear × scheme combinations) and prints a pass/fail summary. Always run it before reporting a change as complete. A non-zero exit code means at least one target failed.
+
+**Curvilinear accuracy limitation:** `3D_solver_curv` only supports 2nd-order accuracy (`id_accuracy` kind=2). The CICD targets for curvilinear are therefore limited to KEEP2, SLAU2, Hybrid2.
+
 ## Adding a New Test Case
 
 Copy an existing case directory (e.g., `cp -r 3D_solver/NSTGV 3D_solver/MYCASE`), then edit:
