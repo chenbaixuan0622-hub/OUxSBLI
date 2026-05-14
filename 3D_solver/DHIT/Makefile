@@ -2,7 +2,7 @@ FC = mpif90
 
 subroutines = name:calc_tau_straight,calc_tau_cross,flux4
 
-OUTPUT_OPTIN = -cuda -acc -fast -Mpreprocess -DUSE_FORCING -Mchkptr -Minline=reshape,$(subroutines) -Minfo=accel,inline -Mchkptr -gpu=ptxinfo,rdc,lto -lnvhpcwrapnvtx
+OUTPUT_OPTIN = -cuda -acc -fast -Mpreprocess -Mchkptr -Minline=reshape,$(subroutines) -Minfo=accel,inline -Mchkptr -gpu=ptxinfo,rdc,lto -lnvhpcwrapnvtx
 
 .SUFFIXES : .f90
 

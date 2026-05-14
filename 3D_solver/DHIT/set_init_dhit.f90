@@ -194,7 +194,6 @@ contains
     !===========================================================
     print *, '[DHIT init]'
     print *, 'Nf           = ', Nf
-    print *, 'kmax         = ', kmax_dealias
     print *, 'u_rms(raw)   = ', sqrt(urms_sq)
     print *, 'u_rms(target)= ', urms
     print *, 'u_scale      = ', uscale
