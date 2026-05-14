@@ -168,10 +168,10 @@ contains
     real(8), intent(in), device, contiguous  :: inv_dx(nx-1)        !< inverse grid spacing x (1/dx)
     real(8), intent(in), device, contiguous  :: inv_dy(ny-1)        !> 1 / dy
     !real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !> 1 / dz
-    real(8), intent(in), device, contiguous  :: Q(nx,5,ny)       !> Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous  :: Q(nx,4,ny)       !> Q(rho, u, v, w, p)
     real(8), intent(in), device, contiguous  :: T(nx,ny)         !> temperature
-    real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2) !> Flux in x direction
-    real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1) !> Flux in y direction
+    real(8), intent(out), device, contiguous :: E(4,nx-1,ny-2) !> Flux in x direction
+    real(8), intent(out), device, contiguous :: F(4,nx-2,ny-1) !> Flux in y direction
     !real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> Flux in z direction
     call calc_Ducros<<<blocks,threads>>>(nx, ny, inv_dx, inv_dy,Q, sensor)
     if (id_bc_x) then

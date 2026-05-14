@@ -81,7 +81,7 @@ contains
     integer, parameter :: sx = threadsF%x            !< tile size in x direction
     integer, parameter :: sy = threadsF%y + 2*io + 1 !< tile size in y direction
     !integer, parameter :: sz = threadsF%z            !< tile size in z direction
-    real(8), dimension(-(io-1):sx*sy-io), shared :: rho, u, v, w, p, tmp
+    real(8), dimension(-(io-1):sx*sy-io), shared :: rho, u, v, p, tmp
     it = threadIdx%x
     jt = threadIdx%y
     !kt = threadIdx%z

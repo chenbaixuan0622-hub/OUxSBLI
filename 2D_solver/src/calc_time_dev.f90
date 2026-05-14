@@ -36,7 +36,7 @@ contains
     integer, intent(in)    :: nx                                !< x grid dimension
     integer, intent(in)    :: ny                                !< y grid dimension
     integer    :: nz=1
-    real(8)    :: z(nz)                                !< z grid dimension
+    real(8)    :: z(1)                                !< z grid dimension
     real(8), intent(in)    :: x(nx)                             !< x coordinates
     real(8), intent(in)    :: dx_cpu(nx-1)                      !< inverse x spacing (host)
     real(8), intent(in)    :: y(ny)                             !< y coordinates
@@ -53,10 +53,6 @@ contains
     real(8), allocatable, device :: xix(:), etay(:), Jacobian(:,:), dtdx(:,:), dtdy(:,:) !, dtdydz(:,:), dtdzdx(:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
-
-    real(8) tmpQ(4,nx,ny) 
-    real(8), allocatable, device :: tmpQJ(:,:,:)
-    allocate(tmpQJ(4,nx,ny))
 
     call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
     ! count GPU
@@ -108,29 +104,12 @@ contains
         enddo
       endif
 
-      do j = 1, ny
-          do i = 1, nx
-            do l = 1, 4
-              tmpQ(l, i, j) = Q(i, l, j)   !Q(l, i, j) = Q(i, l, j)
-              tmpQJ(l, i, j) = QJ(i, l, j) !QJ(l, i, j) = QJ(i, l, j)
-            end do
-          end do
-      end do
 
       if (mod(myrank, 2) == 0) then
-        call send_recv_for_print_even(myrank, nranks, t2, nx, ny, nz,  x, y, z, Jacobian_cpu, tmpQJ, tmpQ, ke0, entropy0)
+        call send_recv_for_print_even(myrank, nranks, t2, nx, ny,  x, y, Jacobian_cpu, QJ, Q, ke0, entropy0)
       else
-        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, nz,  x, y, z,  Jacobian_cpu, tmpQ, ke0, entropy0)
+        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, Q, ke0, entropy0)
       endif
-
-      do j = 1, ny
-        do i = 1, nx
-          do l = 1, 4
-            Q(i, l, j) = tmpQ(l, i, j)
-            QJ(i, l, j) = tmpQJ(l, i, j)
-          end do
-        end do
-      end do
 
     enddo
 
@@ -250,7 +229,7 @@ contains
     integer(2), intent(in) :: id_rescale
     integer, intent(in)    :: myrank, mygpu, nx, ny
     integer :: nz =1
-    real(8) z(nz)
+    real(8) z(1)
     real(8), intent(in)    :: x(nx), dx_cpu(nx-1)
     real(8), intent(in)    :: y(ny), dy_cpu(ny-1)
     real(8), intent(in)    ::  Jacobian_cpu(nx,ny)
@@ -263,10 +242,6 @@ contains
     real(8), allocatable, device :: xix(:), etay(:), Jacobian(:,:), dtdx(:,:), dtdy(:,:)
     ! for plot
     real(4) :: ke0 = 1.d0, entropy0 = 1.d0
-
-    real(8) tmpQ(4,nx,ny) 
-    real(8), allocatable, device :: tmpQJ(:,:,:)
-    allocate(tmpQJ(4,nx,ny))
 
     call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
     ! count GPU
@@ -317,29 +292,11 @@ contains
         enddo
       endif
 
-      do j = 1, ny
-          do i = 1, nx
-            do l = 1, 4
-              tmpQ(l, i, j) = Q(i, l, j)
-              tmpQJ(l, i, j) = QJ(i, l, j)
-            end do
-          end do
-      end do
-
       if (mod(myrank, 2) == 0) then
-        call send_recv_for_print_even(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, tmpQJ, tmpQ, ke0, entropy0)
+        call send_recv_for_print_even(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, QJ, Q, ke0, entropy0)
       else
-        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, nz, x, y, z, Jacobian_cpu, tmpQ, ke0, entropy0)
+        call send_recv_for_print_odd(myrank, nranks, t2, nx, ny, x, y, Jacobian_cpu, Q, ke0, entropy0)
       endif
-
-      do j = 1, ny
-          do i = 1, nx
-            do l = 1, 4
-              Q(i, l, j) = tmpQ(l, i, j)
-              QJ(i, l, j) = tmpQJ(l, i, j)
-            end do
-          end do
-      end do
 
     enddo
 

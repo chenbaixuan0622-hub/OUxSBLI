@@ -464,7 +464,7 @@ contains
           u(ii,jt) = Q(i,2,j)
           v(ii,jt) = Q(i,3,j)
           !w(ii,jt) = Q(i,4,j)
-          p(ii,jt) = Q(i,5,j)
+          p(ii,jt) = Q(i,4,j)
       endif
     enddo
     call syncthreads()

@@ -79,9 +79,9 @@ contains
     integer, intent(in), value                :: nx                  !< number of grid points in x direction
     integer, intent(in), value                :: ny                  !< number of grid points in y direction
     !integer, intent(in), value                :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny)       !< Q(rho, u, v, w, p)
+    real(8), intent(in), device, contiguous   :: Q(nx,4,ny)       !< Q(rho, u, v, w, p)
     real(sp), intent(in), device, contiguous  :: sensor(nx,ny)    !< shock sensor
-    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2) !< Flux in x direction
+    real(8), intent(out), device, contiguous  :: E(4,nx-1,ny-2) !< Flux in x direction
     integer i,  j !< global index in physical space
     integer it, jt !< local index in a block
     integer ii, i_base, idx, idx_r, offset_yz, offset_yzr, i1, i2
