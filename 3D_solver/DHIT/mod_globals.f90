@@ -45,9 +45,9 @@ module mod_globals
   real(8), parameter :: Lx = 2.d0 * pi * L0
   real(8), parameter :: Ly = 2.d0 * pi * L0
   real(8), parameter :: Lz = 2.d0 * pi * L0
-  integer, parameter :: nx = 65
-  integer, parameter :: ny = 65
-  integer, parameter :: nz = 65
+  integer, parameter :: nx = 129
+  integer, parameter :: ny = 129
+  integer, parameter :: nz = 129
 
   ! boundary condition (all periodic)
   logical, parameter :: id_bc_x = .false.
@@ -93,34 +93,29 @@ module mod_globals
   real(8), parameter :: T    = urms**2 / (gamma * R * Mt**2) ! c = sqrt(gamma * R * T)
   real(8), parameter :: S    = 111.d0
   real(8), parameter :: mu0  = 1.716d-5 * (273.2d0 + S) / (T + S) * (T / 273.2d0)**1.5d0
-
   ! Pope (2000) energy spectrum parameters
   real(8), parameter :: pope_L    = 0.71d0   ! integral length scale (peak at k ≈ 2.85/pope_L ≈ 4)
+  real(8), parameter :: pope_C    = 1.5d0
   real(8), parameter :: pope_cL   = 6.78d0   ! large-scale coefficient
   real(8), parameter :: pope_p0   = 2.0d0    ! large-scale exponent (gives E~k^2 at low k)
   real(8), parameter :: pope_beta = 5.2d0    ! dissipation-range coefficient
   real(8), parameter :: pope_ceta = 0.40d0   ! dissipation-range offset constant
-
   ! Reynolds numbers (set Re_lambda; Re and pope_eta are derived)
   real(8), parameter :: Re_lambda = 20.d0                             ! target Taylor-scale Re
   real(8), parameter :: Re        = Re_lambda**2 / (15.d0 * pope_L)   ! integral Re: ρ₀V₀L₀/μ₀
   real(8), parameter :: pope_eta  = pope_L**0.25d0 * Re**(-0.75d0)    ! Kolmogorov scale
-
   real(8), parameter :: nu0  = 15.d0 * urms * pope_L / (pope_ceta * Re_lambda**2)
-
   real(8), parameter :: RHO0 = mu0 / nu0
   real(8), parameter :: p0   = RHO0 * R * T
-
   ! Petersen-type solenoidal forcing parameters
   real(8), parameter :: eps_s  = 15.d0 * nu0 * urms**2 / pope_L**2  ! energy injection rate [m^2/s^3]
-  integer, parameter :: kf_min = 1                                   ! forcing band lower bound
-  integer, parameter :: kf_max = 2                                   ! forcing band upper bound
-  real(8), parameter :: C_T   = 0.1d0                              ! temperature relaxation coefficient
-
+  integer, parameter :: kf_min = 1                                  ! forcing band lower bound
+  integer, parameter :: kf_max = 2                                  ! forcing band upper bound
+  real(8), parameter :: C_T    = 0.1d0                              ! temperature relaxation coefficient
   ! dt is acoustic-limited: c_s = urms / Mt dominates advective speed
   real(8), parameter :: CFL = 0.03d0
   real(8), parameter :: dt  = CFL * (Lx / dble(nx-1)) * Mt / urms
   real(8), parameter :: dtn = urms * dt / L0
   integer, parameter :: np  = 200
-  integer, parameter :: nt  = 100!int(10.d0 / (dble(np) * dtn))
+  integer, parameter :: nt  = 100
 end module mod_globals
