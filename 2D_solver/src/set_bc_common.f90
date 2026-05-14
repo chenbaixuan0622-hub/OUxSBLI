@@ -117,7 +117,7 @@ contains
           Q(i,l,1)  = Q(i,l,ny-1)
           Q(i,l,ny) = Q(i,l,2)
       enddo;enddo
-    !$cuf kernel do(1)<<<*,*>>>
+    !cuf kernel do(1)<<<*,*>>>
     !do k = 2, nz-1
       do l = 1, 4
         Q(1,l,1)   = Q(nx-1,l,ny-1)
@@ -159,7 +159,7 @@ contains
           Q(i,l,ny-1) = Q(i,l,3)
           Q(i,l,ny) = Q(i,l,4)
       enddo;enddo
-    !$cuf kernel do(1) <<<*,*>>>
+    !cuf kernel do(1) <<<*,*>>>
     !do k = 3, nz-2
       do l = 1, 4
         Q(1,l,1) = Q(nx-3,l,ny-3)
@@ -219,7 +219,7 @@ contains
           Q(i,l,ny-1) = Q(i,l,5)
           Q(i,l,ny)   = Q(i,l,6)
       enddo;enddo
-    !$cuf kernel do(1)<<<*,*>>>
+    !cuf kernel do(1)<<<*,*>>>
     !do k = 4, nz-3
       do l = 1, 4
         Q(1,l,1) = Q(nx-5,l,ny-5)

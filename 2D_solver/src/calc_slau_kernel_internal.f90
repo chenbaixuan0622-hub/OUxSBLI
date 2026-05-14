@@ -106,7 +106,8 @@ contains
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny) then
         idx = ii + offset_yz
         rho(idx) = Q(i,1,j); u(idx) = Q(i,2,j); v(idx) = Q(i,3,j)
-          !w(idx) = Q(i,4,j); p(idx) = Q(i,5,j)   !これは必要？
+          !w(idx) = Q(i,4,j)
+        p(idx) = Q(i,4,j)
       endif
     enddo
     call syncthreads()
@@ -168,7 +169,8 @@ contains
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny) then
         idx = jj + offset_xz
         rho(idx) = Q(i,1,j); u(idx) = Q(i,2,j); v(idx) = Q(i,3,j)
-          !w(idx) = Q(i,4,j,k); p(idx) = Q(i,5,j,k)
+          !w(idx) = Q(i,4,j,k)
+        p(idx) = Q(i,4,j) !!!!!!!!!!!!!!!!!!!!1
       endif
     enddo
     call syncthreads()
