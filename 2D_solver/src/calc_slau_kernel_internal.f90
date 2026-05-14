@@ -170,7 +170,7 @@ contains
         idx = jj + offset_xz
         rho(idx) = Q(i,1,j); u(idx) = Q(i,2,j); v(idx) = Q(i,3,j)
           !w(idx) = Q(i,4,j,k)
-        p(idx) = Q(i,4,j) !!!!!!!!!!!!!!!!!!!!1
+        p(idx) = Q(i,4,j) !!!!!!!!!!!!!!!!!!!!
       endif
     enddo
     call syncthreads()
