@@ -17,7 +17,7 @@ module calc_time_dev
   use print
   implicit none
   interface RungeKutta
-    module procedure RungeKutta_3rd !RungeKutta_4rd
+    module procedure RungeKutta_3rd, RungeKutta_4rd
   end interface
 
 contains 

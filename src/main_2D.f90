@@ -76,7 +76,7 @@ program main
   endif
 
   call cpu_time(t_start)
-  call RungeKutta_3rd(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, x, dx, y, dy, Jacobian, Q)
+  call RungeKutta(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, x, dx, y, dy, Jacobian, Q) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   call cpu_time(t_end)
 
   if (mod(myrank,2) == 0) then
