@@ -28,8 +28,8 @@ module mod_globals
   !             ! kind4 on          !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer, parameter         :: dimension   = 2
-  integer(4), parameter      :: id_visc     = 1
-  real(2), parameter         :: id_scheme   = 0
+  integer(2), parameter      :: id_visc     = 1
+  integer(2), parameter      :: id_scheme   = 0
   integer, parameter         :: sp          = kind(1.d0) ! single or double
   real(sp), parameter        :: threshold   = 0.4_sp
   integer(kind=8), parameter :: id_accuracy = 0
@@ -42,30 +42,21 @@ module mod_globals
   ! mesh
   real(8), parameter :: Lx = 20.d0 * blt
   real(8), parameter :: Ly = 5.d0 * blt
-  real(8), parameter :: Lz = 1.25d0 * blt
   ! DNS
   integer, parameter :: nx = 257!513
   integer, parameter :: ny = 129!161
-  integer, parameter :: nz = 33!65!129
   
   ! boundary condition
   logical, parameter :: id_bc_x = .true.
   logical, parameter :: id_bc_y = .true.
-  logical, parameter :: id_bc_z = .false.
-
-  integer, parameter :: nre1 = int(0.5 * nx)
-  integer, parameter :: nre2 = int(0.9 * nx)
-  integer, parameter :: rerank = 0
 
   ! RTX 4090
   type(dim3), parameter :: threadsE  = dim3(128,1,1)
   type(dim3), parameter :: threadsF  = dim3(32,2,1)
-  type(dim3), parameter :: threadsG  = dim3(32,1,2)
   type(dim3), parameter :: threadsEv = dim3(64,1,1)
   type(dim3), parameter :: threadsFv = dim3(32,2,1)
-  type(dim3), parameter :: threadsGv = dim3(32,1,2)
   type(dim3), parameter :: threads   = dim3(32,2,1)
-  type(dim3) :: blocksE, blocksF, blocksG, blocksEv, blocksFv, blocksGv, blocks
+  type(dim3) :: blocksE, blocksF, blocksEv, blocksFv, blocks
 
   ! time
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -78,7 +69,6 @@ module mod_globals
   integer(kind=2), parameter :: id_RungeKutta = 0
   integer(kind=2), parameter :: id_recal      = 0
   integer, parameter         :: step_offset   = 0
-  integer, parameter         :: start_rescale = 10
   real(8), parameter :: endT  = 0.1d-3
   integer, parameter :: np    = 10
   real(8), parameter :: R     = 287.03d0

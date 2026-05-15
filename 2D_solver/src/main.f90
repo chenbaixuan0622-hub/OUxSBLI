@@ -1,16 +1,15 @@
 program main
   use, intrinsic :: iso_fortran_env
   use mpi
-  use mod_globals, only : id_RungeKutta, id_rescale, id_recal, dimension, nx, ny, nz, Lx, Ly, Lz, &
-  & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
-  & blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv
+  use mod_globals, only : id_RungeKutta, id_recal, dimension, nx, ny, Lx, Ly, &
+  & blocks, threads, blocksE, blocksF, threadsE, threadsF, blocksEv, blocksFv, threadsEv, threadsFv
   use set
   use set_coordinate
   use calc_time_dev
   implicit none
   integer i, j, l, m, s, mygpu, ios, errorcode
   real(8) t_start, t_end
-  real(8), allocatable :: x(:), dx(:), y(:), dy(:), z(:), dz(:), Jacobian(:,:), Q(:,:,:)
+  real(8), allocatable :: x(:), dx(:), y(:), dy(:), Jacobian(:,:), Q(:,:,:)
   character(len=8) header
   character(len=40) filename
   logical is_sequential
@@ -24,24 +23,12 @@ program main
 
   print *, "my rank is", myrank
   if (mod(myrank,2) == 0) then
-    if (dimension == 3) then
-      call set_block3(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, threadsG, threadsGv, &
-                      blocks, blocksE, blocksEv, blocksF, blocksFv, blocksG, blocksGv)
-    else
-      call set_block2(nx, ny, threads, threadsE, threadsEv, threadsF, threadsFv, &
-                      blocks, blocksE, blocksEv, blocksF, blocksFv)
-    endif
+    call set_block2(nx, ny, threads, threadsE, threadsEv, threadsF, threadsFv, &
+                    blocks, blocksE, blocksEv, blocksF, blocksFv)
   endif
-  if (dimension == 3) then
-    allocate(Q(nx,dimension+2,ny), x(nx), dx(nx-1), y(ny), dy(ny-1), z(nz), dz(nz-1), Jacobian(nx,ny))
-    call set_grid(myrank, nx, ny, Lx, Ly, x, y, dx, dy)
-    call set_Jacobian_xy3(nx, ny, nz, dx, dy, dz, Jacobian)
-  else
-    allocate(Q(nx,dimension+2,ny), x(nx), dx(nx-1), y(ny), dy(ny-1), Jacobian(nx,ny))
-    !z(1) = 0.d0; dz(1) = 1.d0
-    call set_grid(myrank, nx, ny, Lx, Ly, x, y, dx, dy)
-    call set_Jacobian_xy2(nx, ny, dx, dy, Jacobian)
-  endif
+  allocate(Q(nx,dimension+2,ny), x(nx), dx(nx-1), y(ny), dy(ny-1), Jacobian(nx,ny))
+  call set_grid(myrank, nx, ny, Lx, Ly, x, y, dx, dy)
+  call set_Jacobian_xy2(nx, ny, dx, dy, Jacobian)
 
   if (mod(myrank,2) == 0) then
     if (kind(id_recal) == 4) then
@@ -76,7 +63,7 @@ program main
   endif
 
   call cpu_time(t_start)
-  call RungeKutta(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, x, dx, y, dy, Jacobian, Q) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  call RungeKutta(id_RungeKutta, myrank, mygpu, nx, ny, x, dx, y, dy, Jacobian, Q)
   call cpu_time(t_end)
 
   if (mod(myrank,2) == 0) then
@@ -90,17 +77,14 @@ program main
       print *, "calculation time:", m, " [min] ", s, " [sec]"
     endif
     ! save data
-    !do l = 1, nz
-      do j = 1, ny
-        do i = 1, nx
-          do m = 1, dimension+2
-            Q(i,m,j) = Jacobian(i,j) * Q(i,m,j)
+    do j = 1, ny
+      do i = 1, nx
+        do m = 1, dimension+2
+          Q(i,m,j) = Jacobian(i,j) * Q(i,m,j)
     enddo;enddo;enddo
     call cpu_time(t_start)
     write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream")
-    !header = 'SEQFMT01'
-    !write(10) header
     write(10) Q
     close(10)
     call cpu_time(t_end)
@@ -111,3 +95,4 @@ program main
   deallocate(Q, x, dx, y, dy, Jacobian)
   call MPI_FINALIZE(ierr)
 end program main
+
