@@ -23,7 +23,7 @@ module mod_globals
   !             ! kind4 HR-SLAU2    !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer, parameter         :: dimension   = 2
-  integer(2), parameter      :: id_visc     = 1
+  integer(4), parameter      :: id_visc     = 2
   integer(2), parameter      :: id_scheme   = 0
   integer, parameter         :: sp          = kind(1.d0) ! single or double
   real(sp), parameter        :: threshold   = 0.4_sp
@@ -35,15 +35,12 @@ module mod_globals
   real(8), parameter         :: blt         = 1.d-3
   
   ! mesh
-  real(8), parameter :: pi = acos(-1.d0)
-  real(8), parameter :: Lx = 2.d0 * pi
-  real(8), parameter :: Ly = 2.d0 * pi
-  integer, parameter :: nx = 513
-  integer, parameter :: ny = 513
+  integer, parameter :: nx = 4097
+  integer, parameter :: ny = 257
  
   ! boundary condition
-  logical, parameter :: id_bc_x = .false.
-  logical, parameter :: id_bc_y = .false.
+  logical, parameter :: id_bc_x = .true.
+  logical, parameter :: id_bc_y = .true.
 
   type(dim3), parameter :: threadsE  = dim3(32,1,1)
   type(dim3), parameter :: threadsF  = dim3(32,4,1)
@@ -61,7 +58,7 @@ module mod_globals
   !               ! kind=4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer(kind=2), parameter :: id_recal = 0
-  integer(kind=4), parameter :: id_RungeKutta = 0
+  integer(kind=2), parameter :: id_RungeKutta = 0
   integer, parameter         :: step_offset   = 0
 
   ! physical properties
@@ -69,20 +66,22 @@ module mod_globals
   real(8), parameter :: Pr    = 0.71d0
   real(8), parameter :: Prt   = 0.9d0
   real(8), parameter :: R     = 287.03d0
-
-  ! HR-SLAU2 and HR-AUSM+-up towards High Resolution Unsteady Aerodynamic Simulations
-  ! Keiichi Kitamura, Atsushi Hashimoto
-  ! JAXA-SP-14-010
-
-  ! initial condition
-  real(8), parameter :: M0   = 0.1d0
-  real(8), parameter :: rho0 = 1.d0
-  real(8), parameter :: u0   = 1.d0
-  real(8), parameter :: d1   = pi / 15.d0
-  real(8), parameter :: d2   = 0.05d0
-  real(8), parameter :: dt   = 0.25d0 * 0.25d0 * 1.d-3
-  real(8), parameter :: endT = 8.d0
-  integer, parameter :: np   = 10
+ 
+  real(8), parameter :: T0   = 300.d0
+  real(8), parameter :: C    = 1.461d-6
+  real(8), parameter :: S    = 110.3d0
+  real(8), parameter :: mu0  = C * T0**1.5 / (T0 + S)
+  real(8), parameter :: Re   = 25000.d0
+  real(8), parameter :: rho0 = 1.293d0
+  real(8), parameter :: p0   = rho0 * R * T0
+  real(8), parameter :: rho1 = 0.125d0 * rho0
+  real(8), parameter :: p1   = 0.1d0 * p0
+  real(8), parameter :: Lx   = Re * mu0 / sqrt(rho0 * p0)
+  real(8), parameter :: Ly   = 0.1d0 * Lx
+  real(8), parameter :: CFL  = 0.1d0
+  real(8), parameter :: dt   = CFL * Lx / (dble(nx-1) * sqrt(p0 / rho0))
+  real(8), parameter :: endT = 0.2136d0 * Lx / sqrt(p0 / rho0)
+  integer, parameter :: np   = 100
   integer, parameter :: nt   = int(endT / (dble(np) * dt))
 end module mod_globals
 

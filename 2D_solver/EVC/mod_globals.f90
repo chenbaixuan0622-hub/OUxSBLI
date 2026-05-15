@@ -35,12 +35,11 @@ module mod_globals
   real(8), parameter         :: blt         = 1.d-3
   
   ! mesh
-  real(8), parameter :: pi = acos(-1.d0)
-  real(8), parameter :: Lx = 2.d0 * pi
-  real(8), parameter :: Ly = 2.d0 * pi
-  integer, parameter :: nx = 513
-  integer, parameter :: ny = 513
- 
+  real(8), parameter :: Lx = 0.1d0
+  real(8), parameter :: Ly = 0.1d0
+  integer, parameter :: nx = 258
+  integer, parameter :: ny = 258
+  
   ! boundary condition
   logical, parameter :: id_bc_x = .false.
   logical, parameter :: id_bc_y = .false.
@@ -60,29 +59,29 @@ module mod_globals
   ! id_recal      ! kind=2 ! set 0   !
   !               ! kind=4 ! recal   !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=2), parameter :: id_recal = 0
-  integer(kind=4), parameter :: id_RungeKutta = 0
-  integer, parameter         :: step_offset   = 0
+  integer(kind=2), parameter  :: id_recal      = 0
+  integer(kind=4), parameter  :: id_RungeKutta = 0
+  integer, parameter          :: step_offset   = 0
 
   ! physical properties
   real(8), parameter :: gamma = 1.4d0
   real(8), parameter :: Pr    = 0.71d0
   real(8), parameter :: Prt   = 0.9d0
-  real(8), parameter :: R     = 287.03d0
-
-  ! HR-SLAU2 and HR-AUSM+-up towards High Resolution Unsteady Aerodynamic Simulations
-  ! Keiichi Kitamura, Atsushi Hashimoto
-  ! JAXA-SP-14-010
+  real(8), parameter :: R     = 287.15d0
 
   ! initial condition
-  real(8), parameter :: M0   = 0.1d0
-  real(8), parameter :: rho0 = 1.d0
-  real(8), parameter :: u0   = 1.d0
-  real(8), parameter :: d1   = pi / 15.d0
-  real(8), parameter :: d2   = 0.05d0
-  real(8), parameter :: dt   = 0.25d0 * 0.25d0 * 1.d-3
-  real(8), parameter :: endT = 8.d0
-  integer, parameter :: np   = 10
-  integer, parameter :: nt   = int(endT / (dble(np) * dt))
+  real(8), parameter :: M0    = 0.05d0
+  real(8), parameter :: beta  = 1.d0 / 50.d0
+  real(8), parameter :: theta = 0.d0 / 180.d0
+  real(8), parameter :: Rc    = 0.005d0
+  real(8), parameter :: p0    = 1.d5
+  real(8), parameter :: T0    = 300.d0
+  real(8), parameter :: u0    = M0 * sqrt(gamma * R * T0)
+  real(8), parameter :: rho0  = p0 / (R * T0)
+  real(8), parameter :: CFL   = 0.05d0
+  real(8), parameter :: dt    = CFL * Lx / (dble(nx-1) * u0)
+  real(8), parameter :: T     = 1.d0 * Lx / u0
+  integer, parameter :: np    = 1
+  integer, parameter :: nt    = int(T / (dble(np) * abs(dt)))
 end module mod_globals
 
