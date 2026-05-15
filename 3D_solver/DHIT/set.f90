@@ -1,5 +1,5 @@
 module set
-  use mod_globals, only : nx, ny, nz, gamma, R, RHO0, V0, p0, L0, T, dtn
+  use mod_globals, only : nx, ny, nz 
   use set_bc_common
   use set_coordinate
   use set_init_dhit
