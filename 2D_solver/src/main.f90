@@ -20,6 +20,8 @@ program main
   call MPI_COMM_SIZE(MPI_COMM_WORLD, nranks, ierr)
   call MPI_COMM_RANK(MPI_COMM_WORLD, myrank, ierr)
   mygpu = myrank / 2
+  
+  call execute_command_line('mkdir -p recal', wait=.true., exitstat=ierr)
 
   print *, "my rank is", myrank
   if (mod(myrank,2) == 0) then

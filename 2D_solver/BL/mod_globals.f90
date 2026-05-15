@@ -4,13 +4,11 @@ module mod_globals
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_visc     ! kind2 Euler       !
   !             ! kind4 NS          !
-  !             ! kind8 LES         !
   !             ! 1 2nd             !
   !             ! 2 4th             !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_scheme   ! integer(2) KEEP   !
   !             ! real(2)    SLAU   !
-  !             ! real(4)    Roe    !
   !             ! real(8)    Hybrid !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! id_accuracy ! kind2 2nd         !
@@ -24,9 +22,6 @@ module mod_globals
   ! id_slau     ! kind2 SLAU        !
   !             ! kind4 HR-SLAU2    !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_rescale  ! kind2 off         !
-  !             ! kind4 on          !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer, parameter         :: dimension   = 2
   integer(4), parameter      :: id_visc     = 1
   integer(2), parameter      :: id_scheme   = 0
@@ -35,7 +30,7 @@ module mod_globals
   integer(kind=8), parameter :: id_accuracy = 0
   integer(kind=2), parameter :: id_tvd      = 0
   integer(kind=4), parameter :: id_slau     = 0
-  integer(kind=4), parameter :: id_rescale  = 0
+  integer(kind=2), parameter :: id_rescale  = 0
   integer(kind=2), parameter :: id_gpumpi   = 0
   real(8), parameter         :: blt         = 1.d-3
 
@@ -43,8 +38,8 @@ module mod_globals
   real(8), parameter :: Lx = 20.d0 * blt
   real(8), parameter :: Ly = 5.d0 * blt
   ! DNS
-  integer, parameter :: nx = 257!513
-  integer, parameter :: ny = 129!161
+  integer, parameter :: nx = 257
+  integer, parameter :: ny = 129
   
   ! boundary condition
   logical, parameter :: id_bc_x = .true.

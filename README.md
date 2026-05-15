@@ -6,7 +6,7 @@
   <img src="./img/OUxSBLI.png" alt="OUxSBLI">  
 </div>
 
-OUxSBLI is a GPU-accelerated CFD code written in CUDA Fortran. It employs explicit high-order finite-difference schemes on a rectilinear grid.
+OUxSBLI is a GPU-accelerated CFD code written in CUDA Fortran. It employs explicit high-order finite-difference schemes on a rectilinear and a curvilinear grid.
 
 ## Dependency
 * HPC SDK (version 24.* and 25.* are better)

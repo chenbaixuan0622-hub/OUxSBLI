@@ -39,7 +39,7 @@ contains
     integer, intent(in)  :: myrank, nx, ny
     real(8), intent(in)  :: xs(nx), ys(ny)
     real(8), intent(out) :: Q(nx,4,ny)
-    call set_init_tbl(nx, ny, xs, ys, 0.1d0, 0.75d0*blt, blt, u0, p0, T0, M0, Q)
+    call set_init_tbl(nx, ny, xs, ys, 0.75d0*blt, blt, u0, p0, T0, M0, Q)
   end subroutine set_init
 
 
