@@ -28,7 +28,7 @@ module mod_globals
   !             ! kind4 on          !
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer, parameter         :: dimension   = 2
-  integer(2), parameter      :: id_visc     = 1
+  integer(4), parameter      :: id_visc     = 1
   integer(2), parameter      :: id_scheme   = 0
   integer, parameter         :: sp          = kind(1.d0) ! single or double
   real(sp), parameter        :: threshold   = 0.4_sp

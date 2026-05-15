@@ -13,9 +13,9 @@ module calc_flux_base
   use calc_slau_kernel_internal
   use calc_hybrid_kernel
   use calc_hybrid_kernel_internal
-  ! use calc_visc2
-  ! use calc_visc4
-  ! use calc_visc4_internal
+  use calc_visc2
+  use calc_visc4
+  use calc_visc4_internal
   use set
   implicit none
   private
@@ -29,7 +29,7 @@ module calc_flux_base
   end interface calc_conv
 
   interface calc_EF
-     module procedure calc_EF_Euler !calc_EFG_visc
+     module procedure calc_EF_Euler, calc_EF_visc
   end interface calc_EF
 contains
   !> Allocate the persistent Ducros sensor array on the device.
@@ -150,52 +150,43 @@ contains
   !> Compute fluxes for viscous (Navier-Stokes) flow - convective + viscous components
   !> Computes stress tensor tau_ij = mu*(du_i/dx_j + du_j/dx_i) - (2/3)*mu*delta_ij*(div u)
   !> and heat flux via Fourier's law: q = -k*dT/dx where k depends on Prandtl number
-  ! subroutine calc_EFG_visc(id_visc, nx, ny, inv_dx, inv_dy,  Jacobian, QJ, Q, T, mu, mut, qc2, E, F)
-  !   use mod_globals, only : id_scheme
-  !   integer(4), intent(in), value            :: id_visc             !> ID for equation, int 4 means NS
-  !   integer, intent(in), value               :: nx                  !> number of grid points in x direction
-  !   integer, intent(in), value               :: ny                  !> number of grid points in y direction
-  !   !integer, intent(in), value               :: nz                  !> number of grid points in z direction
-  !   real(8), intent(in), device, contiguous  :: inv_dx(nx-1)        !> 1 / dx (for finite differences)
-  !   real(8), intent(in), device, contiguous  :: inv_dy(ny-1)        !> 1 / dy
-  !   !real(8), intent(in), device, contiguous  :: inv_dz(nz-1)        !> 1 / dz
-  !   real(8), intent(in), device, contiguous  :: Jacobian(nx,ny)     !> Jacobian determinant for scaling
-  !   real(8), intent(in), device, contiguous  :: QJ(nx,4,ny)      !> Q/Jacobian (scaled conserved variables)
-  !   real(8), intent(out), device, contiguous :: Q(nx,4,ny)       !> Q(rho, u, v, w, p) primitive variables
-  !   real(8), intent(out), device, contiguous :: T(nx,ny)         !> temperature field (for viscosity & heat flux)
-  !   real(8), intent(out), device, contiguous :: mu(nx,ny)        !> molecular viscosity via Sutherland's law
-  !   real(8), intent(out), device, contiguous :: E(4,nx-1,ny-2) !> x-direction flux (convective + viscous)
-  !   real(8), intent(out), device, contiguous :: F(4,nx-2,ny-1) !> y-direction flux (convective + viscous)
-  !   !real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1) !> z-direction flux (convective + viscous)
-  !   integer stat
-  !   ! Step 1: Decode Q and compute T(rho) and mu(T) via Sutherland's formula
-  !   call calc_quantities_T_2D(nx, ny, Jacobian, QJ, Q, T, mu)   !call calc_quantities_T_3D(nx, ny, Jacobian, QJ, Q, T, mu)
-  !   ! Step 2: Compute convective fluxes (KEEP/SLAU/Roe/Hybrid depending on id_scheme)
-  !   call calc_conv(id_scheme, nx, ny, inv_dx, inv_dy, Q, T, E, F)
-  !   ! Step 3: Add viscous fluxes (choose 2nd or 4th-order stencils)
-  !   if (id_visc == 2) then
-  !     ! 4th-order compact finite differences (higher accuracy, larger stencil)
-  !     if (id_bc_x == .false. .and. kind(id_accuracy) == 8) then
-  !       call calc_Ev4_in<<<blocksEv,threadsEv>>>(nx, ny, inv_dx, inv_dy, Q, T, mu, E)
-  !     else
-  !       call calc_Ev4<<<blocksEv,threadsEv>>>(nx, ny, inv_dx, inv_dy, Q, T, mu, E)
-  !     endif
-  !     if (id_bc_y == .false. .and. kind(id_accuracy) == 8) then
-  !       call calc_Fv4_in<<<blocksFv,threadsFv>>>(nx, ny, inv_dy, inv_dx, Q, T, mu, F)
-  !     else
-  !       call calc_Fv4<<<blocksFv,threadsFv>>>(nx, ny, inv_dy, inv_dx, Q, T, mu, F)
-  !     endif
-  !     !if (id_bc_z == .false. .and. kind(id_accuracy) == 8) then
-  !     !  call calc_Gv4_in<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
-  !     !else
-  !       !call calc_Gv4<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
-  !     !endif
-  !   else
-  !     ! 2nd-order centered differences (standard, 3-point stencil)
-  !     call calc_Ev2<<<blocksEv,threadsEv>>>(nx, ny,inv_dx, inv_dy,  Q, T, mu, E)
-  !     call calc_Fv2<<<blocksFv,threadsFv>>>(nx, ny,inv_dy, inv_dx,  Q, T, mu, F)
-  !     !call calc_Gv2<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
-  !   endif
-  ! end subroutine calc_EFG_visc
+  subroutine calc_EF_visc(id_visc, nx, ny, inv_dx, inv_dy, Jacobian, QJ, Q, T, mu, E, F)
+    use mod_globals, only : id_scheme
+    integer(4), intent(in), value            :: id_visc         !> ID for equation, int 4 means NS
+    integer, intent(in), value               :: nx              !> number of grid points in x direction
+    integer, intent(in), value               :: ny              !> number of grid points in y direction
+    real(8), intent(in), device, contiguous  :: inv_dx(nx-1)    !> 1 / dx (for finite differences)
+    real(8), intent(in), device, contiguous  :: inv_dy(ny-1)    !> 1 / dy
+    real(8), intent(in), device, contiguous  :: Jacobian(nx,ny) !> Jacobian determinant for scaling
+    real(8), intent(in), device, contiguous  :: QJ(nx,4,ny)     !> Q/Jacobian (scaled conserved variables)
+    real(8), intent(out), device, contiguous :: Q(nx,4,ny)      !> Q(rho, u, v, w, p) primitive variables
+    real(8), intent(out), device, contiguous :: T(nx,ny)        !> temperature field (for viscosity & heat flux)
+    real(8), intent(out), device, contiguous :: mu(nx,ny)       !> molecular viscosity via Sutherland's law
+    real(8), intent(out), device, contiguous :: E(4,nx-1,ny-2)  !> x-direction flux (convective + viscous)
+    real(8), intent(out), device, contiguous :: F(4,nx-2,ny-1)  !> y-direction flux (convective + viscous)
+    integer stat
+    ! Step 1: Decode Q and compute T(rho) and mu(T) via Sutherland's formula
+    call calc_quantities_T_2D(nx, ny, Jacobian, QJ, Q, T, mu)   !call calc_quantities_T_3D(nx, ny, Jacobian, QJ, Q, T, mu)
+    ! Step 2: Compute convective fluxes (KEEP/SLAU/Roe/Hybrid depending on id_scheme)
+    call calc_conv(id_scheme, nx, ny, inv_dx, inv_dy, Q, T, E, F)
+    ! Step 3: Add viscous fluxes (choose 2nd or 4th-order stencils)
+    if (id_visc == 2) then
+      ! 4th-order compact finite differences (higher accuracy, larger stencil)
+      if (id_bc_x == .false. .and. kind(id_accuracy) == 8) then
+        call calc_Ev4_in<<<blocksEv,threadsEv>>>(nx, ny, inv_dx, inv_dy, Q, T, mu, E)
+      else
+        call calc_Ev4<<<blocksEv,threadsEv>>>(nx, ny, inv_dx, inv_dy, Q, T, mu, E)
+      endif
+      if (id_bc_y == .false. .and. kind(id_accuracy) == 8) then
+        call calc_Fv4_in<<<blocksFv,threadsFv>>>(nx, ny, inv_dy, inv_dx, Q, T, mu, F)
+      else
+        call calc_Fv4<<<blocksFv,threadsFv>>>(nx, ny, inv_dy, inv_dx, Q, T, mu, F)
+      endif
+    else
+      ! 2nd-order centered differences (standard, 3-point stencil)
+      call calc_Ev2<<<blocksEv,threadsEv>>>(nx, ny, inv_dx, inv_dy, Q, T, mu, E)
+      call calc_Fv2<<<blocksFv,threadsFv>>>(nx, ny, inv_dy, inv_dx, Q, T, mu, F)
+    endif
+  end subroutine calc_EF_visc
 end module calc_flux_base
 
