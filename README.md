@@ -3,7 +3,7 @@
 ![Modern Fortran](https://img.shields.io/badge/Modern_Fortran-yes-success)
 
 <div align="center">
-  <img src="./img/OUxSBLI.png" alt="OUxSBLI">  
+  <img src="./docs/img/OUxSBLI.png" alt="OUxSBLI">  
 </div>
 
 OUxSBLI is a GPU-accelerated CFD code written in CUDA Fortran. It employs explicit high-order finite-difference schemes on a rectilinear and a curvilinear grid.
@@ -82,23 +82,23 @@ The results are consistent with Lusher's results.
 ~~~
 
 <div align="center">
-  <img src="./img/Ek.png" alt="TGV_kinetic_energy" width="450">  
+  <img src="./docs/img/Ek.png" alt="TGV_kinetic_energy" width="450">  
 </div>
 
 <div align="center">
-  <img src="./img/enstrophy.png" alt="TGV_total_enstrophy" width="450">  
+  <img src="./docs/img/enstrophy.png" alt="TGV_total_enstrophy" width="450">  
 </div>
 
 ### Shock Boundary Layer Interaction (SBLI)
 
 <div align="center">
-  <img src="./img/sbli_2d.png" alt="SBLI" width="900">  
+  <img src="./docs/img/sbli_2d.png" alt="SBLI" width="900">  
 </div>
 
 ### NACA0012
 
 <div align="center">
-  <img src="./img/naca_p.gif" alt="NACA" width="900">
+  <img src="./docs/img/naca_p.gif" alt="NACA" width="900">
 </div>
 
 ## Related Publication
