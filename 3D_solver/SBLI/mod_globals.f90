@@ -126,7 +126,7 @@ module mod_globals
   ! reflected shock
   real(8), parameter :: a2    = sqrt(gamma * R * T2)
   real(8), parameter :: M2    = sqrt(u2**2 + v2**2) / a2
-  real(8), parameter :: beta_r = dacos(-1.d0) * 37.7d0 / 180.d0
+  real(8), parameter :: beta_r = dacos(-1.d0) * 44.1d0 / 180.d0
   real(8), parameter :: Mr    = M2 * dsin(beta_r)
   real(8), parameter :: Mr2   = Mr**2
   real(8), parameter :: T3    = T2 * (1.d0 + 2.d0 * (gamma - 1.d0) * (Mr2 - 1.d0) * (1.d0 + gamma * Mr2) / (Mr2 * (gamma + 1.d0)**2))

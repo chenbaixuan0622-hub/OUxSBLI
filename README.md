@@ -6,7 +6,7 @@
   <img src="./docs/img/OUxSBLI.png" alt="OUxSBLI">  
 </div>
 
-OUxSBLI is a GPU-accelerated CFD code written in CUDA Fortran. It employs explicit high-order finite-difference schemes on a rectilinear and a curvilinear grid.
+OUxSBLI is a GPU-accelerated CFD code with Python-API written in CUDA Fortran. It employs explicit high-order finite-difference schemes on a rectilinear grid (3D and 2D solvers) and a curvilinear grid.
 
 ## Dependency
 * HPC SDK (version 24.* and 25.* are better)
@@ -52,7 +52,7 @@ $ bash ./calc.sh
 * ME4-Base
 * Gaitonde and Visbal's 2nd-order scheme
 ### Spatial SGS
-* Selective mixed scale model (Under development)
+* Selective mixed scale model
 ### Temporal
 * 3-3 TVD Runge-Kutta
 * 4-4 Runge-Kutta
@@ -94,6 +94,10 @@ The results are consistent with Lusher's results.
 <div align="center">
   <img src="./docs/img/sbli_2d.png" alt="SBLI" width="900">  
 </div>
+
+### 2D Oblique Shock
+
+M=2 freestream with θ=8° flow deflection. Pre- and post-shock states agree with the Rankine-Hugoniot relations within 2% and 5% respectively, verified by `ouxsbli/tests/test_os.py`.
 
 ### NACA0012
 
