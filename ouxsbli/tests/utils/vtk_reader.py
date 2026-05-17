@@ -86,6 +86,14 @@ def getQ(file_path, Nx, Ny, Nz, reader=None):
          p.astype(np.float32, copy=False)
 
 
+def initial_vtr(data_dir):
+  import glob
+  files = glob.glob(os.path.join(str(data_dir), "Q*.vtr"))
+  if not files:
+    raise FileNotFoundError(f"No Q*.vtr files found in {data_dir}")
+  return min(files, key=lambda f: extract_number(os.path.basename(f)))
+
+
 def latest_vtr(data_dir):
   import glob
   files = glob.glob(os.path.join(str(data_dir), "Q*.vtr"))
