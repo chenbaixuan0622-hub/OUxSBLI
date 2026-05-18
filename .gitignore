@@ -3,18 +3,17 @@
 *.vtr
 *.vts
 *.vtk
+*.png
 *.mod
 *.o
 *.out
-*.png
 *.so
 *.err
 *.ncu-rep
+*.egg-info
+*.pyc
 .vscode
-docs/auto_summary.md
-3D_solver/ETGV/data
-3D_solver/NSTGV/data
-3D_solver/IVST/data
-3D_solver/TBL/data
-3D_solver/SBLI/data
+build
+ouxsbli/__pycache__
+ouxsbli/tests/tmp
 

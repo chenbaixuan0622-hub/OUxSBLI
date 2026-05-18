@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Is
 
-OUxSBLI is a GPU-accelerated CFD solver for compressible flows (Euler/Navier-Stokes), written in CUDA Fortran with MPI parallelization. It targets NVIDIA GPUs via the HPC SDK and solves test cases defined in `3D_solver/<CASE>/`. A curvilinear O-grid variant for wing/airfoil cases lives in `3D_solver_curv/<CASE>/`.
+OUxSBLI is a GPU-accelerated CFD solver for compressible flows (Euler/Navier-Stokes), written in CUDA Fortran with MPI parallelization. It targets NVIDIA GPUs via the HPC SDK and solves test cases defined in `3D_solver/<CASE>/`. A standalone 2D solver lives under `2D_solver/<CASE>/`. A curvilinear O-grid variant for wing/airfoil cases lives in `3D_solver_curv/<CASE>/`.
 
 ## Build & Run
 
@@ -22,6 +22,14 @@ For curvilinear cases (e.g. NACA 0012):
 
 ```bash
 cd 3D_solver_curv/NACA
+make clean && make
+bash calc.sh
+```
+
+For 2D cases (e.g. oblique shock):
+
+```bash
+cd 2D_solver/OS
 make clean && make
 bash calc.sh
 ```
@@ -50,7 +58,7 @@ Key differences from the Cartesian solver:
 - **Computational spacing**: Δξ = Δη = 1 (unit); physical z spacing is the dimensional `dz` passed as an argument.
 - **Scheme dispatch**: Only KEEP (`integer(2)`), SLAU (`real(2)`), and Hybrid (`real(8)`) are supported. **LES (`id_visc = integer(8)`) is not implemented** in `calc_flux_base_curv.f90`; only Euler and NS are dispatched.
 - **Viscous kernels**: `calc_visc2_curv.f90` (Gaitonde & Visbal, curvilinear); physical gradients use chain rule (∂f/∂x = ξ_x·∂f/∂ξ + η_x·∂f/∂η).
-- **Per-case config**: `3D_solver_curv/<CASE>/` containing `mod_globals.f90`, `set.f90`, `Makefile`, `calc.sh`.
+- **Per-case config**: `3D_solver_curv/<CASE>/` containing `mod_globals.f90`, `set.f90`, `Makefile`, `calc.sh`. Available cases: NACA (O-grid airfoil), CORN (compression corner, M=2, θ=8°).
 - `load_smem_visc2.f90` (in `3D_solver/src/`) provides async pipeline shared-memory load helpers (`pipelineMemcpyAsync` / `pipelineCommit` / `pipelineWaitPrior`); requires the `wmma` module.
 
 ### Data Flow (Cartesian)
@@ -79,6 +87,23 @@ main_curv.f90
         └─ calc_para()       # MPI ghost-cell exchange
         └─ print()           # VTK output
 ```
+
+### 2D Solver (`2D_solver/`)
+
+A standalone 2D solver sharing the same convective/viscous kernels as the 3D Cartesian solver. Source layout mirrors the 3D structure:
+
+- `2D_solver/src/` — shared 2D utilities (main, grid, BCs)
+- `2D_solver/<CASE>/` — per-case config: `mod_globals.f90`, `set.f90`, `Makefile`, `calc.sh`
+
+Available cases:
+
+| Case | Description |
+|------|-------------|
+| BL   | Supersonic laminar boundary layer |
+| DSL  | Double shear layer |
+| EVC  | Euler vortex convection (grid-convergence study) |
+| OS   | 2D oblique shock (M=2, θ=8°, SLAU, Euler) |
+| ST   | Sod shock tube |
 
 ### Convective Schemes (dispatched from `calc_flux_base.f90`)
 
@@ -116,6 +141,49 @@ The **value** of these parameters is ignored; only the **type kind** matters. Fo
 ## MPI Decomposition
 
 1D decomposition in the x-direction via `calc_para.f90`. Default is 2 MPI ranks (`mpirun -n 2 a.out`), with `mygpu = myrank / 2` (2 ranks per GPU). GPU-aware MPI is optional via `id_gpumpi`.
+
+## Compile Testing (AI Agent)
+
+After modifying any solver source or CICD configuration, verify that all build targets still compile by running from the repository root:
+
+```bash
+bash test_cicd.sh
+```
+
+This script builds all 12 targets (9 Cartesian × scheme/accuracy combinations + 3 curvilinear × scheme combinations) and prints a pass/fail summary. Always run it before reporting a change as complete. A non-zero exit code means at least one target failed.
+
+**Curvilinear accuracy limitation:** `3D_solver_curv` only supports 2nd-order accuracy (`id_accuracy` kind=2). The CICD targets for curvilinear are therefore limited to KEEP2, SLAU2, Hybrid2.
+
+## Python Test Suite
+
+Integration and convergence tests live in `ouxsbli/tests/`. Run with pytest from the repository root:
+
+```bash
+pytest ouxsbli/tests/
+```
+
+| Test file | What it checks |
+|-----------|----------------|
+| `test_etgv.py` | Supersonic Taylor-Green vortex (energy decay) |
+| `test_st.py` | Sod shock tube (exact Riemann solution) |
+| `test_evc.py` | Euler vortex convergence — KEEP 2nd/4th/6th, SLAU 2nd; expected order ≥1.5/3.5 |
+| `test_os.py` | 2D oblique shock — pre/post state vs. Rankine-Hugoniot (tol 2%/5%) |
+| `test_corn.py` | 3D_solver_curv/CORN — pressure and density ratios vs. θ-β-M theory (tol 5%) |
+
+Analytical helpers in `ouxsbli/tests/utils/`:
+- `oblique_shock.py` — `beta_from_theta()`, `post_shock_state()` via bisection on the θ-β-M relation
+- `sod_exact.py` — exact Riemann solver for the Sod shock tube
+- `vtk_reader.py` — VTK output reader
+
+## Tutorials
+
+`tutorials/ouxsbli_bl/` — Supersonic flat-plate boundary layer (M=2, dimensional parameters, wall-normal grid stretching, Riemann-invariant top BC). Run like any case:
+
+```bash
+cd tutorials/ouxsbli_bl
+make clean && make
+bash calc.sh
+```
 
 ## Adding a New Test Case
 

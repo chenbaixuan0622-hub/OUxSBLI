@@ -3,10 +3,10 @@
 ![Modern Fortran](https://img.shields.io/badge/Modern_Fortran-yes-success)
 
 <div align="center">
-  <img src="./img/OUxSBLI.png" alt="OUxSBLI">  
+  <img src="./docs/img/OUxSBLI.png" alt="OUxSBLI">  
 </div>
 
-OUxSBLI is a GPU-accelerated CFD code written in CUDA Fortran. It employs explicit high-order finite-difference schemes on a rectilinear grid.
+OUxSBLI is a GPU-accelerated CFD code with Python-API written in CUDA Fortran. It employs explicit high-order finite-difference schemes on a rectilinear grid (3D and 2D solvers) and a curvilinear grid.
 
 ## Dependency
 * HPC SDK (version 24.* and 25.* are better)
@@ -52,7 +52,7 @@ $ bash ./calc.sh
 * ME4-Base
 * Gaitonde and Visbal's 2nd-order scheme
 ### Spatial SGS
-* Selective mixed scale model (Under development)
+* Selective mixed scale model
 ### Temporal
 * 3-3 TVD Runge-Kutta
 * 4-4 Runge-Kutta
@@ -82,23 +82,27 @@ The results are consistent with Lusher's results.
 ~~~
 
 <div align="center">
-  <img src="./img/Ek.png" alt="TGV_kinetic_energy" width="450">  
+  <img src="./docs/img/Ek.png" alt="TGV_kinetic_energy" width="450">  
 </div>
 
 <div align="center">
-  <img src="./img/enstrophy.png" alt="TGV_total_enstrophy" width="450">  
+  <img src="./docs/img/enstrophy.png" alt="TGV_total_enstrophy" width="450">  
 </div>
 
 ### Shock Boundary Layer Interaction (SBLI)
 
 <div align="center">
-  <img src="./img/sbli_2d.png" alt="SBLI" width="900">  
+  <img src="./docs/img/sbli_2d.png" alt="SBLI" width="900">  
 </div>
+
+### 2D Oblique Shock
+
+M=2 freestream with θ=8° flow deflection. Pre- and post-shock states agree with the Rankine-Hugoniot relations within 2% and 5% respectively, verified by `ouxsbli/tests/test_os.py`.
 
 ### NACA0012
 
 <div align="center">
-  <img src="./img/naca_p.gif" alt="NACA" width="900">
+  <img src="./docs/img/naca_p.gif" alt="NACA" width="900">
 </div>
 
 ## Related Publication
@@ -118,6 +122,12 @@ Jun Hatayama, Kento Tanaka, and Toshinori Kouchi. "Nonlinear causal relationship
 ~~~
 
 The repository was made publicly available after publication to improve reproducibility. However, this version may differ slightly from the version used in the paper.
+
+## AI-Assisted Development
+Development during 2024 and 2025 was primarily conducted by the project owner.  
+Starting in 2026, the project expanded its contributor base and introduced AI-assisted "vibe coding" workflows using Claude Code.
+
+To maintain transparency, we aim to clearly distinguish which parts of the codebase and development workflow involve AI-generated content or AI-assisted modifications. In addition, as part of our effort to share practical knowledge on AI-assisted development in the HPC community, we provide Claude Code plan files under `./docs/plans`.
 
 ## License
 This project is under BSD 3-Clause License
