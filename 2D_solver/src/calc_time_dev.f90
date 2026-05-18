@@ -60,6 +60,7 @@ contains
       endif
       call pre_calc(nx, ny,  myrank, nranks, x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q, overlap, &
                     dtdx, dtdy, xix, etay, Jacobian, QJ, ke0, entropy0)
+      QJ2 = QJ ! initialize QJ2
     else
       call MPI_RECV(ke0,      1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
       call MPI_RECV(entropy0, 1, MPI_REAL4, myrank-1, myrank,   MPI_COMM_WORLD, istat, ierr)
