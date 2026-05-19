@@ -32,7 +32,7 @@ KIND_MAP: dict[str, dict] = {
     "id_tvd": {
         "none":    "integer(2)",
         "minmod":  "integer(4)",
-        "muscl4":  "integer(8)",
+        "hybrid":  "integer(8)",
     },
     "id_slau": {
         "slau":    "integer(2)",

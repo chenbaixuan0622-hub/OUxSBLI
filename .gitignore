@@ -15,9 +15,5 @@
 .vscode
 build
 ouxsbli/__pycache__
-3D_solver/ETGV/data
-3D_solver/NSTGV/data
-3D_solver/IVST/data
-3D_solver/TBL/data
-3D_solver/SBLI/data
+ouxsbli/tests/tmp
 
