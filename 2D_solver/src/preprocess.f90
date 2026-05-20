@@ -6,7 +6,6 @@ module preprocess
   use print
   implicit none
 contains
-
   !> Check GPU device properties and availability
   !> Prints device name and capability information
   subroutine check_gpu(mygpu)
@@ -81,7 +80,7 @@ contains
     real(4), intent(inout)                   :: entropy0            !< reference entropy
     real(8) xix_cpu(nx-1), etay_cpu(ny-1)
     real(8) dtdx_cpu(nx-2), dtdy_cpu(ny-2)
-    real(4) rho1d(nx*ny), p1d(nx*ny), v1d(nx*ny*3)
+    !real(io) rho1d(nx*ny), p1d(nx*ny), v1d(nx*ny*3)
     integer i, j, k, l, ierr
     ! set Q / Jacobian
     do j = 1, ny
@@ -114,10 +113,7 @@ contains
     else
       overlap = 1
     endif
-    call make_1d_for_print(nx, ny, Jacobian_cpu, Q, rho1d, p1d, v1d)
-    call print_vtk(0, nx, ny, x, y, rho1d, p1d, v1d)
-    call MPI_SEND(ke0,      1, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(entropy0, 1, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
+    call print0(myrank, nx, ny, x, y, Jacobian_cpu, Q, ke0, entropy0)
   end subroutine pre_calc
 end module preprocess
 
