@@ -22,10 +22,7 @@ def getGrid(file_path):
   x = numpy_support.vtk_to_numpy(grid.GetXCoordinates())
   y = numpy_support.vtk_to_numpy(grid.GetYCoordinates())
   z = numpy_support.vtk_to_numpy(grid.GetZCoordinates())
-  return len(x), len(y), len(z), \
-         x.astype(np.float32, copy=False), \
-         y.astype(np.float32, copy=False), \
-         z.astype(np.float32, copy=False)
+  return len(x), len(y), len(z), x, y, z
 
 
 def getVector(file_path, Nx, Ny, Nz, name):
@@ -41,9 +38,7 @@ def getVector(file_path, Nx, Ny, Nz, name):
   u = V[:,:,:,0]
   v = V[:,:,:,1]
   w = V[:,:,:,2]
-  return u.astype(np.float32, copy=False), \
-         v.astype(np.float32, copy=False), \
-         w.astype(np.float32, copy=False)
+  return u, v, w
 
 
 def getScalar(file_path, Nx, Ny, Nz, name):
@@ -56,7 +51,7 @@ def getScalar(file_path, Nx, Ny, Nz, name):
   Q = reader.GetOutput()
   a = numpy_support.vtk_to_numpy(Q.GetPointData().GetArray(name))
   a = a.reshape((Nz,Ny,Nx))
-  return a.astype(np.float32, copy=False)
+  return a
 
 
 def getQ(file_path, Nx, Ny, Nz, reader=None):
@@ -79,11 +74,7 @@ def getQ(file_path, Nx, Ny, Nz, reader=None):
   w   = V[:,:,:,2]
   p   = numpy_support.vtk_to_numpy(Q.GetPointData().GetArray("p"))
   p   = p.reshape((Nz,Ny,Nx))
-  return rho.astype(np.float32, copy=False), \
-         u.astype(np.float32, copy=False), \
-         v.astype(np.float32, copy=False), \
-         w.astype(np.float32, copy=False), \
-         p.astype(np.float32, copy=False)
+  return rho, u, v, w, p
 
 
 def initial_vtr(data_dir):

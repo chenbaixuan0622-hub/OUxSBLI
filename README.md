@@ -1,6 +1,7 @@
 [![DOI](https://zenodo.org/badge/761651757.svg)](https://doi.org/10.5281/zenodo.19396475)
 ![CUDA Fortran](https://img.shields.io/badge/CUDA_Fortran-GPU_Accelerated-76B900)
 ![Modern Fortran](https://img.shields.io/badge/Modern_Fortran-yes-success)
+[![Python](https://img.shields.io/badge/Python-3.10+-3776ab?style=flat&logo=python&logoColor=white)](https://python.org)
 
 <div align="center">
   <img src="./docs/img/OUxSBLI.png" alt="OUxSBLI">  
@@ -9,10 +10,16 @@
 OUxSBLI is a GPU-accelerated CFD code with Python-API written in CUDA Fortran. It employs explicit high-order finite-difference schemes on a rectilinear grid (3D and 2D solvers) and a curvilinear grid.
 
 ## Dependency
+### CUDA Fortran only
 * HPC SDK (version 24.* and 25.* are better)
 * ParaView (for visualization output files are XML VTK format)
+### Python API
+* Python (3.10>= is better)
+* numpy
+* vtk
 
 ## Usage
+### CUDA Fortran only
 1. Go to a working directory (supersonic viscous Taylor-Green vortex)
 ~~~bash
 $ cd ./3D_solver/NSTGV
@@ -39,8 +46,38 @@ $ make
 $ bash ./calc.sh
 ~~~
 
-6. Optimization
+1. Optimization
 * In some directories, you can get nsys and ncu iformation by running profile.sh
+
+### Python API
+1. Install Python API, `ouxsbli`
+~~~bash
+$ pip install .
+~~~
+
+2. Set parameters and run.
+~~~python
+from ouxsbli import Case
+
+OUxSBLI_ROOT = your_path
+WORKDIR      = your_path
+
+case = Case(
+  source   = str(pathlib.Path(OUxSBLI_ROOT) / "3D_solver/NSTGV"),
+  workdir  = WORKDIR,
+  # physics
+  visc     = "ns",
+  scheme   = "slau",
+  accuracy = 2,
+  # grid
+  nx       = 128,
+  ny       = 128,
+  nz       = 128,
+)
+
+case.build()
+case.run(nranks=2) # mpiexec -n 2 ./a.out
+~~~
 
 ## Discretization
 ### Spatial (Convection terms)
