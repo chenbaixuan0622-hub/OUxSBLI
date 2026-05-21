@@ -26,7 +26,7 @@ contains
     lf = char(10)
     
     ! Create output directory
-    write(result_dir, '(a, i0)') 'data/rank', myrank
+    write(result_dir, '(a)') 'data'
     call execute_command_line('mkdir -p ' // trim(result_dir), wait=.true., exitstat=ierr)
     
     ! Output filename
