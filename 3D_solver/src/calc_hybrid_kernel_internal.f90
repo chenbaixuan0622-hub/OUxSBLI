@@ -12,7 +12,7 @@ module calc_hybrid_kernel_internal
   use calc_hybrid
   implicit none
   private
-  public calc_hybrid_x_in, calc_hybrid_y_in, calc_hybrid_z_in
+  public calc_hybrid_x_in, calc_hybrid_y_in, calc_hybrid_z_in, calc_hybrid_z_in_koff
   !> io = 0, 1, 2 for 2nd, 4th, 6th order — compile-time stencil half-width.
   !> Derived from id_accuracy kind: kind=2 → io=0, kind=4 → io=1, kind=8 → io=2.
   integer, parameter :: io = kind(id_accuracy) / 3
@@ -269,4 +269,65 @@ contains
       end associate
     endif
   end subroutine calc_hybrid_z_in
+
+
+  !> Hybrid z-flux kernel restricted to k in [k_lo, k_hi] — used for interior/halo split
+  attributes(global) subroutine calc_hybrid_z_in_koff(nx, ny, nz, Q, T, sensor, G, k_lo, k_hi)
+    use mod_constant, only : Normal_z
+    integer, intent(in), value                :: nx, ny, nz, k_lo, k_hi
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
+    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1)
+    integer i, j, k, it, jt, kt, kk, k_base
+    real(8), dimension(-(io-1):threadsG%z+io+1, threadsG%y, threadsG%x), shared :: rho, u, v, w, p
+    real(8), dimension(threadsG%z, threadsG%y, threadsG%x), shared :: rhor, ur, vr, wr, pr
+    real(sp) fdz
+    real(8) rhol, ul, vl, wl, pl
+    it = threadIdx%x;  jt = threadIdx%y;  kt = threadIdx%z
+    i  = (blockIdx%x-1)*blockDim%x + it + 1
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    k_base = (blockIdx%z-1)*blockDim%z + k_lo - 1
+    do kk = kt-io, threadsG%z+io+1, blockDim%z
+      k = k_base + kk
+      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+        rho(kk,jt,it) = Q(i,1,j,k);   u(kk,jt,it) = Q(i,2,j,k)
+          v(kk,jt,it) = Q(i,3,j,k);   w(kk,jt,it) = Q(i,4,j,k)
+          p(kk,jt,it) = Q(i,5,j,k)
+      endif
+    enddo
+    call syncthreads()
+    k = k_base + kt
+    if (k_lo <= k .and. k <= k_hi .and. i <= nx-1 .and. j <= ny-1) then
+      fdz = 0.5_sp * (sensor(i,j,k) + sensor(i,j,k+1))
+      if (fdz <= threshold) then
+        block
+          real(8) tmp(2*io+2)
+          tmp = T(i, j, k-io:k+io+1)
+          associate(ww => w)
+            G(:,i-1,j-1,k) = KEEP(id_accuracy, &
+                                   rho(kt-io:kt+io+1,jt,it), u(kt-io:kt+io+1,jt,it), &
+                                     v(kt-io:kt+io+1,jt,it), w(kt-io:kt+io+1,jt,it), &
+                                    ww(kt-io:kt+io+1,jt,it), p(kt-io:kt+io+1,jt,it), tmp, Normal_z)
+          end associate
+        end block
+      else
+        call delta_r(id_accuracy, fdz, rho(kt-io:kt+io+1,jt,it), rhol, rhor(kt,jt,it))
+        call delta_r(id_accuracy, fdz,   u(kt-io:kt+io+1,jt,it),   ul,   ur(kt,jt,it))
+        call delta_r(id_accuracy, fdz,   v(kt-io:kt+io+1,jt,it),   vl,   vr(kt,jt,it))
+        call delta_r(id_accuracy, fdz,   w(kt-io:kt+io+1,jt,it),   wl,   wr(kt,jt,it))
+        call delta_r(id_accuracy, fdz,   p(kt-io:kt+io+1,jt,it),   pl,   pr(kt,jt,it))
+      endif
+    endif
+    call syncthreads()
+    if (k_lo <= k .and. k <= k_hi .and. i <= nx-1 .and. j <= ny-1 .and. fdz > threshold) then
+      rho(kt,jt,it) = rhol;   u(kt,jt,it) = ul;   v(kt,jt,it) = vl
+        w(kt,jt,it) = wl;     p(kt,jt,it) = pl
+      associate(un1 => w(kt,jt,it), un2 => wr(kt,jt,it))
+        call SLAU(id_slau, rho(kt,jt,it), rhor(kt,jt,it), u(kt,jt,it), ur(kt,jt,it), v(kt,jt,it), vr(kt,jt,it), &
+                  w(kt,jt,it), wr(kt,jt,it), un1, un2, p(kt,jt,it), pr(kt,jt,it), Normal_z, 1.0_sp, &
+                  G(1,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(4,i-1,j-1,k), G(5,i-1,j-1,k))
+      end associate
+    endif
+  end subroutine calc_hybrid_z_in_koff
 end module calc_hybrid_kernel_internal

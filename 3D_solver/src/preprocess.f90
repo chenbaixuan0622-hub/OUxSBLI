@@ -63,40 +63,27 @@ contains
   end subroutine allocate_device_mem
 
 
-  !> Preprocessing: compute metrics, initialize Q, transfer to device
-  !> Divides computational domain across MPI ranks
+  !> Preprocessing: compute metrics, initialize Q, transfer to device.
+  !> When zdec=.false. (non-zdec RK): writes t=0 VTK directly on compute rank.
+  !> When zdec=.true.  (zdec RK4):    sends rho1d/p1d/v1d to paired IO rank (myrank+1).
   subroutine pre_calc(nx, ny, nz, myrank, nranks, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q, overlap, &
-                      dtdxdy, dtdydz, dtdzdx, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0)
+                      dtdxdy, dtdydz, dtdzdx, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0, zdec)
     use mod_globals, only : dt
-    integer, intent(in)                      :: nx                  !< x grid dimension
-    integer, intent(in)                      :: ny                  !< y grid dimension
-    integer, intent(in)                      :: nz                  !< z grid dimension
-    integer, intent(in)                      :: myrank              !< MPI rank of this process
-    integer, intent(in)                      :: nranks              !< total number of MPI ranks
-    real(8), intent(in)                      :: x(nx)               !< x coordinate array (host)
-    real(8), intent(in)                      :: dx_cpu(nx-1)        !< inverse x spacing (host)
-    real(8), intent(in)                      :: y(ny)               !< y coordinate array (host)
-    real(8), intent(in)                      :: dy_cpu(ny-1)        !< inverse y spacing (host)
-    real(8), intent(in)                      :: z(nz)               !< z coordinate array (host)
-    real(8), intent(in)                      :: dz_cpu(nz-1)        !< inverse z spacing (host)
-    real(8), intent(in)                      :: Jacobian_cpu(nx,ny) !< Jacobian determinant (host)
-    real(8), intent(inout)                   :: Q(nx,5,ny,nz)       !< conservative variables on host
-    integer, intent(out)                     :: overlap             !< ghost cell width for MPI halo exchange
-    real(8), intent(out), device, contiguous :: dtdxdy(nx-2,ny-2)   !< dt * Sxy (device)
-    real(8), intent(out), device, contiguous :: dtdydz(ny-2,nz-2)   !< dt * Syz (device)
-    real(8), intent(out), device, contiguous :: dtdzdx(nx-2,nz-2)   !< dt * Szx (device)
-    real(8), intent(out), device, contiguous :: xix(nx-1)           !< x coordinate metric (device)
-    real(8), intent(out), device, contiguous :: etay(ny-1)          !< y coordinate metric (device)
-    real(8), intent(out), device, contiguous :: zetaz(nz-1)         !< z coordinate metric (device)
-    real(8), intent(out), device, contiguous :: Jacobian(nx,ny)     !< Jacobian determinant (device)
-    real(8), intent(out), device, contiguous :: QJ(nx,5,ny,nz)      !< Q divided by Jacobian (device)
-    real(4), intent(inout)                   :: ke0                 !< reference kinetic energy
-    real(4), intent(inout)                   :: entropy0            !< reference entropy
+    integer, intent(in)                      :: nx, ny, nz, myrank, nranks
+    real(8), intent(in)                      :: x(nx), dx_cpu(nx-1), y(ny), dy_cpu(ny-1)
+    real(8), intent(in)                      :: z(nz), dz_cpu(nz-1), Jacobian_cpu(nx,ny)
+    real(8), intent(inout)                   :: Q(nx,5,ny,nz)
+    integer, intent(out)                     :: overlap
+    real(8), intent(out), device, contiguous :: dtdxdy(nx-2,ny-2), dtdydz(ny-2,nz-2), dtdzdx(nx-2,nz-2)
+    real(8), intent(out), device, contiguous :: xix(nx-1), etay(ny-1), zetaz(nz-1)
+    real(8), intent(out), device, contiguous :: Jacobian(nx,ny)
+    real(8), intent(out), device, contiguous :: QJ(nx,5,ny,nz)
+    real(4), intent(inout)                   :: ke0, entropy0
+    logical, intent(in)                      :: zdec
     real(8) xix_cpu(nx-1), etay_cpu(ny-1), zetaz_cpu(nz-1)
     real(8) dtdxdy_cpu(nx-2,ny-2), dtdydz_cpu(ny-2,nz-2), dtdzdx_cpu(nx-2,nz-2)
     real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
-    integer i, j, k, l, ierr
-    ! set Q / Jacobian
+    integer i, j, k, l, ierr, ireq3(3), istat3(MPI_STATUS_SIZE, 3)
     do k = 1, nz
       do j = 1, ny
         do l = 1, 5
@@ -106,7 +93,6 @@ contains
         enddo
       enddo
     enddo
-    ! copy on GPU
     xix_cpu   = 1.d0 / dx_cpu
     etay_cpu  = 1.d0 / dy_cpu
     zetaz_cpu = 1.d0 / dz_cpu
@@ -130,7 +116,6 @@ contains
     zetaz    = zetaz_cpu
     Jacobian = Jacobian_cpu
     QJ = Q
-    ! for multi GPU
     if (kind(id_accuracy) == 8) then
       overlap = 3
     elseif (kind(id_accuracy) == 4) then
@@ -139,9 +124,16 @@ contains
       overlap = 1
     endif
     call make_1d_for_print(nx, ny, nz, Jacobian_cpu, Q, rho1d, p1d, v1d)
-    call print_vtk(0, nx, ny, nz, myrank+1, nranks, x, y, z, rho1d, p1d, v1d, ke0, entropy0)
     call MPI_SEND(ke0,      1, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
     call MPI_SEND(entropy0, 1, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
+    if (zdec) then
+      call MPI_ISEND(rho1d, nx*ny*nz,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(1), ierr)
+      call MPI_ISEND(p1d,   nx*ny*nz,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(2), ierr)
+      call MPI_ISEND(v1d,   nx*ny*nz*3, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(3), ierr)
+      call MPI_WAITALL(3, ireq3, istat3, ierr)
+    else
+      call print_vtk(0, nx, ny, nz, myrank+1, nranks, x, y, z, rho1d, p1d, v1d, ke0, entropy0)
+    end if
   end subroutine pre_calc
 
 

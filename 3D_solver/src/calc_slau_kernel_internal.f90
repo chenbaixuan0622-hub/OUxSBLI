@@ -5,7 +5,7 @@ module calc_slau_kernel_internal
   use calc_hybrid
   implicit none
   private
-  public calc_slau_x_in, calc_slau_y_in, calc_slau_z_in
+  public calc_slau_x_in, calc_slau_y_in, calc_slau_z_in, calc_slau_z_in_koff
   !> io = 0, 1, 2 (2nd, 4th, 6th)
   integer, parameter :: io = kind(id_accuracy) / 3
 
@@ -257,5 +257,64 @@ contains
       end associate
     endif
   end subroutine calc_slau_z_in
+
+
+  !> SLAU z-flux kernel restricted to k in [k_lo, k_hi] — used for interior/halo split
+  attributes(global) subroutine calc_slau_z_in_koff(nx, ny, nz, Q, sensor, G, k_lo, k_hi)
+    use mod_constant, only : Normal_z
+    integer, intent(in), value                :: nx, ny, nz, k_lo, k_hi
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
+    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1)
+    integer i,  j,  k
+    integer it, jt, kt
+    integer kk, k_base, idx, idx_r, offset_xy, offset_xyr, i1, i2
+    integer, parameter :: sx  = threadsG%x
+    integer, parameter :: sy  = threadsG%y
+    integer, parameter :: sz  = threadsG%z + 2*io + 1
+    integer, parameter :: szr = threadsG%z
+    real(8), dimension(-(io-1):sx*sy*sz-io), shared :: rho,  u,  v,  w,  p
+    real(8), dimension(sx*sy*szr), shared           :: rhor, ur, vr, wr, pr
+    real(8) rhol, ul, vl, wl, pl
+    real(sp) fdz
+    it = threadIdx%x
+    jt = threadIdx%y
+    kt = threadIdx%z
+    i  = (blockIdx%x-1)*blockDim%x + it + 1
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    k_base     = (blockIdx%z-1)*blockDim%z + k_lo - 1
+    offset_xy  = (jt-1) * sz  + (it-1) * sz  * sy
+    offset_xyr = (jt-1) * szr + (it-1) * szr * sy
+    do kk = kt-io, threadsG%z+io+1, blockDim%z
+      k = k_base + kk
+      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+        idx = kk + offset_xy
+        rho(idx) = Q(i,1,j,k); u(idx) = Q(i,2,j,k); v(idx) = Q(i,3,j,k)
+          w(idx) = Q(i,4,j,k); p(idx) = Q(i,5,j,k)
+      endif
+    enddo
+    call syncthreads()
+    k = k_base + kt
+    if (k_lo <= k .and. k <= k_hi .and. i <= nx-1 .and. j <= ny-1) then
+      idx   = kt + offset_xy
+      idx_r = kt + offset_xyr
+      i1    = idx - io
+      i2    = idx + io + 1
+      fdz   = 0.50_sp * (sensor(i,j,k) + sensor(i,j,k+1))
+      call interp(id_accuracy, &
+                  rho(i1:i2),  u(i1:i2),  v(i1:i2),  w(i1:i2),  p(i1:i2), &
+                  rhol,        ul,        vl,        wl,        pl, &
+                  rhor(idx_r), ur(idx_r), vr(idx_r), wr(idx_r), pr(idx_r), fdz)
+    endif
+    call syncthreads()
+    if (k_lo <= k .and. k <= k_hi .and. i <= nx-1 .and. j <= ny-1) then
+      rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
+      associate(un1 => w(idx), un2 => wr(idx_r))
+        call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
+                  w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_z, fdz, &
+                  G(1,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(4,i-1,j-1,k), G(5,i-1,j-1,k))
+      end associate
+    endif
+  end subroutine calc_slau_z_in_koff
 end module calc_slau_kernel_internal
 

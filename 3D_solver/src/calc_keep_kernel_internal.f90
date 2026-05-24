@@ -3,7 +3,7 @@ module calc_keep_kernel_internal
   use mod_constant, only : R_over_gamma_1, one_third, one_sixth, one_twelfth, two_third
   implicit none
   private
-  public calc_keep_x_in, calc_keep_y_in, calc_keep_z_in
+  public calc_keep_x_in, calc_keep_y_in, calc_keep_z_in, calc_keep_z_in_koff
   real(8), parameter :: one_24        = 1.d0 / 24.d0
   real(8), parameter :: one_48        = 1.d0 / 48.d0
   real(8), parameter :: one_60        = 1.d0 / 60.d0
@@ -158,5 +158,51 @@ contains
       end associate
     endif
   end subroutine calc_keep_z_in
+
+
+  !> KEEP z-flux kernel restricted to k in [k_lo, k_hi] — used for interior/halo split
+  !> k_base is shifted by k_lo-1 so blockIdx%z=1, threadIdx%z=1 maps to k=k_lo
+  attributes(global) subroutine calc_keep_z_in_koff(nx, ny, nz, Q, T, G, k_lo, k_hi)
+    use mod_constant, only : Normal_z
+    integer, intent(in), value                :: nx, ny, nz, k_lo, k_hi
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous   :: T(nx,ny,nz)
+    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1)
+    integer i,  j,  k
+    integer it, jt, kt
+    integer kk, k_base, idx, offset_xy
+    integer, parameter :: sx = threadsG%x
+    integer, parameter :: sy = threadsG%y
+    integer, parameter :: sz = threadsG%z + 2*io + 1
+    real(8), dimension(-(io-1):sx*sy*sz-io), shared :: rho, u, v, w, p, tmp
+    it = threadIdx%x
+    jt = threadIdx%y
+    kt = threadIdx%z
+    i  = (blockIdx%x-1)*blockDim%x + it + 1
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    k_base = (blockIdx%z-1)*blockDim%z + k_lo - 1
+    offset_xy = (jt-1) * sz + (it-1) * sz * sy
+    do kk = kt-io, threadsG%z+io+1, blockDim%z
+      k = k_base + kk
+      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+        idx = kk + offset_xy
+        rho(idx) = Q(i,1,j,k);   u(idx) = Q(i,2,j,k)
+          v(idx) = Q(i,3,j,k);   w(idx) = Q(i,4,j,k)
+          p(idx) = Q(i,5,j,k); tmp(idx) =   T(i,j,k)
+      endif
+    enddo
+    call syncthreads()
+    k = k_base + kt
+    if (k_lo <= k .and. k <= k_hi .and. i <= nx-1 .and. j <= ny-1) then
+      associate(ww => w)
+      idx = kt + offset_xy
+      G(:,i-1,j-1,k) = KEEP(id_accuracy, &
+                            rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
+                              v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
+                             ww(idx-io:idx+io+1), p(idx-io:idx+io+1), &
+                            tmp(idx-io:idx+io+1), Normal_z)
+      end associate
+    endif
+  end subroutine calc_keep_z_in_koff
 end module calc_keep_kernel_internal
 

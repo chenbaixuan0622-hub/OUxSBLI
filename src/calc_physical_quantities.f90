@@ -57,16 +57,16 @@ contains
   end subroutine calc_quantities_T_2D
 
 
-  subroutine calc_quantities_3D(nx, ny, nz, Jacobian, QJ, Q, T)
-    integer, intent(in), value               :: nx, ny, nz
-    real(8), intent(in), device, contiguous  :: Jacobian(nx,ny)
-    real(8), intent(in), device, contiguous  :: QJ(nx,5,ny,nz) ! Q / Jacobian
-    real(8), intent(out), device, contiguous :: Q(nx,5,ny,nz)
-    real(8), intent(out), device, contiguous :: T(nx,ny,nz)
+  subroutine calc_quantities_3D(nx, ny, nz, Jacobian, QJ, Q, T, k_lo, k_hi)
+    integer, intent(in), value                 :: nx, ny, nz, k_lo, k_hi
+    real(8), intent(in), device, contiguous    :: Jacobian(nx,ny)
+    real(8), intent(in), device, contiguous    :: QJ(nx,5,ny,nz) ! Q / Jacobian
+    real(8), intent(inout), device, contiguous :: Q(nx,5,ny,nz)
+    real(8), intent(inout), device, contiguous :: T(nx,ny,nz)
     integer i, j, k
     real(8) :: over_Q1, rho, u, v, w, p
     !$cuf kernel do(3) <<<*,(32,4,2)>>>
-    do k = 1, nz
+    do k = k_lo, k_hi
       do j = 1, ny
         do i = 1, nx
           over_Q1    = 1.d0 / QJ(i,1,j,k)
@@ -83,19 +83,19 @@ contains
           T(i,j,k)   = p / (R * rho)
     enddo;enddo;enddo
   end subroutine calc_quantities_3D
-  
 
-  subroutine calc_quantities_T_3D(nx, ny, nz, Jacobian, QJ, Q, T, mu)
-    integer, intent(in), value               :: nx, ny, nz
-    real(8), intent(in), device, contiguous  :: Jacobian(nx,ny)
-    real(8), intent(in), device, contiguous  :: QJ(nx,5,ny,nz) ! Q / Jacobian
-    real(8), intent(out), device, contiguous :: Q(nx,5,ny,nz)
-    real(8), intent(out), device, contiguous :: T(nx,ny,nz)
-    real(8), intent(out), device, contiguous :: mu(nx,ny,nz)
+
+  subroutine calc_quantities_T_3D(nx, ny, nz, Jacobian, QJ, Q, T, mu, k_lo, k_hi)
+    integer, intent(in), value                 :: nx, ny, nz, k_lo, k_hi
+    real(8), intent(in), device, contiguous    :: Jacobian(nx,ny)
+    real(8), intent(in), device, contiguous    :: QJ(nx,5,ny,nz) ! Q / Jacobian
+    real(8), intent(inout), device, contiguous :: Q(nx,5,ny,nz)
+    real(8), intent(inout), device, contiguous :: T(nx,ny,nz)
+    real(8), intent(inout), device, contiguous :: mu(nx,ny,nz)
     integer i, j, k
     real(8) :: over_Q1, rho, u, v, w, p, temp
     !$cuf kernel do(3) <<<*,(32,4,2)>>>
-    do k = 1, nz
+    do k = k_lo, k_hi
       do j = 1, ny
         do i = 1, nx
           over_Q1    = 1.d0 / QJ(i,1,j,k)
