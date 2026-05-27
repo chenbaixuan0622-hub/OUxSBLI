@@ -34,7 +34,7 @@ program main
   call set_Jacobian_xy2(nx, ny, dx, dy, Jacobian)
 
   if (mod(myrank,2) == 0) then
-    if (kind(id_recal) == 4) then
+    if (id_recal) then
       write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"
       open(10, file=filename, action="read", form="unformatted", access="sequential", status="old", iostat=ios)
       if (ios /= 0) then
@@ -57,11 +57,9 @@ program main
         print *, "myrank is ", myrank, "simulation has been restarted. access is stream"
       endif
       close(10)
-    elseif (kind(id_recal) == 2) then
+    else
       write(*,*) "set initial condition"
       call set_init(myrank, nx, ny, x, y, Q)
-    else
-      write(*,*) "wrong paramater was found"
     endif
   endif
 
