@@ -2,8 +2,8 @@
 !> Uses centered difference stencils to compute viscous stresses and heat flux
 !> Generally more accurate but requires larger stencils than 2nd-order
 module calc_visc4
-  use mod_globals, only : id_visc, id_bc_x, id_bc_y, gamma, R, Pr, Prt, dt, threadsEv, threadsFv
-  use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third, two_third, one_twelfth
+  use mod_globals, only : gamma, R, Pr, Prt, dt, threadsEv, threadsFv
+  use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third, two_third, one_twelfth, id_visc
   use load_smem_visc4
   implicit none
   private

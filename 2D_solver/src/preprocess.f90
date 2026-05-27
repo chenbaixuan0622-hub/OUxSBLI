@@ -22,7 +22,7 @@ contains
   !> Allocate GPU device memory for simulation variables
   !> Size and allocation depends on viscosity model selection
   subroutine allocate_device_mem(myrank, nx, ny, dtdx, dtdy, xix, etay, Jacobian, ruvwp, T, mu, E, F)
-    use mod_globals, only : id_visc
+    use mod_constant, only : id_visc
     use calc_flux_base, only : init_sensor
     integer, intent(in)                       :: myrank        !< MPI rank
     integer, intent(in)                       :: nx            !< x grid dimension

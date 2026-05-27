@@ -4,10 +4,10 @@ module calc_time_dev
   use cudafor
   use mpi
   use nvtx
-  use mod_globals, only : id_visc, nt, np, &
+  use mod_globals, only : nt, np, &
   & blocks, threads, blocksE, blocksF, threadsE, threadsF, &
   & blocksEv, blocksFv, threadsEv, threadsFv
-  use mod_constant, only : one_third
+  use mod_constant, only : one_third, id_visc
   use calc_flux_base
   use calc_steps
   use set

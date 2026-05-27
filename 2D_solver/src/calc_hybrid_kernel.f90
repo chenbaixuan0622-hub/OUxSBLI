@@ -1,6 +1,6 @@
 module calc_hybrid_kernel
-  use mod_globals, only : id_slau, gamma, threshold, threadsE, threadsF
-  use mod_constant, only : over_gamma_1, R_over_gamma_1, one_third, one_sixth, one_twelfth, two_third
+  use mod_globals, only : gamma, threshold, threadsE, threadsF
+  use mod_constant, only : over_gamma_1, R_over_gamma_1, one_third, one_sixth, one_twelfth, two_third, id_slau
   use calc_muscl
   use calc_hybrid
   implicit none

@@ -1,7 +1,8 @@
 #define io 4
 module print
   use mpi
-  use mod_globals, only : id_accuracy, nt, np, dt, step_offset, gamma, R, dimension
+  use mod_globals, only : nt, np, dt, step_offset, gamma, R, dimension
+  use mod_constant, only : id_accuracy
   implicit none
   interface
     subroutine print_entropy(step, nx, ny, nz, rho1d, p1d, entropy0, myrank)

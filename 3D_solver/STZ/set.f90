@@ -7,7 +7,7 @@ contains
 
   subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, x, y, z, dx, dy, dz)
     use mpi
-    use mod_globals, only : id_accuracy
+    use mod_constant, only : id_accuracy
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: Lx, Ly, Lz
     real(8), intent(out) :: x(nx), y(ny), z(nz), dx(nx-1), dy(ny-1), dz(nz-1)
@@ -66,7 +66,7 @@ contains
   !   - does NOT call set_bc_cyclic (which would corrupt z ghost cells)
   subroutine set_bc(myrank, nx, ny, nz, Jacobian, QJ, Qre)
     use mpi
-    use mod_globals, only : id_accuracy
+    use mod_constant, only : id_accuracy
     integer, intent(in), value               :: myrank, nx, ny, nz
     real(8), intent(in), device              :: Jacobian(nx,ny)
     real(8), intent(inout), device           :: QJ(nx,5,ny,nz)

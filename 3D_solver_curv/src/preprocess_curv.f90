@@ -28,7 +28,7 @@ contains
       dt_Szeta, n_xi_x, n_xi_y, n_eta_x, n_eta_y, &
       xi_x, xi_y, eta_x, eta_y, Jacobian, &
       ruvwp, T, mu, E, F, G)
-    use mod_globals, only : id_visc
+    use mod_constant, only : id_visc
     use calc_flux_base_curv, only : init_sensor_curv
     integer, intent(in)                       :: myrank
     integer, intent(in)                       :: nx
@@ -78,7 +78,8 @@ contains
       x_phys, y_phys, z, Q, overlap, &
       dt_Szeta, n_xi_x, n_xi_y, n_eta_x, n_eta_y, &
       xi_x, xi_y, eta_x, eta_y, Jacobian, QJ, ke0, entropy0)
-    use mod_globals, only : dt, id_accuracy
+    use mod_globals, only : dt
+    use mod_constant, only : id_accuracy
     use print_curv, only : print_vtk_curv
     integer, intent(in)                      :: nx
     integer, intent(in)                      :: ny

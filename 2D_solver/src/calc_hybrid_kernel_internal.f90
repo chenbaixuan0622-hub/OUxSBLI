@@ -1,13 +1,13 @@
 !> Interior-only Hybrid kernel variants — skip boundary stencil-order fallback branches.
-!> Called when id_bc_x/y = .false. (periodic domain) so all points are interior.
+!> Used for periodic domains where all points are interior (no boundary stencil fallback needed).
 !> Eliminates the if/elseif/else order-fallback branches that cause warp divergence
 !> in the regular calc_hybrid_kernel.f90 subroutines.
 !> Shared memory layout matches the regular kernels (2D shaped, sweep direction first).
 !> The KEEP/SLAU physics branch (fdx <= threshold) is preserved — only the stencil-order
 !> boundary fallback is removed.
 module calc_hybrid_kernel_internal
-  use mod_globals, only : id_accuracy, id_slau, gamma, threshold, threadsE, threadsF
-  use mod_constant, only : over_gamma_1, R_over_gamma_1, one_third, one_sixth, one_twelfth, two_third
+  use mod_globals, only : gamma, threshold, threadsE, threadsF
+  use mod_constant, only : over_gamma_1, R_over_gamma_1, one_third, one_sixth, one_twelfth, two_third, id_accuracy, id_slau
   use calc_muscl
   use calc_hybrid
   implicit none

@@ -1,8 +1,9 @@
 program main
   use, intrinsic :: iso_fortran_env
   use mpi
-  use mod_globals, only : id_RungeKutta, id_recal, dimension, nx, ny, Lx, Ly, &
+  use mod_globals, only : dimension, nx, ny, Lx, Ly, &
   & blocks, threads, blocksE, blocksF, threadsE, threadsF, blocksEv, blocksFv, threadsEv, threadsFv
+  use mod_constant, only : id_RungeKutta, id_recal
   use set
   use set_coordinate
   use calc_time_dev

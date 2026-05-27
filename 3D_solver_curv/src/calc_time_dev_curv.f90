@@ -2,9 +2,9 @@
 module calc_time_dev_curv
   use cudafor
   use mpi
-  use mod_globals, only : id_visc, nt, np, &
+  use mod_globals, only : nt, np, &
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, dt
-  use mod_constant, only : one_third
+  use mod_constant, only : one_third, id_visc
   use calc_flux_base_curv
   use calc_steps_curv
   use set

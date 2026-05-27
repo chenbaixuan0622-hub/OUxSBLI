@@ -13,7 +13,13 @@
 *.egg-info
 *.pyc
 .vscode
+2D_solver/*/build
+2D_solver/*/data
+3D_solver/*/build
+3D_solver/*/data
+3D_solver_curv/*/build
+3D_solver_curv/*/data
 build
+data
 ouxsbli/__pycache__
 ouxsbli/tests/tmp
-

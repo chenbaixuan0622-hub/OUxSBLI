@@ -1,6 +1,6 @@
 module calc_slau_kernel_internal
-  use mod_globals, only : id_accuracy, id_slau, gamma, threadsE, threadsF, threadsG
-  use mod_constant, only : over_gamma_1
+  use mod_globals, only : gamma, threadsE, threadsF, threadsG
+  use mod_constant, only : over_gamma_1, id_accuracy, id_slau
   use calc_muscl
   use calc_hybrid
   implicit none

@@ -2,8 +2,8 @@
 !> Optimized variants without boundary condition handling for periodic domains
 !> Uses centered difference stencils; assumes all threads execute interior 4th-order path
 module calc_visc4_internal
-  use mod_globals, only : id_visc, gamma, R, Pr, Prt, dt, threadsEv, threadsFv
-  use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third, two_third, one_twelfth
+  use mod_globals, only : gamma, R, Pr, Prt, dt, threadsEv, threadsFv
+  use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third, two_third, one_twelfth, id_visc
   use load_smem_visc4
   implicit none
   private
