@@ -1,4 +1,7 @@
 #:include 'config.fypp'
+#:if not defined('VISC_ORDER')
+  #:set VISC_ORDER = '4' if ORDER >= 4 else '2'
+#:endif
 module calc_flux_base
   use mod_globals, only : sp, &
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
@@ -140,7 +143,6 @@ contains
     ! ===================================================================
     #:set is_les   = (VISC == 'LES')
     #:set les_args = ', mut, qc2' if is_les else ''
-    #:set ord_num  = '4' if ORDER >= 4 else '2'
     ! ===================================================================
     ! axis
     ! ===================================================================
@@ -169,7 +171,7 @@ contains
       
       #:for d in dirs
       #:set in_sfx = '_in' if (not d['is_bc'] and ORDER == 6) else ''
-      call calc_${d['dir']}$v${ord_num}$${in_sfx}$<<<blocks${d['dir']}$v,threads${d['dir']}$v>>>&
+      call calc_${d['dir']}$v${VISC_ORDER}$${in_sfx}$<<<blocks${d['dir']}$v,threads${d['dir']}$v>>>&
            &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$, ${d['dir']}$)
       #:endfor
     #:else
@@ -188,7 +190,7 @@ contains
 
       #:for d in dirs
       #:set in_sfx = '_in' if (not d['is_bc'] and ORDER == 6) else ''
-      call calc_${d['dir']}$v${ord_num}$${in_sfx}$_koff<<<blocks${d['dir']}$v,threads${d['dir']}$v>>>&
+      call calc_${d['dir']}$v${VISC_ORDER}$${in_sfx}$_koff<<<blocks${d['dir']}$v,threads${d['dir']}$v>>>&
            &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$, ${d['dir']}$, ${d['ov']}$, nz-overlap_fb-1)
       #:endfor
     #:endif
@@ -232,7 +234,6 @@ contains
     ! ===================================================================
     #:set is_les   = (VISC == 'LES')
     #:set les_args = ', mut, qc2' if is_les else ''
-    #:set ord_num  = '4' if ORDER >= 4 else '2'
     ! ===================================================================
     ! axis
     ! ===================================================================
@@ -254,10 +255,10 @@ contains
     #:for d in dirs
     #:set in_sfx = '_in' if (d['has_in'] and not d['is_bc'] and ORDER == 6) else ''
     ! Low-index side
-    call calc_${d['dir']}$v${ord_num}$${in_sfx}$_koff<<<blocks${d['dir']}$v,threads${d['dir']}$v>>>&
+    call calc_${d['dir']}$v${VISC_ORDER}$${in_sfx}$_koff<<<blocks${d['dir']}$v,threads${d['dir']}$v>>>&
            &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$, ${d['dir']}$, ${d['b_lo'][0]}$, ${d['b_lo'][1]}$)
     ! High-index side
-    call calc_${d['dir']}$v${ord_num}$${in_sfx}$_koff<<<blocks${d['dir']}$v,threads${d['dir']}$v>>>&
+    call calc_${d['dir']}$v${VISC_ORDER}$${in_sfx}$_koff<<<blocks${d['dir']}$v,threads${d['dir']}$v>>>&
            &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$, ${d['dir']}$, ${d['b_hi'][0]}$, ${d['b_hi'][1]}$)
     #:endfor
   #:endif

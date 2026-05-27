@@ -1,5 +1,6 @@
 !> Module for preprocessing and GPU memory management
 !> Handles device setup, memory allocation, and initial data transfers
+#:include 'config.fypp'
 module preprocess
   use cudafor
   use mpi
@@ -22,7 +23,6 @@ contains
   !> Allocate GPU device memory for simulation variables
   !> Size and allocation depends on viscosity model selection
   subroutine allocate_device_mem(myrank, nx, ny, dtdx, dtdy, xix, etay, Jacobian, ruvwp, T, mu, E, F)
-    use mod_constant, only : id_visc
     use calc_flux_base, only : init_sensor
     integer, intent(in)                       :: myrank        !< MPI rank
     integer, intent(in)                       :: nx            !< x grid dimension
@@ -40,11 +40,11 @@ contains
     integer ierr
     allocate(ruvwp(nx,4,ny), E(4,nx-1,ny-2), F(4,nx-2,ny-1),  stat=ierr)
     allocate(dtdx(nx-2), dtdy(ny-2), xix(nx-1), etay(ny-1), Jacobian(nx,ny), stat=ierr)
-    if (kind(id_visc) == 2) then
-      allocate(T(nx,ny), mu(1,1), stat=ierr)
-    elseif (kind(id_visc) == 4) then
-      allocate(T(nx,ny), mu(nx,ny), stat=ierr)
-    endif
+  #:if VISC == 'Euler'
+    allocate(T(nx,ny), mu(1,1), stat=ierr)
+  #:elif VISC == 'NS'
+    allocate(T(nx,ny), mu(nx,ny), stat=ierr)
+  #:endif
     call init_sensor(nx, ny)
     if (ierr /= 0) then
       print *, "myrank is ", myrank, " memory allocation failed", ierr

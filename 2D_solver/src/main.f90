@@ -3,7 +3,7 @@ program main
   use mpi
   use mod_globals, only : dimension, nx, ny, Lx, Ly, &
   & blocks, threads, blocksE, blocksF, threadsE, threadsF, blocksEv, blocksFv, threadsEv, threadsFv
-  use mod_constant, only : id_RungeKutta, id_recal
+  use mod_constant, only : id_recal
   use set
   use set_coordinate
   use calc_time_dev
@@ -66,7 +66,7 @@ program main
   endif
 
   call cpu_time(t_start)
-  call RungeKutta(id_RungeKutta, myrank, mygpu, nx, ny, x, dx, y, dy, Jacobian, Q)
+  call RungeKutta(myrank, mygpu, nx, ny, x, dx, y, dy, Jacobian, Q)
   call cpu_time(t_end)
 
   if (mod(myrank,2) == 0) then

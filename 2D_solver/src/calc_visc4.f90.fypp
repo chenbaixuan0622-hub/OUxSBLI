@@ -1,3 +1,4 @@
+#:include 'config.fypp'
 !> Module containing 4th-order viscous flux computation kernels
 !> Uses centered difference stencils to compute viscous stresses and heat flux
 !> Generally more accurate but requires larger stencils than 2nd-order

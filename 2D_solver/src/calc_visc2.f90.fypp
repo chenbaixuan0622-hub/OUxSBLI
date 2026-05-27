@@ -1,3 +1,4 @@
+#:include 'config.fypp'
 module calc_visc2
   use mod_globals, only : gamma, R, Pr, Prt, dt, threadsEv, threadsFv
   use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third, two_third

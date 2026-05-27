@@ -33,12 +33,12 @@ make clean && make
 bash calc.sh
 ```
 
-For 2D cases (still Makefile-based):
+**2D solver cases use CMake:**
 
 ```bash
-cd 2D_solver/OS
-make clean && make
-bash calc.sh
+cd 2D_solver/OS    # or BL, DSL, EVC, SBLI, ST
+cmake -B build && cmake --build build -j   # fypp preprocess + compile
+cd build && mpirun -n 1 ./a.out            # run simulation
 ```
 
 **Compiler requirement:** NVIDIA HPC SDK (`mpif90` with `-cuda -acc -fast -gpu=ptxinfo,rdc,lto`). Versions 24.* and 25.* are confirmed working.
@@ -92,7 +92,7 @@ Source files with the `.f90.fypp` extension are **templates**; CMake runs `fypp 
 | `3D_solver/src/calc_visc4_internal.f90.fypp` | Interior-only 4th-order viscous |
 | `3D_solver/src/preprocess.f90.fypp` | Device memory allocation helpers |
 
-The 2D solver still uses Makefiles; `2D_solver/src/calc_flux_base.f90.fypp` is preprocessed by the case Makefile using the same `fypp -I<case-dir>` pattern.
+The 2D solver uses CMake (like 3D); `2D_solver/src/calc_flux_base.f90.fypp` is preprocessed by the per-case CMakeLists.txt using the same `fypp -I<case-dir>` pattern.
 
 ### Changing the scheme or method
 
@@ -161,7 +161,7 @@ main_curv.f90
 A standalone 2D solver sharing the same convective/viscous kernels as the 3D Cartesian solver. Source layout mirrors the 3D structure:
 
 - `2D_solver/src/` — shared 2D utilities (main, grid, BCs)
-- `2D_solver/<CASE>/` — per-case config: `mod_globals.f90`, `set.f90`, `config.fypp`, `Makefile`, `calc.sh`
+- `2D_solver/<CASE>/` — per-case config: `mod_globals.f90`, `set.f90`, `config.fypp`, `CMakeLists.txt`, `calc.sh`
 
 Available cases:
 
@@ -280,8 +280,8 @@ Analytical helpers in `ouxsbli/tests/utils/`:
 
 ```bash
 cd tutorials/ouxsbli_bl
-make clean && make
-bash calc.sh
+cmake -B build && cmake --build build -j
+cd build && mpirun -n 1 ./a.out
 ```
 
 ## Adding a New Test Case
@@ -294,7 +294,13 @@ For 3D Cartesian:
 5. Edit `calc.sh` — MPI rank count and runtime args
 6. `cmake -B build && cmake --build build -j`
 
-For 2D cases, `cp -r 2D_solver/OS 2D_solver/MYCASE` then follow the same pattern (Makefile-based).
+For 2D cases:
+1. `cp -r 2D_solver/OS 2D_solver/MYCASE`
+2. Edit `mod_globals.f90` — grid size, physical parameters
+3. Edit `set.f90` — grid generation, initial conditions, boundary condition calls
+4. Edit `config.fypp` — VISC, SCHEME, ORDER, BC_X/Y/Z, etc.
+5. Edit `calc.sh` — runtime args
+6. `cmake -B build && cmake --build build -j`
 
 ## Notice
 * From an occupancy perspective, the subroutines invoked within `calc_flux_base.f90` should not be executed on separate streams.

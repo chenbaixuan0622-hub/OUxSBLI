@@ -1,7 +1,4 @@
 #:include 'config.fypp'
-#:if not defined('VISC_ORDER')
-  #:set VISC_ORDER = ORDER
-#:endif
 #:if not defined('COMMZ')
   #:set COMMZ = False
 #:endif
@@ -36,17 +33,6 @@ module mod_constant
   real(8), constant  :: Normal_y(5) = (/0.d0, 0.d0, 1.d0, 0.d0, 0.d0/)
   real(8), constant  :: Normal_z(5) = (/0.d0, 0.d0, 0.d0, 1.d0, 0.d0/)
   ! Fypp-generated kind-dispatch parameters
-  #:if VISC == 'Euler'
-  integer(2), parameter :: id_visc = 1
-  #:elif VISC == 'NS' and VISC_ORDER >= 4
-  integer(4), parameter :: id_visc = 2
-  #:elif VISC == 'NS'
-  integer(4), parameter :: id_visc = 1
-  #:elif VISC == 'LES' and VISC_ORDER >= 4
-  integer(8), parameter :: id_visc = 2
-  #:elif VISC == 'LES'
-  integer(8), parameter :: id_visc = 1
-  #:endif
   #:if ORDER == 2
   integer(2), parameter :: id_accuracy = 0
   #:elif ORDER == 4

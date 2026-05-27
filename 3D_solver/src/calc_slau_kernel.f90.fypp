@@ -85,6 +85,8 @@ contains
       call delta4(fdx,   w(idx-1:idx+2),   wl,   wr(idx_r))
       call delta4(fdx,   p(idx-1:idx+2),   pl,   pr(idx_r))
       fdx = wiggle_detector(p(idx-1:idx+2))
+    #:endif
+    #:if ORDER >= 4
     else
       rhol = rho(idx); rhor(idx_r) = rho(idx+1)
         ul =   u(idx);   ur(idx_r) =   u(idx+1)
@@ -179,6 +181,8 @@ contains
       call delta4(fdy,   w(idx-1:idx+2),   wl,   wr(idx_r))
       call delta4(fdy,   p(idx-1:idx+2),   pl,   pr(idx_r))
       fdy = wiggle_detector(p(idx-1:idx+2))
+    #:endif
+    #:if ORDER >= 4
     else
       rhol = rho(idx); rhor(idx_r) = rho(idx+1)
         ul =   u(idx);   ur(idx_r) =   u(idx+1)
@@ -273,6 +277,8 @@ contains
       call delta4(fdz,   w(idx-1:idx+2),   wl,   wr(idx_r))
       call delta4(fdz,   p(idx-1:idx+2),   pl,   pr(idx_r))
       fdz = wiggle_detector(p(idx-1:idx+2))
+    #:endif
+    #:if ORDER >= 4
     else
       rhol = rho(idx); rhor(idx_r) = rho(idx+1)
         ul =   u(idx);   ur(idx_r) =   u(idx+1)

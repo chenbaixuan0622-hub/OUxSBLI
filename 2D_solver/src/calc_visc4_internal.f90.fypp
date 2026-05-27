@@ -1,3 +1,4 @@
+#:include 'config.fypp'
 !> Module containing 4th-order viscous flux computation kernels for interior-only regions
 !> Optimized variants without boundary condition handling for periodic domains
 !> Uses centered difference stencils; assumes all threads execute interior 4th-order path
