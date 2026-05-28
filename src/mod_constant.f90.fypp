@@ -33,6 +33,13 @@ module mod_constant
   real(8), constant  :: Normal_y(5) = (/0.d0, 0.d0, 1.d0, 0.d0, 0.d0/)
   real(8), constant  :: Normal_z(5) = (/0.d0, 0.d0, 0.d0, 1.d0, 0.d0/)
   ! Fypp-generated kind-dispatch parameters
+  #:if VISC == 'Euler'
+  integer(2), parameter :: id_visc = 0
+  #:elif VISC == 'NS'
+  integer(4), parameter :: id_visc = 0
+  #:elif VISC == 'LES'
+  integer(8), parameter :: id_visc = 0
+  #:endif
   #:if ORDER == 2
   integer(2), parameter :: id_accuracy = 0
   #:elif ORDER == 4
