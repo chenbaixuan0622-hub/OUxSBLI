@@ -1,6 +1,6 @@
 #:include 'config.fypp'
 #:if not defined('VISC_ORDER')
-  #:set VISC_ORDER = '4' if ORDER >= 4 else '2'
+  #:set VISC_ORDER = 4 if ORDER >= 4 else 2
 #:endif
 module calc_flux_base
   use mod_globals, only : sp, &

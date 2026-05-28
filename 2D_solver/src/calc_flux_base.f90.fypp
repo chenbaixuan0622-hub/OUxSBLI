@@ -1,7 +1,6 @@
 #:include 'config.fypp'
-#:include 'config.fypp'
 #:if not defined('VISC_ORDER')
-  #:set VISC_ORDER = '4' if ORDER >= 4 else '2'
+  #:set VISC_ORDER = 4 if ORDER >= 4 else 2
 #:endif
 !> Module for computing convective and viscous fluxes
 !> Dispatches to different numerical schemes (KEEP, SLAU, Hybrid)
@@ -10,7 +9,6 @@ module calc_flux_base
   use mod_globals, only : sp, &
   & blocks, threads, blocksE, blocksF, threadsE, threadsF, &
   & blocksEv, blocksFv, threadsEv, threadsFv
-  use mod_constant, only : id_accuracy
   use calc_physical_quantities
   use calc_hybrid
   use calc_keep_kernel
@@ -58,7 +56,6 @@ contains
   !> Ducros shock sensor: f_d = (∇·u)²/[(∇·u)² + (∇×u)² + ε]
   #:endif
   subroutine calc_conv(nx, ny, inv_dx, inv_dy, Q, T, E, F)
-    use mod_constant, only : id_accuracy
     implicit none
     integer, intent(in), value               :: nx             !< number of grid points in x direction
     integer, intent(in), value               :: ny             !< number of grid points in y direction

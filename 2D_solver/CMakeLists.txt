@@ -17,7 +17,12 @@ find_program(FYPP_EXE fypp REQUIRED)
 # Macro: call from each case's CMakeLists.txt after setting CASE_EXTRA_SOURCES.
 # CMAKE_CURRENT_SOURCE_DIR / BINARY_DIR resolve to the caller's case directory.
 macro(add_ouxsbli_2d_case)
-  set(FYPP_FLAGS "-I${CMAKE_CURRENT_SOURCE_DIR}")
+  if(DEFINED CASE_DIR)
+    set(_CASE_DIR "${CASE_DIR}")
+  else()
+    set(_CASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+  endif()
+  set(FYPP_FLAGS "-I${_CASE_DIR}")
 
   # mod_constant comes from the shared src/ (../../src relative to case dir)
   set(_PARENT_FYPP "mod_constant")
@@ -42,7 +47,7 @@ macro(add_ouxsbli_2d_case)
     set(_out "${CMAKE_CURRENT_BINARY_DIR}/${_f}.f90")
     add_custom_command(OUTPUT ${_out}
       COMMAND ${FYPP_EXE} ${FYPP_FLAGS} ${_in} ${_out}
-      DEPENDS ${_in} "${CMAKE_CURRENT_SOURCE_DIR}/config.fypp"
+      DEPENDS ${_in} "${_CASE_DIR}/config.fypp"
       COMMENT "fypp ../../src: ${_f}")
     list(APPEND _GEN ${_out})
   endforeach()
@@ -52,13 +57,13 @@ macro(add_ouxsbli_2d_case)
     set(_out "${CMAKE_CURRENT_BINARY_DIR}/${_f}.f90")
     add_custom_command(OUTPUT ${_out}
       COMMAND ${FYPP_EXE} ${FYPP_FLAGS} ${_in} ${_out}
-      DEPENDS ${_in} "${CMAKE_CURRENT_SOURCE_DIR}/config.fypp"
+      DEPENDS ${_in} "${_CASE_DIR}/config.fypp"
       COMMENT "fypp ../src: ${_f}")
     list(APPEND _GEN ${_out})
   endforeach()
 
   set(_BASE
-      "${CMAKE_CURRENT_SOURCE_DIR}/mod_globals.f90"
+      "${_CASE_DIR}/mod_globals.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/set.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpu_gpu_mpi.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../src/set_coordinate.f90"
