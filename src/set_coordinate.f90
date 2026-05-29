@@ -100,13 +100,12 @@ contains
     integer, intent(in)  :: nx, ny, nz
     real(8), intent(in)  :: dx(nx-1), dy(ny-1), dz(nz-1)
     real(8), intent(out) :: Jacobian(nx,ny)
-    integer i, j, k
-    do k = 2, nz-1
-      do j = 2, ny-1
-        do i = 2, nx-1
-          Jacobian(i,j) = 8.d0 / &
-          & ((dx(i-1) + dx(i)) * (dy(j-1) + dy(j)) * (dz(k-1) + dz(k)))
-    enddo;enddo;enddo
+    integer i, j
+    do j = 2, ny-1
+      do i = 2, nx-1
+        Jacobian(i,j) = 8.d0 / &
+        & ((dx(i-1) + dx(i)) * (dy(j-1) + dy(j)) * 2.d0*dz(1))
+    enddo;enddo
     do i = 1, nx
       Jacobian(i,1)  = Jacobian(i,2)
       Jacobian(i,ny) = Jacobian(i,ny-1)

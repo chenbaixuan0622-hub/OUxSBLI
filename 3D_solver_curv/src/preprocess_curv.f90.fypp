@@ -1,3 +1,4 @@
+#:include 'config.fypp'
 !> Preprocessing and GPU memory management for curvilinear case.
 !> Contains only the curvilinear routines; rectangular-grid routines
 !> (allocate_device_mem, pre_calc, pre_rescale) are omitted to avoid
@@ -5,7 +6,6 @@
 module preprocess_curv
   use cudafor
   use mpi
-  use print
   use calc_flux_base_curv, only : init_sensor
   implicit none
 contains
@@ -28,7 +28,6 @@ contains
       dt_Szeta, n_xi_x, n_xi_y, n_eta_x, n_eta_y, &
       xi_x, xi_y, eta_x, eta_y, Jacobian, &
       ruvwp, T, mu, E, F, G)
-    use mod_constant, only : id_visc
     use calc_flux_base_curv, only : init_sensor_curv
     integer, intent(in)                       :: myrank
     integer, intent(in)                       :: nx
@@ -55,11 +54,11 @@ contains
     allocate(eta_x(nx,ny), eta_y(nx,ny), stat=ierr)
     allocate(Jacobian(nx,ny), stat=ierr)
 
-    if (kind(id_visc) == 2) then
-      allocate(T(nx,ny,nz), mu(1,1,1), stat=ierr)
-    elseif (kind(id_visc) == 4) then
-      allocate(T(nx,ny,nz), mu(nx,ny,nz), stat=ierr)
-    endif
+    #:if VISC == 'Euler'
+    allocate(T(nx,ny,nz), mu(1,1,1), stat=ierr)
+    #:elif VISC == 'NS'
+    allocate(T(nx,ny,nz), mu(nx,ny,nz), stat=ierr)
+    #:endif
 
     call init_sensor_curv(nx, ny, nz)
     if (ierr /= 0) then
@@ -79,8 +78,7 @@ contains
       dt_Szeta, n_xi_x, n_xi_y, n_eta_x, n_eta_y, &
       xi_x, xi_y, eta_x, eta_y, Jacobian, QJ, ke0, entropy0)
     use mod_globals, only : dt
-    use mod_constant, only : id_accuracy
-    use print_curv, only : print_vtk_curv
+    use print_curv, only : print_vtk_curv, make_1d_for_print_curv
     integer, intent(in)                      :: nx
     integer, intent(in)                      :: ny
     integer, intent(in)                      :: nz
@@ -130,19 +128,12 @@ contains
     eta_y    = eta_y_cpu
     Jacobian = Jac_cpu
     QJ       = Q
-    ! 3. Set overlap based on accuracy
-    if (kind(id_accuracy) == 8) then
-      overlap = 3
-    elseif (kind(id_accuracy) == 4) then
-      overlap = 2
-    else
-      overlap = 1
-    endif
+    ! 3. Set overlap from compile-time ORDER
+    overlap = ${ORDER_IO + 1}$
     ! 4. Output step 0
-    call make_1d_for_print(nx, ny, nz, Jac_cpu, Q, rho1d, p1d, v1d)
+    call make_1d_for_print_curv(nx, ny, nz, Jac_cpu, Q, rho1d, p1d, v1d)
     call print_vtk_curv(0, nx, ny, nz, myrank+1, nranks, x_phys, y_phys, z, rho1d, p1d, v1d, ke0, entropy0)
-    call MPI_SEND(ke0,      1, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(entropy0, 1, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
+    call MPI_SEND(ke0,      1, MPI_REAL4, myrank+1, 3*(myrank+1)+1, MPI_COMM_WORLD, ierr)
+    call MPI_SEND(entropy0, 1, MPI_REAL4, myrank+1, 3*(myrank+1)+2, MPI_COMM_WORLD, ierr)
   end subroutine pre_calc_curv
 end module preprocess_curv
-

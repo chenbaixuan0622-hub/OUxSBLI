@@ -142,8 +142,8 @@ contains
     integer, intent(in), value                 :: nx                  !< number of grid points in x direction
     integer, intent(in), value                 :: ny                  !< number of grid points in y direction
     integer, intent(in), value                 :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device, contiguous    :: dx(nx-1)            !< inverse grid spacing in y (1/dy)
-    real(8), intent(in), device, contiguous    :: dy(ny-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device, contiguous    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device, contiguous    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
     real(8), intent(in), device, contiguous    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
     real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)       !< conservative variables
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points

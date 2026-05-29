@@ -253,13 +253,13 @@ contains
     Q = QJ
     call make_1d_for_print(nx, ny, Jacobian_cpu, Q, rho1d, p1d, v1d)
     if (io == 4) then
-      call MPI_ISEND(rho1d, nx*ny,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(1), ierr)
-      call MPI_ISEND(p1d,   nx*ny,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(2), ierr)
-      call MPI_ISEND(v1d,   nx*ny*3, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(3), ierr)
+      call MPI_ISEND(rho1d, nx*ny,   MPI_REAL4, myrank+1, 3*(myrank+1)-2, MPI_COMM_WORLD, ireq3(1), ierr)
+      call MPI_ISEND(p1d,   nx*ny,   MPI_REAL4, myrank+1, 3*(myrank+1)-1, MPI_COMM_WORLD, ireq3(2), ierr)
+      call MPI_ISEND(v1d,   nx*ny*3, MPI_REAL4, myrank+1, 3*(myrank+1),   MPI_COMM_WORLD, ireq3(3), ierr)
     else
-      call MPI_ISEND(rho1d, nx*ny,   MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(1), ierr)
-      call MPI_ISEND(p1d,   nx*ny,   MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(2), ierr)
-      call MPI_ISEND(v1d,   nx*ny*3, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(3), ierr)
+      call MPI_ISEND(rho1d, nx*ny,   MPI_REAL8, myrank+1, 3*(myrank+1)-2, MPI_COMM_WORLD, ireq3(1), ierr)
+      call MPI_ISEND(p1d,   nx*ny,   MPI_REAL8, myrank+1, 3*(myrank+1)-1, MPI_COMM_WORLD, ireq3(2), ierr)
+      call MPI_ISEND(v1d,   nx*ny*3, MPI_REAL8, myrank+1, 3*(myrank+1),   MPI_COMM_WORLD, ireq3(3), ierr)
     endif
     call MPI_WAITALL(3, ireq3, istat3, ierr)
   end subroutine send_recv_for_print_even2
@@ -276,13 +276,13 @@ contains
     Q = QJ
     call make_1d_for_print(nx, ny, nz, Jacobian_cpu, Q, rho1d, p1d, v1d)
     if (io == 4) then
-      call MPI_ISEND(rho1d, nx*ny*nz,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(1), ierr)
-      call MPI_ISEND(p1d,   nx*ny*nz,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(2), ierr)
-      call MPI_ISEND(v1d,   nx*ny*nz*3, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(3), ierr)
+      call MPI_ISEND(rho1d, nx*ny*nz,   MPI_REAL4, myrank+1, 3*(myrank+1)-2, MPI_COMM_WORLD, ireq3(1), ierr)
+      call MPI_ISEND(p1d,   nx*ny*nz,   MPI_REAL4, myrank+1, 3*(myrank+1)-1, MPI_COMM_WORLD, ireq3(2), ierr)
+      call MPI_ISEND(v1d,   nx*ny*nz*3, MPI_REAL4, myrank+1, 3*(myrank+1),   MPI_COMM_WORLD, ireq3(3), ierr)
     else
-      call MPI_ISEND(rho1d, nx*ny*nz,   MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(1), ierr)
-      call MPI_ISEND(p1d,   nx*ny*nz,   MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(2), ierr)
-      call MPI_ISEND(v1d,   nx*ny*nz*3, MPI_REAL8, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(3), ierr)
+      call MPI_ISEND(rho1d, nx*ny*nz,   MPI_REAL8, myrank+1, 3*(myrank+1)-2, MPI_COMM_WORLD, ireq3(1), ierr)
+      call MPI_ISEND(p1d,   nx*ny*nz,   MPI_REAL8, myrank+1, 3*(myrank+1)-1, MPI_COMM_WORLD, ireq3(2), ierr)
+      call MPI_ISEND(v1d,   nx*ny*nz*3, MPI_REAL8, myrank+1, 3*(myrank+1),   MPI_COMM_WORLD, ireq3(3), ierr)
     endif
     call MPI_WAITALL(3, ireq3, istat3, ierr)
   end subroutine send_recv_for_print_even3
@@ -296,13 +296,13 @@ contains
     integer ireq3(3), istat3(MPI_STATUS_SIZE,3), ierr
     real(io) rho1d(nx*ny), p1d(nx*ny), v1d(nx*ny*3)
     if (io == 4) then
-      call MPI_IRECV(rho1d, nx*ny,   MPI_REAL4, myrank-1, myrank, MPI_COMM_WORLD, ireq3(1), ierr)
-      call MPI_IRECV(p1d,   nx*ny,   MPI_REAL4, myrank-1, myrank, MPI_COMM_WORLD, ireq3(2), ierr)
-      call MPI_IRECV(v1d,   nx*ny*3, MPI_REAL4, myrank-1, myrank, MPI_COMM_WORLD, ireq3(3), ierr)
+      call MPI_IRECV(rho1d, nx*ny,   MPI_REAL4, myrank-1, 3*myrank-2, MPI_COMM_WORLD, ireq3(1), ierr)
+      call MPI_IRECV(p1d,   nx*ny,   MPI_REAL4, myrank-1, 3*myrank-1, MPI_COMM_WORLD, ireq3(2), ierr)
+      call MPI_IRECV(v1d,   nx*ny*3, MPI_REAL4, myrank-1, 3*myrank,   MPI_COMM_WORLD, ireq3(3), ierr)
     else
-      call MPI_IRECV(rho1d, nx*ny,   MPI_REAL8, myrank-1, myrank, MPI_COMM_WORLD, ireq3(1), ierr)
-      call MPI_IRECV(p1d,   nx*ny,   MPI_REAL8, myrank-1, myrank, MPI_COMM_WORLD, ireq3(2), ierr)
-      call MPI_IRECV(v1d,   nx*ny*3, MPI_REAL8, myrank-1, myrank, MPI_COMM_WORLD, ireq3(3), ierr)
+      call MPI_IRECV(rho1d, nx*ny,   MPI_REAL8, myrank-1, 3*myrank-2, MPI_COMM_WORLD, ireq3(1), ierr)
+      call MPI_IRECV(p1d,   nx*ny,   MPI_REAL8, myrank-1, 3*myrank-1, MPI_COMM_WORLD, ireq3(2), ierr)
+      call MPI_IRECV(v1d,   nx*ny*3, MPI_REAL8, myrank-1, 3*myrank,   MPI_COMM_WORLD, ireq3(3), ierr)
     endif
     call MPI_WAITALL(3, ireq3, istat3, ierr)
     call print_vtk(step, nx, ny, x, y, rho1d, p1d, v1d)
@@ -317,13 +317,13 @@ contains
     integer ireq3(3), istat3(MPI_STATUS_SIZE,3), ierr
     real(io) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
     if (io == 4) then
-      call MPI_IRECV(rho1d, nx*ny*nz,   MPI_REAL4, myrank-1, myrank, MPI_COMM_WORLD, ireq3(1), ierr)
-      call MPI_IRECV(p1d,   nx*ny*nz,   MPI_REAL4, myrank-1, myrank, MPI_COMM_WORLD, ireq3(2), ierr)
-      call MPI_IRECV(v1d,   nx*ny*nz*3, MPI_REAL4, myrank-1, myrank, MPI_COMM_WORLD, ireq3(3), ierr)
+      call MPI_IRECV(rho1d, nx*ny*nz,   MPI_REAL4, myrank-1, 3*myrank-2, MPI_COMM_WORLD, ireq3(1), ierr)
+      call MPI_IRECV(p1d,   nx*ny*nz,   MPI_REAL4, myrank-1, 3*myrank-1, MPI_COMM_WORLD, ireq3(2), ierr)
+      call MPI_IRECV(v1d,   nx*ny*nz*3, MPI_REAL4, myrank-1, 3*myrank,   MPI_COMM_WORLD, ireq3(3), ierr)
     else
-      call MPI_IRECV(rho1d, nx*ny*nz,   MPI_REAL8, myrank-1, myrank, MPI_COMM_WORLD, ireq3(1), ierr)
-      call MPI_IRECV(p1d,   nx*ny*nz,   MPI_REAL8, myrank-1, myrank, MPI_COMM_WORLD, ireq3(2), ierr)
-      call MPI_IRECV(v1d,   nx*ny*nz*3, MPI_REAL8, myrank-1, myrank, MPI_COMM_WORLD, ireq3(3), ierr)
+      call MPI_IRECV(rho1d, nx*ny*nz,   MPI_REAL8, myrank-1, 3*myrank-2, MPI_COMM_WORLD, ireq3(1), ierr)
+      call MPI_IRECV(p1d,   nx*ny*nz,   MPI_REAL8, myrank-1, 3*myrank-1, MPI_COMM_WORLD, ireq3(2), ierr)
+      call MPI_IRECV(v1d,   nx*ny*nz*3, MPI_REAL8, myrank-1, 3*myrank,   MPI_COMM_WORLD, ireq3(3), ierr)
     endif
     call MPI_WAITALL(3, ireq3, istat3, ierr)
     call print_vtk(step, nx, ny, nz, myrank, nranks, x, y, z, rho1d, p1d, v1d, ke0, entropy0)
@@ -342,8 +342,8 @@ contains
     integer ierr
     call make_1d_for_print(nx, ny, Jacobian_cpu, Q, rho1d, p1d, v1d)
     call print_vtk(0, nx, ny, x, y, rho1d, p1d, v1d)
-    call MPI_SEND(ke0,      1, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_SEND(entropy0, 1, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
+    call MPI_SEND(ke0,      1, MPI_REAL4, myrank+1, 3*(myrank+1)+1, MPI_COMM_WORLD, ierr)
+    call MPI_SEND(entropy0, 1, MPI_REAL4, myrank+1, 3*(myrank+1)+2, MPI_COMM_WORLD, ierr)
   end subroutine print0
 
 

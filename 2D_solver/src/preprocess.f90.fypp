@@ -106,14 +106,7 @@ contains
     Jacobian = Jacobian_cpu
     QJ = Q
     ! for multi GPU
-    if (kind(id_accuracy) == 8) then
-      overlap = 3
-    elseif (kind(id_accuracy) == 4) then
-      overlap = 2
-    else
-      overlap = 1
-    endif
+    overlap = ${ORDER_IO + 1}$
     call print0(myrank, nx, ny, x, y, Jacobian_cpu, Q, ke0, entropy0)
   end subroutine pre_calc
 end module preprocess
-

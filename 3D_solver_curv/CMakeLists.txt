@@ -16,7 +16,7 @@ find_program(FYPP_EXE fypp REQUIRED)
 
 # Macro: call from each case's CMakeLists.txt after setting CASE_EXTRA_SOURCES.
 # CMAKE_CURRENT_SOURCE_DIR / BINARY_DIR resolve to the caller's case directory.
-macro(add_ouxsbli_2d_case)
+macro(add_ouxsbli_curv_case)
   if(DEFINED CASE_DIR)
     set(_CASE_DIR "${CASE_DIR}")
   else()
@@ -24,22 +24,12 @@ macro(add_ouxsbli_2d_case)
   endif()
   set(FYPP_FLAGS "-I${_CASE_DIR}")
 
-  # mod_constant comes from the shared src/ (../../src relative to case dir)
   set(_PARENT_FYPP "mod_constant")
-  # calc_flux_base is the only fypp template in 2D_solver/src/
   set(_SHARED_FYPP
-      "calc_flux_base"
-      "calc_time_dev"
-      "preprocess"
-      "calc_keep_kernel"
-      "calc_keep_kernel_internal"
-      "calc_visc2"
-      "calc_visc4"
-      "calc_visc4_internal"
-      "calc_slau_kernel"
-      "calc_slau_kernel_internal"
-      "calc_hybrid_kernel"
-      "calc_hybrid_kernel_internal")
+      "calc_flux_base_curv"
+      "preprocess_curv"
+      "calc_time_dev_curv"
+      "main_curv")
 
   set(_GEN "")
   foreach(_f ${_PARENT_FYPP})
@@ -70,12 +60,17 @@ macro(add_ouxsbli_2d_case)
       "${CMAKE_CURRENT_SOURCE_DIR}/../../src/calc_physical_quantities.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../src/calc_muscl.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../src/print.f90"
-      "${CMAKE_CURRENT_SOURCE_DIR}/../src/load_smem_visc2.f90"
-      "${CMAKE_CURRENT_SOURCE_DIR}/../src/load_smem_visc4.f90"
-      "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_hybrid.f90"
-      "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_steps.f90"
-      "${CMAKE_CURRENT_SOURCE_DIR}/../src/set_bc_common.f90"
-      "${CMAKE_CURRENT_SOURCE_DIR}/../src/main.f90")
+      "${CMAKE_CURRENT_SOURCE_DIR}/../../src/print_curv.f90"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src/calc_hybrid.f90"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src/set_bc_common.f90"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_hybrid_curv.f90"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_keep_kernel_curv.f90"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_slau_kernel_curv.f90"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_hybrid_kernel_curv.f90"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_steps_curv.f90"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../src/load_smem_visc2_curv.f90"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_visc2_curv.f90"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_para_curv.f90")
 
   get_filename_component(_CASE "${CMAKE_CURRENT_SOURCE_DIR}" NAME)
   add_executable(${_CASE} ${_BASE} ${CASE_EXTRA_SOURCES} ${_GEN})
@@ -86,7 +81,8 @@ macro(add_ouxsbli_2d_case)
   target_include_directories(${_CASE} PRIVATE
       "${CMAKE_CURRENT_BINARY_DIR}"
       "${CMAKE_CURRENT_SOURCE_DIR}/../src"
-      "${CMAKE_CURRENT_SOURCE_DIR}/../../src")
+      "${CMAKE_CURRENT_SOURCE_DIR}/../../src"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src")
   set_target_properties(${_CASE} PROPERTIES
       OUTPUT_NAME "a.out"
       RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
