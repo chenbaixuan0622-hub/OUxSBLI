@@ -40,6 +40,9 @@ contains
       if (1 <= i .and. i <= nx .and. 3 <= j .and. j <= ny-2) then
         uy(idx) = (two_third * (-Q(i,2,j-1) + Q(i,2,j+1)) - one_twelfth * (-Q(i,2,j-2) + Q(i,2,j+2))) * inv_dy(j)
         vy(idx) = (two_third * (-Q(i,3,j-1) + Q(i,3,j+1)) - one_twelfth * (-Q(i,3,j-2) + Q(i,3,j+2))) * inv_dy(j)
+      else
+        uy(idx) = 0.d0
+        vy(idx) = 0.d0
       endif
     enddo
     call pipelineWaitPrior(0)
@@ -81,6 +84,9 @@ contains
       if (3 <= i .and. i <= nx-2 .and. 1 <= j .and. j <= ny) then
         ux(idx) = (two_third * (-Q(i-1,2,j) + Q(i+1,2,j)) - one_twelfth * (-Q(i-2,2,j) + Q(i+2,2,j))) * inv_dx(i)
         vx(idx) = (two_third * (-Q(i-1,3,j) + Q(i+1,3,j)) - one_twelfth * (-Q(i-2,3,j) + Q(i+2,3,j))) * inv_dx(i)
+      else
+        ux(idx) = 0.d0
+        vx(idx) = 0.d0
       endif
     enddo
     call pipelineWaitPrior(0)

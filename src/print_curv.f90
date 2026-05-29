@@ -119,9 +119,9 @@ contains
     real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
     Q = QJ
     call make_1d_for_print_curv(nx, ny, nz, Jacobian_cpu, Q, rho1d, p1d, v1d)
-    call MPI_ISEND(rho1d, nx*ny*nz,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(1), ierr)
-    call MPI_ISEND(p1d,   nx*ny*nz,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(2), ierr)
-    call MPI_ISEND(v1d,   nx*ny*nz*3, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(3), ierr)
+    call MPI_ISEND(rho1d, nx*ny*nz,   MPI_REAL4, myrank+1, 3*(myrank+1)-2, MPI_COMM_WORLD, ireq3(1), ierr)
+    call MPI_ISEND(p1d,   nx*ny*nz,   MPI_REAL4, myrank+1, 3*(myrank+1)-1, MPI_COMM_WORLD, ireq3(2), ierr)
+    call MPI_ISEND(v1d,   nx*ny*nz*3, MPI_REAL4, myrank+1, 3*(myrank+1),   MPI_COMM_WORLD, ireq3(3), ierr)
     call MPI_WAITALL(3, ireq3, istat3, ierr)
   end subroutine send_recv_for_print_even_curv
 
@@ -134,9 +134,9 @@ contains
     real(4), intent(inout) :: ke0, entropy0
     integer ireq3(3), istat3(MPI_STATUS_SIZE,3), ierr
     real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
-    call MPI_IRECV(rho1d, nx*ny*nz,   MPI_REAL4, myrank-1, myrank, MPI_COMM_WORLD, ireq3(1), ierr)
-    call MPI_IRECV(p1d,   nx*ny*nz,   MPI_REAL4, myrank-1, myrank, MPI_COMM_WORLD, ireq3(2), ierr)
-    call MPI_IRECV(v1d,   nx*ny*nz*3, MPI_REAL4, myrank-1, myrank, MPI_COMM_WORLD, ireq3(3), ierr)
+    call MPI_IRECV(rho1d, nx*ny*nz,   MPI_REAL4, myrank-1, 3*myrank-2, MPI_COMM_WORLD, ireq3(1), ierr)
+    call MPI_IRECV(p1d,   nx*ny*nz,   MPI_REAL4, myrank-1, 3*myrank-1, MPI_COMM_WORLD, ireq3(2), ierr)
+    call MPI_IRECV(v1d,   nx*ny*nz*3, MPI_REAL4, myrank-1, 3*myrank,   MPI_COMM_WORLD, ireq3(3), ierr)
     call MPI_WAITALL(3, ireq3, istat3, ierr)
     call print_vtk_curv(step, nx, ny, nz, myrank, nranks, x_phys, y_phys, z, rho1d, p1d, v1d, ke0, entropy0)
   end subroutine send_recv_for_print_odd_curv
