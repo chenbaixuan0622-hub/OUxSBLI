@@ -190,8 +190,8 @@ contains
 
       #:for d in dirs
       #:set in_sfx = '_in' if (not d['is_bc'] and ORDER == 6) else ''
-      call calc_${d['dir']}$v${VISC_ORDER}$${in_sfx}$_koff<<<blocks${d['dir']}$v,threads${d['dir']}$v>>>&
-           &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$, ${d['dir']}$, ${d['ov']}$, nz-overlap_fb-1)
+      call calc_${d['dir']}$v${VISC_ORDER}$_koff${in_sfx}$<<<blocks${d['dir']}$v,threads${d['dir']}$v>>>&           ! exchange "${in_sfx}$" and " _koff "
+           &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$,  ${d['ov']}$, nz-overlap_fb-1, ${d['dir']}$) ! moved "${d['dir']}$" 
       #:endfor
     #:endif
   #:endif
@@ -255,11 +255,11 @@ contains
     #:for d in dirs
     #:set in_sfx = '_in' if (d['has_in'] and not d['is_bc'] and ORDER == 6) else ''
     ! Low-index side
-    call calc_${d['dir']}$v${VISC_ORDER}$${in_sfx}$_koff<<<blocks${d['dir']}$v,threads${d['dir']}$v>>>&
-           &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$, ${d['dir']}$, ${d['b_lo'][0]}$, ${d['b_lo'][1]}$)
+    call calc_${d['dir']}$v${VISC_ORDER}$_koff${in_sfx}$<<<blocks${d['dir']}$v,threads${d['dir']}$v>>>&          ! exchange ${in_sfx}$ and _koff
+           &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$,  ${d['b_lo'][0]}$, ${d['b_lo'][1]}$ , ${d['dir']}$) ! moved "${d['dir']}$"
     ! High-index side
-    call calc_${d['dir']}$v${VISC_ORDER}$${in_sfx}$_koff<<<blocks${d['dir']}$v,threads${d['dir']}$v>>>&
-           &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$, ${d['dir']}$, ${d['b_hi'][0]}$, ${d['b_hi'][1]}$)
+    call calc_${d['dir']}$v${VISC_ORDER}$_koff${in_sfx}$<<<blocks${d['dir']}$v,threads${d['dir']}$v>>>&           ! exchange ${in_sfx}$ and _koff
+           &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$, ${d['b_hi'][0]}$, ${d['b_hi'][1]}$ , ${d['dir']}$)  ! moved "${d['dir']}$"
     #:endfor
   #:endif
   end subroutine calc_EFG_halo
