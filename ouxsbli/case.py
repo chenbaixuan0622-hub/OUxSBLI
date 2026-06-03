@@ -50,8 +50,8 @@ _ALIAS = {
 _VALUE_NORMALIZE: dict[str, dict[str, str]] = {
     "SCHEME":       {"keep": "KEEP", "slau": "SLAU", "roe": "Roe", "hybrid": "Hybrid"},
     "VISC":         {"euler": "Euler", "ns": "NS", "les": "LES"},
-    "TVD":          {"none": "none", "minmod": "minmod",
-                     "muscl4": "muscl4", "hybrid": "muscl4"},  # "hybrid" → muscl4 limiter
+    "TVD":          {"none": "none", "tvd": "tvd", "hybrid": "hybrid",
+                     "minmod": "tvd", "muscl4": "hybrid"},  # backward-compat aliases
     "SLAU_VARIANT": {"slau": "SLAU", "hrslau2": "HRSLAU2"},
 }
 

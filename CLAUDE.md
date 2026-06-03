@@ -57,7 +57,7 @@ Each case directory contains a **`config.fypp`** file that declares all compile-
 #:set VISC    = 'NS'      # 'Euler', 'NS', 'LES'
 #:set SCHEME  = 'SLAU'    # 'KEEP', 'SLAU', 'Roe', 'Hybrid'
 #:set ORDER   = 6         # 2, 4, 6  (convective + viscous stencil order)
-#:set TVD     = 'muscl4'  # 'none', 'minmod', 'muscl4'
+#:set TVD     = 'hybrid'  # 'none', 'tvd', 'hybrid'
 #:set RESCALE = True       # True → SBLI reference-state rescaling
 #:set COMMZ   = False      # True → z-direction MPI halo decomposition
 #:set RK      = 3          # 3 (TVD-RK3) or 4 (classical RK4)
@@ -210,7 +210,7 @@ All compile-time scheme/method choices live in `<CASE>/config.fypp`. The fypp pr
 | `SCHEME` | `'KEEP'`, `'SLAU'`, `'Roe'`, `'Hybrid'` | Convective flux scheme |
 | `ORDER` | `2`, `4`, `6` | Spatial accuracy (convective + viscous) |
 | `VISC_ORDER` | `2`, `4` | Override viscous stencil order (defaults to `ORDER`) |
-| `TVD` | `'none'`, `'minmod'`, `'muscl4'` | TVD limiter for reconstruction |
+| `TVD` | `'none'`, `'tvd'`, `'hybrid'` | TVD limiter for reconstruction |
 | `SLAU_VARIANT` | `'SLAU'`, `'HRSLAU2'` | SLAU flux variant |
 | `RESCALE` | `True`, `False` | SBLI reference-state rescaling |
 | `COMMZ` | `True`, `False` | z-direction MPI halo decomposition (overlapped comms) |
@@ -235,7 +235,7 @@ This file is **not** preprocessed by fypp. It holds:
 |-----------|--------|--------|--------|
 | `id_visc` (integer) | Euler | NS | LES |
 | `id_accuracy` (integer) | 2nd order | 4th order | 6th order |
-| `id_tvd` (integer) | no TVD | minmod | MUSCL-4th |
+| `id_tvd` (integer) | no TVD | tvd | hybrid |
 | `id_slau` (integer) | SLAU | HRSLAU2 | — |
 | `id_rescale` (integer) | off | on | — |
 | `id_scheme` | integer(2)=KEEP | real(2)=SLAU | real(4)=Roe / real(8)=Hybrid |

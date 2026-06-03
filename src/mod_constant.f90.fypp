@@ -49,9 +49,9 @@ module mod_constant
   #:endif
   #:if TVD == 'none'
   integer(2), parameter :: id_tvd = 0
-  #:elif TVD == 'minmod'
+  #:elif TVD == 'tvd'
   integer(4), parameter :: id_tvd = 0
-  #:elif TVD == 'muscl4'
+  #:elif TVD == 'hybrid'
   integer(8), parameter :: id_tvd = 0
   #:endif
   #:if SLAU_VARIANT == 'SLAU'

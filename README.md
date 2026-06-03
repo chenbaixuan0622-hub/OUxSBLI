@@ -2,6 +2,7 @@
 ![CUDA Fortran](https://img.shields.io/badge/CUDA_Fortran-GPU_Accelerated-76B900)
 ![Modern Fortran](https://img.shields.io/badge/Modern_Fortran-yes-success)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776ab?style=flat&logo=python&logoColor=white)](https://python.org)
+[![Docs](https://img.shields.io/badge/docs-online-blue)](https://htymjun.github.io/OUxSBLI/)
 
 <div align="center">
   <img src="./docs/img/OUxSBLI.png" alt="OUxSBLI">  
@@ -9,90 +10,134 @@
 
 OUxSBLI is a GPU-accelerated CFD code with Python-API written in CUDA Fortran. It employs explicit high-order finite-difference schemes on a rectilinear grid (3D and 2D solvers) and a curvilinear grid.
 
+## Documentation
+
+| Guide | Description |
+|-------|-------------|
+| [Quick Start](docs/quickstart.md) | Run your first simulation in minutes |
+| [Installation](docs/installation.md) | Full setup guide for a fresh machine |
+| [Configuration](docs/configuration.md) | config.fypp reference and rebuild workflow |
+| [Theory](docs/theory.md) | Numerical methods and governing equations |
+| [Python API](docs/api.md) | `ouxsbli` package reference |
+
 ## Dependency
-### CUDA Fortran only
-* HPC SDK (version 24.* and 25.* are better)
-* ParaView (for visualization output files are XML VTK format)
+
+### CUDA Fortran
+* NVIDIA HPC SDK 24.x or 25.x — provides `mpif90` and bundled MPI
+* CMake 3.18 or newer
+* [fypp](https://fypp.readthedocs.io/) (`pip install fypp`) — Fortran preprocessor
+* ParaView — for visualizing VTK output
+
 ### Python API
-* Python (3.10>= is better)
+* Python 3.10 or newer
 * numpy
 * vtk
 
 ## Usage
-### CUDA Fortran only
-1. Go to a working directory (supersonic viscous Taylor-Green vortex)
-~~~bash
-$ cd ./3D_solver/NSTGV
-~~~
 
-2. Edit mod_globals.f90
-  * Choose equation type "id_visc" (Euler or NS)
-  * Choose scheme "id_scheme", "id_accuracy", "id_tvd", and "id_slau"
-  * Choose grid size "nx", "ny", and "nz"
-  * Optimize block-size
-  * Choose time integration method
-3. Edit set.f90
-  * Set grid
-  * Set initial conditions
-  * Set boundary conditions
+### CUDA Fortran
 
-4. Compile
-~~~bash
-$ make
-~~~
+1. Go to a case directory (e.g. NS Taylor-Green vortex):
 
-5. Execute
-~~~bash
-$ bash ./calc.sh
-~~~
+```bash
+cd 3D_solver/NSTGV
+```
 
-1. Optimization
-* In some directories, you can get nsys and ncu iformation by running profile.sh
+2. Edit **`config.fypp`** to choose the physics model, convective scheme, spatial order, boundary conditions, and other compile-time options:
+
+```python
+#:set VISC   = 'NS'      # 'Euler', 'NS', or 'LES'
+#:set SCHEME = 'SLAU'    # 'KEEP', 'SLAU', 'Roe', or 'Hybrid'
+#:set ORDER  = 6         # spatial order: 2, 4, or 6
+#:set BC_X   = False     # False → periodic; True → wall/inflow BCs
+#:set BC_Y   = False
+#:set BC_Z   = False
+```
+
+See [docs/configuration.md](docs/configuration.md) for the full reference.
+
+3. Edit **`mod_globals.f90`** to set grid size, domain lengths, physical parameters, and GPU thread-block sizes:
+
+```fortran
+integer, parameter :: nx = 513
+integer, parameter :: ny = 513
+integer, parameter :: nz = 513
+real(8), parameter :: Re = 1600.d0
+```
+
+4. Edit **`set.f90`** if you need to change the grid geometry, initial conditions, or boundary condition routines.
+
+5. Build with CMake:
+
+```bash
+cmake -B build && cmake --build build -j
+```
+
+6. Run the simulation:
+
+```bash
+cd build && mpirun -n 2 ./a.out
+```
+
+VTK output files (`Q00000.vtr`, `Q00001.vtr`, …) appear in the `data/` directory.
+
+**Profiling:** In some case directories, `profile.sh` runs nsys/ncu profiling:
+
+```bash
+cd build && bash ../profile.sh
+```
 
 ### Python API
-1. Install Python API, `ouxsbli`
-~~~bash
-$ pip install .
-~~~
 
-2. Set parameters and run.
-~~~python
+1. Install the `ouxsbli` package:
+
+```bash
+pip install -e ".[dev]"
+```
+
+2. Create a `Case`, build, and run:
+
+```python
+import pathlib
 from ouxsbli import Case
 
-OUxSBLI_ROOT = your_path
-WORKDIR      = your_path
-
 case = Case(
-  source   = str(pathlib.Path(OUxSBLI_ROOT) / "3D_solver/NSTGV"),
-  workdir  = WORKDIR,
-  # physics
-  visc     = "ns",
-  scheme   = "slau",
-  accuracy = 2,
-  # grid
-  nx       = 128,
-  ny       = 128,
-  nz       = 128,
+    source  = "3D_solver/NSTGV",
+    workdir = "/tmp/my_run",
+    # physics (maps to config.fypp)
+    visc    = "NS",
+    scheme  = "SLAU",
+    accuracy = 6,
+    # grid (maps to mod_globals.f90)
+    nx = 128,
+    ny = 128,
+    nz = 128,
 )
 
 case.build()
-case.run(nranks=2) # mpiexec -n 2 ./a.out
-~~~
+case.run(nranks=2)  # mpirun -n 2 ./a.out
+```
+
+See [docs/api.md](docs/api.md) for the full API reference.
 
 ## Discretization
+
 ### Spatial (Convection terms)
 * Kinetic energy and entropy preserving (KEEP) scheme
 * Simple low-dissipation AUSM (SLAU) scheme
 * Roe scheme
 * KEEP / SLAU hybrid scheme
+
 ### Spatial (Viscous terms)
 * ME4-Base
 * Gaitonde and Visbal's 2nd-order scheme
+
 ### Spatial SGS
 * Selective mixed scale model
+
 ### Temporal
-* 3-3 TVD Runge-Kutta
-* 4-4 Runge-Kutta
+* 3-stage TVD Runge-Kutta
+* 4-stage classical Runge-Kutta
 
 ## Validations and visualizations
 
