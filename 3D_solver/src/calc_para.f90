@@ -269,5 +269,120 @@ contains
     endif
     deallocate(Qs_left, Qs_right, Qr_left, Qr_right)
   end subroutine exchange_rescale
+
+
+  !> Pack bottom z interior slab (z=overlap+1..2*overlap) for sending to rank_lo
+  subroutine flatten_z_lo(nx, ny, nz, overlap, Q, Q1d_lo)
+    integer, intent(in), value   :: nx, ny, nz, overlap
+    real(8), intent(in), device  :: Q(nx,5,ny,nz)
+    real(8), intent(out), device :: Q1d_lo(nx*ny*overlap*5)
+    integer i, j, k, l
+    !$cuf kernel do(4)<<<*,*>>>
+    do k = 1, overlap
+      do j = 1, ny
+        do l = 1, 5
+          do i = 1, nx
+            Q1d_lo(ny*nx*5*(k-1)+nx*5*(j-1)+nx*(l-1)+i) = Q(i,l,j,overlap+k)
+    enddo;enddo;enddo;enddo
+  end subroutine flatten_z_lo
+
+
+  !> Pack top z interior slab (z=nz-2*overlap+1..nz-overlap) for sending to rank_hi
+  subroutine flatten_z_hi(nx, ny, nz, overlap, Q, Q1d_hi)
+    integer, intent(in), value   :: nx, ny, nz, overlap
+    real(8), intent(in), device  :: Q(nx,5,ny,nz)
+    real(8), intent(out), device :: Q1d_hi(nx*ny*overlap*5)
+    integer i, j, k, l
+    !$cuf kernel do(4)<<<*,*>>>
+    do k = 1, overlap
+      do j = 1, ny
+        do l = 1, 5
+          do i = 1, nx
+            Q1d_hi(ny*nx*5*(k-1)+nx*5*(j-1)+nx*(l-1)+i) = Q(i,l,j,nz-2*overlap+k)
+    enddo;enddo;enddo;enddo
+  end subroutine flatten_z_hi
+
+
+  !> Fill bottom z ghost cells (z=1..overlap) from data received from rank_lo
+  subroutine reconstruct_z_lo(nx, ny, nz, overlap, Q1d_lo, Q)
+    integer, intent(in), value     :: nx, ny, nz, overlap
+    real(8), intent(in), device    :: Q1d_lo(nx*ny*overlap*5)
+    real(8), intent(inout), device :: Q(nx,5,ny,nz)
+    integer i, j, k, l
+    !$cuf kernel do(4)<<<*,*>>>
+    do k = 1, overlap
+      do j = 1, ny
+        do l = 1, 5
+          do i = 1, nx
+            Q(i,l,j,k) = Q1d_lo(ny*nx*5*(k-1)+nx*5*(j-1)+nx*(l-1)+i)
+    enddo;enddo;enddo;enddo
+  end subroutine reconstruct_z_lo
+
+
+  !> Fill top z ghost cells (z=nz-overlap+1..nz) from data received from rank_hi
+  subroutine reconstruct_z_hi(nx, ny, nz, overlap, Q1d_hi, Q)
+    integer, intent(in), value     :: nx, ny, nz, overlap
+    real(8), intent(in), device    :: Q1d_hi(nx*ny*overlap*5)
+    real(8), intent(inout), device :: Q(nx,5,ny,nz)
+    integer i, j, k, l
+    !$cuf kernel do(4)<<<*,*>>>
+    do k = 1, overlap
+      do j = 1, ny
+        do l = 1, 5
+          do i = 1, nx
+            Q(i,l,j,nz-overlap+k) = Q1d_hi(ny*nx*5*(k-1)+nx*5*(j-1)+nx*(l-1)+i)
+    enddo;enddo;enddo;enddo
+  end subroutine reconstruct_z_hi
+
+
+  !> Post non-blocking z-halo exchange for even/odd compute/IO pattern.
+  !> Only even compute ranks call this; neighbors are step=2 apart:
+  !>   rank_lo = mod(myrank - 2 + nranks, nranks)
+  !>   rank_hi = mod(myrank + 2, nranks)
+  !> req(1)=Isend to rank_lo  req(2)=Isend to rank_hi
+  !> req(3)=Irecv from rank_lo  req(4)=Irecv from rank_hi
+  !> Caller must not modify send_lo/send_hi until after MPI_Waitall on req
+  subroutine start_exchange_z(myrank, nranks, overlap, nx, ny, nz, QJ, &
+                               Qs1d_lo, Qs1d_hi, Qr1d_lo, Qr1d_hi, &
+                               send_lo, send_hi, recv_lo, recv_hi, req)
+    integer, intent(in)            :: myrank, nranks, overlap, nx, ny, nz
+    real(8), intent(in), device    :: QJ(nx,5,ny,nz)
+    real(8), intent(inout), device :: Qs1d_lo(nx*ny*overlap*5), Qs1d_hi(nx*ny*overlap*5)
+    real(8), intent(inout), device :: Qr1d_lo(nx*ny*overlap*5), Qr1d_hi(nx*ny*overlap*5)
+    real(8), intent(inout)         :: send_lo(nx*ny*overlap*5), send_hi(nx*ny*overlap*5)
+    real(8), intent(inout)         :: recv_lo(nx*ny*overlap*5), recv_hi(nx*ny*overlap*5)
+    integer, intent(out)           :: req(4)
+    integer rank_lo, rank_hi, msglen, stat, ierr
+    rank_lo = mod(myrank - 2 + nranks, nranks)
+    rank_hi = mod(myrank + 2, nranks)
+    msglen  = nx * ny * overlap * 5
+    call flatten_z_lo(nx, ny, nz, overlap, QJ, Qs1d_lo)
+    call flatten_z_hi(nx, ny, nz, overlap, QJ, Qs1d_hi)
+    stat = cudaMemcpy(send_lo, Qs1d_lo, msglen, cudaMemcpyDeviceToHost)
+    stat = cudaMemcpy(send_hi, Qs1d_hi, msglen, cudaMemcpyDeviceToHost)
+    call MPI_Isend(send_lo, msglen, MPI_REAL8, rank_lo, 20, MPI_COMM_WORLD, req(1), ierr)
+    call MPI_Isend(send_hi, msglen, MPI_REAL8, rank_hi, 21, MPI_COMM_WORLD, req(2), ierr)
+    call MPI_Irecv(recv_lo, msglen, MPI_REAL8, rank_lo, 21, MPI_COMM_WORLD, req(3), ierr)
+    call MPI_Irecv(recv_hi, msglen, MPI_REAL8, rank_hi, 20, MPI_COMM_WORLD, req(4), ierr)
+  end subroutine start_exchange_z
+
+
+  !> Complete z-halo exchange: MPI_Waitall, H2D copy, unpack ghost cells into QJ
+  subroutine finish_exchange_z(overlap, nx, ny, nz, &
+                                recv_lo, recv_hi, Qr1d_lo, Qr1d_hi, QJ, req)
+    integer, intent(in)            :: overlap, nx, ny, nz
+    real(8), intent(in)            :: recv_lo(nx*ny*overlap*5), recv_hi(nx*ny*overlap*5)
+    real(8), intent(inout), device :: Qr1d_lo(nx*ny*overlap*5), Qr1d_hi(nx*ny*overlap*5)
+    real(8), intent(inout), device :: QJ(nx,5,ny,nz)
+    integer, intent(inout)         :: req(4)
+    integer msglen, stat, ierr
+    integer istat4(MPI_STATUS_SIZE,4)
+    msglen = nx * ny * overlap * 5
+    call MPI_Waitall(4, req, istat4, ierr)
+    stat = cudaMemcpy(Qr1d_lo, recv_lo, msglen, cudaMemcpyHostToDevice)
+    stat = cudaMemcpy(Qr1d_hi, recv_hi, msglen, cudaMemcpyHostToDevice)
+    call reconstruct_z_lo(nx, ny, nz, overlap, Qr1d_lo, QJ)
+    call reconstruct_z_hi(nx, ny, nz, overlap, Qr1d_hi, QJ)
+  end subroutine finish_exchange_z
 end module calc_para
 

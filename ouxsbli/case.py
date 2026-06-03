@@ -10,9 +10,9 @@ Usage::
         workdir = "/tmp/run_01",
         Re      = 800.0,
         nx      = 65,
-        scheme  = "slau",
-        visc    = "ns",
-        accuracy = 2,
+        scheme  = "KEEP",
+        visc    = "NS",
+        accuracy = 6,
     )
     case.build()
     case.run(nranks=2)
@@ -22,25 +22,50 @@ import shutil
 import subprocess
 import pathlib
 from typing import Any
-from .patcher import patch
+from .patcher import patch, _is_macro_line
 
-
-# Mapping from friendly parameter alias → Fortran parameter name used in patcher
+# ---------------------------------------------------------------------------
+# Alias table: friendly Case() kwarg → fypp macro name in config.fypp
+# ---------------------------------------------------------------------------
 _ALIAS = {
-    "scheme":   "id_scheme",
-    "visc":     "id_visc",
-    "accuracy": "id_accuracy",
-    "tvd":      "id_tvd",
-    "slau":     "id_slau",
-    "rescale":  "id_rescale",
-    "recal":    "id_recal",
-    "rk":       "id_RungeKutta",
-    "gpumpi":   "id_gpumpi",
+    "scheme":     "SCHEME",
+    "visc":       "VISC",
+    "accuracy":   "ORDER",
+    "visc_order": "VISC_ORDER",
+    "tvd":        "TVD",
+    "slau":       "SLAU_VARIANT",
+    "rescale":    "RESCALE",
+    "recal":      "RESTART",
+    "rk":         "RK",
+    "gpumpi":     "GPUMPI",
+    "bc_x":       "BC_X",
+    "bc_y":       "BC_Y",
+    "commz":      "COMMZ",
+}
+
+# ---------------------------------------------------------------------------
+# Value normalisation for config.fypp string parameters
+# fypp comparisons are case-sensitive: 'Euler' ≠ 'EULER', 'none' ≠ 'NONE'.
+# ---------------------------------------------------------------------------
+_VALUE_NORMALIZE: dict[str, dict[str, str]] = {
+    "SCHEME":       {"keep": "KEEP", "slau": "SLAU", "roe": "Roe", "hybrid": "Hybrid"},
+    "VISC":         {"euler": "Euler", "ns": "NS", "les": "LES"},
+    "TVD":          {"none": "none", "minmod": "minmod",
+                     "muscl4": "muscl4", "hybrid": "muscl4"},  # "hybrid" → muscl4 limiter
+    "SLAU_VARIANT": {"slau": "SLAU", "hrslau2": "HRSLAU2"},
+}
+
+# ---------------------------------------------------------------------------
+# RK stage-count normalisation  (human-friendly strings → int)
+# ---------------------------------------------------------------------------
+_RK_NORMALIZE: dict[str, int] = {
+    "tvd_rk3": 3, "rk3": 3,
+    "rk4": 4, "classical_rk4": 4,
 }
 
 
 class Case:
-    """Manage one simulation run (copy source → patch → build → run → read)."""
+    """Manage one simulation run (copy source -> patch config.fypp + mod_globals.f90 -> cmake/make -> run)."""
 
     def __init__(self, source: str, workdir: str, **params: Any) -> None:
         """
@@ -52,17 +77,20 @@ class Case:
         workdir:
             Path for the new working directory that will be created.
         **params:
-            Parameter overrides forwarded to :func:`~ouxsbli.patcher.patch`.
-            Scalar parameters (``Re``, ``nx``, ``CFL``, …) accept int/float.
-            Kind-dispatch parameters accept the friendly strings defined in
-            ``patcher.KIND_MAP`` (e.g. ``scheme="slau"``, ``visc="ns"``).
+            Parameter overrides.  Recognised aliases (e.g. ``scheme``,
+            ``visc``, ``accuracy``) are expanded to the fypp macro names used
+            in ``config.fypp``.  All other parameters (``nx``, ``ny``, ``Re``,
+            etc.) are forwarded to ``mod_globals.f90``.
         """
-        repo_root = pathlib.Path(__file__).resolve().parent.parent
-        self.source  = (repo_root / source).resolve()
+        self.repo_root = pathlib.Path(__file__).resolve().parent.parent
+        self.source  = (self.repo_root / source).resolve()
         self.workdir = pathlib.Path(workdir).resolve()
-        # Expand friendly aliases to the exact Fortran parameter names
+        self.build_dir = self.workdir / "build"
+        # Expand friendly aliases; do NOT blanket-uppercase values —
+        # config.fypp comparisons are case-sensitive (e.g. 'Euler' ≠ 'EULER').
         self.params: dict[str, Any] = {
-            _ALIAS.get(k, k): v for k, v in params.items()
+            _ALIAS.get(k.lower(), k): v
+            for k, v in params.items()
         }
         self._built = False
 
@@ -71,40 +99,68 @@ class Case:
     # ------------------------------------------------------------------
 
     def _setup(self) -> None:
-        """Copy source directory to workdir and patch mod_globals.f90."""
+        """Copy source directory to workdir, then patch config.fypp and mod_globals.f90."""
         if self.workdir.exists():
             shutil.rmtree(self.workdir)
-        shutil.copytree(self.source, self.workdir)
 
+        shutil.copytree(
+            self.source,
+            self.workdir,
+            ignore=shutil.ignore_patterns("build", "CMakeCache.txt", "CMakeFiles", "*.cmake"),
+        )
+
+        config_path  = self.workdir / "config.fypp"
         globals_path = self.workdir / "mod_globals.f90"
+
+        if not config_path.exists():
+            raise FileNotFoundError(f"config.fypp not found in {self.source}")
         if not globals_path.exists():
             raise FileNotFoundError(f"mod_globals.f90 not found in {self.source}")
 
-        original = globals_path.read_text()
-        patched  = patch(original, self.params)
-        globals_path.write_text(patched)
+        config_text  = config_path.read_text()
+        globals_text = globals_path.read_text()
+        config_lines = config_text.splitlines()
 
-        # The Makefile's vpath uses paths relative to the original source dir.
-        # make runs from workdir, so rewrite them as absolute paths.
-        makefile_path = self.workdir / "Makefile"
-        if makefile_path.exists():
-            lines = makefile_path.read_text().splitlines(keepends=True)
-            for i, line in enumerate(lines):
-                if line.startswith("vpath %f90 "):
-                    rel_paths = line[len("vpath %f90 "):].strip().split(":")
-                    abs_paths = [str((self.source / p).resolve()) for p in rel_paths]
-                    lines[i] = "vpath %f90 " + ":".join(abs_paths) + "\n"
-            makefile_path.write_text("".join(lines))
+        config_params:  dict[str, Any] = {}
+        globals_params: dict[str, Any] = {}
+
+        for k, v in self.params.items():
+            # Normalise RK string → integer stage count
+            if k == "RK" and isinstance(v, str):
+                v = _RK_NORMALIZE.get(v.lower(), v)
+
+            if any(_is_macro_line(line, k) for line in config_lines):
+                # param lives in config.fypp — apply fypp-correct casing for strings
+                if isinstance(v, str) and k in _VALUE_NORMALIZE:
+                    v = _VALUE_NORMALIZE[k].get(v.lower(), v)
+                config_params[k] = v
+            else:
+                # param is not in config.fypp → route to mod_globals.f90
+                globals_params[k] = v
+
+        config_path.write_text(patch(config_text, config_params))
+        globals_path.write_text(patch(globals_text, globals_params))
 
     # ------------------------------------------------------------------
     # Build
     # ------------------------------------------------------------------
 
     def build(self) -> None:
-        """Copy source, apply patches, and compile with make."""
+        """Apply patches, generate build system via CMake, and compile."""
         self._setup()
-        self._run_cmd(["make", "clean"])
-        self._run_cmd(["make"])
+
+        self.build_dir.mkdir(exist_ok=True)
+        # Set the CMake src dir to "original case dir".
+        # This ensures that relative paths to ../CMakeLists.txt and src/ work correctly.
+        cmake_cmd = [
+            "cmake",
+            str(self.source),  # This line is important
+            f"-DCASE_DIR={self.workdir}"
+        ]
+
+        self._run_cmd(cmake_cmd, cwd=self.build_dir)
+        self._run_cmd(["make"], cwd=self.build_dir)
+
         self._built = True
 
     # ------------------------------------------------------------------
@@ -119,8 +175,20 @@ class Case:
         nranks:
             Number of MPI ranks (default 2).
         """
-        (self.workdir / "data").mkdir(exist_ok=True)
-        self._run_cmd(["mpirun", "-n", str(nranks), "./a.out"])
+        if not self._built:
+            raise RuntimeError("Must call build() before run()")
+
+        data_dir = self.workdir / "data"
+        data_dir.mkdir(exist_ok=True)
+
+        # NOTE: Depending on CMakeLists.txt, the executable may be placed in build_dir
+        # Output artifacts remain cleanly in workdir.
+        exe_path = self.build_dir / "a.out"
+        if not exe_path.exists():
+            # Fallback path if CMake installs the executable to the workdir root instead
+            exe_path = self.workdir / "a.out"
+
+        self._run_cmd(["mpirun", "-n", str(nranks), str(exe_path)], cwd=self.workdir)
 
     # ------------------------------------------------------------------
     # Internal
@@ -154,10 +222,10 @@ class Case:
         env["PATH"] = ":".join(extra) + ":" + env.get("PATH", "")
         return env
 
-    def _run_cmd(self, cmd: list[str]) -> None:
+    def _run_cmd(self, cmd: list[str], cwd: pathlib.Path) -> None:
         result = subprocess.run(
             cmd,
-            cwd=self.workdir,
+            cwd=cwd,
             capture_output=True,
             text=True,
             env=self._build_env(),
@@ -175,4 +243,3 @@ class Case:
             f"workdir={str(self.workdir)!r}, "
             f"params={self.params})"
         )
-

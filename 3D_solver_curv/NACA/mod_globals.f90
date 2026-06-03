@@ -1,41 +1,9 @@
 module mod_globals
   use cudafor
   implicit none
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_visc     ! kind2 Euler       !
-  !             ! kind4 NS          !
-  !             ! kind8 LES         !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_scheme   ! integer(2) KEEP   !
-  !             ! real(2)    SLAU   !
-  !             ! real(4)    Roe    !
-  !             ! real(8)    Hybrid !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_accuracy ! kind2 2nd         !
-  !             ! kind4 4th         !
-  !             ! kind8 6th         !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_tvd      ! kind2 non TVD     !
-  !             ! kind4 minmod      !
-  !             ! kind8 Hybrid      !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_slau     ! kind2 SLAU        !
-  !             ! kind4 HR-SLAU2    !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_rescale  ! kind2 off         !
-  !             ! kind4 on          !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! Value is IGNORED; only the kind matters for dispatch
   integer, parameter    :: dimension   = 3
-  integer(4), parameter :: id_visc     = 0
-  real(8), parameter    :: id_scheme   = 0
   integer, parameter    :: sp          = 4
   real(sp), parameter   :: threshold   = 0.1_sp
-  integer(2), parameter :: id_accuracy = 0
-  integer(2), parameter :: id_tvd      = 0
-  integer(2), parameter :: id_slau     = 0
-  integer(2), parameter :: id_rescale  = 0
-  integer(2), parameter :: id_gpumpi   = 0
   
   ! NACA 0012 O-grid geometry
   real(8), parameter :: chord = 0.05d0
@@ -52,10 +20,6 @@ module mod_globals
   integer, parameter :: nz = 17         ! quasi-2D spanwise
 
   real(8), parameter :: beta  = dacos(-1.d0) * 37.2d0 / 180.d0
-  ! Boundary condition flags
-  logical, parameter :: id_bc_x = .false. ! xi is periodic (O-grid wraps around airfoil)
-  logical, parameter :: id_bc_y = .true.  ! eta has airfoil wall (j=1) and far-field (j=ny)
-  logical, parameter :: id_bc_z = .false. ! z-periodic
 
   ! GPU thread block dimensions (tuned for nx≈194, ny≈80)
   type(dim3), parameter :: threads   = dim3(32, 8, 1)
@@ -68,16 +32,6 @@ module mod_globals
   type(dim3) :: blocks, blocksE, blocksEv, blocksF, blocksFv, blocksG, blocksGv
 
   ! time
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_RungeKutta ! kind=2 ! 3rd_TVD !
-  !               ! kind=4 ! 4th     !
-  !               ! kind=8 ! Gauss   !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_recal      ! kind=2 ! set 0   !
-  !               ! kind=4 ! recal   !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(2), parameter :: id_RungeKutta = 0  ! kind=2 → TVD-RK3
-  integer(2), parameter :: id_recal      = 0  ! kind=2 → initialize
   integer, parameter    :: step_offset   = 0
 
   ! Free-stream flow conditions (non-dimensional)

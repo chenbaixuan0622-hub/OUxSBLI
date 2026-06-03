@@ -1,8 +1,9 @@
 module calc_forcing
   use cufft
   use cudafor
-  use mod_globals, only : id_accuracy, nx, ny, nz, eps_s, kf_min, kf_max, threads, &
+  use mod_globals, only : nx, ny, nz, eps_s, kf_min, kf_max, threads, &
                           gamma, R, C_T, dt, T_ref_const => T
+  use mod_constant, only : id_accuracy
   implicit none
   integer,    save :: Nf, off
   integer,    save :: fft_plan

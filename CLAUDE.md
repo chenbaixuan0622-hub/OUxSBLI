@@ -10,15 +10,22 @@ OUxSBLI is a GPU-accelerated CFD solver for compressible flows (Euler/Navier-Sto
 
 All work happens inside a specific test-case directory. There is no top-level build.
 
-```bash
-cd 3D_solver/NSTGV    # or ETGV, IVST, KHI, SBLI, TBL
+**3D solver cases use CMake:**
 
-make clean && make    # compile with mpif90 + CUDA flags
-bash calc.sh          # run simulation (typically mpirun -n 2 a.out)
-bash profile.sh       # (where available) nsys/ncu profiling
+```bash
+cd 3D_solver/NSTGV    # or DHIT, ETGV, IVST, KHI, SBLI, STZ, TBL
+
+cmake -B build && cmake --build build -j   # fypp preprocess + compile
+cd build && mpirun -n 2 ./a.out            # run simulation
 ```
 
-For curvilinear cases (e.g. NACA 0012):
+Profiling (where available):
+
+```bash
+cd build && bash ../profile.sh    # nsys/ncu profiling
+```
+
+For curvilinear cases (still Makefile-based):
 
 ```bash
 cd 3D_solver_curv/NACA
@@ -26,25 +33,86 @@ make clean && make
 bash calc.sh
 ```
 
-For 2D cases (e.g. oblique shock):
+**2D solver cases use CMake:**
 
 ```bash
-cd 2D_solver/OS
-make clean && make
-bash calc.sh
+cd 2D_solver/OS    # or BL, DSL, EVC, SBLI, ST
+cmake -B build && cmake --build build -j   # fypp preprocess + compile
+cd build && mpirun -n 1 ./a.out            # run simulation
 ```
 
 **Compiler requirement:** NVIDIA HPC SDK (`mpif90` with `-cuda -acc -fast -gpu=ptxinfo,rdc,lto`). Versions 24.* and 25.* are confirmed working.
 
 **Output format:** XML VTK files, readable with ParaView.
 
+## Fypp Preprocessing System
+
+The 3D solver uses [fypp](https://fypp.readthedocs.io/) to generate case-specialised Fortran from templates. CMake drives this automatically.
+
+### How it works
+
+Each case directory contains a **`config.fypp`** file that declares all compile-time configuration variables:
+
+```python
+#:set VISC    = 'NS'      # 'Euler', 'NS', 'LES'
+#:set SCHEME  = 'SLAU'    # 'KEEP', 'SLAU', 'Roe', 'Hybrid'
+#:set ORDER   = 6         # 2, 4, 6  (convective + viscous stencil order)
+#:set TVD     = 'muscl4'  # 'none', 'minmod', 'muscl4'
+#:set RESCALE = True       # True → SBLI reference-state rescaling
+#:set COMMZ   = False      # True → z-direction MPI halo decomposition
+#:set RK      = 3          # 3 (TVD-RK3) or 4 (classical RK4)
+#:set RESTART = False      # True → read initial condition from file
+#:set BC_X    = True       # True → wall/inflow BCs in x; False → periodic
+#:set BC_Y    = True       # same for y
+#:set BC_Z    = False      # same for z
+#:set SLAU_VARIANT = 'HRSLAU2'  # 'SLAU' or 'HRSLAU2'
+#:set VISC_ORDER   = 6     # viscous stencil order (defaults to ORDER if omitted)
+#:set ORDER_IO = ORDER // 2 - 1  # ghost-cell count for I/O interpolation
+```
+
+Source files with the `.f90.fypp` extension are **templates**; CMake runs `fypp -I<case-dir> <template>.f90.fypp <output>.f90` for each one. The generated `.f90` files land in `3D_solver/<CASE>/build/`.
+
+### fypp-preprocessed source files
+
+| Template (in `src/` or `3D_solver/src/`) | Purpose |
+|------------------------------------------|---------|
+| `src/mod_constant.f90.fypp` | Kind-dispatch Fortran parameters from config values |
+| `3D_solver/src/calc_flux_base.f90.fypp` | Top-level flux dispatcher (convective + viscous) |
+| `3D_solver/src/calc_time_dev.f90.fypp` | RK time-stepping orchestration |
+| `3D_solver/src/calc_keep_kernel.f90.fypp` | KEEP convective kernel |
+| `3D_solver/src/calc_slau_kernel.f90.fypp` | SLAU convective kernel |
+| `3D_solver/src/calc_roe_kernel.f90.fypp` | Roe convective kernel |
+| `3D_solver/src/calc_hybrid_kernel.f90.fypp` | Hybrid KEEP↔SLAU kernel |
+| `3D_solver/src/calc_keep_kernel_internal.f90.fypp` | Interior-only KEEP variant |
+| `3D_solver/src/calc_slau_kernel_internal.f90.fypp` | Interior-only SLAU variant |
+| `3D_solver/src/calc_roe_kernel_internal.f90.fypp` | Interior-only Roe variant |
+| `3D_solver/src/calc_hybrid_kernel_internal.f90.fypp` | Interior-only Hybrid variant |
+| `3D_solver/src/calc_visc2.f90.fypp` | 2nd-order viscous kernels |
+| `3D_solver/src/calc_visc4.f90.fypp` | 4th-order viscous kernels |
+| `3D_solver/src/calc_visc4_internal.f90.fypp` | Interior-only 4th-order viscous |
+| `3D_solver/src/preprocess.f90.fypp` | Device memory allocation helpers |
+
+The 2D solver uses CMake (like 3D); `2D_solver/src/calc_flux_base.f90.fypp` is preprocessed by the per-case CMakeLists.txt using the same `fypp -I<case-dir>` pattern.
+
+### Changing the scheme or method
+
+Edit the **`config.fypp`** in the case directory and rebuild:
+
+```bash
+# e.g. switch NSTGV from KEEP to Hybrid
+vim 3D_solver/NSTGV/config.fypp      # change SCHEME = 'Hybrid'
+cmake --build build -j               # CMake detects config.fypp changed, re-runs fypp
+```
+
+Do **not** manually edit the generated `.f90` files in `build/`; they are overwritten on every build.
+
 ## Architecture
 
-Source is split across two directories; the Makefile's `vpath` merges them:
+Source is split across directories; CMake/vpath merges them at build time:
 
-- `src/` — shared utilities: `main.f90`, `mod_constant.f90`, `cpu_gpu_mpi.f90`, `calc_muscl.f90`, `calc_physical_quantities.f90`, `print.f90`, `set_coordinate.f90`, `set_compressible_bl.f90`
-- `3D_solver/src/` — solver kernels: all `calc_*.f90` scheme and time-integration modules
-- `3D_solver/<CASE>/` — per-case configuration: `mod_globals.f90` (parameters), `set.f90` (grid/IC/BC), `Makefile`, `calc.sh`
+- `src/` — shared templates and utilities: `mod_constant.f90.fypp`, `main.f90`, `cpu_gpu_mpi.f90`, `calc_muscl.f90`, `calc_physical_quantities.f90`, `print.f90`, `set_coordinate.f90`, `set_compressible_bl.f90`
+- `3D_solver/src/` — solver kernels (mostly `.f90.fypp` templates): convective/viscous scheme modules, time-integration, preprocessing
+- `3D_solver/<CASE>/` — per-case configuration: `mod_globals.f90` (grid/physical params, thread blocks), `set.f90` (grid/IC/BC), `config.fypp` (build-time scheme/method flags), `CMakeLists.txt`, `calc.sh`
 
 ### Curvilinear Solver (`3D_solver_curv/`)
 
@@ -67,10 +135,10 @@ Key differences from the Cartesian solver:
 main.f90
   └─ set_coordinate()        # grid metrics & Jacobians
   └─ set() [set.f90]         # grid, IC, BC (case-specific)
-  └─ calc_time_dev()         # time-loop entry point
-        └─ calc_flux_base()  # dispatches to convective + viscous kernels
+  └─ calc_time_dev()         # time-loop entry point  [fypp-generated]
+        └─ calc_flux_base()  # dispatches to convective + viscous kernels  [fypp-generated]
         └─ calc_steps()      # RK stage update (Q += dt * RHS)
-        └─ calc_para()       # MPI ghost-cell exchange
+        └─ calc_para()       # MPI ghost-cell exchange (x) or z-halo (COMMZ)
         └─ print()           # VTK output
 ```
 
@@ -93,7 +161,7 @@ main_curv.f90
 A standalone 2D solver sharing the same convective/viscous kernels as the 3D Cartesian solver. Source layout mirrors the 3D structure:
 
 - `2D_solver/src/` — shared 2D utilities (main, grid, BCs)
-- `2D_solver/<CASE>/` — per-case config: `mod_globals.f90`, `set.f90`, `Makefile`, `calc.sh`
+- `2D_solver/<CASE>/` — per-case config: `mod_globals.f90`, `set.f90`, `config.fypp`, `CMakeLists.txt`, `calc.sh`
 
 Available cases:
 
@@ -103,36 +171,77 @@ Available cases:
 | DSL  | Double shear layer |
 | EVC  | Euler vortex convection (grid-convergence study) |
 | OS   | 2D oblique shock (M=2, θ=8°, SLAU, Euler) |
+| SBLI | 2D shock-boundary layer interaction |
 | ST   | Sod shock tube |
 
-### Convective Schemes (dispatched from `calc_flux_base.f90`)
+### 3D Cartesian Cases
+
+| Case | Description |
+|------|-------------|
+| DHIT | Decaying homogeneous isotropic turbulence |
+| ETGV | Supersonic Taylor-Green vortex (entropy-preserving) |
+| IVST | Inviscid vortex / smooth test case |
+| KHI  | Kelvin-Helmholtz instability |
+| NSTGV| NS Taylor-Green vortex |
+| SBLI | Shock-boundary layer interaction (RESCALE=True) |
+| STZ  | z-direction halo exchange validation (COMMZ=True, BC_Z=True) |
+| TBL  | Turbulent boundary layer (LES, Hybrid scheme) |
+
+### Convective Schemes (dispatched from `calc_flux_base.f90.fypp`)
 
 | Scheme | Files | Best for |
 |--------|-------|----------|
-| KEEP (Kinetic Energy & Entropy Preserving) | `calc_keep_kernel.f90`, `calc_keep_3d.f90` | Smooth vortical flows (TGV, KHI) |
-| SLAU (Simple Low-dissipation AUSM) | `calc_slau_kernel.f90`, `calc_slau_3d.f90` | Compressible turbulence with shocks (SBLI, TBL) |
-| Roe | `calc_roe_kernel.f90`, `calc_roe_3d.f90` | Supersonic/hypersonic discontinuities |
-| Hybrid (KEEP↔SLAU via Ducros sensor) | `calc_hybrid_kernel.f90`, `calc_hybrid.f90` | Mixed smooth/shocked regions |
+| KEEP (Kinetic Energy & Entropy Preserving) | `calc_keep_kernel.f90.fypp`, `calc_keep_kernel_internal.f90.fypp` | Smooth vortical flows (TGV, KHI) |
+| SLAU (Simple Low-dissipation AUSM) | `calc_slau_kernel.f90.fypp`, `calc_slau_kernel_internal.f90.fypp` | Compressible turbulence with shocks (SBLI, TBL) |
+| Roe | `calc_roe_kernel.f90.fypp`, `calc_roe_kernel_internal.f90.fypp` | Supersonic/hypersonic discontinuities |
+| Hybrid (KEEP↔SLAU via Ducros sensor) | `calc_hybrid_kernel.f90.fypp`, `calc_hybrid_kernel_internal.f90.fypp` | Mixed smooth/shocked regions |
 
-Viscous discretization: `calc_visc2.f90` (Gaitonde & Visbal 2nd-order) or `calc_visc4.f90` (4th-order compact).
+Viscous discretization: `calc_visc2.f90.fypp` (Gaitonde & Visbal 2nd-order) or `calc_visc4.f90.fypp` + `calc_visc4_internal.f90.fypp` (4th-order compact).
 
-## Configuration in `mod_globals.f90`
+## Configuration
 
-**Critical:** scheme/method selection uses the Fortran `kind` of constants as a compile-time flag—not the value:
+### config.fypp (primary interface — edit this)
 
-```fortran
-integer(4), parameter :: id_visc     = 2   ! kind=2→Euler, kind=4→NS, kind=8→LES
-real(2),    parameter :: id_scheme   = 0   ! integer(2)→KEEP, real(2)→SLAU, real(4)→Roe, real(8)→Hybrid
-integer(8), parameter :: id_accuracy = 0   ! kind=2→2nd, kind=4→4th, kind=8→6th order
-integer(8), parameter :: id_tvd      = 0   ! kind=2→no TVD, kind=4→minmod, kind=8→MUSCL 4th
-integer(2), parameter :: id_rescale  = 0   ! kind=2→off, kind=4→on (SBLI reference state)
-integer(2), parameter :: id_RungeKutta = 0 ! kind=2→TVD RK3, kind=4→RK4
-integer(2), parameter :: id_recal    = 0   ! kind=2→initialize, kind=4→restart from file
-```
+All compile-time scheme/method choices live in `<CASE>/config.fypp`. The fypp preprocessor expands `.f90.fypp` templates with these values, generating specialised Fortran with no runtime branching overhead.
 
-The **value** of these parameters is ignored; only the **type kind** matters. For example, to switch from Euler to Navier-Stokes, change `integer(4)` to `integer(2)` for `id_visc`—not the value `2`.
+| Variable | Values | Effect |
+|----------|--------|--------|
+| `VISC` | `'Euler'`, `'NS'`, `'LES'` | Physics model |
+| `SCHEME` | `'KEEP'`, `'SLAU'`, `'Roe'`, `'Hybrid'` | Convective flux scheme |
+| `ORDER` | `2`, `4`, `6` | Spatial accuracy (convective + viscous) |
+| `VISC_ORDER` | `2`, `4` | Override viscous stencil order (defaults to `ORDER`) |
+| `TVD` | `'none'`, `'minmod'`, `'muscl4'` | TVD limiter for reconstruction |
+| `SLAU_VARIANT` | `'SLAU'`, `'HRSLAU2'` | SLAU flux variant |
+| `RESCALE` | `True`, `False` | SBLI reference-state rescaling |
+| `COMMZ` | `True`, `False` | z-direction MPI halo decomposition (overlapped comms) |
+| `RK` | `3`, `4` | Runge-Kutta stages (TVD-RK3 or classical RK4) |
+| `RESTART` | `True`, `False` | Restart from checkpoint file |
+| `BC_X` | `True`, `False` | Wall/inflow BCs in x (False → periodic) |
+| `BC_Y` | `True`, `False` | Same for y |
+| `BC_Z` | `True`, `False` | Same for z |
 
-**GPU thread blocks** are also set here as `dim3` constants (`threadsE`, `threadsF`, `threadsG`, etc.) and must be tuned to the GPU architecture and grid size.
+### mod_globals.f90 (grid, physical parameters, thread blocks)
+
+This file is **not** preprocessed by fypp. It holds:
+- Grid size (`nx`, `ny`, `nz`), domain lengths (`Lx`, `Ly`, `Lz`)
+- Physical parameters (`gamma`, `R`, `Pr`, `dt`, flow conditions)
+- GPU thread-block sizes as `dim3` constants (`threadsE`, `threadsF`, `threadsG`, `threadsEv`, etc.) — must be tuned to the GPU architecture and grid size
+
+### mod_constant.f90 (generated — do not edit directly)
+
+`src/mod_constant.f90.fypp` is preprocessed per-case into `build/mod_constant.f90`. It generates Fortran `parameter` constants that encode config choices via the **type kind** (not the value):
+
+| Parameter | kind=2 | kind=4 | kind=8 |
+|-----------|--------|--------|--------|
+| `id_visc` (integer) | Euler | NS | LES |
+| `id_accuracy` (integer) | 2nd order | 4th order | 6th order |
+| `id_tvd` (integer) | no TVD | minmod | MUSCL-4th |
+| `id_slau` (integer) | SLAU | HRSLAU2 | — |
+| `id_rescale` (integer) | off | on | — |
+| `id_scheme` | integer(2)=KEEP | real(2)=SLAU | real(4)=Roe / real(8)=Hybrid |
+| `id_bc_x/y/z` (integer) | periodic | wall/inflow | — |
+
+The **value** of these parameters is always 0; only the **type kind** matters for compile-time dispatch. `id_recal` (restart flag) is a Fortran `logical` (`.true.`/`.false.`).
 
 ## Conservative Variable Layout
 
@@ -140,19 +249,9 @@ The **value** of these parameters is ignored; only the **type kind** matters. Fo
 
 ## MPI Decomposition
 
-1D decomposition in the x-direction via `calc_para.f90`. Default is 2 MPI ranks (`mpirun -n 2 a.out`), with `mygpu = myrank / 2` (2 ranks per GPU). GPU-aware MPI is optional via `id_gpumpi`.
+**x-direction (default):** 1D decomposition via `calc_para.f90`. Default is 2 MPI ranks (`mpirun -n 2 a.out`), with `mygpu = myrank / 2` (2 ranks per GPU). GPU-aware MPI is optional via `id_gpumpi`.
 
-## Compile Testing (AI Agent)
-
-After modifying any solver source or CICD configuration, verify that all build targets still compile by running from the repository root:
-
-```bash
-bash test_cicd.sh
-```
-
-This script builds all 12 targets (9 Cartesian × scheme/accuracy combinations + 3 curvilinear × scheme combinations) and prints a pass/fail summary. Always run it before reporting a change as complete. A non-zero exit code means at least one target failed.
-
-**Curvilinear accuracy limitation:** `3D_solver_curv` only supports 2nd-order accuracy (`id_accuracy` kind=2). The CICD targets for curvilinear are therefore limited to KEEP2, SLAU2, Hybrid2.
+**z-direction (COMMZ=True):** Enabled for cases like STZ. Overlapped communication: non-blocking z-halo exchange is posted, interior fluxes are computed while MPI is in flight, then halo fluxes are completed. The `overlap` depth equals `ORDER // 2` (1/2/3 for 2nd/4th/6th order). `COMMZ=True` and `RESCALE=True` cannot be combined.
 
 ## Python Test Suite
 
@@ -177,29 +276,42 @@ Analytical helpers in `ouxsbli/tests/utils/`:
 
 ## Tutorials
 
-`tutorials/ouxsbli_bl/` — Supersonic flat-plate boundary layer (M=2, dimensional parameters, wall-normal grid stretching, Riemann-invariant top BC). Run like any case:
+`tutorials/ouxsbli_bl/` — Supersonic flat-plate boundary layer (M=2, dimensional parameters, wall-normal grid stretching, Riemann-invariant top BC). Run like any 2D case:
 
 ```bash
 cd tutorials/ouxsbli_bl
-make clean && make
-bash calc.sh
+cmake -B build && cmake --build build -j
+cd build && mpirun -n 1 ./a.out
 ```
 
 ## Adding a New Test Case
 
-Copy an existing case directory (e.g., `cp -r 3D_solver/NSTGV 3D_solver/MYCASE`), then edit:
-1. `mod_globals.f90` — grid size, physical parameters, scheme flags
-2. `set.f90` — grid generation, initial conditions, boundary condition calls
-3. `calc.sh` — MPI rank count and any case-specific runtime args
+For 3D Cartesian:
+1. `cp -r 3D_solver/NSTGV 3D_solver/MYCASE`
+2. Edit `mod_globals.f90` — grid size, physical parameters, thread block sizes
+3. Edit `set.f90` — grid generation, initial conditions, boundary condition calls
+4. Edit `config.fypp` — VISC, SCHEME, ORDER, BC_X/Y/Z, etc.
+5. Edit `calc.sh` — MPI rank count and runtime args
+6. `cmake -B build && cmake --build build -j`
+
+For 2D cases:
+1. `cp -r 2D_solver/OS 2D_solver/MYCASE`
+2. Edit `mod_globals.f90` — grid size, physical parameters
+3. Edit `set.f90` — grid generation, initial conditions, boundary condition calls
+4. Edit `config.fypp` — VISC, SCHEME, ORDER, BC_X/Y/Z, etc.
+5. Edit `calc.sh` — runtime args
+6. `cmake -B build && cmake --build build -j`
 
 ## Notice
 * From an occupancy perspective, the subroutines invoked within `calc_flux_base.f90` should not be executed on separate streams.
 * `calc_flux_base.f90` and `calc_steps.f90` are the main bottleneck. You should optimize them.
 * `calc_flux_base.f90` calls `calc_*_kernel.f90`, `calc_*_kernel_internal.f90`, and `calc_visc*.f90`. They are the main bottleneck.
 * Roe scheme is not used. KEEP, SLAU, Hybrid schemes should be optimized.
-* `id_accuracy` is not only for convection terms but also for viscous terms because it controls the size of the ghost cells.
+* `id_accuracy` controls ghost-cell count for both convective and viscous stencils.
 * Do not add `contiguous` and `shared` attributes when passing shared memory as an argument.
 * `cpu_gpu_mpi.f90` will be modified in the future.
+* STZ case exists specifically to validate the z-direction halo exchange (COMMZ=True, BC_Z=True); more validation and 6-point stencil support are still required.
+* When modifying `.f90.fypp` templates, always verify the generated output in `build/` for all affected cases — a fypp condition that looks correct may silently produce wrong code for one combination of config variables.
 
 ## Strict Tooling Rules
 - MCP servers are strictly prohibited.

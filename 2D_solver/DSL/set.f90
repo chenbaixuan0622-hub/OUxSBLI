@@ -1,5 +1,6 @@
 module set
-  use mod_globals, only : id_accuracy, nx, ny, gamma, R
+  use mod_globals, only : nx, ny, gamma, R
+  use mod_constant, only : id_accuracy
   use set_bc_common
   use set_coordinate
   implicit none

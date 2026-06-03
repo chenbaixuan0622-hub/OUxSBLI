@@ -1,4 +1,5 @@
-nohup mpiexec -n 4 ./a.out &
+#!/bin/bash
+mkdir -p data
+nohup mpiexec -n 4 ./build/a.out &
 cp mod_globals.f90 ./data
 cp set.f90 ./data
-

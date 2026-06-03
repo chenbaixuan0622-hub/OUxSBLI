@@ -3,7 +3,7 @@ module load_smem_visc2
   use mod_globals, only : threadsEv, threadsFv, threadsGv
   implicit none
   private
-  public load_smem_visc2_x, load_smem_visc2_y, load_smem_visc2_z
+  public load_smem_visc2_x, load_smem_visc2_y, load_smem_visc2_z, load_smem_visc2_z_koff
 contains
   attributes(device) subroutine load_smem_visc2_x(it, jt, kt, j, k, idx, nx, ny, nz, Q, u, v, w)
     integer, intent(in), value              :: it            !< local idx for x direction
@@ -120,4 +120,39 @@ contains
     call pipelineWaitPrior(0)
     call syncthreads()
   end subroutine load_smem_visc2_z
+
+
+  !> Like load_smem_visc2_z but k_base is shifted by k_lo-1 for koff kernel launches
+  attributes(device) subroutine load_smem_visc2_z_koff(it, jt, kt, i, j, idx, nx, ny, nz, Q, u, v, w, k_lo)
+    integer, intent(in), value              :: it, jt, kt
+    integer, intent(in), value              :: i, j, idx
+    integer, intent(in), value              :: nx, ny, nz
+    integer, intent(in), value              :: k_lo
+    real(8), intent(in), device, contiguous :: Q(nx,5,ny,nz)
+    integer, parameter :: sx = threadsGv%x
+    integer, parameter :: sy = threadsGv%y
+    integer, parameter :: sz = threadsGv%z + 1
+    real(8), intent(inout) :: u(0:sx*sy*sz-1)
+    real(8), intent(inout) :: v(0:sx*sy*sz-1)
+    real(8), intent(inout) :: w(0:sx*sy*sz-1)
+    integer k_base, kk, k, idx_l, offset_xy
+    k_base    = (blockIdx%z-1)*blockDim%z + k_lo - 1
+    offset_xy = (jt-1)*sz + (it-1)*sz*sy
+    do kk = kt, threadsGv%z+1, blockDim%z
+      k = k_base + kk
+      idx_l = (kk-1) + offset_xy
+      if (i <= nx .and. j <= ny .and. 1 <= k .and. k <= nz) then
+        call pipelineMemcpyAsync(u(idx_l), Q(i,2,j,k))
+        call pipelineMemcpyAsync(v(idx_l), Q(i,3,j,k))
+        call pipelineMemcpyAsync(w(idx_l), Q(i,4,j,k))
+      else
+        u(idx_l) = 0.d0
+        v(idx_l) = 0.d0
+        w(idx_l) = 0.d0
+      endif
+    enddo
+    call pipelineCommit()
+    call pipelineWaitPrior(0)
+    call syncthreads()
+  end subroutine load_smem_visc2_z_koff
 end module load_smem_visc2

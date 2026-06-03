@@ -1,9 +1,9 @@
 module set
   use cudafor
   use mpi
-  use mod_globals, only : id_rescale, ny1, nre2, gamma, R, Cp, Pr, u0, p0, T0, M0, blt, beta, &
+  use mod_globals, only : ny1, nre2, gamma, R, Cp, Pr, u0, p0, T0, M0, blt, beta, &
                           ny2, rho2, p2, ux, uy, rf, Taw, rho3, p3, ux3, uy3
-  use mod_constant, only : Cp, gamma_1, over_gamma, over_gamma_1
+  use mod_constant, only : Cp, gamma_1, over_gamma, over_gamma_1, id_rescale
   use set_bc_common
   use set_bc_tbl_sbli
   use set_init_common

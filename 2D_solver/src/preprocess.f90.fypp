@@ -1,0 +1,112 @@
+!> Module for preprocessing and GPU memory management
+!> Handles device setup, memory allocation, and initial data transfers
+#:include 'config.fypp'
+module preprocess
+  use cudafor
+  use mpi
+  use print
+  implicit none
+contains
+  !> Check GPU device properties and availability
+  !> Prints device name and capability information
+  subroutine check_gpu(mygpu)
+    integer, intent(in) :: mygpu                         !< GPU device ID to check
+    integer ilen, stat
+    type(cudaDeviceProp) prop
+    stat = cudaSetDevice(mygpu)
+    stat = cudaGetDeviceProperties(prop, mygpu)
+    ilen = verify(prop%name, ' ', .true.)
+    print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", mygpu, ") is available"
+  end subroutine check_gpu
+
+
+  !> Allocate GPU device memory for simulation variables
+  !> Size and allocation depends on viscosity model selection
+  subroutine allocate_device_mem(myrank, nx, ny, dtdx, dtdy, xix, etay, Jacobian, ruvwp, T, mu, E, F)
+    use calc_flux_base, only : init_sensor
+    integer, intent(in)                       :: myrank        !< MPI rank
+    integer, intent(in)                       :: nx            !< x grid dimension
+    integer, intent(in)                       :: ny            !< y grid dimension
+    real(8), intent(out), allocatable, device :: dtdx(:)       !< dt * Sxy
+    real(8), intent(out), allocatable, device :: dtdy(:)       !< dt * Syz
+    real(8), intent(out), allocatable, device :: xix(:)        !< coordinate transform metric in x
+    real(8), intent(out), allocatable, device :: etay(:)       !< coordinate transform metric in y
+    real(8), intent(out), allocatable, device :: Jacobian(:,:) !< Jacobian determinant for coordinate transform
+    real(8), intent(out), allocatable, device :: ruvwp(:,:,:)  !< work array for momentum/velocities
+    real(8), intent(out), allocatable, device :: T(:,:)        !< temperature field
+    real(8), intent(out), allocatable, device :: mu(:,:)       !< molecular viscosity
+    real(8), intent(out), allocatable, device :: E(:,:,:)      !< flux in x direction
+    real(8), intent(out), allocatable, device :: F(:,:,:)      !< flux in y direction
+    integer ierr
+    allocate(ruvwp(nx,4,ny), E(4,nx-1,ny-2), F(4,nx-2,ny-1),  stat=ierr)
+    allocate(dtdx(nx-2), dtdy(ny-2), xix(nx-1), etay(ny-1), Jacobian(nx,ny), stat=ierr)
+  #:if VISC == 'Euler'
+    allocate(T(nx,ny), mu(1,1), stat=ierr)
+  #:elif VISC == 'NS'
+    allocate(T(nx,ny), mu(nx,ny), stat=ierr)
+  #:endif
+    call init_sensor(nx, ny)
+    if (ierr /= 0) then
+      print *, "myrank is ", myrank, " memory allocation failed", ierr
+    else
+      print *, "myrank is ", myrank, " memory allocation has completed"
+    endif
+  end subroutine allocate_device_mem
+
+
+  !> Preprocessing: compute metrics, initialize Q, transfer to device
+  !> Divides computational domain across MPI ranks
+  subroutine pre_calc(nx, ny, myrank, nranks, x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q, overlap, &
+                      dtdx, dtdy, xix, etay, Jacobian, QJ, ke0, entropy0)
+    use mod_globals, only : dt
+    integer, intent(in)                      :: nx                  !< x grid dimension
+    integer, intent(in)                      :: ny                  !< y grid dimension
+    integer, intent(in)                      :: myrank              !< MPI rank of this process
+    integer, intent(in)                      :: nranks              !< total number of MPI ranks
+    real(8), intent(in)                      :: x(nx)               !< x coordinate array (host)
+    real(8), intent(in)                      :: dx_cpu(nx-1)        !< inverse x spacing (host)
+    real(8), intent(in)                      :: y(ny)               !< y coordinate array (host)
+    real(8), intent(in)                      :: dy_cpu(ny-1)        !< inverse y spacing (host)
+    real(8), intent(in)                      :: Jacobian_cpu(nx,ny) !< Jacobian determinant (host)
+    real(8), intent(inout)                   :: Q(nx,4,ny)          !< conservative variables on host
+    integer, intent(out)                     :: overlap             !< ghost cell width for MPI halo exchange
+    real(8), intent(out), device, contiguous :: dtdx(nx-2)          !< dt * Sxy (device)
+    real(8), intent(out), device, contiguous :: dtdy(ny-2)          !< dt * Syz (device)
+    real(8), intent(out), device, contiguous :: xix(nx-1)           !< x coordinate metric (device)
+    real(8), intent(out), device, contiguous :: etay(ny-1)          !< y coordinate metric (device)
+    real(8), intent(out), device, contiguous :: Jacobian(nx,ny)     !< Jacobian determinant (device)
+    real(8), intent(out), device, contiguous :: QJ(nx,4,ny)         !< Q divided by Jacobian (device)
+    real(4), intent(inout)                   :: ke0                 !< reference kinetic energy
+    real(4), intent(inout)                   :: entropy0            !< reference entropy
+    real(8) xix_cpu(nx-1), etay_cpu(ny-1)
+    real(8) dtdx_cpu(nx-2), dtdy_cpu(ny-2)
+    !real(io) rho1d(nx*ny), p1d(nx*ny), v1d(nx*ny*3)
+    integer i, j, k, l, ierr
+    ! set Q / Jacobian
+    do j = 1, ny
+      do l = 1, 4
+        do i = 1, nx
+          Q(i,l,j) = Q(i,l,j) / Jacobian_cpu(i,j)
+        enddo
+      enddo
+    enddo
+    ! copy on GPU
+    xix_cpu   = 1.d0 / dx_cpu
+    etay_cpu  = 1.d0 / dy_cpu
+    do i = 1, nx-2
+      dtdx_cpu(i) = 0.5d0 * dt * (dx_cpu(i) + dx_cpu(i+1))
+    enddo
+    do j = 1, ny-2
+      dtdy_cpu(j) = 0.5d0 * dt * (dy_cpu(j) + dy_cpu(j+1))
+    enddo
+    dtdx     = dtdx_cpu
+    dtdy     = dtdy_cpu
+    xix      = xix_cpu
+    etay     = etay_cpu
+    Jacobian = Jacobian_cpu
+    QJ = Q
+    ! for multi GPU
+    overlap = ${ORDER_IO + 1}$
+    call print0(myrank, nx, ny, x, y, Jacobian_cpu, Q, ke0, entropy0)
+  end subroutine pre_calc
+end module preprocess

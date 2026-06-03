@@ -1,0 +1,157 @@
+#:include 'config.fypp'
+module preprocess
+  use cudafor
+  use mpi
+  use print
+  use calc_flux_base, only : init_sensor
+  implicit none
+contains
+
+  subroutine check_gpu(mygpu)
+    integer, intent(in) :: mygpu
+    integer ilen, stat
+    type(cudaDeviceProp) prop
+    stat = cudaSetDevice(mygpu)
+    stat = cudaGetDeviceProperties(prop, mygpu)
+    ilen = verify(prop%name, ' ', .true.)
+    print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", mygpu, ") is available"
+  end subroutine check_gpu
+
+
+  subroutine allocate_device_mem(myrank, nx, ny, nz, dtdxdy, dtdydz, dtdzdx, xix, etay, zetaz, Jacobian, ruvwp, T, mu, mut, qc2, E, F, G)
+    integer, intent(in)                       :: myrank, nx, ny, nz
+    real(8), intent(out), allocatable, device :: dtdxdy(:,:), dtdydz(:,:), dtdzdx(:,:)
+    real(8), intent(out), allocatable, device :: xix(:), etay(:), zetaz(:)
+    real(8), intent(out), allocatable, device :: Jacobian(:,:)
+    real(8), intent(out), allocatable, device :: ruvwp(:,:,:,:)
+    real(8), intent(out), allocatable, device :: T(:,:,:), mu(:,:,:), mut(:,:,:), qc2(:,:,:)
+    real(8), intent(out), allocatable, device :: E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
+    integer ierr
+    allocate(ruvwp(5,nx,ny,nz), E(5,nx-1,ny-2,nz-2), F(5,nx-2,ny-1,nz-2), G(5,nx-2,ny-2,nz-1), stat=ierr)
+    allocate(dtdxdy(nx-2,ny-2), dtdydz(ny-2,nz-2), dtdzdx(nx-2,nz-2), xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(nx,ny), stat=ierr)
+#:if VISC == 'Euler'
+    allocate(T(nx,ny,nz), mu(1,1,1), mut(1,1,1), qc2(1,1,1), stat=ierr)
+#:elif VISC == 'NS'
+    allocate(T(nx,ny,nz), mu(nx,ny,nz), mut(1,1,1), qc2(1,1,1), stat=ierr)
+#:elif VISC == 'LES'
+    allocate(T(nx,ny,nz), mu(nx,ny,nz), mut(nx,ny,nz), qc2(nx,ny,nz), stat=ierr)
+#:endif
+    call init_sensor(nx, ny, nz)
+    if (ierr /= 0) then
+      print *, "myrank is ", myrank, " memory allocation failed", ierr
+    else
+      print *, "myrank is ", myrank, " memory allocation has completed"
+    endif
+  end subroutine allocate_device_mem
+
+
+  subroutine pre_calc(nx, ny, nz, myrank, nranks, x, dx_cpu, y, dy_cpu, z, dz_cpu, Jacobian_cpu, Q, &
+                      dtdxdy, dtdydz, dtdzdx, xix, etay, zetaz, Jacobian, QJ, ke0, entropy0)
+    use mod_globals, only : dt
+    integer, intent(in)                      :: nx, ny, nz, myrank, nranks
+    real(8), intent(in)                      :: x(nx), dx_cpu(nx-1), y(ny), dy_cpu(ny-1)
+    real(8), intent(in)                      :: z(nz), dz_cpu(nz-1), Jacobian_cpu(nx,ny)
+    real(8), intent(inout)                   :: Q(nx,5,ny,nz)
+    real(8), intent(out), device, contiguous :: dtdxdy(nx-2,ny-2), dtdydz(ny-2,nz-2), dtdzdx(nx-2,nz-2)
+    real(8), intent(out), device, contiguous :: xix(nx-1), etay(ny-1), zetaz(nz-1)
+    real(8), intent(out), device, contiguous :: Jacobian(nx,ny)
+    real(8), intent(out), device, contiguous :: QJ(nx,5,ny,nz)
+    real(4), intent(inout)                   :: ke0, entropy0
+    real(8) xix_cpu(nx-1), etay_cpu(ny-1), zetaz_cpu(nz-1)
+    real(8) dtdxdy_cpu(nx-2,ny-2), dtdydz_cpu(ny-2,nz-2), dtdzdx_cpu(nx-2,nz-2)
+    real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
+    integer i, j, k, l, ierr, ireq3(3), istat3(MPI_STATUS_SIZE, 3)
+    do k = 1, nz
+      do j = 1, ny
+        do l = 1, 5
+          do i = 1, nx
+            Q(i,l,j,k) = Q(i,l,j,k) / Jacobian_cpu(i,j)
+          enddo
+        enddo
+      enddo
+    enddo
+    xix_cpu   = 1.d0 / dx_cpu
+    etay_cpu  = 1.d0 / dy_cpu
+    zetaz_cpu = 1.d0 / dz_cpu
+    do j = 1, ny-2
+      do i = 1, nx-2
+        dtdxdy_cpu(i,j) = 0.25d0 * dt * (dx_cpu(i) + dx_cpu(i+1)) * (dy_cpu(j) + dy_cpu(j+1))
+    enddo;enddo
+    do k = 1, nz-2
+      do j = 1, ny-2
+        dtdydz_cpu(j,k) = 0.25d0 * dt * (dy_cpu(j) + dy_cpu(j+1)) * (dz_cpu(k) + dz_cpu(k+1))
+    enddo;enddo
+    do k = 1, nz-2
+      do i = 1, nx-2
+        dtdzdx_cpu(i,k) = 0.25d0 * dt * (dz_cpu(k) + dz_cpu(k+1)) * (dx_cpu(i) + dx_cpu(i+1))
+    enddo;enddo
+    dtdxdy = dtdxdy_cpu
+    dtdydz = dtdydz_cpu
+    dtdzdx = dtdzdx_cpu
+    xix      = xix_cpu
+    etay     = etay_cpu
+    zetaz    = zetaz_cpu
+    Jacobian = Jacobian_cpu
+    QJ = Q
+    call make_1d_for_print(nx, ny, nz, Jacobian_cpu, Q, rho1d, p1d, v1d)
+    call MPI_SEND(ke0,      1, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
+    call MPI_SEND(entropy0, 1, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
+    call MPI_ISEND(rho1d, nx*ny*nz,   MPI_REAL4, myrank+1, 3*(myrank+1)-2, MPI_COMM_WORLD, ireq3(1), ierr)
+    call MPI_ISEND(p1d,   nx*ny*nz,   MPI_REAL4, myrank+1, 3*(myrank+1)-1, MPI_COMM_WORLD, ireq3(2), ierr)
+    call MPI_ISEND(v1d,   nx*ny*nz*3, MPI_REAL4, myrank+1, 3*(myrank+1),   MPI_COMM_WORLD, ireq3(3), ierr)
+    call MPI_WAITALL(3, ireq3, istat3, ierr)
+  end subroutine pre_calc
+
+
+  subroutine pre_rescale(myrank, flag_re, flag_req, ny, nz, Qre, Qm, Qm_cpu)
+    use mod_globals, only : rerank
+    integer, intent(in)                         :: myrank, ny, nz
+    integer, intent(inout)                      :: flag_re, flag_req
+    real(8), intent(inout), allocatable, device :: Qre(:), Qm(:)
+    real(8), intent(inout), allocatable         :: Qm_cpu(:)
+    character(len=40) filename
+    logical exists
+    integer j, stat, ilen, ireq, ierr, errorcode
+    type(cudaDeviceProp) prop
+    if (myrank == rerank) then
+      call MPI_IRECV(flag_re, 1, MPI_INTEGER, rerank+1, 1001, MPI_COMM_WORLD, flag_req, ierr)
+    endif
+    if (mod(myrank,2) == 0) then
+      allocate(Qre(ny*(nz-6)*5), Qm(ny*5), stat=ierr)
+      Qm(:) = 0.d0
+      if (ierr /= 0) then
+        print *, "myrank is ", myrank, " memory allocation failed (Qm)", ierr
+      else
+        print *, "myrank is ", myrank, " memory allocation has completed (Qm)"
+      endif
+    elseif (myrank == rerank+1) then
+      stat = cudaSetDevice(0)
+      stat = cudaGetDeviceProperties(prop, 0)
+      ilen = verify(prop%name, ' ', .true.)
+      print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", 0, ") calculates rescaling"
+      allocate(Qm_cpu(ny*5))
+#:if RESTART
+      write(filename, "(a)") "recal/Qm.dat"
+      inquire(file=filename, exist=exists)
+      if (exists) then
+#:if not RESCALE
+        print *, "Qm exists (not fixed value)"
+#:endif
+        do j = 1, 5*ny
+          if (Qm_cpu(j) /= Qm_cpu(j)) then
+            print *, "Qm is NaN"
+            call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
+          endif
+        enddo
+      else
+#:if RESCALE
+        print *, "Qm is required but doesn't exist"
+        call MPI_ABORT(MPI_COMM_WORLD, errorcode, ierr)
+#:endif
+        Qm_cpu(:) = 0.d0
+        print *, "Qm doesn't exist"
+      endif
+#:endif
+    endif
+  end subroutine pre_rescale
+end module preprocess

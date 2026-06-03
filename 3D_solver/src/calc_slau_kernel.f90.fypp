@@ -1,0 +1,305 @@
+#:include 'config.fypp'
+module calc_slau_kernel
+  use mod_globals, only : gamma, threadsE, threadsF, threadsG
+  use mod_constant, only : id_slau, over_gamma_1
+  use calc_muscl
+  use calc_hybrid
+  implicit none
+  private
+  public calc_slau_x, calc_slau_y, calc_slau_z
+  integer, parameter :: io = ${ORDER_IO}$
+  !> io = 0, 1, 2 (2nd, 4th, 6th)
+
+  interface SLAU
+    module procedure SLAU1, HRSLAU2
+  end interface SLAU
+contains
+  include 'calc_slau_3d.f90'
+
+  attributes(global) subroutine calc_slau_x(nx, ny, nz, Q, sensor, E)
+    use mod_constant, only : Normal_x
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
+    integer i, j, k, it, jt, kt
+    integer ii, i_base, idx, offset_yz
+    integer, parameter :: sx = threadsE%x + 2*io + 1
+    integer, parameter :: sy = threadsE%y
+    integer, parameter :: sz = threadsE%z
+    #:if ORDER >= 4
+    integer idx_r, offset_yzr
+    integer, parameter :: sxr = threadsE%x
+    real(8), dimension(sxr*sy*sz), shared :: rhor, ur, vr, wr, pr
+    real(8) rhol, ul, vl, wl, pl
+    real(sp) fdx
+    #:endif
+    real(8), dimension(-(io-1):sx*sy*sz-io), shared :: rho, u, v, w, p
+    it = threadIdx%x
+    jt = threadIdx%y
+    kt = threadIdx%z
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    k  = (blockIdx%z-1)*blockDim%z + kt + 1
+    i_base    = (blockIdx%x-1)*blockDim%x
+    offset_yz = (jt-1) * sx + (kt-1) * sx * sy
+    #:if ORDER >= 4
+    offset_yzr = (jt-1) * sxr + (kt-1) * sxr * sy
+    #:endif
+    do ii = it-io, threadsE%x+io+1, blockDim%x
+      i = i_base + ii
+      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+        idx = ii + offset_yz
+        rho(idx) = Q(i,1,j,k); u(idx) = Q(i,2,j,k); v(idx) = Q(i,3,j,k)
+          w(idx) = Q(i,4,j,k); p(idx) = Q(i,5,j,k)
+      endif
+    enddo
+    call syncthreads()
+    i = (blockIdx%x-1)*blockDim%x + it
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
+    idx = it + offset_yz
+    #:if ORDER >= 4
+    idx_r = it + offset_yzr
+    fdx   = 0.5_sp * (sensor(i,j,k) + sensor(i+1,j,k))
+    #:endif
+  
+    #:if ORDER == 6
+    if (3 <= i .and. i <= nx-3) then
+      call delta6(fdx, rho(idx-2:idx+3), rhol, rhor(idx_r))
+      call delta6(fdx,   u(idx-2:idx+3),   ul,   ur(idx_r))
+      call delta6(fdx,   v(idx-2:idx+3),   vl,   vr(idx_r))
+      call delta6(fdx,   w(idx-2:idx+3),   wl,   wr(idx_r))
+      call delta6(fdx,   p(idx-2:idx+3),   pl,   pr(idx_r))
+      fdx = wiggle_detector(p(idx-1:idx+2))
+    elseif (2 <= i .and. i <= nx-2) then
+      call delta4(fdx, rho(idx-1:idx+2), rhol, rhor(idx_r))
+      call delta4(fdx,   u(idx-1:idx+2),   ul,   ur(idx_r))
+      call delta4(fdx,   v(idx-1:idx+2),   vl,   vr(idx_r))
+      call delta4(fdx,   w(idx-1:idx+2),   wl,   wr(idx_r))
+      call delta4(fdx,   p(idx-1:idx+2),   pl,   pr(idx_r))
+      fdx = wiggle_detector(p(idx-1:idx+2))
+    #:elif ORDER == 4
+    if (2 <= i .and. i <= nx-2) then
+      call delta4(fdx, rho(idx-1:idx+2), rhol, rhor(idx_r))
+      call delta4(fdx,   u(idx-1:idx+2),   ul,   ur(idx_r))
+      call delta4(fdx,   v(idx-1:idx+2),   vl,   vr(idx_r))
+      call delta4(fdx,   w(idx-1:idx+2),   wl,   wr(idx_r))
+      call delta4(fdx,   p(idx-1:idx+2),   pl,   pr(idx_r))
+      fdx = wiggle_detector(p(idx-1:idx+2))
+    #:endif
+    #:if ORDER >= 4
+    else
+      rhol = rho(idx); rhor(idx_r) = rho(idx+1)
+        ul =   u(idx);   ur(idx_r) =   u(idx+1)
+        vl =   v(idx);   vr(idx_r) =   v(idx+1)
+        wl =   w(idx);   wr(idx_r) =   w(idx+1)
+        pl =   p(idx);   pr(idx_r) =   p(idx+1)
+       fdx = 1.0_sp
+    endif
+    #:endif
+    #:if ORDER >= 4
+    associate(un1 => ul, un2 => ur(idx_r))
+      call SLAU(id_slau, rhol, rhor(idx_r), ul, ur(idx_r), vl, vr(idx_r), &
+                wl, wr(idx_r), un1, un2, pl, pr(idx_r), Normal_x, fdx, &
+                E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
+    end associate
+    #:else
+    associate(un1 => u(idx), un2 => u(idx+1))
+      call SLAU(id_slau, rho(idx), rho(idx+1), u(idx), u(idx+1), v(idx), v(idx+1), &
+                w(idx), w(idx+1), un1, un2, p(idx), p(idx+1), Normal_x, 1.0_sp, &
+                E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
+    end associate
+    #:endif
+  end subroutine calc_slau_x
+
+
+  attributes(global) subroutine calc_slau_y(nx, ny, nz, Q, sensor, F)
+    use mod_constant, only : Normal_y
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
+    integer i, j, k, it, jt, kt
+    integer jj, j_base, idx, offset_xz
+    integer, parameter :: sx = threadsF%x
+    integer, parameter :: sy = threadsF%y + 2*io + 1
+    integer, parameter :: sz = threadsF%z
+    real(8), dimension(-(io-1):sx*sy*sz-io), shared :: rho, u, v, w, p
+    #:if ORDER >= 4
+    integer idx_r, offset_xzr
+    integer, parameter :: syr = threadsF%y
+    real(8), dimension(sx*syr*sz), shared :: rhor, ur, vr, wr, pr
+    real(8) rhol, ul, vl, wl, pl
+    real(sp) fdy
+    #:endif
+    it = threadIdx%x
+    jt = threadIdx%y
+    kt = threadIdx%z
+    i  = (blockIdx%x-1)*blockDim%x + it + 1
+    k  = (blockIdx%z-1)*blockDim%z + kt + 1
+    j_base    = (blockIdx%y-1)*blockDim%y
+    offset_xz = (it-1) * sy + (kt-1) * sy * sx
+    #:if ORDER >= 4
+    offset_xzr = (it-1) * syr + (kt-1) * syr * sx
+    #:endif
+    do jj = jt-io, threadsF%y+io+1, blockDim%y
+      j = j_base + jj
+      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+        idx = jj + offset_xz
+        rho(idx) = Q(i,1,j,k); u(idx) = Q(i,2,j,k); v(idx) = Q(i,3,j,k)
+          w(idx) = Q(i,4,j,k); p(idx) = Q(i,5,j,k)
+      endif
+    enddo
+    call syncthreads()
+    j = (blockIdx%y-1)*blockDim%y + jt
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
+    idx = jt + offset_xz
+    #:if ORDER >= 4
+    idx_r = jt + offset_xzr
+    fdy   = 0.5_sp * (sensor(i,j,k) + sensor(i,j+1,k))
+    #:endif
+
+    #:if ORDER == 6
+    if (3 <= j .and. j <= ny-3) then
+      call delta6(fdy, rho(idx-2:idx+3), rhol, rhor(idx_r))
+      call delta6(fdy,   u(idx-2:idx+3),   ul,   ur(idx_r))
+      call delta6(fdy,   v(idx-2:idx+3),   vl,   vr(idx_r))
+      call delta6(fdy,   w(idx-2:idx+3),   wl,   wr(idx_r))
+      call delta6(fdy,   p(idx-2:idx+3),   pl,   pr(idx_r))
+      fdy = wiggle_detector(p(idx-1:idx+2))
+    elseif (2 <= j .and. j <= ny-2) then
+      call delta4(fdy, rho(idx-1:idx+2), rhol, rhor(idx_r))
+      call delta4(fdy,   u(idx-1:idx+2),   ul,   ur(idx_r))
+      call delta4(fdy,   v(idx-1:idx+2),   vl,   vr(idx_r))
+      call delta4(fdy,   w(idx-1:idx+2),   wl,   wr(idx_r))
+      call delta4(fdy,   p(idx-1:idx+2),   pl,   pr(idx_r))
+      fdy = wiggle_detector(p(idx-1:idx+2))
+    #:elif ORDER == 4
+    if (2 <= j .and. j <= ny-2) then
+      call delta4(fdy, rho(idx-1:idx+2), rhol, rhor(idx_r))
+      call delta4(fdy,   u(idx-1:idx+2),   ul,   ur(idx_r))
+      call delta4(fdy,   v(idx-1:idx+2),   vl,   vr(idx_r))
+      call delta4(fdy,   w(idx-1:idx+2),   wl,   wr(idx_r))
+      call delta4(fdy,   p(idx-1:idx+2),   pl,   pr(idx_r))
+      fdy = wiggle_detector(p(idx-1:idx+2))
+    #:endif
+    #:if ORDER >= 4
+    else
+      rhol = rho(idx); rhor(idx_r) = rho(idx+1)
+        ul =   u(idx);   ur(idx_r) =   u(idx+1)
+        vl =   v(idx);   vr(idx_r) =   v(idx+1)
+        wl =   w(idx);   wr(idx_r) =   w(idx+1)
+        pl =   p(idx);   pr(idx_r) =   p(idx+1)
+       fdy = 1.0_sp
+    endif
+    #:endif
+    #:if ORDER >= 4
+    associate(un1 => vl, un2 => vr(idx_r))
+      call SLAU(id_slau, rhol, rhor(idx_r), ul, ur(idx_r), vl, vr(idx_r), &
+                wl, wr(idx_r), un1, un2, pl, pr(idx_r), Normal_y, fdy, &
+                F(1,i-1,j,k-1), F(2,i-1,j,k-1), F(3,i-1,j,k-1), F(4,i-1,j,k-1), F(5,i-1,j,k-1))
+    end associate
+    #:else
+    associate(un1 => v(idx), un2 => v(idx+1))
+      call SLAU(id_slau, rho(idx), rho(idx+1), u(idx), u(idx+1), v(idx), v(idx+1), &
+                w(idx), w(idx+1), un1, un2, p(idx), p(idx+1), Normal_y, 1.0_sp, &
+                F(1,i-1,j,k-1), F(2,i-1,j,k-1), F(3,i-1,j,k-1), F(4,i-1,j,k-1), F(5,i-1,j,k-1))
+    end associate
+    #:endif
+  end subroutine calc_slau_y
+
+
+  attributes(global) subroutine calc_slau_z(nx, ny, nz, Q, sensor, G)
+    use mod_constant, only : Normal_z
+    integer, intent(in), value                :: nx, ny, nz
+    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
+    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
+    integer i, j, k, it, jt, kt
+    integer kk, k_base, idx, offset_xy
+    integer, parameter :: sx = threadsG%x
+    integer, parameter :: sy = threadsG%y
+    integer, parameter :: sz = threadsG%z + 2*io + 1
+    real(8), dimension(-(io-1):sx*sy*sz-io), shared :: rho, u, v, w, p
+    #:if ORDER >= 4
+    integer idx_r, offset_xyr
+    integer, parameter :: szr = threadsG%z
+    real(8), dimension(sx*sy*szr), shared :: rhor, ur, vr, wr, pr
+    real(8) rhol, ul, vl, wl, pl
+    real(sp) fdz
+    #:endif
+    it = threadIdx%x
+    jt = threadIdx%y
+    kt = threadIdx%z
+    i  = (blockIdx%x-1)*blockDim%x + it + 1
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    k_base    = (blockIdx%z-1)*blockDim%z
+    offset_xy = (jt-1) * sz + (it-1) * sz * sy
+    #:if ORDER >= 4
+    offset_xyr = (jt-1) * szr + (it-1) * szr * sy
+    #:endif
+    do kk = kt-io, threadsG%z+io+1, blockDim%z
+      k = k_base + kk
+      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+        idx = kk + offset_xy
+        rho(idx) = Q(i,1,j,k); u(idx) = Q(i,2,j,k); v(idx) = Q(i,3,j,k)
+          w(idx) = Q(i,4,j,k); p(idx) = Q(i,5,j,k)
+      endif
+    enddo
+    call syncthreads()
+    k = (blockIdx%z-1)*blockDim%z + kt
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
+    idx = kt + offset_xy
+    #:if ORDER >= 4
+    idx_r = kt + offset_xyr
+    fdz   = 0.5_sp * (sensor(i,j,k) + sensor(i,j,k+1))
+    #:endif
+
+    #:if ORDER == 6
+    if (3 <= k .and. k <= nz-3) then
+      call delta6(fdz, rho(idx-2:idx+3), rhol, rhor(idx_r))
+      call delta6(fdz,   u(idx-2:idx+3),   ul,   ur(idx_r))
+      call delta6(fdz,   v(idx-2:idx+3),   vl,   vr(idx_r))
+      call delta6(fdz,   w(idx-2:idx+3),   wl,   wr(idx_r))
+      call delta6(fdz,   p(idx-2:idx+3),   pl,   pr(idx_r))
+      fdz = wiggle_detector(p(idx-1:idx+2))
+    elseif (2 <= k .and. k <= nz-2) then
+      call delta4(fdz, rho(idx-1:idx+2), rhol, rhor(idx_r))
+      call delta4(fdz,   u(idx-1:idx+2),   ul,   ur(idx_r))
+      call delta4(fdz,   v(idx-1:idx+2),   vl,   vr(idx_r))
+      call delta4(fdz,   w(idx-1:idx+2),   wl,   wr(idx_r))
+      call delta4(fdz,   p(idx-1:idx+2),   pl,   pr(idx_r))
+      fdz = wiggle_detector(p(idx-1:idx+2))
+    #:elif ORDER == 4
+    if (2 <= k .and. k <= nz-2) then
+      call delta4(fdz, rho(idx-1:idx+2), rhol, rhor(idx_r))
+      call delta4(fdz,   u(idx-1:idx+2),   ul,   ur(idx_r))
+      call delta4(fdz,   v(idx-1:idx+2),   vl,   vr(idx_r))
+      call delta4(fdz,   w(idx-1:idx+2),   wl,   wr(idx_r))
+      call delta4(fdz,   p(idx-1:idx+2),   pl,   pr(idx_r))
+      fdz = wiggle_detector(p(idx-1:idx+2))
+    #:endif
+    #:if ORDER >= 4
+    else
+      rhol = rho(idx); rhor(idx_r) = rho(idx+1)
+        ul =   u(idx);   ur(idx_r) =   u(idx+1)
+        vl =   v(idx);   vr(idx_r) =   v(idx+1)
+        wl =   w(idx);   wr(idx_r) =   w(idx+1)
+        pl =   p(idx);   pr(idx_r) =   p(idx+1)
+       fdz = 1.0_sp
+    endif
+    #:endif
+    #:if ORDER >= 4
+    associate(un1 => wl, un2 => wr(idx_r))
+      call SLAU(id_slau, rhol, rhor(idx_r), ul, ur(idx_r), vl, vr(idx_r), &
+                wl, wr(idx_r), un1, un2, pl, pr(idx_r), Normal_z, fdz, &
+                G(1,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(4,i-1,j-1,k), G(5,i-1,j-1,k))
+    end associate
+    #:else
+    associate(un1 => w(idx), un2 => w(idx+1))
+      call SLAU(id_slau, rho(idx), rho(idx+1), u(idx), u(idx+1), v(idx), v(idx+1), &
+                w(idx), w(idx+1), un1, un2, p(idx), p(idx+1), Normal_z, 1.0_sp, &
+                G(1,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(4,i-1,j-1,k), G(5,i-1,j-1,k))
+    end associate
+    #:endif
+  end subroutine calc_slau_z
+end module calc_slau_kernel

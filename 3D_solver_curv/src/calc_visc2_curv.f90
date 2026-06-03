@@ -231,8 +231,8 @@ contains
     integer i, j, k, it, jt, kt, idx
     real(8) viscous_work, tzx, tzy, tzz
     real(8) mux, muz, mvz, mwz, mwx, mvy, mwy, muz_u, muz_v
-    real(8) xi_x_f, xi_y_f, eta_x_f, eta_y_f, mu_f, duz_dz
-    real(8) dmvz_deta, dmwz_deta, mx1, mx2, my1, my2
+    real(8) xi_x_f, xi_y_f, eta_x_f, eta_y_f, mu_f, mu_u_z
+    real(8) mu_v_z, mu_w_z, mx1, mx2, my1, my2
     real(8) mu_xi_u, mu_xi_v, mu_xi_w, mu_eta_u, mu_eta_v, mu_eta_w, dTdz
     real(8) txx_p, txy_p, tyy_p, txz_p, tyz_p
     it = threadIdx%x
@@ -251,9 +251,9 @@ contains
     eta_x_f = eta_x(i,j)
     eta_y_f = eta_y(i,j)
     mu_f    = 0.5d0 * (mu(i,j,k) + mu(i,j,k+1))
-    duz_dz  = mu_f * (u(idx+1) - u(idx)) / dz
-    dmvz_deta = mu_f * (v(idx+1) - v(idx)) / dz
-    dmwz_deta = mu_f * (w(idx+1) - w(idx)) / dz
+    mu_u_z = mu_f * (u(idx+1) - u(idx)) / dz
+    mu_v_z = mu_f * (v(idx+1) - v(idx)) / dz
+    mu_w_z = mu_f * (w(idx+1) - w(idx)) / dz
     
     ! ξ-cross (at z-face corners: mu at (i-1/2, j, k+1/2))
     mx1 = 0.0625d0 * (mu(i-1,j,k) + mu(i,j,k) + mu(i-1,j,k+1) + mu(i,j,k+1))
@@ -282,9 +282,9 @@ contains
     mwy = mu_xi_w * xi_y_f + mu_eta_w * eta_y_f
     
     ! Stress tensor (z-face, no projection since nz=(0,0,1))
-    tzx = mwx + duz_dz
-    tzy = mwy + dmvz_deta
-    tzz = two_third * (2.d0*dmwz_deta - mux - mvy)
+    tzx = mwx + mu_u_z
+    tzy = mwy + mu_v_z
+    tzz = two_third * (2.d0*mu_w_z - mux - mvy)
     
     dTdz = T(i,j,k+1) - T(i,j,k)
     viscous_work = Cp_over_Pr * mu_f * dTdz / dz &
@@ -632,8 +632,8 @@ contains
     real(8) viscous_work, Hsgs, tzx, tzy, tzz
     real(8) mux, muz, mvz, mwz, mwx, mvy, mwy
     real(8) muxsgs, mu_eta_usgs, mvxsgs, mwxsgs, mvysgs, mwysgs
-    real(8) xi_x_f, xi_y_f, eta_x_f, eta_y_f, mu_f, duz_dz
-    real(8) dmvz_deta, dmwz_deta, mx1, mx2, mx1sgs, mx2sgs, my1, my2, my1sgs, my2sgs
+    real(8) xi_x_f, xi_y_f, eta_x_f, eta_y_f, mu_f, mu_u_z
+    real(8) mu_v_z, mu_w_z, mx1, mx2, mx1sgs, mx2sgs, my1, my2, my1sgs, my2sgs
     real(8) mu_xi_u, mu_xi_v, mu_xi_w, mu_eta_u, mu_eta_v, mu_eta_w, dTdz
     real(8) txx_p, txy_p, tyy_p, txz_p, tyz_p
     real(8) H1, H2
@@ -653,9 +653,9 @@ contains
     eta_x_f = eta_x(i,j)
     eta_y_f = eta_y(i,j)
     mu_f    = 0.5d0 * (mu(i,j,k) + mu(i,j,k+1))
-    duz_dz  = mu_f * (u(idx+1) - u(idx)) / dz
-    dmvz_deta = mu_f * (v(idx+1) - v(idx)) / dz
-    dmwz_deta = mu_f * (w(idx+1) - w(idx)) / dz
+    mu_u_z = mu_f * (u(idx+1) - u(idx)) / dz
+    mu_v_z = mu_f * (v(idx+1) - v(idx)) / dz
+    mu_w_z = mu_f * (w(idx+1) - w(idx)) / dz
     
     ! ξ-cross (at z-face corners: mu at (i-1/2, j, k+1/2))
     mx1 = 0.0625d0 * (mu(i-1,j,k) + mu(i,j,k) + mu(i-1,j,k+1) + mu(i,j,k+1))
@@ -711,9 +711,9 @@ contains
     Hsgs = -0.5d0*(mut(i,j,k)+mut(i,j,k+1))*(H2-H1) / (dz * Prt)
 
     ! Stress tensor (z-face, no projection since nz=(0,0,1))
-    tzx = mwx + duz_dz
-    tzy = mwy + dmvz_deta
-    tzz = two_third * (2.d0*dmwz_deta - mux - mvy)
+    tzx = mwx + mu_u_z
+    tzy = mwy + mu_v_z
+    tzz = two_third * (2.d0*mu_w_z - mux - mvy)
 
     ! Add SGS contribution (physical gradients via chain rule, mirroring molecular block)
     block

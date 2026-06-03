@@ -140,7 +140,8 @@ contains
 
 
   pure attributes(device) subroutine delta4(sensor, a, al, ar)
-    use mod_globals, only : id_tvd, sp
+    use mod_globals, only : sp
+    use mod_constant, only : id_tvd
     real(sp), intent(in), value     :: sensor
     real(8), intent(in), contiguous :: a(4)
     real(8), intent(out)            :: al, ar
@@ -153,7 +154,8 @@ contains
 
 
   pure attributes(device) subroutine delta6(sensor, a, al, ar)
-    use mod_globals, only : id_tvd, sp
+    use mod_globals, only : sp
+    use mod_constant, only : id_tvd
     real(sp), intent(in), value     :: sensor
     real(8), intent(in), contiguous :: a(6)
     real(8), intent(out)            :: al, ar

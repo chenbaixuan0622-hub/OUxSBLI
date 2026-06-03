@@ -4,7 +4,7 @@ module load_smem_visc4
   use mod_constant, only : two_third, one_twelfth
   implicit none
   private
-  public load_smem_visc4_x, load_smem_visc4_y, load_smem_visc4_z
+  public load_smem_visc4_x, load_smem_visc4_y, load_smem_visc4_z, load_smem_visc4_z_koff
 contains
   #if _CUDA_ARCH_ >= 900
   !> TMA version
@@ -240,5 +240,61 @@ contains
     call pipelineWaitPrior(0)
     call syncthreads()
   end subroutine load_smem_visc4_z
+
+
+  !> Like load_smem_visc4_z but k_base is shifted by k_lo-1 for koff kernel launches
+  attributes(device) subroutine load_smem_visc4_z_koff(it, jt, kt, i, j, &
+                                                  nx, ny, nz, inv_dx, inv_dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+    integer, intent(in), value              :: it            !< local idx for x direction
+    integer, intent(in), value              :: jt            !< local idx for y direction
+    integer, intent(in), value              :: kt            !< local idx for z direction
+    integer, intent(in), value              :: i             !< global idx for x direction
+    integer, intent(in), value              :: j             !< global idx for y direction
+    integer, intent(in), value              :: nx            !< number of grid points in x direction
+    integer, intent(in), value              :: ny            !< number of grid points in y direction
+    integer, intent(in), value              :: nz            !< number of grid points in z direction
+    real(8), intent(in), device, contiguous :: inv_dx(nx-1)  !< inverse grid spacing in x (1/dx)
+    real(8), intent(in), device, contiguous :: inv_dy(ny-1)  !< inverse grid spacing in y (1/dy)
+    real(8), intent(in), device, contiguous :: Q(nx,5,ny,nz) !< conservative variables
+    integer, intent(in), value              :: k_lo          !< z-index lower bound (global, 1-based)
+    integer, parameter :: io_v = 2
+    integer, parameter :: sx = threadsGv%x
+    integer, parameter :: sy = threadsGv%y
+    integer, parameter :: sz = threadsGv%z + 2*io_v + 1
+    real(8), intent(inout) ::  u(-(io_v-1):sx*sy*sz-io_v) !< attribute(shared)
+    real(8), intent(inout) ::  v(-(io_v-1):sx*sy*sz-io_v) !< attribute(shared)
+    real(8), intent(inout) ::  w(-(io_v-1):sx*sy*sz-io_v) !< attribute(shared)
+    real(8), intent(inout) :: ux(-(io_v-1):sx*sy*sz-io_v) !< attribute(shared) gradient 4th-order accuracy
+    real(8), intent(inout) :: wx(-(io_v-1):sx*sy*sz-io_v) !< attribute(shared) gradient 4th-order accuracy
+    real(8), intent(inout) :: vy(-(io_v-1):sx*sy*sz-io_v) !< attribute(shared) gradient 4th-order accuracy
+    real(8), intent(inout) :: wy(-(io_v-1):sx*sy*sz-io_v) !< attribute(shared) gradient 4th-order accuracy
+    integer k_base, kk, k, idx, offset_xy
+    k_base = (blockIdx%z-1)*blockDim%z + k_lo - 1
+    offset_xy = (jt-1)*sz + (it-1)*sz*sy
+    do kk = kt-io_v, threadsGv%z+io_v+1, blockDim%z
+      k = k_base + kk
+      idx = kk + offset_xy
+      if (i <= nx .and. j <= ny .and. 1 <= k .and. k <= nz) then
+        call pipelineMemcpyAsync(u(idx), Q(i,2,j,k))
+        call pipelineMemcpyAsync(v(idx), Q(i,3,j,k))
+        call pipelineMemcpyAsync(w(idx), Q(i,4,j,k))
+      endif
+    enddo
+    call pipelineCommit()
+    do kk = kt-io_v, threadsGv%z+io_v+1, blockDim%z
+      k = k_base + kk
+      idx = kk + offset_xy
+      if (3 <= i .and. i <= nx-2 .and. j <= ny .and. 1 <= k .and. k <= nz) then
+        ux(idx) = (two_third * (-Q(i-1,2,j,k) + Q(i+1,2,j,k)) - one_twelfth * (-Q(i-2,2,j,k) + Q(i+2,2,j,k))) * inv_dx(i)
+        wx(idx) = (two_third * (-Q(i-1,4,j,k) + Q(i+1,4,j,k)) - one_twelfth * (-Q(i-2,4,j,k) + Q(i+2,4,j,k))) * inv_dx(i)
+      endif
+      if (i <= nx .and. 3 <= j .and. j <= ny-2 .and. 1 <= k .and. k <= nz) then
+        vy(idx) = (two_third * (-Q(i,3,j-1,k) + Q(i,3,j+1,k)) - one_twelfth * (-Q(i,3,j-2,k) + Q(i,3,j+2,k))) * inv_dy(j)
+        wy(idx) = (two_third * (-Q(i,4,j-1,k) + Q(i,4,j+1,k)) - one_twelfth * (-Q(i,4,j-2,k) + Q(i,4,j+2,k))) * inv_dy(j)
+      endif
+    enddo
+    call pipelineWaitPrior(0)
+    call syncthreads()
+  end subroutine load_smem_visc4_z_koff
 end module load_smem_visc4
 
