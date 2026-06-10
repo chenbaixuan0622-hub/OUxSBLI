@@ -1,9 +1,10 @@
 program main
   use, intrinsic :: iso_fortran_env
   use mpi
-  use mod_globals, only : id_RungeKutta, id_rescale, id_recal, dimension, nx, ny, nz, Lx, Ly, Lz, &
+  use mod_globals, only : dimension, nx, ny, nz, Lx, Ly, Lz, &
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
   & blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv
+  use mod_constant, only : id_recal
   use set
   use set_coordinate
   use calc_time_dev
@@ -26,7 +27,7 @@ program main
 
   print *, "my rank is", myrank
   if (mod(myrank,2) == 0) then
-    call set_block3(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, threadsG, threadsGv, &
+    call set_block_3D(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, threadsG, threadsGv, &
                       blocks, blocksE, blocksEv, blocksF, blocksFv, blocksG, blocksGv)
   endif
   allocate(Q(nx,dimension+2,ny,nz), x(nx), dx(nx-1), y(ny), dy(ny-1), z(nz), dz(nz-1), Jacobian(nx,ny))
@@ -34,7 +35,7 @@ program main
   call set_Jacobian_xy3(nx, ny, nz, dx, dy, dz, Jacobian)
 
   if (mod(myrank,2) == 0) then
-    if (kind(id_recal) == 4) then
+    if (id_recal) then
       write(filename, "(a, i5.5, a)") "recal/Q", int(myrank/2+1), ".dat"
       open(10, file=filename, action="read", form="unformatted", access="sequential", status="old", iostat=ios)
       if (ios /= 0) then
@@ -57,16 +58,14 @@ program main
         print *, "myrank is ", myrank, "simulation has been restarted. access is stream"
       endif
       close(10)
-    elseif (kind(id_recal) == 2) then
+    else
       write(*,*) "set initial condition"
       call set_init(myrank, nx, ny, nz, x, y, z, Q)
-    else
-      write(*,*) "wrong paramater was found"
     endif
   endif
 
   call cpu_time(t_start)
-  call RungeKutta(id_RungeKutta, id_rescale, myrank, mygpu, nx, ny, nz, x, dx, y, dy, z, dz, Jacobian, Q)
+  call RungeKutta(myrank, mygpu, nx, ny, nz, x, dx, y, dy, z, dz, Jacobian, Q)
   call cpu_time(t_end)
 
   if (mod(myrank,2) == 0) then
@@ -100,4 +99,3 @@ program main
   deallocate(Q, x, dx, y, dy, z, dz, Jacobian)
   call MPI_FINALIZE(ierr)
 end program main
-

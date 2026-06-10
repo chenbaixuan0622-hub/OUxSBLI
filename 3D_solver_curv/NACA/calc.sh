@@ -1,2 +1,5 @@
 #!/bin/bash
-nohup mpirun -n 2 ./a.out &
+mkdir -p data
+nohup mpiexec -n 2 ./build/a.out &
+cp mod_globals.f90 ./data
+cp set.f90 ./data

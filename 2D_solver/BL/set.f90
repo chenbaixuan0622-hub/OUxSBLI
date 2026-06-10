@@ -1,8 +1,8 @@
 module set
   use cudafor
   use mpi
-  use mod_globals, only : id_rescale, gamma, R, Pr, u0, p0, T0, M0, blt, rho2, p2, ux, uy, rf, Taw
-  use mod_constant, only : Cp, gamma_1, over_gamma, over_gamma_1
+  use mod_globals, only : gamma, R, Pr, u0, p0, T0, M0, blt, rho2, p2, ux, uy, rf, Taw
+  use mod_constant, only : id_rescale, Cp, gamma_1, over_gamma, over_gamma_1
   use set_bc_common
   use set_init_common
   implicit none

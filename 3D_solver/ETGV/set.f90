@@ -5,7 +5,7 @@ module set
   implicit none
 contains
   subroutine set_grid(myrank, nx, ny, nz, Lx, Ly, Lz, xc, yc, zc, dx, dy, dz)
-    use mod_globals, only : id_accuracy
+    use mod_constant, only : id_accuracy
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: Lx, Ly, Lz
     real(8), intent(out) :: xc(nx), yc(ny), zc(nz), dx(nx-1), dy(ny-1), dz(nz-1)
@@ -14,7 +14,7 @@ contains
 
 
   subroutine set_init(myrank, nx, ny, nz, x, y, z, Q)
-    use mod_globals, only : id_accuracy
+    use mod_constant, only : id_accuracy
     integer, intent(in)  :: myrank, nx, ny, nz
     real(8), intent(in)  :: x(nx), y(ny), z(nz)
     real(8), intent(out) :: Q(nx,5,ny,nz)
@@ -46,7 +46,7 @@ contains
 
 
   subroutine set_bc(myrank, nx, ny, nz, Jacobian, Q, Qre)
-    use mod_globals, only : id_accuracy
+    use mod_constant, only : id_accuracy
     integer, intent(in), value            :: myrank, nx, ny, nz
     real(8), intent(in), device           :: Jacobian(nx,ny)
     real(8), intent(inout), device        :: Q(nx,5,ny,nz)

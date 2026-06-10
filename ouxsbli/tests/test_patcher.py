@@ -50,62 +50,6 @@ class TestToFortranDouble:
 
 
 # ---------------------------------------------------------------------------
-# Kind-dispatch parameters (3D NSTGV)
-# ---------------------------------------------------------------------------
-
-class TestKindPatch3D:
-    @pytest.fixture
-    def src(self):
-        return _load(NSTGV_GLOB)
-
-    def test_visc_euler_to_ns(self, src):
-        out  = patch(src, {"id_visc": "ns"})
-        line = _find_line(out, "id_visc")
-        assert "integer(4)" in line
-
-    def test_visc_ns_to_les(self, src):
-        out  = patch(src, {"id_visc": "les"})
-        line = _find_line(out, "id_visc")
-        assert "integer(8)" in line
-
-    def test_scheme_keep_to_slau(self, src):
-        # NSTGV default is KEEP (integer(2)); switch to SLAU (real(2))
-        out  = patch(src, {"id_scheme": "slau"})
-        line = _find_line(out, "id_scheme")
-        assert "real(2)" in line
-
-    def test_scheme_keep_to_hybrid(self, src):
-        out  = patch(src, {"id_scheme": "hybrid"})
-        line = _find_line(out, "id_scheme")
-        assert "real(8)" in line
-
-    def test_accuracy_2nd_to_4th(self, src):
-        out  = patch(src, {"id_accuracy": 4})
-        line = _find_line(out, "id_accuracy")
-        assert "integer(4)" in line
-
-    def test_tvd_none_to_minmod(self, src):
-        out  = patch(src, {"id_tvd": "minmod"})
-        line = _find_line(out, "id_tvd")
-        assert "integer(4)" in line
-
-    def test_invalid_scheme_raises(self, src):
-        with pytest.raises(ValueError, match="id_scheme"):
-            patch(src, {"id_scheme": "nonexistent"})
-
-    def test_multiple_kind_changes(self, src):
-        out = patch(src, {"id_visc": "ns", "id_scheme": "slau", "id_accuracy": 4})
-        assert "integer(4)" in _find_line(out, "id_visc")
-        assert "real(2)"    in _find_line(out, "id_scheme")
-        assert "integer(4)" in _find_line(out, "id_accuracy")
-
-    def test_original_unchanged(self, src):
-        patch(src, {"id_visc": "ns"})
-        # Original string must be untouched
-        assert "integer(4), parameter      :: id_visc" in src
-
-
-# ---------------------------------------------------------------------------
 # Scalar parameters (3D NSTGV)
 # ---------------------------------------------------------------------------
 
@@ -149,6 +93,11 @@ class TestScalarPatch3D:
         assert "33"  in _find_line(out, "ny")
         assert "33"  in _find_line(out, "nz")
 
+    def test_original_unchanged(self, src):
+        out = patch(src, {"Re": 800.0})
+        # patch() must not mutate the original string
+        assert "1600" in src
+
 
 # ---------------------------------------------------------------------------
 # 2D BL case
@@ -158,12 +107,6 @@ class TestPatch2D:
     @pytest.fixture
     def src(self):
         return _load(BL_GLOB)
-
-    def test_scheme_keep_to_slau(self, src):
-        # BL default is KEEP via integer(2) — switch to SLAU (real(2))
-        out  = patch(src, {"id_scheme": "slau"})
-        line = _find_line(out, "id_scheme")
-        assert "real(2)" in line
 
     def test_nx(self, src):
         out  = patch(src, {"nx": 129})
@@ -177,12 +120,30 @@ class TestPatch2D:
 
 
 # ---------------------------------------------------------------------------
-# Alias resolution via Case constructor (smoke test, no build)
+# Alias resolution and value normalisation (smoke tests, no build)
 # ---------------------------------------------------------------------------
 
 class TestAlias:
     def test_alias_scheme(self):
-        """Case maps 'scheme' → 'id_scheme' before patching."""
+        """Case maps 'scheme' → 'SCHEME' (config.fypp macro)."""
         from ouxsbli.case import _ALIAS
-        assert _ALIAS["scheme"] == "id_scheme"
-        assert _ALIAS["visc"]   == "id_visc"
+        assert _ALIAS["scheme"] == "SCHEME"
+        assert _ALIAS["visc"]   == "VISC"
+
+    def test_alias_accuracy(self):
+        from ouxsbli.case import _ALIAS
+        assert _ALIAS["accuracy"] == "ORDER"
+
+    def test_value_normalize_visc(self):
+        """'euler' is normalised to the fypp-correct 'Euler' (case-sensitive)."""
+        from ouxsbli.case import _VALUE_NORMALIZE
+        assert _VALUE_NORMALIZE["VISC"]["euler"] == "Euler"
+        assert _VALUE_NORMALIZE["VISC"]["ns"]    == "NS"
+
+    def test_value_normalize_tvd(self):
+        from ouxsbli.case import _VALUE_NORMALIZE
+        assert _VALUE_NORMALIZE["TVD"]["none"]    == "none"
+        assert _VALUE_NORMALIZE["TVD"]["tvd"]     == "tvd"
+        assert _VALUE_NORMALIZE["TVD"]["hybrid"]  == "hybrid"
+        assert _VALUE_NORMALIZE["TVD"]["minmod"]  == "tvd"     # backward-compat alias
+        assert _VALUE_NORMALIZE["TVD"]["muscl4"]  == "hybrid"  # backward-compat alias

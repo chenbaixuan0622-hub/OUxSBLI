@@ -1,5 +1,19 @@
 import numpy as np
-from scipy.optimize import bisect
+from scipy.optimize import brentq, minimize_scalar
+
+
+def beta(M, theta_deg, gamma=1.4):
+  """Weak oblique shock angle (degrees) given Mach M and deflection angle theta (degrees)."""
+  theta = np.radians(theta_deg)
+  def g(b):
+    return (2.0 / np.tan(b) * (M**2 * np.sin(b)**2 - 1.0) /
+            (M**2 * (gamma + np.cos(2.0*b)) + 2.0))
+  b_lo = np.arcsin(1.0/M) + 1e-8
+  b_hi = np.pi/2.0 - 1e-8
+  # Find β_max (the deflection-angle maximum) as the upper bracket for the weak shock.
+  # g(b_lo) = 0 and g(b_max) = tan(θ_max) > tan(θ), so brentq finds the weak-shock root.
+  b_max = minimize_scalar(lambda b: -g(b), bounds=(b_lo, b_hi), method='bounded').x
+  return np.degrees(brentq(lambda b: g(b) - np.tan(theta), b_lo, b_max))
 
 
 def free_stream(M0, gamma, R, p_tot, T_tot):

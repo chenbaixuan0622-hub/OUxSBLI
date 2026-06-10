@@ -29,17 +29,17 @@ contains
     integer :: i
     real(8) :: y, w
     if (x <= x_tab(1)) then
-      lin_interp = y_tab(1)
+      y = y_tab(1)
       return
     endif
     do i = 1, n-1
       if (x_tab(i) <= x .and. x <= x_tab(i+1)) then
         w = (x - x_tab(i)) / (x_tab(i+1) - x_tab(i))
-        lin_interp = (1.0d0 - w) * y_tab(i) + w * y_tab(i+1)
+        y = (1.0d0 - w) * y_tab(i) + w * y_tab(i+1)
         return
       endif
     enddo
-    lin_interp = y_tab(n)
+    y = y_tab(n)
   end function lin_interp
 
 

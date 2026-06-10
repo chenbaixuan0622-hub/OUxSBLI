@@ -1,11 +1,12 @@
 program main
   use, intrinsic :: iso_fortran_env
   use mpi
-  use mod_globals, only : id_RungeKutta, id_rescale, id_recal, nx, ny, nz, Lx, Ly, Lz, &
+  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, &
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
   & blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv
+  use mod_constant, only : id_RungeKutta, id_rescale, id_recal
   use set
-  use set_coordinate, only : set_block3
+  use set_coordinate, only : set_block_3D
   use calc_time_dev_curv
   implicit none
   integer :: i, j, l, m, s, mygpu, ios, errorcode
@@ -28,9 +29,9 @@ program main
   mygpu = myrank / 2
 
   if (mod(myrank,2) == 0) then
-    call set_block3(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, &
-                    threadsG, threadsGv, &
-                    blocks, blocksE, blocksEv, blocksF, blocksFv, blocksG, blocksGv)
+    call set_block_3D(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, &
+                      threadsG, threadsGv, &
+                      blocks, blocksE, blocksEv, blocksF, blocksFv, blocksG, blocksGv)
   endif
 
   allocate(Q(nx,5,ny,nz), x(nx), dx(nx-1), y(ny), dy(ny-1), z(nz), dz(nz-1), Jacobian(nx,ny))

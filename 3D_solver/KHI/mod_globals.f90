@@ -1,42 +1,9 @@
 module mod_globals
   use cudafor
   implicit none
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_visc       ! kind2 Euler     !
-  !               ! kind4 NS        !
-  !               ! kind8 LES       !
-  !               ! 1 2nd           !
-  !               ! 2 4th           !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_scheme   ! integer(2) KEEP   !
-  !             ! real(2)    SLAU   !
-  !             ! real(4)    Roe    !
-  !             ! real(8)    Hybrid !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_accuracy ! kind2 2nd         !
-  !             ! kind4 4th         !
-  !             ! kind8 6th         !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_tvd      ! kind2 non TVD     !
-  !             ! kind4 minmod      !
-  !             ! kind8 MUSCL4th    !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_slau     ! kind2 SLAU        !
-  !             ! kind4 HR-SLAU2    !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_rescale  ! kind2 off         !
-  !             ! kind4 on          !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer, parameter         :: dimension   = 3
-  integer(4), parameter      :: id_visc     = 2
-  integer(2), parameter      :: id_scheme   = 0
   integer, parameter         :: sp          = kind(1.d0) ! single or double
   real(sp), parameter        :: threshold   = 0.9_sp
-  integer(kind=8), parameter :: id_accuracy = 0
-  integer(kind=2), parameter :: id_tvd      = 0
-  integer(kind=4), parameter :: id_slau     = 0
-  integer(kind=2), parameter :: id_rescale  = 0
-  integer(kind=2), parameter :: id_gpumpi   = 0
   real(8), parameter         :: blt         = 0.d0
 
   ! mesh
@@ -47,10 +14,6 @@ module mod_globals
   integer, parameter :: ny = 130
   integer, parameter :: nz = 130
   
-  ! boundary condition
-  logical, parameter :: id_bc_x = .false.
-  logical, parameter :: id_bc_y = .false.
-  logical, parameter :: id_bc_z = .false.
 
   integer, parameter :: nre1 = 1
   integer, parameter :: nre2 = nx
@@ -66,15 +29,6 @@ module mod_globals
   type(dim3) :: blocksE, blocksF, blocksG, blocksEv, blocksFv, blocksGv, blocks
 
   ! time
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_RungeKutta ! kind=2 ! 3rd_TVD !
-  !               ! kind=4 ! 4th     !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_recal      ! kind=2 ! set 0   !
-  !               ! kind=4 ! recal   !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=2), parameter  :: id_recal = 0
-  integer(kind=4), parameter  :: id_RungeKutta = 0
   integer, parameter          :: step_offset = 0
   integer, parameter          :: start_rescale = 0
 

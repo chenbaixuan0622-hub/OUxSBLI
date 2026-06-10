@@ -1,8 +1,8 @@
 !> Curvilinear Hybrid flux kernels with Ducros-based scheme blending
 !> Automatically switches between KEEP (smooth) and SLAU (shock) schemes
 module calc_hybrid_kernel_curv
-  use mod_globals, only : id_accuracy, id_slau, gamma, threshold, threadsE, threadsF, threadsG
-  use mod_constant, only : over_gamma_1, R_over_gamma_1, one_third, one_sixth, one_twelfth, two_third
+  use mod_globals, only : gamma, threshold, threadsE, threadsF, threadsG
+  use mod_constant, only : over_gamma_1, R_over_gamma_1, one_third, one_sixth, one_twelfth, two_third, id_accuracy, id_slau
   use calc_muscl
   use calc_hybrid_curv
   implicit none

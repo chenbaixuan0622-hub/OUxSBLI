@@ -1,35 +1,9 @@
 module mod_globals
   use cudafor
   implicit none
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_visc     ! kind2 Euler       !
-  !             ! kind4 NS          !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_scheme   ! integer(2) KEEP   !
-  !             ! real(2)    SLAU   !
-  !             ! real(8)    Hybrid !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_accuracy ! kind2 2nd         !
-  !             ! kind4 4th         !
-  !             ! kind8 6th         !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_tvd      ! kind2 non TVD     !
-  !             ! kind4 minmod      !
-  !             ! kind8 Hybrid      !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_slau     ! kind2 SLAU        !
-  !             ! kind4 HR-SLAU2    !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   integer, parameter         :: dimension   = 2
-  integer(2), parameter      :: id_visc     = 1       ! Euler (inviscid)
-  real(2),    parameter      :: id_scheme   = 0.0     ! SLAU
   integer, parameter         :: sp          = kind(1.d0)
   real(sp), parameter        :: threshold   = 0.4_sp
-  integer(kind=8), parameter :: id_accuracy = 0       ! 2nd order
-  integer(kind=8), parameter :: id_tvd      = 0       ! no TVD
-  integer(kind=4), parameter :: id_slau     = 0       ! standard SLAU
-  integer(kind=2), parameter :: id_rescale  = 0
-  integer(kind=2), parameter :: id_gpumpi   = 0
   real(8), parameter         :: blt         = 1.d-3
 
   ! Mesh: 4 x 2 non-dimensional domain, periodic in y
@@ -38,9 +12,6 @@ module mod_globals
   integer, parameter :: nx = 257
   integer, parameter :: ny = 129
 
-  ! Boundary condition flags
-  logical, parameter :: id_bc_x = .true. ! non-periodic in x (inflow/outflow)
-  logical, parameter :: id_bc_y = .true. ! periodic in y
 
   ! GPU thread blocks (tuned for 2D, ~257x129 grid)
   type(dim3), parameter :: threadsE  = dim3(128, 1, 1)
@@ -51,15 +22,6 @@ module mod_globals
   type(dim3) :: blocksE, blocksF, blocksEv, blocksFv, blocks
 
   ! Time stepping
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_RungeKutta ! kind2 ! TVD-RK3 !
-  !               ! kind4 ! RK4     !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! id_recal      ! kind2 ! init    !
-  !               ! kind4 ! restart !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  integer(kind=2), parameter :: id_recal      = 0   ! initialise
-  integer(kind=2), parameter :: id_RungeKutta = 0   ! TVD-RK3
   integer, parameter         :: step_offset   = 0
   real(8), parameter :: endT  = 0.1d-3
   integer, parameter :: np    = 10

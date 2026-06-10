@@ -1,126 +1,122 @@
 """
-Patch mod_globals.f90 parameter declarations in-place.
-
-OUxSBLI uses Fortran type *kind* (not value) as a compile-time dispatch flag.
-For example:
-  integer(2) → KEEP scheme     real(2) → SLAU scheme
-  integer(4) → Navier-Stokes   integer(8) → LES
-
-KIND_PARAMS lists the parameters that use this kind-dispatch mechanism.
-All other parameters are treated as plain scalar replacements.
+Patch config.fypp macro definitions or mod_globals.f90 Fortran parameter declarations.
 """
 import re
 
-# Maps each kind-dispatch parameter to a dict of {user-string → Fortran type+kind}.
-KIND_MAP: dict[str, dict] = {
-    "id_visc": {
-        "euler": "integer(2)",
-        "ns":    "integer(4)",
-        "les":   "integer(8)",
-    },
-    "id_scheme": {
-        "keep":   "integer(2)",
-        "slau":   "real(2)",
-        "roe":    "real(4)",
-        "hybrid": "real(8)",
-    },
-    "id_accuracy": {
-        2: "integer(2)",
-        4: "integer(4)",
-        6: "integer(8)",
-    },
-    "id_tvd": {
-        "none":    "integer(2)",
-        "minmod":  "integer(4)",
-        "hybrid":  "integer(8)",
-    },
-    "id_slau": {
-        "slau":    "integer(2)",
-        "hr_slau2": "integer(4)",
-    },
-    "id_rescale": {
-        False: "integer(2)",
-        True:  "integer(4)",
-    },
-    "id_recal": {
-        "init":    "integer(2)",
-        "restart": "integer(4)",
-    },
-    "id_RungeKutta": {
-        "tvd_rk3": "integer(2)",
-        "rk4":     "integer(4)",
-    },
-    "id_gpumpi": {
-        False: "integer(2)",
-        True:  "integer(4)",
-    },
-}
-
-KIND_PARAMS = set(KIND_MAP)
-
-# Matches the type+kind prefix in both styles: integer(4)  and  integer(kind=4)
-_KIND_PREFIX_RE = re.compile(r'\b(integer|real)\((kind=)?\d+\)')
-
 
 def patch(src_text: str, changes: dict) -> str:
-    """Return src_text with each parameter in *changes* rewritten.
+    """Patch fypp macro definitions (#:set) or Fortran parameter declarations in *src_text*.
 
-    Scalar parameters (Re, nx, CFL, …) accept int or float values.
-    Kind-dispatch parameters (id_visc, id_scheme, …) accept the string/int
-    keys defined in KIND_MAP above.
-
-    Example::
-        new_src = patch(src, {"Re": 800.0, "nx": 65, "scheme": "slau"})
+    Works transparently on both config.fypp (fypp macros) and mod_globals.f90
+    (Fortran parameter declarations).  For params not found in the text, a new
+    #:set line is appended **only** when the file is a fypp source (i.e. it
+    already contains at least one '#:set' directive).
     """
     lines = src_text.splitlines()
     for i, line in enumerate(lines):
         for param, value in changes.items():
-            if not _is_param_line(line, param):
-                continue
-            if param in KIND_PARAMS:
-                lines[i] = _rewrite_kind(line, param, value)
-            else:
-                lines[i] = _rewrite_scalar(line, param, value)
+            if _is_macro_line(line, param):
+                lines[i] = _rewrite_macro(line, param, value)
+                break
+            elif _is_param_line(line, param):
+                lines[i] = _rewrite_param(line, param, value)
+                break
+
+    # Append not-found params only for fypp files (those containing '#:set' directives)
+    is_fypp = any("#:set" in l for l in lines)
+    for param, value in changes.items():
+        found = any(_is_macro_line(l, param) or _is_param_line(l, param) for l in lines)
+        if not found and is_fypp:
+            lines.append(_rewrite_macro(f"#:set {param} = ", param, value))
+
     return "\n".join(lines) + "\n"
 
 
 # ---------------------------------------------------------------------------
-# Internal helpers
+# Fortran parameter declaration helpers
 # ---------------------------------------------------------------------------
 
 def _is_param_line(line: str, param: str) -> bool:
-    """True if *line* is the Fortran parameter declaration for *param*."""
-    # Strip inline comment so we don't match inside a comment block
+    """True if *line* is a Fortran parameter declaration for *param*.
+
+    Matches lines of the form::
+
+        [type[(kind)][, attribs]], parameter :: param ...
+
+    Comparison is case-insensitive; only the part before the first ``!``
+    (Fortran comment character) is examined.
+    """
     code = line.split("!")[0]
-    if "parameter" not in code.lower():
-        return False
-    # Look for :: param_name followed by word boundary (not part of a longer name)
-    return bool(re.search(r"::\s*" + re.escape(param) + r"\b", code, re.IGNORECASE))
+    pattern = r"parameter\s*::\s*" + re.escape(param) + r"\b"
+    return bool(re.search(pattern, code, re.IGNORECASE))
 
 
-def _rewrite_kind(line: str, param: str, value) -> str:
-    """Replace the type+kind prefix to change the dispatch kind."""
-    try:
-        new_kind = KIND_MAP[param][value]
-    except KeyError:
-        valid = list(KIND_MAP[param].keys())
-        raise ValueError(f"Invalid value {value!r} for {param}. Valid: {valid}") from None
-    return _KIND_PREFIX_RE.sub(new_kind, line, count=1)
+def _rewrite_param(line: str, param: str, value) -> str:
+    """Replace the value of a Fortran parameter declaration.
 
+    Handles scalar types (int, float, bool) and replaces any existing RHS
+    expression (including complex ones like ``int(T/dt)``).
 
-def _rewrite_scalar(line: str, param: str, value) -> str:
-    """Replace the RHS of a scalar parameter declaration."""
+    Examples::
+
+        'integer, parameter :: nx = 513'         → 'integer, parameter :: nx = 65'
+        'real(8), parameter :: Re = 1600.d0'     → 'real(8), parameter :: Re = 800.0d0'
+        'integer, parameter :: nt = int(T/dt)'   → 'integer, parameter :: nt = 500'
+    """
     if isinstance(value, bool):
         new_val = ".true." if value else ".false."
     elif isinstance(value, int):
         new_val = str(value)
     elif isinstance(value, float):
-        # Fortran double-precision literal: 1600.0 → 1600.0d0
         new_val = _to_fortran_double(value)
     else:
         new_val = str(value)
 
-    # Separate code from trailing inline comment
+    # Split off trailing Fortran comment
+    if "!" in line:
+        excl = line.index("!")
+        code_part, comment_part = line[:excl], line[excl:]
+    else:
+        code_part, comment_part = line, ""
+
+    # Replace everything after  'parameter :: param ='  (handles expressions too)
+    new_code = re.sub(
+        r"(parameter\s*::\s*" + re.escape(param) + r"\s*=\s*).*$",
+        lambda m: m.group(1) + new_val,
+        code_part,
+        flags=re.IGNORECASE,
+    )
+    return new_code + comment_part
+
+
+# ---------------------------------------------------------------------------
+# fypp macro helpers  (unchanged from original)
+# ---------------------------------------------------------------------------
+
+def _is_macro_line(line: str, param: str) -> bool:
+    """True if *line* is the fypp macro definition for *param* (#:set param = ...)."""
+    code = line.split("!")[0].split("#")[0] if "!" in line else line
+    pattern = r"^\s*#:\s*set\s+" + re.escape(param) + r"\b"
+    return bool(re.search(pattern, line, re.IGNORECASE))
+
+
+def _rewrite_macro(line: str, param: str, value) -> str:
+    """Replace the RHS of a fypp macro definition."""
+    if isinstance(value, bool):
+        new_val = "True" if value else "False"
+    elif isinstance(value, int):
+        new_val = str(value)
+    elif isinstance(value, float):
+        new_val = _to_fortran_double(value)
+    elif isinstance(value, str):
+        val_str = value.strip()
+        if (val_str.startswith("'") and val_str.endswith("'")) or (val_str.startswith('"') and val_str.endswith('"')):
+            new_val = val_str
+        else:
+            new_val = f"'{val_str}'"
+    else:
+        new_val = str(value)
+
     if "!" in line:
         excl = line.index("!")
         code_part    = line[:excl]
@@ -129,13 +125,17 @@ def _rewrite_scalar(line: str, param: str, value) -> str:
         code_part    = line
         comment_part = ""
 
-    # Replace everything after the = sign in the code part
     new_code = re.sub(
-        r"(::\s*" + re.escape(param) + r"\s*=\s*)(.+?)\s*$",
+        r"(#:\s*set\s+" + re.escape(param) + r"\s*=\s*)(.+?)\s*$",
         lambda m: m.group(1) + new_val,
         code_part,
         flags=re.IGNORECASE,
     )
+
+    if new_code == code_part and "=" in code_part:
+        prefix = code_part.split("=")[0] + "="
+        new_code = f"{prefix} {new_val}"
+
     return new_code + comment_part
 
 

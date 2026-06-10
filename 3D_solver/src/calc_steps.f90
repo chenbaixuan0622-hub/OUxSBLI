@@ -183,33 +183,5 @@ contains
     enddo
   end subroutine calc_step4
 
-  !> Applies Petersen solenoidal forcing contribution at one RK substep.
-  !> Updates momentum: Δ(ρuᵢ) += coef·dt·ρ·fᵢ
-  !> Updates energy:   Δ(ρE)  += coef·dt·(ρu·fx + ρv·fy + ρw·fz)
-  attributes(global) subroutine add_forcing(nx, ny, nz, coef, QJ_in, QJ_out, fx_d, fy_d, fz_d)
-    integer, intent(in), value                 :: nx, ny, nz
-    real(8), intent(in), value                 :: coef
-    real(8), intent(in),    device, contiguous :: QJ_in(nx,5,ny,nz)
-    real(8), intent(inout), device, contiguous :: QJ_out(nx,5,ny,nz)
-    real(8), intent(in),    device, contiguous :: fx_d(nx,ny,nz)
-    real(8), intent(in),    device, contiguous :: fy_d(nx,ny,nz)
-    real(8), intent(in),    device, contiguous :: fz_d(nx,ny,nz)
-    integer :: i, j, k
-    real(8) :: fx, fy, fz, rho, cdt
-    i = (blockIdx%x-1)*blockDim%x + threadIdx%x
-    j = (blockIdx%y-1)*blockDim%y + threadIdx%y
-    k = (blockIdx%z-1)*blockDim%z + threadIdx%z
-    if (nx-2 < i .or. ny-2 < j .or. nz-2 < k) return
-    fx  = fx_d(i+1, j+1, k+1)
-    fy  = fy_d(i+1, j+1, k+1)
-    fz  = fz_d(i+1, j+1, k+1)
-    rho = QJ_in(i+1, 1, j+1, k+1)
-    cdt = coef * dt
-    QJ_out(i+1, 2, j+1, k+1) = QJ_out(i+1, 2, j+1, k+1) + cdt * rho * fx
-    QJ_out(i+1, 3, j+1, k+1) = QJ_out(i+1, 3, j+1, k+1) + cdt * rho * fy
-    QJ_out(i+1, 4, j+1, k+1) = QJ_out(i+1, 4, j+1, k+1) + cdt * rho * fz
-    QJ_out(i+1, 5, j+1, k+1) = QJ_out(i+1, 5, j+1, k+1) + cdt * ( &
-      QJ_in(i+1,2,j+1,k+1)*fx + QJ_in(i+1,3,j+1,k+1)*fy + QJ_in(i+1,4,j+1,k+1)*fz)
-  end subroutine add_forcing
 end module calc_steps
 

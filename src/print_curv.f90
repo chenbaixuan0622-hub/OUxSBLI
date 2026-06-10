@@ -2,18 +2,17 @@
 !> Outputs StructuredGrid format for visualization in ParaView
 module print_curv
   use mpi
-  use print, only : make_1d_for_print
-  use mod_globals, only : step_offset
+  use mod_globals, only : step_offset, gamma
   implicit none
-  public print_vtk_curv, send_recv_for_print_even_curv, send_recv_for_print_odd_curv
+  public print_vtk_curv, send_recv_for_print_even_curv, send_recv_for_print_odd_curv, make_1d_for_print_curv
 contains
   !> Output solution in VTK StructuredGrid format (for curvilinear grids)
   !> Includes physical coordinates (x_phys, y_phys, z)
   subroutine print_vtk_curv(step, nx, ny, nz, myrank, nranks, &
-                             x_phys, y_phys, z, rho1d, p1d, vel1d, ke0, entropy0)
+                             x_phys, y_phys, z, rho_flat, p_flat, vel1d, ke0, entropy0)
     integer, intent(in) :: step, nx, ny, nz, myrank, nranks
     real(8), intent(in) :: x_phys(nx,ny), y_phys(nx,ny), z(nz)
-    real(4), intent(in) :: rho1d(nx*ny*nz), p1d(nx*ny*nz), vel1d(nx*ny*nz*3)
+    real(4), intent(in) :: rho_flat(nx*ny*nz), p_flat(nx*ny*nz), vel1d(nx*ny*nz*3)
     real(4), intent(inout) :: ke0, entropy0
     character(len=60) :: filename, result_dir
     integer :: i, j, k, l, m, iunit, ierr
@@ -26,7 +25,7 @@ contains
     lf = char(10)
     
     ! Create output directory
-    write(result_dir, '(a)') 'data'
+    result_dir = 'data'
     call execute_command_line('mkdir -p ' // trim(result_dir), wait=.true., exitstat=ierr)
     
     ! Output filename
@@ -95,8 +94,8 @@ contains
     enddo
 
     ! Write scalar/vector fields: one 4-byte length header then all data
-    write(10) int(4*nx*ny*nz, 4),   rho1d
-    write(10) int(4*nx*ny*nz, 4),   p1d
+    write(10) int(4*nx*ny*nz, 4),   rho_flat
+    write(10) int(4*nx*ny*nz, 4),   p_flat
     write(10) int(4*3*nx*ny*nz, 4), vel1d
     
     write(10) lf // '  </AppendedData>' // lf
@@ -117,12 +116,12 @@ contains
     real(8), intent(inout)      :: Q(nx,5,ny,nz)
     real(4), intent(inout)      :: ke0, entropy0
     integer ireq3(3), istat3(MPI_STATUS_SIZE,3), ierr
-    real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
+    real(4) rho_flat(nx*ny*nz), p_flat(nx*ny*nz), vel_flat(nx*ny*nz*3)
     Q = QJ
-    call make_1d_for_print(nx, ny, nz, Jacobian_cpu, Q, rho1d, p1d, v1d)
-    call MPI_ISEND(rho1d, nx*ny*nz,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(1), ierr)
-    call MPI_ISEND(p1d,   nx*ny*nz,   MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(2), ierr)
-    call MPI_ISEND(v1d,   nx*ny*nz*3, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ireq3(3), ierr)
+    call make_1d_for_print_curv(nx, ny, nz, Jacobian_cpu, Q, rho_flat, p_flat, vel_flat)
+    call MPI_ISEND(rho_flat, nx*ny*nz,   MPI_REAL4, myrank+1, 3*(myrank+1)-2, MPI_COMM_WORLD, ireq3(1), ierr)
+    call MPI_ISEND(p_flat,   nx*ny*nz,   MPI_REAL4, myrank+1, 3*(myrank+1)-1, MPI_COMM_WORLD, ireq3(2), ierr)
+    call MPI_ISEND(vel_flat,   nx*ny*nz*3, MPI_REAL4, myrank+1, 3*(myrank+1),   MPI_COMM_WORLD, ireq3(3), ierr)
     call MPI_WAITALL(3, ireq3, istat3, ierr)
   end subroutine send_recv_for_print_even_curv
 
@@ -134,12 +133,12 @@ contains
     real(8), intent(inout) :: Q(nx,5,ny,nz)
     real(4), intent(inout) :: ke0, entropy0
     integer ireq3(3), istat3(MPI_STATUS_SIZE,3), ierr
-    real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
-    call MPI_IRECV(rho1d, nx*ny*nz,   MPI_REAL4, myrank-1, myrank, MPI_COMM_WORLD, ireq3(1), ierr)
-    call MPI_IRECV(p1d,   nx*ny*nz,   MPI_REAL4, myrank-1, myrank, MPI_COMM_WORLD, ireq3(2), ierr)
-    call MPI_IRECV(v1d,   nx*ny*nz*3, MPI_REAL4, myrank-1, myrank, MPI_COMM_WORLD, ireq3(3), ierr)
+    real(4) rho_flat(nx*ny*nz), p_flat(nx*ny*nz), vel_flat(nx*ny*nz*3)
+    call MPI_IRECV(rho_flat, nx*ny*nz,   MPI_REAL4, myrank-1, 3*myrank-2, MPI_COMM_WORLD, ireq3(1), ierr)
+    call MPI_IRECV(p_flat,   nx*ny*nz,   MPI_REAL4, myrank-1, 3*myrank-1, MPI_COMM_WORLD, ireq3(2), ierr)
+    call MPI_IRECV(vel_flat,   nx*ny*nz*3, MPI_REAL4, myrank-1, 3*myrank,   MPI_COMM_WORLD, ireq3(3), ierr)
     call MPI_WAITALL(3, ireq3, istat3, ierr)
-    call print_vtk_curv(step, nx, ny, nz, myrank, nranks, x_phys, y_phys, z, rho1d, p1d, v1d, ke0, entropy0)
+    call print_vtk_curv(step, nx, ny, nz, myrank, nranks, x_phys, y_phys, z, rho_flat, p_flat, vel_flat, ke0, entropy0)
   end subroutine send_recv_for_print_odd_curv
 
 
@@ -150,4 +149,34 @@ contains
     write(s, '(i0)') i
     s = adjustl(s)
   end function int_to_str
+
+
+  !> Convert curvilinear conserved variable QJ to real(4) 1D arrays for VTK output.
+  !> QJ(nx,5,ny,nz) = [rho/J, rho*u/J, rho*v/J, rho*w/J, rho*E/J]; Jacobian = 1/(J_2D*dz).
+  subroutine make_1d_for_print_curv(nx, ny, nz, Jacobian, QJ, rho_flat, p_flat, vel_flat)
+    integer, intent(in)  :: nx, ny, nz
+    real(8), intent(in)  :: Jacobian(nx,ny), QJ(nx,5,ny,nz)
+    real(4), intent(out), dimension(nx*ny*nz)   :: rho_flat, p_flat
+    real(4), intent(out), dimension(nx*ny*nz*3) :: vel_flat
+    real(8) rho, u, v, w, p
+    integer i, j, k, l, m
+    l = 1
+    m = 1
+    do k = 1, nz
+      do j = 1, ny
+        do i = 1, nx
+          rho      = Jacobian(i,j) * QJ(i,1,j,k)
+          u        = QJ(i,2,j,k) / QJ(i,1,j,k)
+          v        = QJ(i,3,j,k) / QJ(i,1,j,k)
+          w        = QJ(i,4,j,k) / QJ(i,1,j,k)
+          p        = (gamma - 1.d0) * (Jacobian(i,j) * QJ(i,5,j,k) - 0.5d0 * rho * (u**2 + v**2 + w**2))
+          rho_flat(l) = real(rho, 4)
+          p_flat(l)   = real(p,   4)
+          vel_flat(m)   = real(u,   4)
+          vel_flat(m+1) = real(v,   4)
+          vel_flat(m+2) = real(w,   4)
+          l = l + 1
+          m = m + 3
+    enddo;enddo;enddo
+  end subroutine make_1d_for_print_curv
 end module print_curv

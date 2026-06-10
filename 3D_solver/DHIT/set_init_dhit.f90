@@ -1,7 +1,8 @@
 module set_init_dhit
   use cufft
-  use mod_globals, only : id_accuracy, gamma, RHO0, p0, Urms, pi, pope_L, &
+  use mod_globals, only : gamma, RHO0, p0, Urms, pi, pope_L, &
                           pope_eta, pope_C, pope_cL, pope_p0, pope_beta, pope_ceta
+  use mod_constant, only : id_accuracy
   implicit none
 contains
   subroutine init_spectral_velocity(nx, ny, nz, Q)

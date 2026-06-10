@@ -1,8 +1,8 @@
 module calc_rescale
   use cudafor
   use mpi
-  use mod_globals, only : id_gpumpi, id_recal, nre1, nre2, rerank, nt, np, dt, gamma , R, Pr, u0, rho0, p0, M0, blt, start_rescale
-  use mod_constant, only : Cp, gamma_1, over_gamma_1, mu0_T0_S_over_T0_2_3, over_T0
+  use mod_globals, only : nre1, nre2, rerank, nt, np, dt, gamma , R, Pr, u0, rho0, p0, M0, blt, start_rescale
+  use mod_constant, only : Cp, gamma_1, over_gamma_1, mu0_T0_S_over_T0_2_3, over_T0, id_gpumpi, id_recal
   use cpu_gpu_mpi
 contains
   subroutine calc_mean(step, ireq, flag_re, nx, ny, nz, Jacobian, QJ, Qm)
