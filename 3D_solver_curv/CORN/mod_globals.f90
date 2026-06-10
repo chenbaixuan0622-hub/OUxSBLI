@@ -35,6 +35,12 @@ module mod_globals
   real(8), parameter :: gamma   = 1.4d0   ! heat capacity ratio
   real(8), parameter :: R       = 1.d0    ! gas constant (non-dimensional)
   real(8), parameter :: Pr      = 0.72d0  ! Prandtl number
+    
+  ! Non-dimensional free-stream
+  real(8), parameter :: rho_inf = 1.d0
+  real(8), parameter :: u_inf   = Ma_inf
+  real(8), parameter :: v_inf   = 0.d0
+  real(8), parameter :: p_inf   = 1.d0 / gamma
 
   ! Time stepping parameters
   real(8), parameter :: dt = 5.d-5

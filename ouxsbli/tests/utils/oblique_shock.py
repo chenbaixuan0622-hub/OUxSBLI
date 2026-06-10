@@ -23,8 +23,34 @@ def free_stream(M0, gamma, R, p_tot, T_tot):
   return u0, p0, T0
 
 
-def oblique_shock(M0, p0, T0, beta, gamma, R):
-  Ms   = M0 * np.sin(beta)
+def beta(M, theta_deg, gamma=1.4):
+    theta = np.radians(theta_deg)
+
+    f = lambda b: (
+        np.tan(theta)
+        - 2/np.tan(b)
+        * (M**2*np.sin(b)**2 - 1)
+        / (M**2*(gamma + np.cos(2*b)) + 2)
+    )
+    mu = np.arcsin(1/M)
+    # weak solution only
+    beta_max = np.radians(45)
+    return np.degrees(bisect(f, mu + 1e-6, beta_max))
+
+
+def downstream_mach(M1, beta_deg, theta_deg, gamma=1.4):
+    beta = np.radians(beta_deg)
+    theta = np.radians(theta_deg)
+    Mn1 = M1 * np.sin(beta)
+    Mn2 = np.sqrt(
+        (1 + 0.5*(gamma-1)*Mn1**2)
+        / (gamma*Mn1**2 - 0.5*(gamma-1))
+    )
+    return Mn2 / np.sin(beta - theta)
+
+
+def oblique_shock(M0, p0, T0, beta_rad, gamma, R):
+  Ms   = M0 * np.sin(beta_rad)
   Ms2  = Ms**2
   T2   = T0 * (1.e0 + 2.e0 * (gamma - 1.e0) * (Ms2 - 1.e0) * (1.e0 + gamma * Ms2) / (Ms2 * (gamma + 1.e0)**2))
   p2   = p0 * (1.e0 + 2.e0 * gamma * (Ms2 - 1.e0) / (gamma + 1.e0))
