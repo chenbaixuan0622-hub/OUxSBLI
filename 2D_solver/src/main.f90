@@ -26,8 +26,8 @@ program main
 
   print *, "my rank is", myrank
   if (mod(myrank,2) == 0) then
-    call set_block2(nx, ny, threads, threadsE, threadsEv, threadsF, threadsFv, &
-                    blocks, blocksE, blocksEv, blocksF, blocksFv)
+    call set_block_2D(nx, ny, threads, threadsE, threadsEv, threadsF, threadsFv, &
+                      blocks, blocksE, blocksEv, blocksF, blocksFv)
   endif
   allocate(Q(nx,dimension+2,ny), x(nx), dx(nx-1), y(ny), dy(ny-1), Jacobian(nx,ny))
   call set_grid(myrank, nx, ny, Lx, Ly, x, y, dx, dy)

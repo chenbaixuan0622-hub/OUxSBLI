@@ -13,7 +13,8 @@ from ouxsbli import Case
 
 
 ENTROPY_TOL = 3.e-3   # |(s0-s)/s0| threshold
-KE_RES      = 0.75e0  # |ke/ke0|    residual
+KE_RES      = 0.75e0  # ke/ke0 lower bound (must have lost some energy)
+KE_ETOL     = 0.01e0  # ke/ke0 upper bound tolerance (1 % above initial = instability)
 
 
 @pytest.mark.integration
@@ -53,5 +54,8 @@ def test_etgv_ke_and_entropy_preserved(tmp_path):
     ke_final = ke_data[-1, -1]
     assert ke_final > KE_RES, (
         f"Kinetic energy not preserved: ke/ke0 = {ke_final:.2e} < {KE_RES}"
+    )
+    assert ke_final < 1.0 + KE_ETOL, (
+        f"Kinetic energy grew (ke/ke0 = {ke_final:.2e}), possible numerical instability"
     )
 

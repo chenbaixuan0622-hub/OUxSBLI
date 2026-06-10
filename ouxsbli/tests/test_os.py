@@ -10,6 +10,7 @@ import numpy as np
 from ouxsbli import Case
 from .utils.vtk_reader import latest_vtr, getGrid, getQ
 from .utils.oblique_shock import reslected_shock, free_stream
+from .conftest import assert_close_relative
 
 
 R     = 287.03e0
@@ -90,21 +91,14 @@ def test_os_pre_and_post_shock_match_analytical(tmp_path):
     p_post   = p[0,   : nj // 3, 9 * ni // 10 :].astype(float)
 
     # pre-shock assertions (undisturbed free stream)
-    assert abs(rho_pre.mean() - rho0_fs) / rho0_fs < PRE_RTOL, (
-        f"Pre-shock rho: {rho_pre.mean():.4f} vs {rho0_fs:.4f}")
-    assert abs(u_pre.mean() - u0_fs) / u0_fs < PRE_RTOL, (
-        f"Pre-shock u: {u_pre.mean():.4f} vs {u0_fs:.4f}")
-    assert abs(p_pre.mean() - p0_fs) / p0_fs < PRE_RTOL, (
-        f"Pre-shock p: {p_pre.mean():.4f} vs {p0_fs:.4f}")
+    assert_close_relative(rho_pre.mean(), rho0_fs, PRE_RTOL, "Pre-shock rho")
+    assert_close_relative(u_pre.mean(),   u0_fs,   PRE_RTOL, "Pre-shock u")
+    assert_close_relative(p_pre.mean(),   p0_fs,   PRE_RTOL, "Pre-shock p")
 
     # post-shock assertions (after reflected shock)
-    assert abs(rho_post.mean() - rho3) / rho3 < POST_RTOL, (
-        f"Post-shock rho: {rho_post.mean():.4f} vs {rho3:.4f}")
-    assert abs(u_post.mean() - ux3) / abs(ux3) < POST_RTOL, (
-        f"Post-shock u: {u_post.mean():.4f} vs {ux3:.4f}")
-    # After a perfect wall reflection the flow is horizontal; uy3 from reslected_shock
-    # is non-zero only because beta_r=37.7° is approximate — check v≈0 directly.
+    assert_close_relative(rho_post.mean(), rho3,       POST_RTOL, "Post-shock rho")
+    assert_close_relative(u_post.mean(),   ux3,        POST_RTOL, "Post-shock u")
+    # After a perfect wall reflection the flow is horizontal; check v≈0 via u scale.
     assert abs(v_post.mean()) / abs(ux3) < POST_RTOL, (
         f"Post-shock v: {v_post.mean():.4f} (expected ≈ 0)")
-    assert abs(p_post.mean() - p3) / p3 < POST_RTOL, (
-        f"Post-shock p: {p_post.mean():.4f} vs {p3:.4f}")
+    assert_close_relative(p_post.mean(),   p3,         POST_RTOL, "Post-shock p")

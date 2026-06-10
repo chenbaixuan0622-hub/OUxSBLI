@@ -59,7 +59,7 @@ contains
     real(4), intent(inout)                   :: ke0, entropy0
     real(8) xix_cpu(nx-1), etay_cpu(ny-1), zetaz_cpu(nz-1)
     real(8) dtdxdy_cpu(nx-2,ny-2), dtdydz_cpu(ny-2,nz-2), dtdzdx_cpu(nx-2,nz-2)
-    real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
+    real(4) rho_flat(nx*ny*nz), p_flat(nx*ny*nz), vel_flat(nx*ny*nz*3)
     integer i, j, k, l, ierr, ireq3(3), istat3(MPI_STATUS_SIZE, 3)
     do k = 1, nz
       do j = 1, ny
@@ -93,12 +93,12 @@ contains
     zetaz    = zetaz_cpu
     Jacobian = Jacobian_cpu
     QJ = Q
-    call make_1d_for_print(nx, ny, nz, Jacobian_cpu, Q, rho1d, p1d, v1d)
+    call make_1d_for_print(nx, ny, nz, Jacobian_cpu, Q, rho_flat, p_flat, vel_flat)
     call MPI_SEND(ke0,      1, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
     call MPI_SEND(entropy0, 1, MPI_REAL4, myrank+1, myrank+1, MPI_COMM_WORLD, ierr)
-    call MPI_ISEND(rho1d, nx*ny*nz,   MPI_REAL4, myrank+1, 3*(myrank+1)-2, MPI_COMM_WORLD, ireq3(1), ierr)
-    call MPI_ISEND(p1d,   nx*ny*nz,   MPI_REAL4, myrank+1, 3*(myrank+1)-1, MPI_COMM_WORLD, ireq3(2), ierr)
-    call MPI_ISEND(v1d,   nx*ny*nz*3, MPI_REAL4, myrank+1, 3*(myrank+1),   MPI_COMM_WORLD, ireq3(3), ierr)
+    call MPI_ISEND(rho_flat, nx*ny*nz,   MPI_REAL4, myrank+1, 3*(myrank+1)-2, MPI_COMM_WORLD, ireq3(1), ierr)
+    call MPI_ISEND(p_flat,   nx*ny*nz,   MPI_REAL4, myrank+1, 3*(myrank+1)-1, MPI_COMM_WORLD, ireq3(2), ierr)
+    call MPI_ISEND(vel_flat,   nx*ny*nz*3, MPI_REAL4, myrank+1, 3*(myrank+1),   MPI_COMM_WORLD, ireq3(3), ierr)
     call MPI_WAITALL(3, ireq3, istat3, ierr)
   end subroutine pre_calc
 
@@ -134,6 +134,9 @@ contains
       write(filename, "(a)") "recal/Qm.dat"
       inquire(file=filename, exist=exists)
       if (exists) then
+        open(10, file=filename, status='old', action='read', form='unformatted', access='stream')
+        read(10) Qm_cpu
+        close(10)
 #:if not RESCALE
         print *, "Qm exists (not fixed value)"
 #:endif

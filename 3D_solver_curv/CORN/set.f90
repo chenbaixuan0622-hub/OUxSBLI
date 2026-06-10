@@ -1,6 +1,7 @@
 module set
   use cudafor
-  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, theta, x_corner, Ma_inf, gamma, R, Pr
+  use mod_globals, only : nx, ny, nz, Lx, Ly, Lz, theta, x_corner, Ma_inf, gamma, R, Pr, &
+                          rho_inf, u_inf, v_inf, p_inf
   use set_coordinate, only : set_grid_c_corner, set_metrics_curv
   use set_bc_common
   implicit none
@@ -164,13 +165,7 @@ contains
     integer, intent(in) :: myrank, nx, ny, nz
     real(8), intent(in) :: x(nx), y(ny), z(nz)
     real(8), intent(out) :: Q(nx,5,ny,nz)
-    real(8) :: rho_inf, u_inf, v_inf, p_inf, E_inf
-    ! Non-dimensional free-stream: M_∞ = 2.5, aoa = 0
-    rho_inf = 1.d0
-    u_inf = Ma_inf          ! cos(0) = 1
-    v_inf = 0.d0            ! sin(0) = 0
-    p_inf = 1.d0 / gamma
-    E_inf = p_inf / (gamma - 1.d0) + 0.5d0 * rho_inf * (u_inf**2 + v_inf**2)
+    real(8) :: E_inf = p_inf / (gamma - 1.d0) + 0.5d0 * rho_inf * (u_inf**2 + v_inf**2)
     ! Initialize all cells to free-stream
     Q = 0.d0
     Q(:,1,:,:) = rho_inf
@@ -197,14 +192,8 @@ contains
     real(8), intent(in), device :: eta_x(nx,ny), eta_y(nx,ny)
     real(8), intent(inout), device :: Q(nx,5,ny,nz)
     integer :: i, j, k
-    real(8) :: rho_inf, u_inf, v_inf, p_inf, E_inf
     real(8) :: nxw, nyw, nmag, u_int, v_int, u_n, Jratio
-    ! Free-stream values
-    rho_inf = 1.d0
-    u_inf = Ma_inf
-    v_inf = 0.d0
-    p_inf = 1.d0 / gamma
-    E_inf = p_inf / (gamma - 1.d0) + 0.5d0 * rho_inf * (u_inf**2 + v_inf**2)
+    real(8) :: E_inf = p_inf / (gamma - 1.d0) + 0.5d0 * rho_inf * (u_inf**2 + v_inf**2)
     ! (a) xi inlet ghost (i=1): Dirichlet free-stream
     !$cuf kernel do(2) <<<*,(16,16)>>>
     do k = 1, nz

@@ -27,7 +27,7 @@ program main
 
   print *, "my rank is", myrank
   if (mod(myrank,2) == 0) then
-    call set_block3(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, threadsG, threadsGv, &
+    call set_block_3D(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, threadsG, threadsGv, &
                       blocks, blocksE, blocksEv, blocksF, blocksFv, blocksG, blocksGv)
   endif
   allocate(Q(nx,dimension+2,ny,nz), x(nx), dx(nx-1), y(ny), dy(ny-1), z(nz), dz(nz-1), Jacobian(nx,ny))
@@ -99,4 +99,3 @@ program main
   deallocate(Q, x, dx, y, dy, z, dz, Jacobian)
   call MPI_FINALIZE(ierr)
 end program main
-

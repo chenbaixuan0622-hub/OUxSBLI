@@ -9,6 +9,6 @@
 #:set RK = 3
 #:set COMMZ = True
 #:set RESTART = False
-#:set TVD = 'minmod'
+#:set TVD = 'tvd'
 #:set SLAU_VARIANT = 'SLAU'
 #:set ORDER_IO = ORDER // 2 - 1

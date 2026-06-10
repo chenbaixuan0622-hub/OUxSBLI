@@ -106,7 +106,7 @@ def _convergence_order(errors, grids):
     e = np.array(errors, dtype=float)
     # log(e) = p*log(h) + C
     log_h = np.log(h)
-    log_e = np.log(e + 1e-300)
+    log_e = np.log(np.maximum(e, 1e-300))
     p = np.polyfit(log_h, log_e, 1)[0]
     return p
 

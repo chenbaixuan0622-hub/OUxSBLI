@@ -21,5 +21,6 @@
 3D_solver_curv/*/data
 build
 data
+tmp
 ouxsbli/__pycache__
 ouxsbli/tests/tmp

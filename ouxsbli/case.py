@@ -23,6 +23,7 @@ import subprocess
 import pathlib
 from typing import Any
 from .patcher import patch, _is_macro_line
+from .ic import ic_to_params, bc_to_params
 
 # ---------------------------------------------------------------------------
 # Alias table: friendly Case() kwarg → fypp macro name in config.fypp
@@ -50,8 +51,8 @@ _ALIAS = {
 _VALUE_NORMALIZE: dict[str, dict[str, str]] = {
     "SCHEME":       {"keep": "KEEP", "slau": "SLAU", "roe": "Roe", "hybrid": "Hybrid"},
     "VISC":         {"euler": "Euler", "ns": "NS", "les": "LES"},
-    "TVD":          {"none": "none", "minmod": "minmod",
-                     "muscl4": "muscl4", "hybrid": "muscl4"},  # "hybrid" → muscl4 limiter
+    "TVD":          {"none": "none", "tvd": "tvd", "hybrid": "hybrid",
+                     "minmod": "tvd", "muscl4": "hybrid"},  # backward-compat aliases
     "SLAU_VARIANT": {"slau": "SLAU", "hrslau2": "HRSLAU2"},
 }
 
@@ -88,9 +89,18 @@ class Case:
         self.build_dir = self.workdir / "build"
         # Expand friendly aliases; do NOT blanket-uppercase values —
         # config.fypp comparisons are case-sensitive (e.g. 'Euler' ≠ 'EULER').
+        # Expand IC/BC specs into flat parameter dicts before alias expansion.
+        raw = dict(params)
+        ic_spec = raw.pop("ic", None)
+        bc_spec = raw.pop("bc", None)
+        if ic_spec is not None:
+            raw.update(ic_to_params(ic_spec))
+        if bc_spec is not None:
+            raw.update(bc_to_params(bc_spec))
+
         self.params: dict[str, Any] = {
             _ALIAS.get(k.lower(), k): v
-            for k, v in params.items()
+            for k, v in raw.items()
         }
         self._built = False
 
@@ -218,6 +228,7 @@ class Case:
             mpi_bin = sdk_root / mpi_subpath
             if mpi_bin.exists():
                 extra.append(str(mpi_bin))
+                env.setdefault("FC", str(mpi_bin / "mpif90"))
                 break
         env["PATH"] = ":".join(extra) + ":" + env.get("PATH", "")
         return env

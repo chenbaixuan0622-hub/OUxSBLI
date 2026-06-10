@@ -142,5 +142,8 @@ class TestAlias:
 
     def test_value_normalize_tvd(self):
         from ouxsbli.case import _VALUE_NORMALIZE
-        assert _VALUE_NORMALIZE["TVD"]["none"]   == "none"
-        assert _VALUE_NORMALIZE["TVD"]["hybrid"] == "muscl4"   # safe alias
+        assert _VALUE_NORMALIZE["TVD"]["none"]    == "none"
+        assert _VALUE_NORMALIZE["TVD"]["tvd"]     == "tvd"
+        assert _VALUE_NORMALIZE["TVD"]["hybrid"]  == "hybrid"
+        assert _VALUE_NORMALIZE["TVD"]["minmod"]  == "tvd"     # backward-compat alias
+        assert _VALUE_NORMALIZE["TVD"]["muscl4"]  == "hybrid"  # backward-compat alias

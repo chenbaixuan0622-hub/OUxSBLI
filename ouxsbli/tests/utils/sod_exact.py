@@ -84,30 +84,35 @@ def solve(x, t, rho_l=1.0, u_l=0.0, p_l=1.0,
 
     s = (x - x0) / (t + 1e-300)           # similarity variable
 
-    rho_out = np.empty_like(x, dtype=float)
-    u_out   = np.empty_like(x, dtype=float)
-    p_out   = np.empty_like(x, dtype=float)
+    rho_out = np.full_like(x, rho_r, dtype=float)
+    u_out   = np.full_like(x, u_r,   dtype=float)
+    p_out   = np.full_like(x, p_r,   dtype=float)
 
-    for idx in range(len(x)):
-        si = s[idx]
-        if si <= s_hl:                     # left undisturbed
-            rho_out[idx], u_out[idx], p_out[idx] = rho_l, u_l, p_l
-        elif si <= s_tl:                   # inside left rarefaction
-            u_i   = g5 * (a_l + g7 * u_l + si)
-            a_i   = g5 * (a_l + g7 * (u_l - si))
-            rho_i = rho_l * (a_i / a_l) ** g4
-            p_i   = p_l   * (a_i / a_l) ** g3
-            rho_out[idx], u_out[idx], p_out[idx] = rho_i, u_i, p_i
-        elif si <= u_star:                 # left star region
-            rho_out[idx], u_out[idx], p_out[idx] = rho_sl, u_star, p_star
-        elif si <= s_tr:                   # right star region
-            rho_out[idx], u_out[idx], p_out[idx] = rho_sr, u_star, p_star
-        elif si <= s_hr:                   # inside right rarefaction (if applicable)
-            u_i   = g5 * (-a_r + g7 * u_r + si)
-            a_i   = g5 * (a_r - g7 * (u_r - si))
-            rho_i = rho_r * (a_i / a_r) ** g4
-            p_i   = p_r   * (a_i / a_r) ** g3
-            rho_out[idx], u_out[idx], p_out[idx] = rho_i, u_i, p_i
-        else:                              # right undisturbed
-            rho_out[idx], u_out[idx], p_out[idx] = rho_r, u_r, p_r
+    m1 = s <= s_hl
+    rho_out[m1] = rho_l;  u_out[m1] = u_l;     p_out[m1] = p_l
+
+    m2 = (s > s_hl) & (s <= s_tl)             # inside left rarefaction
+    if m2.any():
+        s2 = s[m2]
+        u_i2 = g5 * (a_l + g7 * u_l + s2)
+        a_i2 = g5 * (a_l + g7 * (u_l - s2))
+        rho_out[m2] = rho_l * (a_i2 / a_l) ** g4
+        u_out[m2]   = u_i2
+        p_out[m2]   = p_l   * (a_i2 / a_l) ** g3
+
+    m3 = (s > s_tl)  & (s <= u_star)          # left star region
+    rho_out[m3] = rho_sl; u_out[m3] = u_star; p_out[m3] = p_star
+
+    m4 = (s > u_star) & (s <= s_tr)           # right star region
+    rho_out[m4] = rho_sr; u_out[m4] = u_star; p_out[m4] = p_star
+
+    m5 = (s > s_tr)  & (s <= s_hr)            # inside right rarefaction
+    if m5.any():
+        s5 = s[m5]
+        u_i5 = g5 * (-a_r + g7 * u_r + s5)
+        a_i5 = g5 * (a_r  - g7 * (u_r - s5))
+        rho_out[m5] = rho_r * (a_i5 / a_r) ** g4
+        u_out[m5]   = u_i5
+        p_out[m5]   = p_r   * (a_i5 / a_r) ** g3
+
     return rho_out, u_out, p_out

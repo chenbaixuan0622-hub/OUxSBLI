@@ -32,7 +32,7 @@ contains
     integer, parameter :: sxr = threadsE%x
     real(8), dimension(sxr*sy*sz), shared :: rhor, ur, vr, wr, pr
     real(8) rhol, ul, vl, wl, pl
-    real(sp) fdx
+    real(sp) fdx  ! sp intentional: sensor interpolation does not need double precision
     #:endif
     real(8), dimension(-(io-1):sx*sy*sz-io), shared :: rho, u, v, w, p
     it = threadIdx%x
@@ -69,14 +69,14 @@ contains
       call delta6(fdx,   v(idx-2:idx+3),   vl,   vr(idx_r))
       call delta6(fdx,   w(idx-2:idx+3),   wl,   wr(idx_r))
       call delta6(fdx,   p(idx-2:idx+3),   pl,   pr(idx_r))
-      fdx = wiggle_detector(p(idx-1:idx+2))
+      fdx = wiggle_detector(p(idx-1:idx+2))  ! intentional: reconstruction used hybrid sensor; SLAU uses pressure-wiggle sensor
     elseif (2 <= i .and. i <= nx-2) then
       call delta4(fdx, rho(idx-1:idx+2), rhol, rhor(idx_r))
       call delta4(fdx,   u(idx-1:idx+2),   ul,   ur(idx_r))
       call delta4(fdx,   v(idx-1:idx+2),   vl,   vr(idx_r))
       call delta4(fdx,   w(idx-1:idx+2),   wl,   wr(idx_r))
       call delta4(fdx,   p(idx-1:idx+2),   pl,   pr(idx_r))
-      fdx = wiggle_detector(p(idx-1:idx+2))
+      fdx = wiggle_detector(p(idx-1:idx+2))  ! intentional: reconstruction used hybrid sensor; SLAU uses pressure-wiggle sensor
     #:elif ORDER == 4
     if (2 <= i .and. i <= nx-2) then
       call delta4(fdx, rho(idx-1:idx+2), rhol, rhor(idx_r))
@@ -84,7 +84,7 @@ contains
       call delta4(fdx,   v(idx-1:idx+2),   vl,   vr(idx_r))
       call delta4(fdx,   w(idx-1:idx+2),   wl,   wr(idx_r))
       call delta4(fdx,   p(idx-1:idx+2),   pl,   pr(idx_r))
-      fdx = wiggle_detector(p(idx-1:idx+2))
+      fdx = wiggle_detector(p(idx-1:idx+2))  ! intentional: reconstruction used hybrid sensor; SLAU uses pressure-wiggle sensor
     #:endif
     #:if ORDER >= 4
     else
@@ -129,7 +129,7 @@ contains
     integer, parameter :: syr = threadsF%y
     real(8), dimension(sx*syr*sz), shared :: rhor, ur, vr, wr, pr
     real(8) rhol, ul, vl, wl, pl
-    real(sp) fdy
+    real(sp) fdy  ! sp intentional: sensor interpolation does not need double precision
     #:endif
     it = threadIdx%x
     jt = threadIdx%y
@@ -165,14 +165,14 @@ contains
       call delta6(fdy,   v(idx-2:idx+3),   vl,   vr(idx_r))
       call delta6(fdy,   w(idx-2:idx+3),   wl,   wr(idx_r))
       call delta6(fdy,   p(idx-2:idx+3),   pl,   pr(idx_r))
-      fdy = wiggle_detector(p(idx-1:idx+2))
+      fdy = wiggle_detector(p(idx-1:idx+2))  ! intentional: reconstruction used hybrid sensor; SLAU uses pressure-wiggle sensor
     elseif (2 <= j .and. j <= ny-2) then
       call delta4(fdy, rho(idx-1:idx+2), rhol, rhor(idx_r))
       call delta4(fdy,   u(idx-1:idx+2),   ul,   ur(idx_r))
       call delta4(fdy,   v(idx-1:idx+2),   vl,   vr(idx_r))
       call delta4(fdy,   w(idx-1:idx+2),   wl,   wr(idx_r))
       call delta4(fdy,   p(idx-1:idx+2),   pl,   pr(idx_r))
-      fdy = wiggle_detector(p(idx-1:idx+2))
+      fdy = wiggle_detector(p(idx-1:idx+2))  ! intentional: reconstruction used hybrid sensor; SLAU uses pressure-wiggle sensor
     #:elif ORDER == 4
     if (2 <= j .and. j <= ny-2) then
       call delta4(fdy, rho(idx-1:idx+2), rhol, rhor(idx_r))
@@ -180,7 +180,7 @@ contains
       call delta4(fdy,   v(idx-1:idx+2),   vl,   vr(idx_r))
       call delta4(fdy,   w(idx-1:idx+2),   wl,   wr(idx_r))
       call delta4(fdy,   p(idx-1:idx+2),   pl,   pr(idx_r))
-      fdy = wiggle_detector(p(idx-1:idx+2))
+      fdy = wiggle_detector(p(idx-1:idx+2))  ! intentional: reconstruction used hybrid sensor; SLAU uses pressure-wiggle sensor
     #:endif
     #:if ORDER >= 4
     else
@@ -225,7 +225,7 @@ contains
     integer, parameter :: szr = threadsG%z
     real(8), dimension(sx*sy*szr), shared :: rhor, ur, vr, wr, pr
     real(8) rhol, ul, vl, wl, pl
-    real(sp) fdz
+    real(sp) fdz  ! sp intentional: sensor interpolation does not need double precision
     #:endif
     it = threadIdx%x
     jt = threadIdx%y
@@ -261,14 +261,14 @@ contains
       call delta6(fdz,   v(idx-2:idx+3),   vl,   vr(idx_r))
       call delta6(fdz,   w(idx-2:idx+3),   wl,   wr(idx_r))
       call delta6(fdz,   p(idx-2:idx+3),   pl,   pr(idx_r))
-      fdz = wiggle_detector(p(idx-1:idx+2))
+      fdz = wiggle_detector(p(idx-1:idx+2))  ! intentional: reconstruction used hybrid sensor; SLAU uses pressure-wiggle sensor
     elseif (2 <= k .and. k <= nz-2) then
       call delta4(fdz, rho(idx-1:idx+2), rhol, rhor(idx_r))
       call delta4(fdz,   u(idx-1:idx+2),   ul,   ur(idx_r))
       call delta4(fdz,   v(idx-1:idx+2),   vl,   vr(idx_r))
       call delta4(fdz,   w(idx-1:idx+2),   wl,   wr(idx_r))
       call delta4(fdz,   p(idx-1:idx+2),   pl,   pr(idx_r))
-      fdz = wiggle_detector(p(idx-1:idx+2))
+      fdz = wiggle_detector(p(idx-1:idx+2))  ! intentional: reconstruction used hybrid sensor; SLAU uses pressure-wiggle sensor
     #:elif ORDER == 4
     if (2 <= k .and. k <= nz-2) then
       call delta4(fdz, rho(idx-1:idx+2), rhol, rhor(idx_r))
@@ -276,7 +276,7 @@ contains
       call delta4(fdz,   v(idx-1:idx+2),   vl,   vr(idx_r))
       call delta4(fdz,   w(idx-1:idx+2),   wl,   wr(idx_r))
       call delta4(fdz,   p(idx-1:idx+2),   pl,   pr(idx_r))
-      fdz = wiggle_detector(p(idx-1:idx+2))
+      fdz = wiggle_detector(p(idx-1:idx+2))  ! intentional: reconstruction used hybrid sensor; SLAU uses pressure-wiggle sensor
     #:endif
     #:if ORDER >= 4
     else
