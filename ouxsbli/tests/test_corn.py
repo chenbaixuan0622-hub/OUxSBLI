@@ -18,6 +18,7 @@ import numpy as np
 from ouxsbli import Case
 from .utils.vtk_reader import latest_vts, getGrid, getQ
 from .utils.oblique_shock import oblique_shock, beta
+from .conftest import assert_close_relative
 
 
 # CORN parameters (from mod_globals.f90)
@@ -78,20 +79,17 @@ def test_corn_post_shock_state(tmp_path):
     p_inf = 1.e0 / gamma
     T_inf = p_inf / rho_inf
     rho_ref, p_ref, _ = oblique_shock(Ma_inf, p_inf, T_inf, np.radians(beta(Ma_inf, theta_de)), gamma, 1.e0)
-    # Locate the corner in computational index
+    # Locate the post-shock region in computational index space.
+    # i_corner: 1-based interior index of the compression corner.
+    # Post-shock region: i ∈ [i_corner+20, ni-10], j ∈ [0, nj//10].
     # VTK data: rho/p shape (nk, nj, ni)
-    i_lo = ni // 2
-    j_hi = nj // 10
+    i_corner = int(x_corner * (ni - 2) / Lx) + 1
+    i_lo     = i_corner + 20
+    i_hi     = ni - 10
+    j_hi     = nj // 10
 
-    rho_post = np.mean(rho[1,:j_hi,i_lo:])
-    p_post   = np.mean(p[1,  :j_hi,i_lo:])
+    rho_post = np.mean(rho[1, :j_hi, i_lo:i_hi])
+    p_post   = np.mean(p  [1, :j_hi, i_lo:i_hi])
 
-    rel_err_rho = abs(rho_post - rho_ref) / rho_ref
-    rel_err_p   = abs(p_post   - p_ref)   / p_ref
-
-    assert rel_err_rho < ATOL, (
-        f"rel_err={rel_err_rho:.3f}, rho_post={rho_post:.3f}, rho_ref={rho_ref:.3f}, {vts_path}"
-    )
-    assert rel_err_p < ATOL, (
-        f"rel_err={rel_err_p:.3f}, p_post={p_post:.3f}, p_ref={p_ref:.3f}"
-    )
+    assert_close_relative(rho_post, rho_ref, ATOL, f"rho_post (vts={vts_path})")
+    assert_close_relative(p_post,   p_ref,   ATOL, "p_post")

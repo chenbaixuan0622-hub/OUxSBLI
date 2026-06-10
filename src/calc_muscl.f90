@@ -78,8 +78,8 @@ contains
     real(sp), intent(in)        :: sensor
     real(8), intent(in)         :: a2, a3, d1, d2, d3
     real(8), intent(out)        :: al, ar
-    integer(kind=2) :: id2
-    integer(kind=4) :: id4
+    integer(kind=2) :: id2 = 0_2
+    integer(kind=4) :: id4 = 0_4
     if (sensor < threshold) then
       call MUSCL3rdnonTVD(id2, sensor, a2, a3, d1, d2, d3, al, ar)
     else
@@ -129,8 +129,8 @@ contains
     real(8), intent(in)         :: a2, a3, d1, d2, d3, d4, d5
     real(8), intent(out)        :: al, ar
     real(8) alr(2)
-    integer(kind=2) :: id2
-    integer(kind=4) :: id4
+    integer(kind=2) :: id2 = 0_2
+    integer(kind=4) :: id4 = 0_4
     if (sensor < threshold) then
       call MUSCL4thnonTVD(id2, sensor, a2, a3, d1, d2, d3, d4, d5, al, ar)
     else

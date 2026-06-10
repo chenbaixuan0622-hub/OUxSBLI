@@ -2,7 +2,7 @@ module set_coordinate
   use cudafor
   implicit none
   interface set_block
-    module procedure set_block2, set_block3
+    module procedure set_block_2D, set_block_3D
   end interface set_block
 
   interface set_Jacobian_xy
@@ -14,8 +14,8 @@ module set_coordinate
                      set_grid_cyclic4_3D, set_grid_cyclic6_2D, set_grid_cyclic6_3D
   end interface set_grid_cyclic
 contains
-  subroutine set_block2(nx, ny, threads, threadsE, threadsEv, threadsF, threadsFv, &
-                       blocks, blocksE, blocksEv, blocksF, blocksFv)
+  subroutine set_block_2D(nx, ny, threads, threadsE, threadsEv, threadsF, threadsFv, &
+                         blocks, blocksE, blocksEv, blocksF, blocksFv)
     integer, intent(in)     :: nx, ny
     type(dim3), intent(in)  :: threadsE, threadsF, threadsEv, threadsFv, threads
     type(dim3), intent(out) :: blocksE,  blocksF,  blocksEv,  blocksFv,  blocks
@@ -24,11 +24,11 @@ contains
     blocksEv = dim3((nx-1+threadsEv%x-1)/threadsEv%x,(ny-2+threadsEv%y-1)/threadsEv%y,1)
     blocksFv = dim3((nx-2+threadsFv%x-1)/threadsFv%x,(ny-1+threadsFv%y-1)/threadsFv%y,1)
     blocks   = dim3((nx-2+threads%x  -1)/threads%x,  (ny-2+threads%y  -1)/threads%y,  1)
-  end subroutine set_block2
+  end subroutine set_block_2D
 
 
-  subroutine set_block3(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, threadsG, threadsGv, &
-                       blocks, blocksE, blocksEv, blocksF, blocksFv, blocksG, blocksGv)
+  subroutine set_block_3D(nx, ny, nz, threads, threadsE, threadsEv, threadsF, threadsFv, threadsG, threadsGv, &
+                         blocks, blocksE, blocksEv, blocksF, blocksFv, blocksG, blocksGv)
     integer, intent(in)     :: nx, ny, nz
     type(dim3), intent(in)  :: threadsE, threadsF, threadsG, threadsEv, threadsFv, threadsGv, threads
     type(dim3), intent(out) :: blocksE,  blocksF,  blocksG,  blocksEv,  blocksFv,  blocksGv,  blocks
@@ -39,7 +39,7 @@ contains
     blocksFv = dim3((nx-2+threadsFv%x-1)/threadsFv%x,(ny-1+threadsFv%y-1)/threadsFv%y,(nz-2+threadsFv%z-1)/threadsFv%z)
     blocksGv = dim3((nx-2+threadsGv%x-1)/threadsGv%x,(ny-2+threadsGv%y-1)/threadsGv%y,(nz-1+threadsGv%z-1)/threadsGv%z)
     blocks   = dim3((nx-2+threads%x  -1)/threads%x,  (ny-2+threads%y  -1)/threads%y,  (nz-2+threads%z  -1)/threads%z)
-  end subroutine set_block3
+  end subroutine set_block_3D
 
 
   subroutine set_xix(nx, dx, xix)
@@ -104,7 +104,7 @@ contains
     do j = 2, ny-1
       do i = 2, nx-1
         Jacobian(i,j) = 8.d0 / &
-        & ((dx(i-1) + dx(i)) * (dy(j-1) + dy(j)) * 2.d0*dz(1))
+        & ((dx(i-1) + dx(i)) * (dy(j-1) + dy(j)) * 2.d0*dz(1)) ! assumes uniform z-spacing (dz(k)=const)
     enddo;enddo
     do i = 1, nx
       Jacobian(i,1)  = Jacobian(i,2)
@@ -167,7 +167,7 @@ contains
     real(8), intent(in)         :: Lx, Ly
     real(8), intent(out)        :: xc(nx), yc(ny), dx(nx-1), dy(ny-1)
     real(8) dx1, dy1, x(nx+1), y(ny+1)
-    integer i, j, k
+    integer i, j
     dx1 = Lx / dble(nx-2)
     dy1 = Ly / dble(ny-2)
     dx(:) = dx1
@@ -250,7 +250,7 @@ contains
     real(8), intent(in)         :: Lx, Ly
     real(8), intent(out)        :: xc(nx), yc(ny), dx(nx-1), dy(ny-1)
     real(8) dx1, dy1, x(nx+1), y(ny+1)
-    integer i, j
+    integer i, j  ! no k: z-direction not used in 2D
     dx1 = Lx / dble(nx-4)
     dy1 = Ly / dble(ny-4)
     dx(:) = dx1

@@ -68,6 +68,11 @@ contains
   end subroutine GPU_MPI_RECV
   
 
+  ! NOTE: CPU path must stage through a host buffer. MPI_WAIT is called here
+  ! before deallocating buf_cpu to avoid freeing memory while the send is
+  ! in flight (use-after-free). This makes the CPU variant synchronous, unlike
+  ! the GPU variant which returns immediately. Caller's ireq is set to
+  ! MPI_REQUEST_NULL. Will be revisited when cpu_gpu_mpi is refactored.
   subroutine CPU_MPI_ISEND(id_gpu_mpi, buf, count, dest, tag, comm, ireq, ierr)
     integer(2), intent(in)      :: id_gpu_mpi
     real(8), intent(in), device :: buf(count)
@@ -98,10 +103,12 @@ contains
     integer, intent(in), value   :: count, dest, tag, comm
     integer, intent(inout)       :: ireq, ierr
     integer stat(MPI_STATUS_SIZE)
-    real(8) buf_cpu(count)
+    real(8), allocatable :: buf_cpu(:)
+    allocate(buf_cpu(count))
     call MPI_IRECV(buf_cpu, count, MPI_REAL8, dest, tag, comm, ireq, ierr)
     call MPI_WAIT(ireq, stat, ierr)
     buf = buf_cpu
+    deallocate(buf_cpu)
   end subroutine CPU_MPI_IRECV
 
 

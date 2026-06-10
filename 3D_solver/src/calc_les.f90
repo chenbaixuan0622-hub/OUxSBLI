@@ -1,6 +1,7 @@
 !> Module for Large-Eddy Simulation (LES) subgrid-scale modeling
 !> Implements DNS/RANS and dynamic Smagorinsky LES turbulence models
 module calc_les
+  use mod_constant, only : tan10deg2
   implicit none
   private
   public calc_mut
@@ -26,15 +27,15 @@ contains
   end subroutine calc_differential
 
 
-  pure attributes(device) function SMS(u,v,w,uh,vh,wh,dx,dy,dz,qc2) result(nut)
-    real(8), intent(in), dimension(3,3,3) :: u, v, w, uh, vh, wh
+  pure attributes(device) function SMS(u,v,w,u_test,v_test,w_test,dx,dy,dz,qc2) result(nut)
+    real(8), intent(in), dimension(3,3,3) :: u, v, w, u_test, v_test, w_test
     real(8), intent(in), value            :: dx, dy, dz, qc2 ! 1 / dx, 1 / dy, 1 / dz
     real(8) dudx,  dudy,  dudz,  dvdx,  dvdy,  dvdz,  dwdx,  dwdy,  dwdz
     real(8) dudxh, dudyh, dudzh, dvdxh, dvdyh, dvdzh, dwdxh, dwdyh, dwdzh
-    real(8) nut, rtheta, ftheta, vor(3), vorh(3), vord(3), vor2, vorh2, vord2, svor2, tan2, S2, a1, a2, delta
-    real(8) :: pi = acos(-1.d0), Cm = 0.06d0, alpha = 0.5d0
+    real(8) nut, rtheta, ftheta, vor(3), vorh(3), vorticity_diff(3), vor2, vorh2, vorticity_diff2, svor2, tan2, S2, a1, a2, delta
+    real(8), parameter :: Cm = 0.06d0, alpha = 0.5d0
     call calc_differential(u, v, w, dx, dy, dz, dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz)
-    call calc_differential(uh,vh,wh,dx, dy, dz, dudxh,dudyh,dudzh,dvdxh,dvdyh,dvdzh,dwdxh,dwdyh,dwdzh)
+    call calc_differential(u_test,v_test,w_test,dx, dy, dz, dudxh,dudyh,dudzh,dvdxh,dvdyh,dvdzh,dwdxh,dwdyh,dwdzh)
 
     vor(1)  = dwdy - dvdz
     vor(2)  = dudz - dwdx
@@ -44,21 +45,21 @@ contains
     vorh(2) = dudzh - dwdxh
     vorh(3) = dvdxh - dudyh
 
-    vord(:) = vor(:) - vorh(:)
+    vorticity_diff(:) = vor(:) - vorh(:)
 
     vor2  = vor(1)**2  + vor(2)**2  + vor(3)**2
     vorh2 = vorh(1)**2 + vorh(2)**2 + vorh(3)**2
-    vord2 = vord(1)**2 + vord(2)**2 + vord(3)**2
+    vorticity_diff2 = vorticity_diff(1)**2 + vorticity_diff(2)**2 + vorticity_diff(3)**2
 
-    svor2 = 2.d0 * sqrt(vor2) * sqrt(vorh2) + vorh2 + vor2 - vord2
+    svor2 = 2.d0 * sqrt(vor2) * sqrt(vorh2) + vorh2 + vor2 - vorticity_diff2
 
     if (abs(svor2) < 1.d-30) then
       tan2 = 0.d0
     else
-      tan2 = (2.d0 * sqrt(vorh2) * sqrt(vor2) - vorh2 - vor2 + vord2) / svor2
+      tan2 = (2.d0 * sqrt(vorh2) * sqrt(vor2) - vorh2 - vor2 + vorticity_diff2) / svor2
     endif
 
-    rtheta = tan2 / (tan(10.d0 * pi / 180.d0))**2
+    rtheta = tan2 / tan10deg2
     ftheta = min(1.d0, rtheta**2)
 
     S2 = 2.d0 * (dudx**2 + dvdy**2 + dwdz**2) + ((dvdx + dudy)**2 + (dwdy + dvdz)**2 + (dudz + dwdx)**2)
@@ -98,11 +99,12 @@ contains
     real(8), intent(in), device, contiguous  :: Q(nx,5,ny,nz)
     real(8), intent(out), device, contiguous :: mut(nx,ny,nz), qc2(nx,ny,nz)
     integer i, j, k
-    real(8), dimension(3,3,3) :: u3, v3, w3, uh, vh, wh
+    real(8), dimension(3,3,3) :: u3, v3, w3, u_test, v_test, w_test
     real(8), dimension(5,5,5) :: u5, v5, w5
     i = (blockIdx%x-1)*blockDim%x + threadIdx%x + 1
     j = (blockIdx%y-1)*blockDim%y + threadIdx%y + 1
     k = (blockIdx%z-1)*blockDim%z + threadIdx%z + 1
+    if (i < 2 .or. nx-1 < i .or. j < 2 .or. ny-1 < j .or. k < 2 .or. nz-1 < k) return
     u3 = Q(i-1:i+1,2,j-1:j+1,k-1:k+1)
     v3 = Q(i-1:i+1,3,j-1:j+1,k-1:k+1)
     w3 = Q(i-1:i+1,4,j-1:j+1,k-1:k+1)
@@ -110,16 +112,16 @@ contains
       u5 = Q(i-2:i+2,2,j-2:j+2,k-2:k+2)
       v5 = Q(i-2:i+2,3,j-2:j+2,k-2:k+2)
       w5 = Q(i-2:i+2,4,j-2:j+2,k-2:k+2)
-      uh = stride_filter(u5)
-      vh = stride_filter(v5)
-      wh = stride_filter(w5)
+      u_test = stride_filter(u5)
+      v_test = stride_filter(v5)
+      w_test = stride_filter(w5)
     else
-      uh = u3
-      vh = v3
-      wh = w3
+      u_test = u3
+      v_test = v3
+      w_test = w3
     endif
-    qc2(i,j,k) = 0.5d0 * ((u3(2,2,2) - uh(2,2,2))**2 + (v3(2,2,2) - vh(2,2,2))**2 + (w3(2,2,2) - wh(2,2,2))**2)
-    mut(i,j,k) = Q(i,1,j,k) * SMS(u3,v3,w3,uh,vh,wh,dx(i),dy(j),dz(k),qc2(i,j,k))
+    qc2(i,j,k) = 0.5d0 * ((u3(2,2,2) - u_test(2,2,2))**2 + (v3(2,2,2) - v_test(2,2,2))**2 + (w3(2,2,2) - w_test(2,2,2))**2)
+    mut(i,j,k) = Q(i,1,j,k) * SMS(u3,v3,w3,u_test,v_test,w_test,dx(i),dy(j),dz(k),qc2(i,j,k))
   end subroutine calc_mut
 end module calc_les
 

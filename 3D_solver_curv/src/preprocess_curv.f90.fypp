@@ -102,7 +102,7 @@ contains
     real(8), intent(out), device, contiguous :: QJ(nx,5,ny,nz)
     real(4), intent(inout)                   :: ke0, entropy0
     real(8) dt_Szeta_cpu(nx-2,ny-2)
-    real(4) rho1d(nx*ny*nz), p1d(nx*ny*nz), v1d(nx*ny*nz*3)
+    real(4) rho_flat(nx*ny*nz), p_flat(nx*ny*nz), vel_flat(nx*ny*nz*3)
     integer i, j, k, l, ierr
     ! 1. Compute QJ = Q / Jacobian_code and dt_Szeta = dt / (Jacobian_code * dz) = dt * J_2D
     do k = 1, nz
@@ -131,8 +131,8 @@ contains
     ! 3. Set overlap from compile-time ORDER
     overlap = ${ORDER_IO + 1}$
     ! 4. Output step 0
-    call make_1d_for_print_curv(nx, ny, nz, Jac_cpu, Q, rho1d, p1d, v1d)
-    call print_vtk_curv(0, nx, ny, nz, myrank+1, nranks, x_phys, y_phys, z, rho1d, p1d, v1d, ke0, entropy0)
+    call make_1d_for_print_curv(nx, ny, nz, Jac_cpu, Q, rho_flat, p_flat, vel_flat)
+    call print_vtk_curv(0, nx, ny, nz, myrank+1, nranks, x_phys, y_phys, z, rho_flat, p_flat, vel_flat, ke0, entropy0)
     call MPI_SEND(ke0,      1, MPI_REAL4, myrank+1, 3*(myrank+1)+1, MPI_COMM_WORLD, ierr)
     call MPI_SEND(entropy0, 1, MPI_REAL4, myrank+1, 3*(myrank+1)+2, MPI_COMM_WORLD, ierr)
   end subroutine pre_calc_curv

@@ -18,3 +18,12 @@ def pytest_configure(config):
 def repo_root():
     return REPO_ROOT
 
+
+def assert_close_relative(computed, reference, rtol, label=""):
+    """Assert that computed is within rtol of reference (relative error)."""
+    rel_err = abs(computed - reference) / abs(reference)
+    assert rel_err < rtol, (
+        f"{label + ': ' if label else ''}"
+        f"rel_err={rel_err:.3%}, computed={computed:.4g}, ref={reference:.4g}"
+    )
+

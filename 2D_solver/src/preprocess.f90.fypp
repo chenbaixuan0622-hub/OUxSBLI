@@ -80,7 +80,7 @@ contains
     real(4), intent(inout)                   :: entropy0            !< reference entropy
     real(8) xix_cpu(nx-1), etay_cpu(ny-1)
     real(8) dtdx_cpu(nx-2), dtdy_cpu(ny-2)
-    !real(io) rho1d(nx*ny), p1d(nx*ny), v1d(nx*ny*3)
+    !real(io) rho_flat(nx*ny), p_flat(nx*ny), vel_flat(nx*ny*3)
     integer i, j, k, l, ierr
     ! set Q / Jacobian
     do j = 1, ny

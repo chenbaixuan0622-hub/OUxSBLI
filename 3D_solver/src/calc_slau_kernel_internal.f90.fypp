@@ -96,7 +96,7 @@ contains
     real(8), dimension(-(io-1):sx*sy*sz-io), shared :: rho, u, v, w, p
     real(8), dimension(sxr*sy*sz), shared           :: rhor, ur, vr, wr, pr
     real(8) rhol, ul, vl, wl, pl
-    real(sp) fdx
+    real(sp) fdx  ! sp intentional: sensor interpolation does not need double precision
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -153,7 +153,7 @@ contains
     real(8), dimension(-(io-1):sx*sy*sz-io), shared :: rho, u, v, w, p
     real(8), dimension(sx*syr*sz), shared           :: rhor, ur, vr, wr, pr
     real(8) rhol, ul, vl, wl, pl
-    real(sp) fdy
+    real(sp) fdy  ! sp intentional: sensor interpolation does not need double precision
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -210,7 +210,7 @@ contains
     real(8), dimension(-(io-1):sx*sy*sz-io), shared :: rho, u, v, w, p
     real(8), dimension(sx*sy*szr), shared           :: rhor, ur, vr, wr, pr
     real(8) rhol, ul, vl, wl, pl
-    real(sp) fdz
+    real(sp) fdz  ! sp intentional: sensor interpolation does not need double precision
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
@@ -267,7 +267,7 @@ contains
     real(8), dimension(-(io-1):sx*sy*sz-io), shared :: rho, u, v, w, p
     real(8), dimension(sx*sy*szr), shared           :: rhor, ur, vr, wr, pr
     real(8) rhol, ul, vl, wl, pl
-    real(sp) fdz
+    real(sp) fdz  ! sp intentional: sensor interpolation does not need double precision
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
