@@ -88,6 +88,15 @@ program main
     open(10,file=filename,status="replace",action="write",form="unformatted",access="stream")
     write(10) Q
     close(10)
+    ! grid data
+    write(filename, "(a)") "recal/x.dat"
+    open(10,file=filename,status="replace",action="write",form="unformatted",access="stream")
+    write(10) x
+    close(10)
+    write(filename, "(a)") "recal/y.dat"
+    open(10,file=filename,status="replace",action="write",form="unformatted",access="stream")
+    write(10) y
+    close(10)
     call cpu_time(t_end)
     s = t_end - t_start
     print *, "output time:", s, " [sec]"
