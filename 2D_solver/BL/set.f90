@@ -6,6 +6,7 @@ module set
   use set_bc_common
   use set_init_common
   implicit none
+  real(8) ptbl
 contains
   subroutine set_grid(myrank, nx, ny, Lx, Ly, x, y, dx, dy)
     integer, intent(in)  :: myrank, nx, ny
@@ -35,11 +36,68 @@ contains
   end subroutine set_grid
 
 
+  subroutine interpolate_Q(nx, nyi, ny, y, Qi, Qp)
+    integer, intent(in)  :: nx, nyi, ny
+    real(8), intent(in)  :: y(ny)
+    real(8), intent(in)  :: Qi(5,nyi)
+    real(8), intent(out) :: Qp(4,ny)
+    integer :: i, j
+    real(8) :: y1, y2, alpha
+    do j = 1, ny
+      if (y(j) <= Qi(1,1)) then
+        Qp(:,j) = Qi(2:5,1)
+      elseif (y(j) >= Qi(1,nyi)) then
+        Qp(:,j) = Qi(2:5,nyi)
+      else
+        do i = 1, nyi-1
+          y1 = Qi(1,i)
+          y2 = Qi(1,i+1)
+          if (y1 <= y(j) .and. y(j) <= y2) then
+            alpha = (y(j) - y1) / (y2 - y1)
+            Qp(:,j) = (1.0d0 - alpha) * Qi(2:5,i) + alpha * Qi(2:5,i+1)
+            exit
+          endif
+        enddo
+      endif
+    enddo
+  end subroutine interpolate_Q
+
+
   subroutine set_init(myrank, nx, ny, xs, ys, Q)
     integer, intent(in)  :: myrank, nx, ny
     real(8), intent(in)  :: xs(nx), ys(ny)
     real(8), intent(out) :: Q(nx,4,ny)
-    call set_init_tbl(nx, ny, xs, ys, 0.75d0*blt, blt, u0, p0, T0, M0, Q)
+    character(len=40) filename
+    integer j, nyi, filesize, ios
+    real(8) rho, u, v, p
+    real(8), allocatable :: Qi(:,:), Qp(:,:)
+    write(filename, "(a)") "./Qin.dat"
+    open(10, file=filename, action="read", form="unformatted", access="stream", status="old", iostat=ios)
+    if (ios /= 0) then
+      print *, "Error opening file Qin.dat"
+    endif
+    inquire(10, size=filesize)
+    nyi = filesize / (8 * 5)
+    allocate(Qi(5,nyi))
+    read(10) Qi
+    close(10)
+    allocate(Qp(4,ny))
+    call interpolate_Q(nx, nyi, ny, ys, Qi, Qp)
+    ptbl = 0.d0
+    do j = 1, nyi
+      ptbl = ptbl + Qp(4,j)
+    enddo
+    ptbl = ptbl / dble(nyi)
+    do j = 1, ny
+      rho = Qp(1,j)
+      u   = Qp(2,j)
+      v   = Qp(3,j)
+      Q(:,1,j) = rho
+      Q(:,2,j) = rho * u
+      Q(:,3,j) = rho * v
+      Q(:,4,j) = ptbl * over_gamma_1 + 0.5d0 * rho * (u**2 + v**2)
+    enddo
+    deallocate(Qi, Qp)
   end subroutine set_init
 
 
@@ -49,48 +107,20 @@ contains
     real(8), intent(inout), device :: QJ(nx,4,ny) ! Q / Jacobian
     integer i, j, l, ireq, ierr, istat(MPI_STATUS_SIZE)
     real(8) :: p_wall
-    ! Riemann invariants
-    real(8) :: rhoin, pin, cin, vin, Rp, Rm, rhob, ub, vb, cb, pb, v0 = 0.d0
-    ! cache
-    real(8) Jacobian_tmp
-    ! temperature and density at top
-    real(8), parameter :: T       = Taw - rf * u0**2 / (2.d0 * Cp)
-    real(8), parameter :: rho0    = p0 / (R * T)
-    real(8), parameter :: c0      = sqrt(gamma * p0 / rho0)
-    real(8), parameter :: over_c0 = 1.d0 / c0
     !$cuf kernel do(1)<<<*,*>>>
     do j = 2, ny-1
       do l = 1, 4
-        ! inlet
-        QJ(1,l,j) = QJ(nx-5,l,j)
-        QJ(2,l,j) = QJ(nx-4,l,j)
-        QJ(3,l,j) = QJ(nx-3,l,j)
         ! outlet
-        QJ(nx-2,l,j) = QJ(4,l,j)
-        QJ(nx-1,l,j) = QJ(5,l,j)
-        QJ(nx,l,j)   = QJ(6,l,j)
+        QJ(nx,l,j) = QJ(nx-1,l,j)
     enddo;enddo
 
     !$cuf kernel do(1)<<<*,*>>>
     do i = 1, nx
-      ! top
-      ! Riemann invariants
-      Jacobian_tmp = 1.d0 / Jacobian(i,ny)
-      pin   = gamma_1 * (QJ(i,4,ny-1) - 0.5d0 * (QJ(i,2,ny-1)**2 + QJ(i,3,ny-1)**2) &
-              / QJ(i,1,ny-1)) * Jacobian(i,ny-1)
-      rhoin = QJ(i,1,ny-1) * Jacobian(i,ny-1)
-      cin   = sqrt(gamma * pin / rhoin)
-      vin   = QJ(i,3,ny-1) / QJ(i,1,ny-1)
-      Rp   = vin + 2.d0 * cin * over_gamma_1
-      Rm   = v0  - 2.d0 * c0  * over_gamma_1
-      vb   = 0.5d0 * (Rp + Rm)
-      cb   = 0.25d0 * gamma_1 * (Rp - Rm)
-      rhob = (cb * over_c0)**(2.d0 * over_gamma_1) * rho0
-      pb   = (rhob * cb**2) * over_gamma
-      QJ(i,1,ny) = rhob * Jacobian_tmp
-      QJ(i,2,ny) = rhob * u0 * Jacobian_tmp
-      QJ(i,3,ny) = rhob * vb * Jacobian_tmp
-      QJ(i,4,ny) = (pb * over_gamma_1 + 0.5d0 * rhob * (u0**2 + vb**2)) * Jacobian_tmp
+      ! Neumann
+      QJ(i,1,ny) = QJ(i,1,ny-1)
+      QJ(i,2,ny) = QJ(i,2,ny-1)
+      QJ(i,3,ny) = QJ(i,3,ny-1)
+      QJ(i,4,ny) = QJ(i,4,ny-1)
       ! NoSlip
       QJ(i,1,1) = QJ(i,1,2)
       QJ(i,2,1) = 0.d0
@@ -100,4 +130,3 @@ contains
     enddo
   end subroutine set_bc
 end module set
-

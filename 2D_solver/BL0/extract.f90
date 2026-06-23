@@ -1,8 +1,9 @@
 program extract
   implicit none
-  integer j, nx, ny, nxe, filesize, ios
-  real(8) :: tmp(5)
-  real(8), allocatable :: x(:), y(:), Q(:,:,:)
+  integer j, nx, nx1, nx2, ny, filesize, ios
+  real(8) :: rho, u, v, p, tmp(5)
+  real(8) :: gamma = 1.4d0
+  real(8), allocatable :: x(:), y(:), Q(:,:,:), Q1d(:,:)
   character(len=40) filename
 
   write(filename, "(a)") "./recal/x.dat"
@@ -39,17 +40,40 @@ program extract
   close(10)
 
   ! extract surface
-  print *, "Choose extract line nxe:"
-  read(*,*) nxe
+  print *, "Choose extract from:"
+  read(*,*) nx1
+  print *, "to:"
+  read(*,*) nx2
 
-  write(filename, "(a, i5.5, a)") "./Qx", int(nxe), ".dat"
-  open(10, file=filename, action="write", form="formatted", status="replace") 
-  write(10, "(a)") "y rho rhou rhov e"
+  allocate(Q1d(5,ny))
   do j = 1, ny
-    tmp = [y(j), Q(nxe,1,j), Q(nxe,2,j), Q(nxe,3,j), Q(nxe,4,j)]
+    rho = sum(Q(nx1:nx2,1,j)) / dble(nx2 - nx1)
+    u   = sum(Q(nx1:nx2,2,j) / Q(nx1:nx2,1,j)) / dble(nx2 - nx1)
+    v   = sum(Q(nx1:nx2,3,j) / Q(nx1:nx2,1,j)) / dble(nx2 - nx1)
+    p   = sum((gamma - 1.d0) * (Q(nx1:nx2,4,j) &
+          - 0.5d0 * (Q(nx1:nx2,2,j)**2 + Q(nx1:nx2,3,j)**2) / Q(nx1:nx2,1,j))) / dble(nx2 - nx1)
+    Q1d(1,j) = y(j)
+    Q1d(2,j) = rho
+    Q1d(3,j) = u
+    Q1d(4,j) = v
+    Q1d(5,j) = p
+  enddo
+  ! bc on top
+  Q1d(2:5,ny) = Q1d(2:5,ny-1)
+
+  write(filename, "(a, i5.5, a, i5.5, a)") "./Qx", int(nx1), "_", int(nx2), ".d"
+  open(10, file=filename, action="write", form="formatted", status="replace") 
+  write(10, "(a)") "y rho u v p"
+  do j = 1, ny
+    tmp = [Q1d(1,j), Q1d(2,j), Q1d(3,j), Q1d(4,j), Q1d(5,j)]
     write(10, *) tmp
   enddo
   close(10)
 
-  deallocate(x, y, Q)
+  write(filename, "(a, i5.5, a, i5.5, a)") "./Qx", int(nx1), "_", int(nx2), ".dat"
+  open(10, file=filename, action="write", form="unformatted", access="stream", status="replace") 
+  write(10) Q1d
+  close(10)
+
+  deallocate(x, y, Q, Q1d)
 end program extract

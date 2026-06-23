@@ -145,7 +145,8 @@ contains
       print *, "myrank is ", myrank, " memory allocation has completed"
       call pre_calc(nx, ny, myrank, nranks, x, dx_cpu, y, dy_cpu, Jacobian_cpu, Q, overlap, &
                     dtdx, dtdy, xix, etay, Jacobian, QJ, ke0, entropy0)
-      Rs = 0.d0
+      Rs  = 0.d0
+      QJs = QJ ! initialize QJs
     else
       call MPI_RECV(ke0,      1, MPI_REAL4, myrank-1, 3*myrank+1, MPI_COMM_WORLD, istat, ierr)
       call MPI_RECV(entropy0, 1, MPI_REAL4, myrank-1, 3*myrank+2, MPI_COMM_WORLD, istat, ierr)
