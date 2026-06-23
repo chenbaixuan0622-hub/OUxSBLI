@@ -1,10 +1,10 @@
 module mod_globals
   use cudafor
   implicit none
-  integer, parameter         :: dimension   = 2
-  integer, parameter         :: sp          = kind(1.d0) ! single or double
-  real(sp), parameter        :: threshold   = 0.4_sp
-  real(8), parameter         :: blt         = 1.d-3
+  integer, parameter  :: dimension   = 2
+  integer, parameter  :: sp          = kind(1.d0) ! single or double
+  real(sp), parameter :: threshold   = 0.4_sp
+  real(8), parameter  :: blt         = 1.d-3
 
   ! mesh
   real(8), parameter :: Lx = 20.d0 * blt
@@ -12,7 +12,6 @@ module mod_globals
   ! DNS
   integer, parameter :: nx = 257
   integer, parameter :: ny = 129
-  
 
   ! RTX 4090
   type(dim3), parameter :: threadsE  = dim3(128,1,1)
@@ -23,14 +22,17 @@ module mod_globals
   type(dim3) :: blocksE, blocksF, blocksEv, blocksFv, blocks
 
   ! time
-  integer, parameter         :: step_offset   = 0
-  real(8), parameter :: endT  = 0.1d-3
-  integer, parameter :: np    = 10
+  integer, parameter :: step_offset = 0
+  real(8), parameter :: endT  = 0.3d-3
+  integer, parameter :: np    = 30
   real(8), parameter :: R     = 287.03d0
   real(8), parameter :: gamma = 1.4d0
   real(8), parameter :: M0    = 2.d0
-  real(8), parameter :: T0    = 171.31d0
-  real(8), parameter :: p0    = 14924.d0
+  real(8), parameter :: p_tot = 100.d3
+  real(8), parameter :: T_tot = 295.d0
+  real(8), parameter :: p0    = p_tot / ((1.d0 + 0.5d0 * (gamma - 1.d0) * M0**2)**(gamma/(gamma-1.d0)))
+  real(8), parameter :: T0    = T_tot /  (1.d0 + 0.5d0 * (gamma - 1.d0) * M0**2)
+  real(8), parameter :: rho0  = p0 / (R * T0)
   real(8), parameter :: u0    = M0 * sqrt(gamma * R * T0)
   real(8), parameter :: dt    = 3.d-9
   integer, parameter :: nt    = int(endT / (dble(np) * dt))
