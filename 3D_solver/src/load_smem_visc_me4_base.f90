@@ -1,15 +1,15 @@
-module load_smem_visc4
+module load_smem_visc_me4_base
   use wmma
   use mod_globals, only : threadsEv, threadsFv, threadsGv
   use mod_constant, only : two_third, one_twelfth
   implicit none
   private
-  public load_smem_visc4_x, load_smem_visc4_y, load_smem_visc4_z, load_smem_visc4_z_koff
+  public load_smem_visc_me4_base_x, load_smem_visc_me4_base_y, load_smem_visc_me4_base_z, load_smem_visc_me4_base_z_koff
 contains
   #if _CUDA_ARCH_ >= 900
   !> TMA version
-  attributes(device) subroutine load_smem_visc4_x(it, jt, kt, j, k, &
-                                                  nx, ny, nz, inv_dy, inv_dz, Q, u, v, w, uy, vy, uz, wz)
+  attributes(device) subroutine load_smem_visc_me4_base_x(it, jt, kt, j, k, &
+                                                          nx, ny, nz, inv_dy, inv_dz, Q, u, v, w, uy, vy, uz, wz)
     integer, intent(in), value              :: it            !< local idx for x direction
     integer, intent(in), value              :: jt            !< local idx for y direction
     integer, intent(in), value              :: kt            !< local idx for z direction
@@ -77,10 +77,10 @@ contains
     do
       if (barrier_try_wait_sleep(barrier, token, 1000000) .ne. 0) exit
     enddo
-  end subroutine load_smem_visc4_x
+  end subroutine load_smem_visc_me4_base_x
   #else
-  attributes(device) subroutine load_smem_visc4_x(it, jt, kt, j, k, &
-                                                  nx, ny, nz, inv_dy, inv_dz, Q, u, v, w, uy, vy, uz, wz)
+  attributes(device) subroutine load_smem_visc_me4_base_x(it, jt, kt, j, k, &
+                                                          nx, ny, nz, inv_dy, inv_dz, Q, u, v, w, uy, vy, uz, wz)
     integer, intent(in), value              :: it            !< local idx for x direction
     integer, intent(in), value              :: jt            !< local idx for y direction
     integer, intent(in), value              :: kt            !< local idx for z direction
@@ -130,12 +130,12 @@ contains
     enddo
     call pipelineWaitPrior(0)
     call syncthreads()
-  end subroutine load_smem_visc4_x
+  end subroutine load_smem_visc_me4_base_x
   #endif
 
 
-  attributes(device) subroutine load_smem_visc4_y(it, jt, kt, i, k, &
-                                                  nx, ny, nz, inv_dx, inv_dz, Q, u, v, w, ux, vx, vz, wz)
+  attributes(device) subroutine load_smem_visc_me4_base_y(it, jt, kt, i, k, &
+                                                          nx, ny, nz, inv_dx, inv_dz, Q, u, v, w, ux, vx, vz, wz)
     integer, intent(in), value              :: it            !< local idx for x direction
     integer, intent(in), value              :: jt            !< local idx for y direction
     integer, intent(in), value              :: kt            !< local idx for z direction
@@ -185,11 +185,11 @@ contains
     enddo
     call pipelineWaitPrior(0)
     call syncthreads()
-  end subroutine load_smem_visc4_y
+  end subroutine load_smem_visc_me4_base_y
 
   
-  attributes(device) subroutine load_smem_visc4_z(it, jt, kt, i, j, &
-                                                  nx, ny, nz, inv_dx, inv_dy, Q, u, v, w, ux, wx, vy, wy)
+  attributes(device) subroutine load_smem_visc_me4_base_z(it, jt, kt, i, j, &
+                                                          nx, ny, nz, inv_dx, inv_dy, Q, u, v, w, ux, wx, vy, wy)
     integer, intent(in), value              :: it            !< local idx for x direction
     integer, intent(in), value              :: jt            !< local idx for y direction
     integer, intent(in), value              :: kt            !< local idx for z direction
@@ -239,12 +239,12 @@ contains
     enddo
     call pipelineWaitPrior(0)
     call syncthreads()
-  end subroutine load_smem_visc4_z
+  end subroutine load_smem_visc_me4_base_z
 
 
   !> Like load_smem_visc4_z but k_base is shifted by k_lo-1 for koff kernel launches
-  attributes(device) subroutine load_smem_visc4_z_koff(it, jt, kt, i, j, &
-                                                  nx, ny, nz, inv_dx, inv_dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+  attributes(device) subroutine load_smem_visc_me4_base_z_koff(it, jt, kt, i, j, &
+                                                               nx, ny, nz, inv_dx, inv_dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
     integer, intent(in), value              :: it            !< local idx for x direction
     integer, intent(in), value              :: jt            !< local idx for y direction
     integer, intent(in), value              :: kt            !< local idx for z direction
@@ -295,6 +295,5 @@ contains
     enddo
     call pipelineWaitPrior(0)
     call syncthreads()
-  end subroutine load_smem_visc4_z_koff
-end module load_smem_visc4
-
+  end subroutine load_smem_visc_me4_base_z_koff
+end module load_smem_visc_me4_base
