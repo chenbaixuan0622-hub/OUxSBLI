@@ -1,28 +1,46 @@
-!> Module containing 4th-order viscous flux computation kernels
-!> Uses centered difference stencils to compute viscous stresses and heat flux
-!> Generally more accurate but requires larger stencils than 2nd-order
 #:include 'config.fypp'
+#:if not defined('VISC_ORDER')
+  #:set VISC_ORDER = ORDER
+#:endif
+#:if not defined('VISC_STENCIL')
+  #:set VISC_STENCIL = 'Central'
+#:endif
 #:set is_les = (VISC == 'LES')
 #:set base_suf = ""
-module calc_visc4
+#:if VISC_ORDER == 2
+module calc_visc_high
+end module calc_visc_high
+#:else
+module calc_visc_high
   use mod_globals, only : gamma, R, Pr, Prt, dt, threadsEv, threadsFv, threadsGv
   use mod_constant, only : id_visc, Cp, gamma_1, Cp_over_Pr, one_third, two_third, one_twelfth
-  use load_smem_visc4
+  #:if VISC_ORDER == 4
+  use load_smem_visc_cent4
+  #:elif VISC_STENCIL == 'ME4Base'
+  use load_smem_visc_me4_base
+  #:else
+  use load_smem_visc_cent6
+  #:endif
   implicit none
   private
-  public calc_Ev4, calc_Fv4, calc_Gv4, calc_Ev4_koff, calc_Fv4_koff, calc_Gv4_koff
-  real(8), parameter :: one_24 = 1.d0 / 24.d0 !< coefficient for 4th-order flux (1/24)
+  public calc_Ev${VISC_ORDER}$, calc_Fv${VISC_ORDER}$, calc_Gv${VISC_ORDER}$, &
+         calc_Ev${VISC_ORDER}$_koff, calc_Fv${VISC_ORDER}$_koff, calc_Gv${VISC_ORDER}$_koff
+  real(8), parameter :: one_24 = 1.d0 / 24.d0
 contains
+  #:if VISC_ORDER == 4
+  #:include 'calc_visc_cent.f90.fypp'
+  #:elif VISC_STENCIL == 'ME4Base'
   include 'calc_visc_me4_base.f90'
+  #:else
+  #:include 'calc_visc_cent.f90.fypp'
+  #:endif
 
-  !> CUDA Fortran kernel for 4th-order viscous flux in x direction
-  !> High-order accurate computation of viscous stress and heat flux
 #:for is_koff in [False, True]
   #:set suf = base_suf
   #:if is_koff
     #:set suf = suf + "_koff"
   #:endif
-  attributes(global) subroutine calc_Ev4${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
+  attributes(global) subroutine calc_Ev${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
     #:if is_les
       mut, qc2, &
     #:endif
@@ -30,25 +48,29 @@ contains
       k_lo, k_hi, &
     #:endif
     E)
-    integer, intent(in), value                 :: nx                  !< number of grid points in x direction
-    integer, intent(in), value                 :: ny                  !< number of grid points in y direction
-    integer, intent(in), value                 :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device, contiguous    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
-    real(8), intent(in), device, contiguous    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
-    real(8), intent(in), device, contiguous    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
-    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)       !< conservative variables
-    real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
-    real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    integer, intent(in), value                 :: nx
+    integer, intent(in), value                 :: ny
+    integer, intent(in), value                 :: nz
+    real(8), intent(in), device, contiguous    :: dx(nx-1)
+    real(8), intent(in), device, contiguous    :: dy(ny-1)
+    real(8), intent(in), device, contiguous    :: dz(nz-1)
+    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous    :: T(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)
     #:if is_les
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)
     #:endif
-    real(8), intent(inout), device, contiguous :: E(5,nx-1,ny-2,nz-2) !< viscous flux components in x direction
+    real(8), intent(inout), device, contiguous :: E(5,nx-1,ny-2,nz-2)
     #:if is_koff
-    integer, intent(in), value                 :: k_lo                !< z lower bound (global, 1-based)
-    integer, intent(in), value                 :: k_hi                !< z upper bound (global, 1-based)
+    integer, intent(in), value                 :: k_lo
+    integer, intent(in), value                 :: k_hi
     #:endif
+    #:if VISC_ORDER == 4
+    integer, parameter :: io_v = 1
+    #:else
     integer, parameter :: io_v = 2
+    #:endif
     integer, parameter :: sx = threadsEv%x + 2*io_v + 1
     integer, parameter :: sy = threadsEv%y
     integer, parameter :: sz = threadsEv%z
@@ -74,7 +96,13 @@ contains
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     #:endif
     offset_yz = (jt-1)*sx + (kt-1)*sx*sy
-    call load_smem_visc4_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
+    #:if VISC_ORDER == 4
+    call load_smem_visc_cent4_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
+    #:elif VISC_STENCIL == 'ME4Base'
+    call load_smem_visc_me4_base_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
+    #:else
+    call load_smem_visc_cent6_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
+    #:endif
     i  = (blockIdx%x-1)*blockDim%x + it
     idx = it + offset_yz
     #:if is_koff
@@ -82,6 +110,32 @@ contains
     #:else
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     #:endif
+    #:if VISC_ORDER == 4
+    if (2 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
+      block
+        real(8) :: mu4(4)
+        #:if is_les
+        real(8) :: mut4(4)
+        mut4(:) = mut(i-1:i+2, j, k)
+        #:endif
+        mu4(:) = mu(i-1:i+2, j, k)
+        kTx = Cp_over_Pr * interp4(mu4) * diff4(dx(i), T(i-1:i+2, j, k))
+        #:if is_les
+        call calc_tau_straight_LES(mu4, mut4, u(idx-1:idx+2), vy(idx-1:idx+2), wz(idx-1:idx+2), dx(i), txx, utxx)
+        call calc_tau_cross_LES(mu4, mut4, v(idx-1:idx+2), uy(idx-1:idx+2), dx(i), txy, vtxy)
+        call calc_tau_cross_LES(mu4, mut4, w(idx-1:idx+2), uz(idx-1:idx+2), dx(i), txz, wtxz)
+        block
+          real(8) :: H(4)
+          H(:) = Cp * T(i-1:i+2,j,k) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i-1:i+2,j,k)
+          Hsgs = -interp4(mut4) * diff4(dx(i), H) / Prt
+        end block
+        #:else
+        call calc_tau_straight(mu4, u(idx-1:idx+2), vy(idx-1:idx+2), wz(idx-1:idx+2), dx(i), txx, utxx)
+        call calc_tau_cross(mu4, v(idx-1:idx+2), uy(idx-1:idx+2), dx(i), txy, vtxy)
+        call calc_tau_cross(mu4, w(idx-1:idx+2), uz(idx-1:idx+2), dx(i), txz, wtxz)
+        #:endif
+      end block
+    #:elif VISC_STENCIL == 'ME4Base'
     if (3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
       block
         real(8) :: mu3(3)
@@ -111,6 +165,32 @@ contains
         call calc_tau_cross(mu3, w(idx-2:idx+3), uz(idx-2:idx+3), dx(i), txz, wtxz)
         #:endif
       end block
+    #:else
+    if (3 <= i .and. i <= nx-3 .and. 4 <= j .and. j <= ny-3 .and. 4 <= k .and. k <= nz-3) then
+      block
+        real(8) :: mu6(6)
+        #:if is_les
+        real(8) :: mut6(6)
+        mut6(:) = mut(i-2:i+3, j, k)
+        #:endif
+        mu6(:) = mu(i-2:i+3, j, k)
+        kTx = Cp_over_Pr * interp6(mu6) * diff6(dx(i), T(i-2:i+3, j, k))
+        #:if is_les
+        call calc_tau_straight_LES(mu6, mut6, u(idx-2:idx+3), vy(idx-2:idx+3), wz(idx-2:idx+3), dx(i), txx, utxx)
+        call calc_tau_cross_LES(mu6, mut6, v(idx-2:idx+3), uy(idx-2:idx+3), dx(i), txy, vtxy)
+        call calc_tau_cross_LES(mu6, mut6, w(idx-2:idx+3), uz(idx-2:idx+3), dx(i), txz, wtxz)
+        block
+          real(8) :: H(6)
+          H(:) = Cp * T(i-2:i+3,j,k) + 0.5d0 * (u(idx-2:idx+3)**2 + v(idx-2:idx+3)**2 + w(idx-2:idx+3)**2) + qc2(i-2:i+3,j,k)
+          Hsgs = -interp6(mut6) * diff6(dx(i), H) / Prt
+        end block
+        #:else
+        call calc_tau_straight(mu6, u(idx-2:idx+3), vy(idx-2:idx+3), wz(idx-2:idx+3), dx(i), txx, utxx)
+        call calc_tau_cross(mu6, v(idx-2:idx+3), uy(idx-2:idx+3), dx(i), txy, vtxy)
+        call calc_tau_cross(mu6, w(idx-2:idx+3), uz(idx-2:idx+3), dx(i), txz, wtxz)
+        #:endif
+      end block
+    #:endif
     else
       block
         real(8) mx, mux, mvx, mwx, muy, mvy, muz, mwz
@@ -165,10 +245,6 @@ contains
         vtxy = 0.5d0 * (v(idx) + v(idx+1)) * txy
         wtxz = 0.5d0 * (w(idx) + w(idx+1)) * txz
         #:if is_les
-        ! NOTE:
-        ! SGS stress contribution is intentionally excluded
-        ! from viscous work terms following selective mixed
-        ! scale LES modeling strategy.
         muxsgs = mxsgs * (-u(idx) + u(idx+1)) * dx(i)
         mvxsgs = mxsgs * (-v(idx) + v(idx+1)) * dx(i)
         mwxsgs = mxsgs * (-w(idx) + w(idx+1)) * dx(i)
@@ -191,18 +267,16 @@ contains
       + Hsgs &
     #:endif
     )
-  end subroutine calc_Ev4${suf}$
+  end subroutine calc_Ev${VISC_ORDER}$${suf}$
 #:endfor
 
 
-  !> CUDA Fortran kernel for 4th-order viscous flux in y direction
-  !> High-order accurate computation of viscous stress and heat flux
 #:for is_koff in [False, True]
   #:set suf = base_suf
   #:if is_koff
     #:set suf = suf + "_koff"
   #:endif
-  attributes(global) subroutine calc_Fv4${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
+  attributes(global) subroutine calc_Fv${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
     #:if is_les
       mut, qc2, &
     #:endif
@@ -210,25 +284,29 @@ contains
       k_lo, k_hi, &
     #:endif
     F)
-    integer, intent(in), value                 :: nx                  !< number of grid points in x direction
-    integer, intent(in), value                 :: ny                  !< number of grid points in y direction
-    integer, intent(in), value                 :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device, contiguous    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
-    real(8), intent(in), device, contiguous    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
-    real(8), intent(in), device, contiguous    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
-    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)       !< conservative variables
-    real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
-    real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    integer, intent(in), value                 :: nx
+    integer, intent(in), value                 :: ny
+    integer, intent(in), value                 :: nz
+    real(8), intent(in), device, contiguous    :: dx(nx-1)
+    real(8), intent(in), device, contiguous    :: dy(ny-1)
+    real(8), intent(in), device, contiguous    :: dz(nz-1)
+    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous    :: T(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)
     #:if is_les
-    real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)       !< turbulent eddy viscosity (LES model)
-    real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)       !< quadratic constitutive relation correction
+    real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)
     #:endif
-    real(8), intent(inout), device, contiguous :: F(5,nx-2,ny-1,nz-2) !< viscous flux components in y direction
+    real(8), intent(inout), device, contiguous :: F(5,nx-2,ny-1,nz-2)
     #:if is_koff
-    integer, intent(in), value                 :: k_lo                !< z lower bound (global, 1-based)
-    integer, intent(in), value                 :: k_hi                !< z upper bound (global, 1-based)
+    integer, intent(in), value                 :: k_lo
+    integer, intent(in), value                 :: k_hi
     #:endif
+    #:if VISC_ORDER == 4
+    integer, parameter :: io_v = 1
+    #:else
     integer, parameter :: io_v = 2
+    #:endif
     integer, parameter :: sx = threadsFv%x
     integer, parameter :: sy = threadsFv%y + 2*io_v + 1
     integer, parameter :: sz = threadsFv%z
@@ -254,7 +332,13 @@ contains
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     #:endif
     offset_xz = (it-1)*sy + (kt-1)*sy*sx
-    call load_smem_visc4_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
+    #:if VISC_ORDER == 4
+    call load_smem_visc_cent4_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
+    #:elif VISC_STENCIL == 'ME4Base'
+    call load_smem_visc_me4_base_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
+    #:else
+    call load_smem_visc_cent6_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
+    #:endif
     j  = (blockIdx%y-1)*blockDim%y + jt
     idx = jt + offset_xz
     #:if is_koff
@@ -262,6 +346,33 @@ contains
     #:else
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     #:endif
+    #:if VISC_ORDER == 4
+    if (3 <= i .and. i <= nx-2 .and. 2 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
+      block
+        real(8) :: mu4(4), T4(4)
+        #:if is_les
+        real(8) :: mut4(4)
+        mut4(:) = mut(i, j-1:j+2, k)
+        #:endif
+        mu4(:) = mu(i, j-1:j+2, k)
+        T4(:) = T(i, j-1:j+2, k)
+        kTy = Cp_over_Pr * interp4(mu4) * diff4(dy(j), T4)
+        #:if is_les
+        call calc_tau_straight_LES(mu4, mut4, v(idx-1:idx+2), wz(idx-1:idx+2), ux(idx-1:idx+2), dy(j), tyy, vtyy)
+        call calc_tau_cross_LES(mu4, mut4, u(idx-1:idx+2), vx(idx-1:idx+2), dy(j), tyx, utyx)
+        call calc_tau_cross_LES(mu4, mut4, w(idx-1:idx+2), vz(idx-1:idx+2), dy(j), tyz, wtyz)
+        block
+          real(8) :: H(4)
+          H(:) = Cp * T(i,j-1:j+2,k) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i,j-1:j+2,k)
+          Hsgs = -interp4(mut4) * diff4(dy(j), H) / Prt
+        end block
+        #:else
+        call calc_tau_straight(mu4, v(idx-1:idx+2), wz(idx-1:idx+2), ux(idx-1:idx+2), dy(j), tyy, vtyy)
+        call calc_tau_cross(mu4, u(idx-1:idx+2), vx(idx-1:idx+2), dy(j), tyx, utyx)
+        call calc_tau_cross(mu4, w(idx-1:idx+2), vz(idx-1:idx+2), dy(j), tyz, wtyz)
+        #:endif
+      end block
+    #:elif VISC_STENCIL == 'ME4Base'
     if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-2) then
       block
         real(8) :: mu3(3)
@@ -291,6 +402,33 @@ contains
         call calc_tau_cross(mu3, w(idx-2:idx+3), vz(idx-2:idx+3), dy(j), tyz, wtyz)
         #:endif
       end block
+    #:else
+    if (4 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-3 .and. 4 <= k .and. k <= nz-3) then
+      block
+        real(8) :: mu6(6), T6(6)
+        #:if is_les
+        real(8) :: mut6(6)
+        mut6(:) = mut(i, j-2:j+3, k)
+        #:endif
+        mu6(:) = mu(i, j-2:j+3, k)
+        T6(:) = T(i, j-2:j+3, k)
+        kTy = Cp_over_Pr * interp6(mu6) * diff6(dy(j), T6)
+        #:if is_les
+        call calc_tau_straight_LES(mu6, mut6, v(idx-2:idx+3), wz(idx-2:idx+3), ux(idx-2:idx+3), dy(j), tyy, vtyy)
+        call calc_tau_cross_LES(mu6, mut6, u(idx-2:idx+3), vx(idx-2:idx+3), dy(j), tyx, utyx)
+        call calc_tau_cross_LES(mu6, mut6, w(idx-2:idx+3), vz(idx-2:idx+3), dy(j), tyz, wtyz)
+        block
+          real(8) :: H(6)
+          H(:) = Cp * T(i,j-2:j+3,k) + 0.5d0 * (u(idx-2:idx+3)**2 + v(idx-2:idx+3)**2 + w(idx-2:idx+3)**2) + qc2(i,j-2:j+3,k)
+          Hsgs = -interp6(mut6) * diff6(dy(j), H) / Prt
+        end block
+        #:else
+        call calc_tau_straight(mu6, v(idx-2:idx+3), wz(idx-2:idx+3), ux(idx-2:idx+3), dy(j), tyy, vtyy)
+        call calc_tau_cross(mu6, u(idx-2:idx+3), vx(idx-2:idx+3), dy(j), tyx, utyx)
+        call calc_tau_cross(mu6, w(idx-2:idx+3), vz(idx-2:idx+3), dy(j), tyz, wtyz)
+        #:endif
+      end block
+    #:endif
     else
       block
         real(8) my, muy, mvy, mwy, mvz, mwz, mux, mvx
@@ -345,10 +483,6 @@ contains
         vtyy = 0.5d0 * (v(idx) + v(idx+1)) * tyy
         wtyz = 0.5d0 * (w(idx) + w(idx+1)) * tyz
         #:if is_les
-        ! NOTE:
-        ! SGS stress contribution is intentionally excluded
-        ! from viscous work terms following selective mixed
-        ! scale LES modeling strategy.
         muysgs = mysgs * (-u(idx) + u(idx+1)) * dy(j)
         mvysgs = mysgs * (-v(idx) + v(idx+1)) * dy(j)
         mwysgs = mysgs * (-w(idx) + w(idx+1)) * dy(j)
@@ -371,18 +505,16 @@ contains
       + Hsgs &
     #:endif
     )
-  end subroutine calc_Fv4${suf}$
+  end subroutine calc_Fv${VISC_ORDER}$${suf}$
 #:endfor
 
 
-  !> CUDA Fortran kernel for 4th-order viscous flux in z direction
-  !> High-order accurate computation of viscous stress and heat flux
 #:for is_koff in [False, True]
   #:set suf = base_suf
   #:if is_koff
     #:set suf = suf + "_koff"
   #:endif
-  attributes(global) subroutine calc_Gv4${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
+  attributes(global) subroutine calc_Gv${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
     #:if is_les
       mut, qc2, &
     #:endif
@@ -390,25 +522,29 @@ contains
       k_lo, k_hi, &
     #:endif
     G)
-    integer, intent(in), value                 :: nx                  !< number of grid points in x direction
-    integer, intent(in), value                 :: ny                  !< number of grid points in y direction
-    integer, intent(in), value                 :: nz                  !< number of grid points in z direction
-    real(8), intent(in), device, contiguous    :: dx(nx-1)            !< inverse grid spacing in x (1/dx)
-    real(8), intent(in), device, contiguous    :: dy(ny-1)            !< inverse grid spacing in y (1/dy)
-    real(8), intent(in), device, contiguous    :: dz(nz-1)            !< inverse grid spacing in z (1/dz)
-    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)       !< conservative variables
-    real(8), intent(in), device, contiguous    :: T(nx,ny,nz)         !< temperature at grid points
-    real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)        !< molecular viscosity coefficient
+    integer, intent(in), value                 :: nx
+    integer, intent(in), value                 :: ny
+    integer, intent(in), value                 :: nz
+    real(8), intent(in), device, contiguous    :: dx(nx-1)
+    real(8), intent(in), device, contiguous    :: dy(ny-1)
+    real(8), intent(in), device, contiguous    :: dz(nz-1)
+    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous    :: T(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)
     #:if is_les
-    real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)       !< turbulent viscosity coefficient
-    real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)       !< kinetic energy correction term for total enthalpy
+    real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)
     #:endif
-    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1) !< viscous flux components in z direction
+    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1)
     #:if is_koff
-    integer, intent(in), value                 :: k_lo                !< z lower bound (global, 1-based)
-    integer, intent(in), value                 :: k_hi                !< z upper bound (global, 1-based)
+    integer, intent(in), value                 :: k_lo
+    integer, intent(in), value                 :: k_hi
     #:endif
+    #:if VISC_ORDER == 4
+    integer, parameter :: io_v = 1
+    #:else
     integer, parameter :: io_v = 2
+    #:endif
     integer, parameter :: sx = threadsGv%x
     integer, parameter :: sy = threadsGv%y
     integer, parameter :: sz = threadsGv%z + 2*io_v + 1
@@ -431,15 +567,54 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     offset_xy = (jt-1)*sz + (it-1)*sz*sy
     #:if is_koff
-    call load_smem_visc4_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+    #:if VISC_ORDER == 4
+    call load_smem_visc_cent4_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+    #:elif VISC_STENCIL == 'ME4Base'
+    call load_smem_visc_me4_base_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+    #:else
+    call load_smem_visc_cent6_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+    #:endif
     k  = (blockIdx%z-1)*blockDim%z + k_lo - 1 + kt
     if (nx-1 < i .or. ny-1 < j .or. k_hi < k) return
     #:else
-    call load_smem_visc4_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
+    #:if VISC_ORDER == 4
+    call load_smem_visc_cent4_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
+    #:elif VISC_STENCIL == 'ME4Base'
+    call load_smem_visc_me4_base_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
+    #:else
+    call load_smem_visc_cent6_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
+    #:endif
     k  = (blockIdx%z-1)*blockDim%z + kt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
     #:endif
     idx = kt + offset_xy
+    #:if VISC_ORDER == 4
+    if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 2 <= k .and. k <= nz-2) then
+      block
+        real(8) :: mu4(4), T4(4)
+        #:if is_les
+        real(8) :: mut4(4)
+        mut4(:) = mut(i, j, k-1:k+2)
+        #:endif
+        mu4(:) = mu(i, j, k-1:k+2)
+        T4(:) = T(i, j, k-1:k+2)
+        kTz = Cp_over_Pr * interp4(mu4) * diff4(dz(k), T4)
+        #:if is_les
+        call calc_tau_straight_LES(mu4, mut4, w(idx-1:idx+2), ux(idx-1:idx+2), vy(idx-1:idx+2), dz(k), tzz, wtzz)
+        call calc_tau_cross_LES(mu4, mut4, u(idx-1:idx+2), wx(idx-1:idx+2), dz(k), tzx, utzx)
+        call calc_tau_cross_LES(mu4, mut4, v(idx-1:idx+2), wy(idx-1:idx+2), dz(k), tzy, vtzy)
+        block
+          real(8) :: H(4)
+          H(:) = Cp * T(i,j,k-1:k+2) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i,j,k-1:k+2)
+          Hsgs = -interp4(mut4) * diff4(dz(k), H) / Prt
+        end block
+        #:else
+        call calc_tau_straight(mu4, w(idx-1:idx+2), ux(idx-1:idx+2), vy(idx-1:idx+2), dz(k), tzz, wtzz)
+        call calc_tau_cross(mu4, u(idx-1:idx+2), wx(idx-1:idx+2), dz(k), tzx, utzx)
+        call calc_tau_cross(mu4, v(idx-1:idx+2), wy(idx-1:idx+2), dz(k), tzy, vtzy)
+        #:endif
+      end block
+    #:elif VISC_STENCIL == 'ME4Base'
     if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-3) then
       block
         real(8) :: mu3(3)
@@ -469,6 +644,33 @@ contains
         call calc_tau_cross(mu3, v(idx-2:idx+3), wy(idx-2:idx+3), dz(k), tzy, vtzy)
         #:endif
       end block
+    #:else
+    if (4 <= i .and. i <= nx-3 .and. 4 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-3) then
+      block
+        real(8) :: mu6(6), T6(6)
+        #:if is_les
+        real(8) :: mut6(6)
+        mut6(:) = mut(i, j, k-2:k+3)
+        #:endif
+        mu6(:) = mu(i, j, k-2:k+3)
+        T6(:) = T(i, j, k-2:k+3)
+        kTz = Cp_over_Pr * interp6(mu6) * diff6(dz(k), T6)
+        #:if is_les
+        call calc_tau_straight_LES(mu6, mut6, w(idx-2:idx+3), ux(idx-2:idx+3), vy(idx-2:idx+3), dz(k), tzz, wtzz)
+        call calc_tau_cross_LES(mu6, mut6, u(idx-2:idx+3), wx(idx-2:idx+3), dz(k), tzx, utzx)
+        call calc_tau_cross_LES(mu6, mut6, v(idx-2:idx+3), wy(idx-2:idx+3), dz(k), tzy, vtzy)
+        block
+          real(8) :: H(6)
+          H(:) = Cp * T(i,j,k-2:k+3) + 0.5d0 * (u(idx-2:idx+3)**2 + v(idx-2:idx+3)**2 + w(idx-2:idx+3)**2) + qc2(i,j,k-2:k+3)
+          Hsgs = -interp6(mut6) * diff6(dz(k), H) / Prt
+        end block
+        #:else
+        call calc_tau_straight(mu6, w(idx-2:idx+3), ux(idx-2:idx+3), vy(idx-2:idx+3), dz(k), tzz, wtzz)
+        call calc_tau_cross(mu6, u(idx-2:idx+3), wx(idx-2:idx+3), dz(k), tzx, utzx)
+        call calc_tau_cross(mu6, v(idx-2:idx+3), wy(idx-2:idx+3), dz(k), tzy, vtzy)
+        #:endif
+      end block
+    #:endif
     else
       block
         real(8) mz, muz, mvz, mwz, mwx, mux, mvy, mwy
@@ -545,6 +747,7 @@ contains
       + Hsgs &
     #:endif
     )
-  end subroutine calc_Gv4${suf}$
+  end subroutine calc_Gv${VISC_ORDER}$${suf}$
 #:endfor
-end module calc_visc4
+end module calc_visc_high
+#:endif
