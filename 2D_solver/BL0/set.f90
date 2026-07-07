@@ -13,6 +13,7 @@ contains
     real(8), intent(out) :: x(nx), y(ny), dx(nx-1), dy(ny-1)
     integer i, j, ny_b
     real(8) dx1, dy1
+    real(8) s, tanh_s, yi
     dx1 = Lx / dble(nx-1)
     dy1 = dx1
 
@@ -22,16 +23,25 @@ contains
       x(i+1) = x(i) + dx(i)
     enddo
 
-    y(1) = 0.d0
-    do j = 1, ny-1
-      if (y(j) <= 3.d0 * blt) then
-        dy(j) = min(1.d0, max(0.07d0, dble(j)/dble(128))) * dy1
-        ny_b  = j
-      else
-        dy(j) = dy1 * (1.d0 + 0.75d0 * dble(j-ny_b) / dble(ny-ny_b))
-      endif
-      y(j+1) = y(j) + dy(j)
+    s = 1.6d0
+    tanh_s = tanh(s)
+    do j = 1, ny
+      yi = dble(j-1) / dble(ny-1)
+      y(j) = Ly * (1 - tanh(s * (1.d0 - yi)) / tanh_s)
     enddo
+    do j = 1, ny-1
+      dy(j) = y(j+1) - y(j)
+    enddo
+    ! y(1) = 0.d0
+    ! do j = 1, ny-1
+    !   if (y(j) <= 3.d0 * blt) then
+    !     dy(j) = min(1.d0, max(0.07d0, dble(j)/dble(128))) * dy1
+    !     ny_b  = j
+    !   else
+    !     dy(j) = dy1 * (1.d0 + 0.75d0 * dble(j-ny_b) / dble(ny-ny_b))
+    !   endif
+    !   y(j+1) = y(j) + dy(j)
+    ! enddo
   end subroutine set_grid
 
 
@@ -49,6 +59,12 @@ contains
         Q(i,3,j) = 0.d0
         Q(i,4,j) = p0 / (gamma - 1.d0) + 0.5d0 * rho0 * u0**2
     enddo;enddo
+    do i = nx / 10 + 1, nx
+      Q(i,1,1) = rho0
+      Q(i,2,1) = 0.d0
+      Q(i,3,1) = 0.d0
+      Q(i,4,1) = Q(i,4,2)
+    enddo
   end subroutine set_init
 
 
@@ -107,7 +123,7 @@ contains
     enddo
 
     !$cuf kernel do(1)<<<*,*>>>
-    do i = nx / 10, nx
+    do i = nx / 10 + 1, nx
       ! top
       ! Riemann invariants
       Jacobian_tmp = 1.d0 / Jacobian(i,ny)
