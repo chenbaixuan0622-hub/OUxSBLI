@@ -4,14 +4,14 @@ module mod_globals
   integer, parameter  :: dimension   = 2
   integer, parameter  :: sp          = kind(1.d0) ! single or double
   real(sp), parameter :: threshold   = 0.4_sp
-  real(8), parameter  :: blt         = 0.5d-3
+  real(8), parameter  :: blt         = 1.d-3
 
   ! mesh
-  real(8), parameter :: Lx = 80.d0 * blt
-  real(8), parameter :: Ly = 5.d0 * blt
+  real(8), parameter :: Lx = 100.d0 * blt
+  real(8), parameter :: Ly = 10.d0 * blt !5
   ! DNS
-  integer, parameter :: nx = 1025
-  integer, parameter :: ny = 129
+  integer, parameter :: nx = 1281 !1025
+  integer, parameter :: ny = 257 !129
 
   ! RTX 4090
   type(dim3), parameter :: threadsE  = dim3(128,1,1)
