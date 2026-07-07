@@ -7,11 +7,11 @@ module mod_globals
   real(8), parameter  :: blt         = 1.d-3
 
   ! mesh
-  real(8), parameter :: Lx = 20.d0 * blt
-  real(8), parameter :: Ly = 5.d0 * blt
+  real(8), parameter :: Lx = 140.d0 * blt !20
+  real(8), parameter :: Ly = 10.d0 * blt !5
   ! DNS
-  integer, parameter :: nx = 257
-  integer, parameter :: ny = 129
+  integer, parameter :: nx = 1793 !257
+  integer, parameter :: ny = 257 !129
 
   ! RTX 4090
   type(dim3), parameter :: threadsE  = dim3(128,1,1)
@@ -23,8 +23,8 @@ module mod_globals
 
   ! time
   integer, parameter :: step_offset = 0
-  real(8), parameter :: endT  = 0.3d-3
-  integer, parameter :: np    = 30
+  real(8), parameter :: endT  = 8.d-3 !0.3d-3
+  integer, parameter :: np    = 800 !30
   real(8), parameter :: R     = 287.03d0
   real(8), parameter :: gamma = 1.4d0
   real(8), parameter :: M0    = 2.d0
@@ -44,7 +44,7 @@ module mod_globals
   real(8), parameter :: rf    = 0.89d0
   real(8), parameter :: Taw   = T0 * (1.d0 + rf * 0.5d0 * (gamma - 1.d0) * M0**2)
   ! oblique shock
-  real(8), parameter :: beta  = dacos(-1.d0) * 40.03d0 / 180.d0
+  real(8), parameter :: beta  = dacos(-1.d0) * 32.5d0 / 180.d0 !theta=3 !M2, 40.03(theta=10.65)
   real(8), parameter :: Ms    = M0 * dsin(beta)
   real(8), parameter :: Ms2   = Ms**2
   real(8), parameter :: theta = datan(2.d0 * (1.d0 / dtan(beta)) * (Ms2 - 1.d0) / (M0**2 * (gamma + dcos(2.d0 * beta)) + 2.d0))
@@ -61,3 +61,27 @@ module mod_globals
   real(8), parameter :: uy    = - u_magnitude * dsin(theta)
 end module mod_globals
 
+module mod_shock
+  use mod_globals, only : gamma, R, T0, T2, Ms2
+  implicit none
+
+  real(8) :: p0_init
+  real(8) :: rho0_init
+  real(8) :: p2_init
+  real(8) :: rho2_init
+
+  contains
+
+  subroutine calc_p_rho_init(ptbl)
+
+    real(8), intent(in) :: ptbl
+
+    p0_init   = ptbl
+    rho0_init = p0_init / (R * T0)
+
+    p2_init   = p0_init * (1.d0 + 2.d0 * gamma * (Ms2 - 1.d0) / (gamma + 1.d0))
+    rho2_init = p2_init / (R * T2)
+
+  end subroutine calc_p_rho_init
+
+end module mod_shock

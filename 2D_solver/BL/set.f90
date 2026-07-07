@@ -1,10 +1,11 @@
 module set
   use cudafor
   use mpi
-  use mod_globals, only : gamma, R, Pr, u0, p0, T0, M0, blt, rho2, p2, ux, uy, rf, Taw
-  use mod_constant, only : id_rescale, Cp, gamma_1, over_gamma, over_gamma_1
+  use mod_globals, only : gamma, R, Pr, rho0, u0, p0, T0, M0, blt, rho2, p2, ux, uy, rf, Taw
+  use mod_constant, only : id_rescale, Cp, gamma_1, over_gamma, over_gamma_1, mu0_T0_S_over_T0_2_3
   use set_bc_common
   use set_init_common
+  use mod_shock !!!!!!!!!!!!!!!!!!!!!!!oblique shock
   implicit none
   real(8) ptbl
 contains
@@ -14,6 +15,7 @@ contains
     real(8), intent(out) :: x(nx), y(ny), dx(nx-1), dy(ny-1)
     integer i, j, ny_b
     real(8) dx1, dy1
+    real(8) s, tanh_s, yi
     dx1 = Lx / dble(nx-1)
     dy1 = dx1
 
@@ -23,16 +25,25 @@ contains
       x(i+1) = x(i) + dx(i)
     enddo
 
-    y(1) = 0.d0
-    do j = 1, ny-1
-      if (y(j) <= 3.d0 * blt) then
-        dy(j) = min(1.d0, max(0.07d0, dble(j)/dble(128))) * dy1
-        ny_b  = j
-      else
-        dy(j) = dy1 * (1.d0 + 0.75d0 * dble(j-ny_b) / dble(ny-ny_b))
-      endif
-      y(j+1) = y(j) + dy(j)
+    s = 1.6d0
+    tanh_s = tanh(s)
+    do j = 1, ny
+      yi = dble(j-1) / dble(ny-1)
+      y(j) = Ly * (1 - tanh(s * (1.d0 - yi)) / tanh_s)
     enddo
+    do j = 1, ny-1
+      dy(j) = y(j+1) - y(j)
+    enddo
+    ! y(1) = 0.d0
+    ! do j = 1, ny-1
+    !   if (y(j) <= 3.d0 * blt) then
+    !     dy(j) = min(1.d0, max(0.07d0, dble(j)/dble(128))) * dy1
+    !     ny_b  = j
+    !   else
+    !     dy(j) = dy1 * (1.d0 + 0.75d0 * dble(j-ny_b) / dble(ny-ny_b))
+    !   endif
+    !   y(j+1) = y(j) + dy(j)
+    ! enddo
   end subroutine set_grid
 
 
@@ -68,7 +79,8 @@ contains
     real(8), intent(in)  :: xs(nx), ys(ny)
     real(8), intent(out) :: Q(nx,4,ny)
     character(len=40) filename
-    integer j, nyi, filesize, ios
+    integer i, j, nyi, filesize, ios
+    real(8) mu0, nu0, disp_thic, Re_disp, deta !!!!displacement thickness
     real(8) rho, u, v, p
     real(8), allocatable :: Qi(:,:), Qp(:,:)
     write(filename, "(a)") "./Qin.dat"
@@ -97,7 +109,27 @@ contains
       Q(:,3,j) = rho * v
       Q(:,4,j) = ptbl * over_gamma_1 + 0.5d0 * rho * (u**2 + v**2)
     enddo
+
+    call calc_p_rho_init(ptbl)
+
+    mu0 = mu0_T0_S_over_T0_2_3 / (T0 + 111.d0) * T0**1.5d0 !!!!!!!!!!!!!!!!!!!!!displacement thickness
+    nu0 = mu0 * R * T0 / p0_init
+    disp_thic = 0.d0
+    do j = 2, ny
+        deta = -ys(j-1) + ys(j)
+        disp_thic = disp_thic + 0.5d0 * ((1 - (Qp(1,j-1) * Qp(2,j-1)) / (rho0_init * u0)) + (1 - (Qp(1,j) * Qp(2,j)) / (rho0_init * u0))) * deta
+    enddo
+    Re_disp = u0 * disp_thic / nu0
+    print *, "Re_disp = ", Re_disp
+
     deallocate(Qi, Qp)
+
+    do i = int(0.7d0 * nx), nx
+      Q(i,1,ny) = rho2_init
+      Q(i,2,ny) = rho2_init * ux
+      Q(i,3,ny) = rho2_init * uy
+      Q(i,4,ny) = p2_init * over_gamma_1 + 0.5d0 * rho2_init * (ux**2 + uy**2)
+    enddo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   end subroutine set_init
 
 
@@ -105,6 +137,7 @@ contains
     integer, intent(in), value     :: myrank, nx, ny
     real(8), intent(in), device    :: Jacobian(nx,ny)
     real(8), intent(inout), device :: QJ(nx,4,ny) ! Q / Jacobian
+    real(8) Jacobian_tmp
     integer i, j, l, ireq, ierr, istat(MPI_STATUS_SIZE)
     real(8) :: p_wall
     !$cuf kernel do(1)<<<*,*>>>
@@ -116,11 +149,20 @@ contains
 
     !$cuf kernel do(1)<<<*,*>>>
     do i = 1, nx
+      Jacobian_tmp = 1.d0 / Jacobian(1,ny-1)
       ! Neumann
-      QJ(i,1,ny) = QJ(i,1,ny-1)
-      QJ(i,2,ny) = QJ(i,2,ny-1)
-      QJ(i,3,ny) = QJ(i,3,ny-1)
-      QJ(i,4,ny) = QJ(i,4,ny-1)
+      if (i < int(0.7d0 * nx)) then !0.1nx
+        QJ(i,1,ny) = QJ(i,1,ny-1) 
+        QJ(i,2,ny) = QJ(i,2,ny-1)
+        QJ(i,3,ny) = QJ(i,3,ny-1)
+        QJ(i,4,ny) = QJ(i,4,ny-1)
+      else
+        QJ(i,1,ny) = rho2_init * Jacobian_tmp
+        QJ(i,2,ny) = rho2_init * ux * Jacobian_tmp
+        QJ(i,3,ny) = rho2_init * uy * Jacobian_tmp
+        QJ(i,4,ny) = (p2_init * over_gamma_1 + 0.5d0 * rho2_init * (ux**2 + uy**2)) * Jacobian_tmp
+      endif
+
       ! NoSlip
       QJ(i,1,1) = QJ(i,1,2)
       QJ(i,2,1) = 0.d0
