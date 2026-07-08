@@ -44,7 +44,7 @@ module mod_globals
   real(8), parameter :: rf    = 0.89d0
   real(8), parameter :: Taw   = T0 * (1.d0 + rf * 0.5d0 * (gamma - 1.d0) * M0**2)
   ! oblique shock
-  real(8), parameter :: beta  = dacos(-1.d0) * 32.5d0 / 180.d0 !theta=3 !M2, 40.03(theta=10.65)
+  real(8), parameter :: beta  = dacos(-1.d0) * 31.65d0 / 180.d0 !theta=2 !M2, 40.03(theta=10.65)
   real(8), parameter :: Ms    = M0 * dsin(beta)
   real(8), parameter :: Ms2   = Ms**2
   real(8), parameter :: theta = datan(2.d0 * (1.d0 / dtan(beta)) * (Ms2 - 1.d0) / (M0**2 * (gamma + dcos(2.d0 * beta)) + 2.d0))

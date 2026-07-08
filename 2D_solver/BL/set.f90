@@ -129,7 +129,7 @@ contains
       Q(i,2,ny) = rho2_init * ux
       Q(i,3,ny) = rho2_init * uy
       Q(i,4,ny) = p2_init * over_gamma_1 + 0.5d0 * rho2_init * (ux**2 + uy**2)
-    enddo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    enddo
   end subroutine set_init
 
 
