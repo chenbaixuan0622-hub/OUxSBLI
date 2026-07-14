@@ -1,0 +1,91 @@
+#:set N = VISC_ORDER
+  pure attributes(device) function interp${N}$(a) result(ai)
+    real(8), intent(in), contiguous :: a(${N}$)
+    real(8) ai
+    #:if N == 4
+    ai = 0.0625d0 * (-a(1) + 9.d0 * (a(2) + a(3)) - a(4))
+    #:else
+    ai = 0.00390625d0 * (3.d0*a(1) - 25.d0*a(2) + 150.d0*(a(3)+a(4)) - 25.d0*a(5) + 3.d0*a(6))
+    #:endif
+  end function interp${N}$
+
+  pure attributes(device) function diff${N}$(d, a) result(da)
+    real(8), intent(in)             :: d
+    real(8), intent(in), contiguous :: a(${N}$)
+    real(8) da
+    #:if N == 4
+    da = (a(1) - 27.d0 * (a(2) - a(3)) - a(4)) * one_24 * d
+    #:else
+    da = (-0.0046875d0*a(1) + 0.065104167d0*a(2) - 1.171875d0*(a(3)-a(4)) - 0.065104167d0*a(5) + 0.0046875d0*a(6)) * d
+    #:endif
+  end function diff${N}$
+
+  pure attributes(device) subroutine calc_tau_straight(mu, u, vy, wz, d, t11, ut11)
+    real(8), intent(in), contiguous :: mu(${N}$)
+    real(8), intent(in), contiguous :: u(${N}$)
+    real(8), intent(in), contiguous :: vy(${N}$)
+    real(8), intent(in), contiguous :: wz(${N}$)
+    real(8), intent(in)             :: d
+    real(8), intent(out)            :: t11
+    real(8), intent(out)            :: ut11
+    real(8) mui, vyi, wzi, ux
+    mui  = interp${N}$(mu)
+    vyi  = interp${N}$(vy)
+    wzi  = interp${N}$(wz)
+    ux   = diff${N}$(d, u)
+    t11  = two_third * mui * (2.d0 * ux - vyi - wzi)
+    ut11 = interp${N}$(u) * t11
+  end subroutine calc_tau_straight
+
+  pure attributes(device) subroutine calc_tau_straight_LES(mu, mut, u, vy, wz, d, t11, ut11)
+    real(8), intent(in), contiguous :: mu(${N}$)
+    real(8), intent(in), contiguous :: mut(${N}$)
+    real(8), intent(in), contiguous :: u(${N}$)
+    real(8), intent(in), contiguous :: vy(${N}$)
+    real(8), intent(in), contiguous :: wz(${N}$)
+    real(8), intent(in)             :: d
+    real(8), intent(out)            :: t11
+    real(8), intent(out)            :: ut11
+    real(8) mui, vyi, wzi, ux
+    mui  = interp${N}$(mu)
+    vyi  = interp${N}$(vy)
+    wzi  = interp${N}$(wz)
+    ux   = diff${N}$(d, u)
+    t11  = two_third * mui * (2.d0 * ux - vyi - wzi)
+    ut11 = interp${N}$(u) * t11
+    mui  = 0.5d0 * (mui + interp${N}$(mut))
+    t11  = two_third * mui * (2.d0 * ux - vyi - wzi)
+  end subroutine calc_tau_straight_LES
+
+  pure attributes(device) subroutine calc_tau_cross(mu, v, uy, d, t12, vt12)
+    real(8), intent(in), contiguous :: mu(${N}$)
+    real(8), intent(in), contiguous :: v(${N}$)
+    real(8), intent(in), contiguous :: uy(${N}$)
+    real(8), intent(in)             :: d
+    real(8), intent(out)            :: t12
+    real(8), intent(out)            :: vt12
+    real(8) mui, uyi, vx
+    mui  = interp${N}$(mu)
+    uyi  = interp${N}$(uy)
+    vx   = diff${N}$(d, v)
+    t12  = mui * (uyi + vx)
+    vt12 = interp${N}$(v) * t12
+  end subroutine calc_tau_cross
+
+  pure attributes(device) subroutine calc_tau_cross_LES(mu, mut, v, uy, d, t12, vt12)
+    real(8), intent(in), contiguous :: mu(${N}$)
+    real(8), intent(in), contiguous :: mut(${N}$)
+    real(8), intent(in), contiguous :: v(${N}$)
+    real(8), intent(in), contiguous :: uy(${N}$)
+    real(8), intent(in)             :: d
+    real(8), intent(out)            :: t12
+    real(8), intent(out)            :: vt12
+    real(8) mui, uyi, vx
+    mui  = interp${N}$(mu)
+    uyi  = interp${N}$(uy)
+    vx   = diff${N}$(d, v)
+    t12  = mui * (uyi + vx)
+    vt12 = interp${N}$(v) * t12
+    mui  = 0.5d0 * (mui + interp${N}$(mut))
+    t12  = mui * (uyi + vx)
+  end subroutine calc_tau_cross_LES

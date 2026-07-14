@@ -1,6 +1,6 @@
 #:include 'config.fypp'
 #:if not defined('VISC_ORDER')
-  #:set VISC_ORDER = 4 if ORDER >= 4 else 2
+  #:set VISC_ORDER = ORDER
 #:endif
 module calc_flux_base
   use mod_globals, only : sp, &
@@ -18,8 +18,8 @@ module calc_flux_base
   use calc_hybrid_kernel_internal
   #:if VISC in ('NS', 'LES')
   use calc_visc2
-  use calc_visc4
-  use calc_visc4_internal
+  use calc_visc_high
+  use calc_visc_high_internal
   #:endif
   #:if VISC == 'LES'
   use calc_les
