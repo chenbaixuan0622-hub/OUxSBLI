@@ -9,6 +9,6 @@ module purge
 module load nvidia/25.9 nv-hpcx/25.9
 
 cd ${PBS_O_WORKDIR}
-ncu --set full --target-processes all -o my_report_ncu mpiexec ./build/a.out
+ncu --set full --import-source yes --target-processes all -o my_report_ncu mpiexec ./build/a.out
 
 exit 0

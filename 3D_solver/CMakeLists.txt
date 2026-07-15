@@ -13,7 +13,7 @@ if(NOT DEFINED CASE_MAIN_SOURCE)
 endif()
 
 set(SUBROUTINES "name:calc_tau_straight,calc_tau_cross,flux4")
-set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cuda -acc -fast -Mpreprocess -Mchkptr -Minline=reshape,${SUBROUTINES} -Minfo=accel,inline -gpu=ptxinfo,rdc,lto,cc${CASE_GPU_CC} -lnvhpcwrapnvtx")
+set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cuda -acc -fast -Mpreprocess -Mchkptr -Minline=reshape,${SUBROUTINES} -Minfo=accel,inline -gpu=ptxinfo,rdc,lto,cc${CASE_GPU_CC},lineinfo -lnvhpcwrapnvtx")
 
 find_package(MPI REQUIRED Fortran)
 find_program(FYPP_EXE fypp REQUIRED)
