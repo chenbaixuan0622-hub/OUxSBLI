@@ -3,9 +3,24 @@
     real(8), intent(in), contiguous :: a(${N}$)
     real(8) ai
     #:if N == 4
-    ai = 0.0625d0 * (-a(1) + 9.d0 * (a(2) + a(3)) - a(4))
+    block
+      real(8) s1, s2
+      !ai = 0.0625d0 * (-a(1) + 9.d0 * (a(2) + a(3)) - a(4))
+      s1 = a(2) + a(3)
+      s2 = a(1) + a(4)
+      ai = 0.0625d0 * fma(9.d0, s1, -s2)
+    end block
     #:else
-    ai = 0.00390625d0 * (3.d0*a(1) - 25.d0*a(2) + 150.d0*(a(3)+a(4)) - 25.d0*a(5) + 3.d0*a(6))
+    block
+      real(8) s1, s2, s3, v
+      !ai = 0.00390625d0 * (3.d0*a(1) - 25.d0*a(2) + 150.d0*(a(3)+a(4)) - 25.d0*a(5) + 3.d0*a(6))
+      s1 = a(1) + a(6)
+      s2 = a(2) + a(5)
+      s3 = a(3) + a(4)
+      v  = 0.01171875d0 * s1
+      v  = fma(-0.09765625d0, s2, v)
+      ai = fma(0.5859375d0,   s3, v)
+    end block
     #:endif
   end function interp${N}$
 
@@ -14,9 +29,25 @@
     real(8), intent(in), contiguous :: a(${N}$)
     real(8) da
     #:if N == 4
-    da = (a(1) - 27.d0 * (a(2) - a(3)) - a(4)) * one_24 * d
+    block
+      real(8) factor, s1, s2
+      !da = (a(1) - 27.d0 * (a(2) - a(3)) - a(4)) * one_24 * d
+      factor = one_24 * d
+      s1 = a(2) - a(3)
+      s2 = a(1) - a(4)
+      da = factor * fma(-27.d0, s1, s2)
+    end block
     #:else
-    da = (-0.0046875d0*a(1) + 0.065104167d0*a(2) - 1.171875d0*(a(3)-a(4)) - 0.065104167d0*a(5) + 0.0046875d0*a(6)) * d
+    block
+      real(8) s1, s2, s3, v
+      !da = (-0.0046875d0*a(1) + 0.065104167d0*a(2) - 1.171875d0*(a(3)-a(4)) - 0.065104167d0*a(5) + 0.0046875d0*a(6)) * d
+      s1 = -a(1) + a(6)
+      s2 =  a(2) - a(5)
+      s3 = -a(3) + a(4)
+      v  = 0.0046875d0 * s1
+      v  = fma(0.065104167d0, s2, v)
+      da = d * fma(1.171875d0, s3, v)
+    end block
     #:endif
   end function diff${N}$
 
@@ -33,7 +64,7 @@
     vyi  = interp${N}$(vy)
     wzi  = interp${N}$(wz)
     ux   = diff${N}$(d, u)
-    t11  = two_third * mui * (2.d0 * ux - vyi - wzi)
+    t11  = two_third * mui * (fma(2.d0, ux, -vyi - wzi))
     ut11 = interp${N}$(u) * t11
   end subroutine calc_tau_straight
 
@@ -51,10 +82,10 @@
     vyi  = interp${N}$(vy)
     wzi  = interp${N}$(wz)
     ux   = diff${N}$(d, u)
-    t11  = two_third * mui * (2.d0 * ux - vyi - wzi)
+    t11  = two_third * mui * (fma(2.d0, ux, -vyi - wzi))
     ut11 = interp${N}$(u) * t11
     mui  = 0.5d0 * (mui + interp${N}$(mut))
-    t11  = two_third * mui * (2.d0 * ux - vyi - wzi)
+    t11  = two_third * mui * (fma(2.d0, ux, -vyi - wzi))
   end subroutine calc_tau_straight_LES
 
   pure attributes(device) subroutine calc_tau_cross(mu, v, uy, d, t12, vt12)
