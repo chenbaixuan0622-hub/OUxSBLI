@@ -8,10 +8,10 @@ module mod_globals
 
   ! mesh
   real(8), parameter :: Lx = 100.d0 * blt
-  real(8), parameter :: Ly = 10.d0 * blt !5
+  real(8), parameter :: Ly = 12.5d0 * blt !5
   ! DNS
   integer, parameter :: nx = 1281 !1025
-  integer, parameter :: ny = 257 !129
+  integer, parameter :: ny = 321 !129
 
   ! RTX 4090
   type(dim3), parameter :: threadsE  = dim3(128,1,1)
@@ -23,13 +23,13 @@ module mod_globals
 
   ! time
   integer, parameter :: step_offset = 0
-  real(8), parameter :: endT  = 0.4d-3
-  integer, parameter :: np    = 40
+  real(8), parameter :: endT  = 0.8d-3 !0.4d-3
+  integer, parameter :: np    = 80
   real(8), parameter :: R     = 287.03d0
   real(8), parameter :: gamma = 1.4d0
   real(8), parameter :: M0    = 2.d0
   real(8), parameter :: p_tot = 100.d3
-  real(8), parameter :: T_tot = 295.d0
+  real(8), parameter :: T_tot = 518.4d0 !295.d0
   real(8), parameter :: p0    = p_tot / ((1.d0 + 0.5d0 * (gamma - 1.d0) * M0**2)**(gamma/(gamma-1.d0)))
   real(8), parameter :: T0    = T_tot /  (1.d0 + 0.5d0 * (gamma - 1.d0) * M0**2)
   real(8), parameter :: rho0  = p0 / (R * T0)
@@ -41,8 +41,8 @@ module mod_globals
   real(8), parameter :: Pr    = 0.72d0
   real(8), parameter :: Prt   = 0.9d0
   ! wall temperature
-  real(8), parameter :: rf    = 0.89d0
-  real(8), parameter :: Taw   = T0 * (1.d0 + rf * 0.5d0 * (gamma - 1.d0) * M0**2)
+  real(8), parameter :: rf    = dsqrt(Pr) !0.89d0
+  real(8), parameter :: Taw   = 1.6762 * T0 !T0 * (1.d0 + rf * 0.5d0 * (gamma - 1.d0) * M0**2)
   ! oblique shock
   real(8), parameter :: beta  = dacos(-1.d0) * 40.03d0 / 180.d0
   real(8), parameter :: Ms    = M0 * dsin(beta)
