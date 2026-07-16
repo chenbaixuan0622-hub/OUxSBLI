@@ -96,7 +96,7 @@ contains
     enddo;enddo
 
     !$cuf kernel do(1)<<<*,*>>>
-    do i = 1, nx / 10
+    do i = 1, nx
       ! top
       ! Riemann invariants
       Jacobian_tmp = 1.d0 / Jacobian(i,ny)
@@ -115,39 +115,24 @@ contains
       QJ(i,2,ny) = rhob * u0 * Jacobian_tmp
       QJ(i,3,ny) = rhob * vb * Jacobian_tmp
       QJ(i,4,ny) = (pb * over_gamma_1 + 0.5d0 * rhob * (u0**2 + vb**2)) * Jacobian_tmp
-      ! Neumann
-      QJ(i,1,1) = QJ(i,1,2)
-      QJ(i,2,1) = QJ(i,2,2)
-      QJ(i,3,1) = QJ(i,3,2)
-      QJ(i,4,1) = QJ(i,4,2)
     enddo
 
     !$cuf kernel do(1)<<<*,*>>>
-    do i = nx / 10 + 1, nx
-      ! top
-      ! Riemann invariants
-      Jacobian_tmp = 1.d0 / Jacobian(i,ny)
-      pin   = gamma_1 * (QJ(i,4,ny-1) - 0.5d0 * (QJ(i,2,ny-1)**2 + QJ(i,3,ny-1)**2) &
-              / QJ(i,1,ny-1)) * Jacobian(i,ny-1)
-      rhoin = QJ(i,1,ny-1) * Jacobian(i,ny-1)
-      cin   = sqrt(gamma * pin / rhoin)
-      vin   = QJ(i,3,ny-1) / QJ(i,1,ny-1)
-      Rp   = vin + 2.d0 * cin * over_gamma_1
-      Rm   = v0  - 2.d0 * c0  * over_gamma_1
-      vb   = 0.5d0 * (Rp + Rm)
-      cb   = 0.25d0 * gamma_1 * (Rp - Rm)
-      rhob = (cb * over_c0)**(2.d0 * over_gamma_1) * rho0
-      pb   = (rhob * cb**2) * over_gamma
-      QJ(i,1,ny) = rhob * Jacobian_tmp
-      QJ(i,2,ny) = rhob * u0 * Jacobian_tmp
-      QJ(i,3,ny) = rhob * vb * Jacobian_tmp
-      QJ(i,4,ny) = (pb * over_gamma_1 + 0.5d0 * rhob * (u0**2 + vb**2)) * Jacobian_tmp
-      ! NoSlip
-      QJ(i,1,1) = QJ(i,1,2)
-      QJ(i,2,1) = 0.d0
-      QJ(i,3,1) = 0.d0
-      p_wall = gamma_1 * (QJ(i,4,2) - 0.5d0 * (QJ(i,2,2)**2 + QJ(i,3,2)**2) / QJ(i,1,2))
-      QJ(i,4,1) = p_wall * over_gamma_1
+    do i = 1, nx
+      if(i <= int(nx / 10)) then      
+        ! Neumann
+        QJ(i,1,1) = QJ(i,1,2)
+        QJ(i,2,1) = QJ(i,2,2)
+        QJ(i,3,1) = QJ(i,3,2)
+        QJ(i,4,1) = QJ(i,4,2)
+      else
+        ! NoSlip
+        QJ(i,1,1) = QJ(i,1,2)
+        QJ(i,2,1) = 0.d0
+        QJ(i,3,1) = 0.d0
+        p_wall = gamma_1 * (QJ(i,4,2) - 0.5d0 * (QJ(i,2,2)**2 + QJ(i,3,2)**2) / QJ(i,1,2))
+        QJ(i,4,1) = p_wall * over_gamma_1
+      endif
     enddo
   end subroutine set_bc
 end module set
