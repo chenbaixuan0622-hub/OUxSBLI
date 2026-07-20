@@ -90,7 +90,7 @@ contains
     nbxG = blocksG%x; nbyG = blocksG%y; nbzG = blocksG%z
     ! shock sensor
     #:if SCHEME in ('SLAU', 'Roe', 'Hybrid')
-    call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
+    call calc_Ducros<<<blocks,threads,0,stream_conv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
     #:endif
     ! flux -- no viscous term to pair against for VISC == 'Euler': single stream,
     ! still occupancy-tiled so the launch pattern matches the NS/LES path.
@@ -136,9 +136,21 @@ contains
     nbxEv = blocksEv%x; nbyEv = blocksEv%y; nbzEv = blocksEv%z
     nbxFv = blocksFv%x; nbyFv = blocksFv%y; nbzFv = blocksFv%z
     nbxGv = blocksGv%x; nbyGv = blocksGv%y; nbzGv = blocksGv%z
-    ! shock sensor (default stream; legacy-stream semantics order it before phase 1)
+    ! Fv/Gv's fresh (non-koff) write only covers the range where their own
+    ! cross-derivative stencil is valid (VISC_ORDER-wide halo in BOTH
+    ! transverse directions, e.g. Fv needs 4<=i<=nx-3 AND 4<=k<=nz-3), which
+    ! is narrower than the range the paired convective kernel accumulates
+    ! into next (e.g. calc_*_y_in covers i<=nx-1, k<=nz-1). Without this,
+    ! the boundary-shell cells Fv/Gv never touch are read (and accumulated
+    ! onto) uninitialized -- zero them first so the convective accumulate
+    ! sees a valid (viscous-free) baseline there instead of garbage.
+    F = 0.d0
+    G = 0.d0
+    ! shock sensor (stream_conv; same-stream program order puts it before phase 1
+    ! with no extra sync -- must NOT be the default stream, which would insert an
+    ! implicit full-device barrier every RK stage and serialize stream_visc too)
     #:if SCHEME in ('SLAU', 'Roe', 'Hybrid')
-    call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
+    call calc_Ducros<<<blocks,threads,0,stream_conv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
     #:endif
     call init_occupancy()
     ! ---- phase 1: E (conv) || Fv (visc) ----
@@ -179,7 +191,7 @@ contains
     #:set args_sensor = ", sensor" if SCHEME in ('SLAU', 'Roe', 'Hybrid') else ""
     ! shock sensor
     #:if SCHEME in ('SLAU', 'Roe', 'Hybrid')
-    call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
+    call calc_Ducros<<<blocks,threads,0,stream_conv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
     #:endif
     ! flux
     call calc_${scheme_name}$_x${'' if BC_X else '_in'}$<<<blocksE,threadsE>>>(nx, ny, nz, Q${args_t}$${args_sensor}$, E)
@@ -202,7 +214,7 @@ contains
     #:set args_sensor = ", sensor" if SCHEME in ('SLAU', 'Roe', 'Hybrid') else ""
     ! shock sensor
     #:if SCHEME in ('SLAU', 'Roe', 'Hybrid')
-    call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
+    call calc_Ducros<<<blocks,threads,0,stream_conv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
     #:endif
     call calc_${scheme_name}$_z_in_koff<<<bG,threadsG>>>(nx, ny, nz, Q${args_t}$${args_sensor}$, G, k_lo, k_hi)
   end subroutine calc_conv_G_koff

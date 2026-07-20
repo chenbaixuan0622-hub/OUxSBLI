@@ -33,10 +33,10 @@
       ff_RV4 = (rho3 + rho6) * (uu3 + uu6)
       ff_RV5 = (rho2 + rho5) * (uu2 + uu5)
       ff_RV6 = (rho1 + rho4) * (uu1 + uu4)
-      ff_F1 = 0.375d0 * ff_RV1 - 0.075d0 * (ff_RV2 + ff_RV3) + (ff_RV4 + ff_RV5 + ff_RV6) * one_120
-      ff_RV1 = 0.1875d0 * ff_RV1
-      ff_RV2 = 0.0375d0 * ff_RV2
-      ff_RV3 = 0.0375d0 * ff_RV3
+      ff_F1 = c0_375_ff * ff_RV1 - c0_075_ff * (ff_RV2 + ff_RV3) + (ff_RV4 + ff_RV5 + ff_RV6) * one_120
+      ff_RV1 = c0_1875_ff * ff_RV1
+      ff_RV2 = c0_0375_ff * ff_RV2
+      ff_RV3 = c0_0375_ff * ff_RV3
       ff_RV4 = ff_RV4 * one_240
       ff_RV5 = ff_RV5 * one_240
       ff_RV6 = ff_RV6 * one_240
@@ -44,7 +44,7 @@
       ff_RV1_RV2_RV4 = ff_RV1 - ff_RV2 + ff_RV4
       ff_RV1_RV3_RV6 = ff_RV1 - ff_RV3 + ff_RV6
       ff_RV2_RV5     = -ff_RV2 + ff_RV5
-      pres = (p1 - 8.d0 * p2 + 37.d0 * (p3 + p4) - 8.d0 * p5 + p6) * one_60
+      pres = (p1 - c8_ff * p2 + c37_ff * (p3 + p4) - c8_ff * p5 + p6) * one_60
       ff_ruu = ff_RV6*u1 + ff_RV3_RV5*u2 + ff_RV1_RV2_RV4*u3 + ff_RV1_RV3_RV6*u4 + ff_RV2_RV5*u5 + ff_RV4*u6
       ff_ruu = ff_ruu + pres * Normal(2)
       ff_ruv = ff_RV6*v1 + ff_RV3_RV5*v2 + ff_RV1_RV2_RV4*v3 + ff_RV1_RV3_RV6*v4 + ff_RV2_RV5*v5 + ff_RV4*v6
@@ -61,8 +61,8 @@
                       + ff_RV5 * (u2*u5 + v2*v5 + w2*w5) &
                       + ff_RV6 * (u1*u4 + v1*v4 + w1*w4))
       ! pressure diffusion
-      ff_F5 = ff_ene + (0.75d0 * (uu3*p4 + uu4*p3) &
-                      - 0.15d0 * (uu3*p5 + uu5*p3 &
+      ff_F5 = ff_ene + (c0_75_ff * (uu3*p4 + uu4*p3) &
+                      - c0_15_ff * (uu3*p5 + uu5*p3 &
                                 + uu2*p4 + uu4*p2) &
                                + (uu3*p6 + uu6*p3 &
                                 + uu2*p5 + uu5*p2 &
@@ -92,13 +92,13 @@
       uu1=uu(1); uu2=uu(2)
       p1=p(1); p2=p(2)
       T1=T(1); T2=T(2)
-      ff_F1 = 0.25d0 * (rho1 + rho2) * (uu1 + uu2)
-      ff_F2 = 0.5d0 * (ff_F1 * (u1 + u2) + (p1 + p2) * Normal(2))
-      ff_F3 = 0.5d0 * (ff_F1 * (v1 + v2) + (p1 + p2) * Normal(3))
-      ff_F4 = 0.5d0 * (ff_F1 * (w1 + w2) + (p1 + p2) * Normal(4))
-      ff_F5 = ff_F1 * 0.5d0 * (T1 + T2) * R_over_gamma_1_ff ! internal energy
-      ff_F5 = ff_F5 + 0.5d0 * (uu1 * p2 + uu2 * p1) ! pressure diffusion
-      ff_F5 = ff_F5 + 0.5d0 * ff_F1 * (u1 * u2 + v1 * v2 + w1 * w2) ! kinetic energy
+      ff_F1 = c0_25_ff * (rho1 + rho2) * (uu1 + uu2)
+      ff_F2 = c0_5_ff * (ff_F1 * (u1 + u2) + (p1 + p2) * Normal(2))
+      ff_F3 = c0_5_ff * (ff_F1 * (v1 + v2) + (p1 + p2) * Normal(3))
+      ff_F4 = c0_5_ff * (ff_F1 * (w1 + w2) + (p1 + p2) * Normal(4))
+      ff_F5 = ff_F1 * c0_5_ff * (T1 + T2) * R_over_gamma_1_ff ! internal energy
+      ff_F5 = ff_F5 + c0_5_ff * (uu1 * p2 + uu2 * p1) ! pressure diffusion
+      ff_F5 = ff_F5 + c0_5_ff * ff_F1 * (u1 * u2 + v1 * v2 + w1 * w2) ! kinetic energy
       F(1) = real(ff_F1%hi,8) + real(ff_F1%lo,8)
       F(2) = real(ff_F2%hi,8) + real(ff_F2%lo,8)
       F(3) = real(ff_F3%hi,8) + real(ff_F3%lo,8)

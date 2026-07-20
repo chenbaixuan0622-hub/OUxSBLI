@@ -1,7 +1,9 @@
 #:include 'config.fypp'
 module calc_hybrid_kernel_internal
   use mod_globals, only : gamma, threshold, threadsE, threadsF, threadsG
-  use mod_constant, only : id_slau, over_gamma_1_ff, R_over_gamma_1_ff, one_third_ff, one_sixth_ff, one_twelfth_ff, two_third_ff
+  use mod_constant, only : id_slau, over_gamma_1_ff, R_over_gamma_1_ff, one_third_ff, one_sixth_ff, one_twelfth_ff, two_third_ff, &
+                           c0_25_ff, c0_5_ff, c1_ff, c2_ff, gamma_over_gamma_1_ff, &
+                           c0_375_ff, c0_075_ff, c0_1875_ff, c0_0375_ff, c8_ff, c37_ff, c0_75_ff, c0_15_ff
   use calc_muscl
   use calc_hybrid
   use fltflt
@@ -152,7 +154,8 @@ contains
     integer, intent(in), value                :: nx, ny, nz, nbx, nby, nbz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz)
     real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
+    ! phase 2: F already holds phase-1's Fv (viscous) contribution -- accumulate.
+    real(8), intent(inout), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt
     integer :: jj, j_base, idx, idx_r, offset_xz, offset_xzr
     integer :: tile, ntiles, bx, by, bz
@@ -191,7 +194,7 @@ contains
         idx_r = jt + offset_xzr
         fdy   = 0.5_sp * (sensor(i,j,k) + sensor(i,j+1,k))
         if (fdy <= threshold) then
-          F(:,i-1,j,k-1) = KEEP(id_acc, &
+          F(:,i-1,j,k-1) = F(:,i-1,j,k-1) + KEEP(id_acc, &
                                  rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
                                    v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
                                    v(idx-io:idx+io+1), p(idx-io:idx+io+1), &
@@ -207,11 +210,16 @@ contains
       call syncthreads()
       if (io+1 <= j .and. j <= ny-(io+1) .and. i <= nx-1 .and. k <= nz-1 .and. fdy > threshold) then
         rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
-        associate(un1 => v(idx), un2 => vr(idx_r))
-          call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
-                    w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_y_ff, 1.0_sp, &
-                    F(1,i-1,j,k-1), F(2,i-1,j,k-1), F(3,i-1,j,k-1), F(4,i-1,j,k-1), F(5,i-1,j,k-1))
-        end associate
+        block
+          real(8) :: Fout(5)
+          associate(un1 => v(idx), un2 => vr(idx_r))
+            call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
+                      w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_y_ff, 1.0_sp, &
+                      Fout(1), Fout(2), Fout(3), Fout(4), Fout(5))
+          end associate
+          ! phase 2: F already holds phase-1's Fv (viscous) contribution -- accumulate.
+          F(:,i-1,j,k-1) = F(:,i-1,j,k-1) + Fout(:)
+        end block
       endif
       call syncthreads()
     enddo
@@ -223,7 +231,8 @@ contains
     integer, intent(in), value                :: nx, ny, nz, nbx, nby, nbz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz)
     real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
+    ! phase 3: G already holds phase-2's Gv (viscous) contribution -- accumulate.
+    real(8), intent(inout), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt
     integer :: kk, k_base, idx, idx_r, offset_xy, offset_xyr
     integer :: tile, ntiles, bx, by, bz
@@ -262,7 +271,7 @@ contains
         idx_r = kt + offset_xyr
         fdz   = 0.5_sp * (sensor(i,j,k) + sensor(i,j,k+1))
         if (fdz <= threshold) then
-          G(:,i-1,j-1,k) = KEEP(id_acc, &
+          G(:,i-1,j-1,k) = G(:,i-1,j-1,k) + KEEP(id_acc, &
                                  rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
                                    v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
                                    w(idx-io:idx+io+1), p(idx-io:idx+io+1), &
@@ -278,11 +287,16 @@ contains
       call syncthreads()
       if (io+1 <= k .and. k <= nz-(io+1) .and. i <= nx-1 .and. j <= ny-1 .and. fdz > threshold) then
         rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
-        associate(un1 => w(idx), un2 => wr(idx_r))
-          call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
-                    w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_z_ff, 1.0_sp, &
-                    G(1,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(4,i-1,j-1,k), G(5,i-1,j-1,k))
-        end associate
+        block
+          real(8) :: Gout(5)
+          associate(un1 => w(idx), un2 => wr(idx_r))
+            call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
+                      w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_z_ff, 1.0_sp, &
+                      Gout(1), Gout(2), Gout(3), Gout(4), Gout(5))
+          end associate
+          ! phase 3: G already holds phase-2's Gv (viscous) contribution -- accumulate.
+          G(:,i-1,j-1,k) = G(:,i-1,j-1,k) + Gout(:)
+        end block
       endif
       call syncthreads()
     enddo
