@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)  # list(SORT ... COMPARE NATURAL), used below for the CUDA stub search
 
 if(NOT DEFINED CMAKE_Fortran_COMPILER)
   set(CMAKE_Fortran_COMPILER mpif90)
@@ -18,6 +18,33 @@ set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cuda -acc -fast -Mpreprocess -M
 find_package(MPI REQUIRED Fortran)
 find_program(FYPP_EXE fypp REQUIRED)
 
+# Locate libcuda.so for green_ctx_bindings_ff.f90's driver-API calls
+# (mod_streams_ff.f90's Green Context stream setup). The real driver
+# library isn't reliably on the default linker search path on every
+# system -- e.g. WSL keeps it under /usr/lib/wsl/lib, and HPC cluster
+# login/build nodes often have no real GPU driver installed at all. The
+# NVHPC SDK ships its own stub libcuda.so precisely for this: link
+# against the stub at build time (it only needs to satisfy the linker),
+# and the real driver .so is resolved at runtime by the dynamic loader
+# on whichever node actually has a GPU. Falls back to a bare "-lcuda"
+# link flag if nothing is found, preserving the previous behavior on
+# systems where the real driver is already on the default search path.
+if(DEFINED ENV{NVHPC_ROOT})
+  file(GLOB _CUDA_STUB_DIRS "$ENV{NVHPC_ROOT}/cuda/*/targets/*/lib/stubs")
+  # An HPC SDK install bundles multiple CUDA toolkit versions side by side
+  # (e.g. 11.8 and 12.5); Green Contexts need 12.4+, so the search must
+  # prefer the newest stub rather than whichever the filesystem glob
+  # happens to list first -- otherwise find_library can silently pick an
+  # older stub whose libcuda.so lacks cuGreenCtxCreate & friends, which
+  # only fails much later at link time with an obscure undefined-reference
+  # error instead of a clear "not found".
+  list(SORT _CUDA_STUB_DIRS COMPARE NATURAL ORDER DESCENDING)
+endif()
+find_library(CUDA_DRIVER_LIBRARY
+  NAMES cuda
+  HINTS ${_CUDA_STUB_DIRS}
+  PATHS /usr/lib/wsl/lib /usr/lib64 /usr/lib/x86_64-linux-gnu)
+
 # Macro: call from each case's CMakeLists.txt after setting CASE_EXTRA_SOURCES.
 # CMAKE_CURRENT_SOURCE_DIR / BINARY_DIR resolve to the caller's case directory.
 macro(add_ouxsbli_case)
@@ -30,9 +57,6 @@ macro(add_ouxsbli_case)
 
   set(_PARENT_FYPP "mod_constant" "calc_muscl")
   set(_SHARED_FYPP
-      "calc_visc_high_ff"
-      "calc_visc_high_internal_ff"
-      "load_smem_visc_cent_ff"
       "calc_keep_kernel_internal_ff"
       "calc_slau_kernel_internal_ff"
       "calc_hybrid_kernel_ff"
@@ -41,6 +65,9 @@ macro(add_ouxsbli_case)
       "calc_time_dev_ff")
   set(_BASELINE_FYPP
       "calc_visc2"
+      "calc_visc_high"
+      "calc_visc_high_internal"
+      "load_smem_visc_cent"
       "preprocess")
 
   set(_GEN "")
@@ -81,6 +108,7 @@ macro(add_ouxsbli_case)
       "${CMAKE_CURRENT_SOURCE_DIR}/../../src/set_coordinate.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../src/calc_physical_quantities.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../src/fltflt.f90"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../src/green_ctx_bindings_ff.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../src/mod_streams_ff.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_hybrid_ff.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src/load_smem_visc2.f90"
@@ -92,7 +120,14 @@ macro(add_ouxsbli_case)
   get_filename_component(_CASE "${CMAKE_CURRENT_SOURCE_DIR}" NAME)
   add_executable(${_CASE} ${_BASE} ${CASE_MAIN_SOURCE} ${CASE_EXTRA_SOURCES} ${_GEN})
   target_link_libraries(${_CASE} PRIVATE MPI::MPI_Fortran)
-  # CUDA Lib
+  # CUDA driver lib (libcuda.so / stub), needed by green_ctx_bindings_ff.f90's
+  # Green Context calls -- distinct from the runtime API libs nvfortran's
+  # -cuda flag already links. See CUDA_DRIVER_LIBRARY search above.
+  if(CUDA_DRIVER_LIBRARY)
+    target_link_libraries(${_CASE} PRIVATE ${CUDA_DRIVER_LIBRARY})
+  else()
+    target_link_options(${_CASE} PRIVATE -lcuda)
+  endif()
   if (DEFINED CASE_LINK_OPTIONS)
     target_link_options(${_CASE} PRIVATE ${CASE_LINK_OPTIONS})
   endif()

@@ -75,23 +75,22 @@ contains
   end subroutine delta_r6_ff
 
 
-  ! Grid-stride tiled, fltflt counterpart of the original one-block-per-tile,
-  ! real(8) calc_hybrid_x_in. Shared memory is flattened to 1-D (rather than
-  ! native 3-D Fortran arrays) because nvfortran hits an internal compiler
-  ! error ("Unimplemented opcode") on multi-dimensional `shared` arrays of
-  ! type(fltflt) -- the same reason calc_slau_x_in/calc_keep_x_in use this
-  ! layout. `tmp` (temperature) is folded in alongside rho/u/v/w/p exactly
-  ! as calc_keep_x_in does; the left/right split (rhor/ur/vr/wr/pr) mirrors
-  ! calc_slau_x_in, needed only by the SLAU branch of the runtime sensor test.
-  attributes(global) subroutine calc_hybrid_x_in(nx, ny, nz, nbx, nby, nbz, Q, T, sensor, E)
+  ! fltflt counterpart of the real(8) calc_hybrid_x_in. Shared memory is
+  ! flattened to 1-D (rather than native 3-D Fortran arrays) because
+  ! nvfortran hits an internal compiler error ("Unimplemented opcode") on
+  ! multi-dimensional `shared` arrays of type(fltflt) -- the same reason
+  ! calc_slau_x_in/calc_keep_x_in use this layout. `tmp` (temperature) is
+  ! folded in alongside rho/u/v/w/p exactly as calc_keep_x_in does; the
+  ! left/right split (rhor/ur/vr/wr/pr) mirrors calc_slau_x_in, needed only
+  ! by the SLAU branch of the runtime sensor test.
+  attributes(global) subroutine calc_hybrid_x_in(nx, ny, nz, Q, T, sensor, E)
     use mod_constant, only : Normal_x_ff
-    integer, intent(in), value                :: nx, ny, nz, nbx, nby, nbz
+    integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz)
     real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt
     integer :: ii, i_base, idx, idx_r, offset_yz, offset_yzr
-    integer :: tile, ntiles, bx, by, bz
     integer, parameter :: sx  = threadsE%x + 2*io + 1
     integer, parameter :: sxr = threadsE%x
     integer, parameter :: sy  = threadsE%y
@@ -101,69 +100,61 @@ contains
     type(fltflt) rhol, ul, vl, wl, pl
     real(sp) fdx
     it = threadIdx%x;  jt = threadIdx%y;  kt = threadIdx%z
-    ntiles = nbx * nby * nbz
-    do tile = blockIdx%x, ntiles, gridDim%x
-      bx = mod(tile-1, nbx) + 1
-      by = mod((tile-1)/nbx, nby) + 1
-      bz = (tile-1)/(nbx*nby) + 1
-      j  = (by-1)*blockDim%y + jt + 1
-      k  = (bz-1)*blockDim%z + kt + 1
-      i_base     = (bx-1)*blockDim%x
-      offset_yz  = (jt-1) * sx  + (kt-1) * sx  * sy
-      offset_yzr = (jt-1) * sxr + (kt-1) * sxr * sy
-      do ii = it-io, threadsE%x+io+1, blockDim%x
-        i = i_base + ii
-        if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-          idx = ii + offset_yz
-          rho(idx) = fltflt_init(Q(i,1,j,k));   u(idx) = fltflt_init(Q(i,2,j,k))
-            v(idx) = fltflt_init(Q(i,3,j,k));   w(idx) = fltflt_init(Q(i,4,j,k))
-            p(idx) = fltflt_init(Q(i,5,j,k)); tmp(idx) = fltflt_init(T(i,j,k))
-        endif
-      enddo
-      call syncthreads()
-      i = i_base + it
-      if (io+1 <= i .and. i <= nx-(io+1) .and. j <= ny-1 .and. k <= nz-1) then
-        idx   = it + offset_yz
-        idx_r = it + offset_yzr
-        fdx   = 0.5_sp * (sensor(i,j,k) + sensor(i+1,j,k))
-        if (fdx <= threshold) then
-          E(:,i,j-1,k-1) = KEEP(id_acc, &
-                                 rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
-                                   v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
-                                   u(idx-io:idx+io+1), p(idx-io:idx+io+1), &
-                                 tmp(idx-io:idx+io+1), Normal_x_ff)
-        else
-          call delta_r(id_acc, fdx, rho(idx-io:idx+io+1), rhol, rhor(idx_r))
-          call delta_r(id_acc, fdx,   u(idx-io:idx+io+1),   ul,   ur(idx_r))
-          call delta_r(id_acc, fdx,   v(idx-io:idx+io+1),   vl,   vr(idx_r))
-          call delta_r(id_acc, fdx,   w(idx-io:idx+io+1),   wl,   wr(idx_r))
-          call delta_r(id_acc, fdx,   p(idx-io:idx+io+1),   pl,   pr(idx_r))
-        endif
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    k  = (blockIdx%z-1)*blockDim%z + kt + 1
+    i_base     = (blockIdx%x-1)*blockDim%x
+    offset_yz  = (jt-1) * sx  + (kt-1) * sx  * sy
+    offset_yzr = (jt-1) * sxr + (kt-1) * sxr * sy
+    do ii = it-io, threadsE%x+io+1, blockDim%x
+      i = i_base + ii
+      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+        idx = ii + offset_yz
+        rho(idx) = fltflt_init(Q(i,1,j,k));   u(idx) = fltflt_init(Q(i,2,j,k))
+          v(idx) = fltflt_init(Q(i,3,j,k));   w(idx) = fltflt_init(Q(i,4,j,k))
+          p(idx) = fltflt_init(Q(i,5,j,k)); tmp(idx) = fltflt_init(T(i,j,k))
       endif
-      call syncthreads()
-      if (io+1 <= i .and. i <= nx-(io+1) .and. j <= ny-1 .and. k <= nz-1 .and. fdx > threshold) then
-        rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
-        associate(un1 => u(idx), un2 => ur(idx_r))
-          call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
-                    w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_x_ff, 1.0_sp, &
-                    E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
-        end associate
-      endif
-      call syncthreads()
     enddo
+    call syncthreads()
+    i = i_base + it
+    if (io+1 <= i .and. i <= nx-(io+1) .and. j <= ny-1 .and. k <= nz-1) then
+      idx   = it + offset_yz
+      idx_r = it + offset_yzr
+      fdx   = 0.5_sp * (sensor(i,j,k) + sensor(i+1,j,k))
+      if (fdx <= threshold) then
+        E(:,i,j-1,k-1) = KEEP(id_acc, &
+                               rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
+                                 v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
+                                 u(idx-io:idx+io+1), p(idx-io:idx+io+1), &
+                               tmp(idx-io:idx+io+1), Normal_x_ff)
+      else
+        call delta_r(id_acc, fdx, rho(idx-io:idx+io+1), rhol, rhor(idx_r))
+        call delta_r(id_acc, fdx,   u(idx-io:idx+io+1),   ul,   ur(idx_r))
+        call delta_r(id_acc, fdx,   v(idx-io:idx+io+1),   vl,   vr(idx_r))
+        call delta_r(id_acc, fdx,   w(idx-io:idx+io+1),   wl,   wr(idx_r))
+        call delta_r(id_acc, fdx,   p(idx-io:idx+io+1),   pl,   pr(idx_r))
+      endif
+    endif
+    call syncthreads()
+    if (io+1 <= i .and. i <= nx-(io+1) .and. j <= ny-1 .and. k <= nz-1 .and. fdx > threshold) then
+      rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
+      associate(un1 => u(idx), un2 => ur(idx_r))
+        call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
+                  w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_x_ff, 1.0_sp, &
+                  E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
+      end associate
+    endif
   end subroutine calc_hybrid_x_in
 
 
-  attributes(global) subroutine calc_hybrid_y_in(nx, ny, nz, nbx, nby, nbz, Q, T, sensor, F)
+  attributes(global) subroutine calc_hybrid_y_in(nx, ny, nz, Q, T, sensor, F)
     use mod_constant, only : Normal_y_ff
-    integer, intent(in), value                :: nx, ny, nz, nbx, nby, nbz
+    integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz)
     real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     ! phase 2: F already holds phase-1's Fv (viscous) contribution -- accumulate.
     real(8), intent(inout), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt
     integer :: jj, j_base, idx, idx_r, offset_xz, offset_xzr
-    integer :: tile, ntiles, bx, by, bz
     integer, parameter :: sx  = threadsF%x
     integer, parameter :: sy  = threadsF%y + 2*io + 1
     integer, parameter :: syr = threadsF%y
@@ -173,74 +164,66 @@ contains
     type(fltflt) rhol, ul, vl, wl, pl
     real(sp) fdy
     it = threadIdx%x;  jt = threadIdx%y;  kt = threadIdx%z
-    ntiles = nbx * nby * nbz
-    do tile = blockIdx%x, ntiles, gridDim%x
-      bx = mod(tile-1, nbx) + 1
-      by = mod((tile-1)/nbx, nby) + 1
-      bz = (tile-1)/(nbx*nby) + 1
-      i  = (bx-1)*blockDim%x + it + 1
-      k  = (bz-1)*blockDim%z + kt + 1
-      j_base     = (by-1)*blockDim%y
-      offset_xz  = (it-1) * sy  + (kt-1) * sy  * sx
-      offset_xzr = (it-1) * syr + (kt-1) * syr * sx
-      do jj = jt-io, threadsF%y+io+1, blockDim%y
-        j = j_base + jj
-        if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-          idx = jj + offset_xz
-          rho(idx) = fltflt_init(Q(i,1,j,k));   u(idx) = fltflt_init(Q(i,2,j,k))
-            v(idx) = fltflt_init(Q(i,3,j,k));   w(idx) = fltflt_init(Q(i,4,j,k))
-            p(idx) = fltflt_init(Q(i,5,j,k)); tmp(idx) = fltflt_init(T(i,j,k))
-        endif
-      enddo
-      call syncthreads()
-      j = j_base + jt
-      if (io+1 <= j .and. j <= ny-(io+1) .and. i <= nx-1 .and. k <= nz-1) then
-        idx   = jt + offset_xz
-        idx_r = jt + offset_xzr
-        fdy   = 0.5_sp * (sensor(i,j,k) + sensor(i,j+1,k))
-        if (fdy <= threshold) then
-          F(:,i-1,j,k-1) = F(:,i-1,j,k-1) + KEEP(id_acc, &
-                                 rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
-                                   v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
-                                   v(idx-io:idx+io+1), p(idx-io:idx+io+1), &
-                                 tmp(idx-io:idx+io+1), Normal_y_ff)
-        else
-          call delta_r(id_acc, fdy, rho(idx-io:idx+io+1), rhol, rhor(idx_r))
-          call delta_r(id_acc, fdy,   u(idx-io:idx+io+1),   ul,   ur(idx_r))
-          call delta_r(id_acc, fdy,   v(idx-io:idx+io+1),   vl,   vr(idx_r))
-          call delta_r(id_acc, fdy,   w(idx-io:idx+io+1),   wl,   wr(idx_r))
-          call delta_r(id_acc, fdy,   p(idx-io:idx+io+1),   pl,   pr(idx_r))
-        endif
+    i  = (blockIdx%x-1)*blockDim%x + it + 1
+    k  = (blockIdx%z-1)*blockDim%z + kt + 1
+    j_base     = (blockIdx%y-1)*blockDim%y
+    offset_xz  = (it-1) * sy  + (kt-1) * sy  * sx
+    offset_xzr = (it-1) * syr + (kt-1) * syr * sx
+    do jj = jt-io, threadsF%y+io+1, blockDim%y
+      j = j_base + jj
+      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+        idx = jj + offset_xz
+        rho(idx) = fltflt_init(Q(i,1,j,k));   u(idx) = fltflt_init(Q(i,2,j,k))
+          v(idx) = fltflt_init(Q(i,3,j,k));   w(idx) = fltflt_init(Q(i,4,j,k))
+          p(idx) = fltflt_init(Q(i,5,j,k)); tmp(idx) = fltflt_init(T(i,j,k))
       endif
-      call syncthreads()
-      if (io+1 <= j .and. j <= ny-(io+1) .and. i <= nx-1 .and. k <= nz-1 .and. fdy > threshold) then
-        rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
-        block
-          real(8) :: Fout(5)
-          associate(un1 => v(idx), un2 => vr(idx_r))
-            call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
-                      w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_y_ff, 1.0_sp, &
-                      Fout(1), Fout(2), Fout(3), Fout(4), Fout(5))
-          end associate
-          ! phase 2: F already holds phase-1's Fv (viscous) contribution -- accumulate.
-          F(:,i-1,j,k-1) = F(:,i-1,j,k-1) + Fout(:)
-        end block
-      endif
-      call syncthreads()
     enddo
+    call syncthreads()
+    j = j_base + jt
+    if (io+1 <= j .and. j <= ny-(io+1) .and. i <= nx-1 .and. k <= nz-1) then
+      idx   = jt + offset_xz
+      idx_r = jt + offset_xzr
+      fdy   = 0.5_sp * (sensor(i,j,k) + sensor(i,j+1,k))
+      if (fdy <= threshold) then
+        F(:,i-1,j,k-1) = F(:,i-1,j,k-1) + KEEP(id_acc, &
+                               rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
+                                 v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
+                                 v(idx-io:idx+io+1), p(idx-io:idx+io+1), &
+                               tmp(idx-io:idx+io+1), Normal_y_ff)
+      else
+        call delta_r(id_acc, fdy, rho(idx-io:idx+io+1), rhol, rhor(idx_r))
+        call delta_r(id_acc, fdy,   u(idx-io:idx+io+1),   ul,   ur(idx_r))
+        call delta_r(id_acc, fdy,   v(idx-io:idx+io+1),   vl,   vr(idx_r))
+        call delta_r(id_acc, fdy,   w(idx-io:idx+io+1),   wl,   wr(idx_r))
+        call delta_r(id_acc, fdy,   p(idx-io:idx+io+1),   pl,   pr(idx_r))
+      endif
+    endif
+    call syncthreads()
+    if (io+1 <= j .and. j <= ny-(io+1) .and. i <= nx-1 .and. k <= nz-1 .and. fdy > threshold) then
+      rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
+      block
+        real(8) :: Fout(5)
+        associate(un1 => v(idx), un2 => vr(idx_r))
+          call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
+                    w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_y_ff, 1.0_sp, &
+                    Fout(1), Fout(2), Fout(3), Fout(4), Fout(5))
+        end associate
+        ! phase 2: F already holds phase-1's Fv (viscous) contribution -- accumulate.
+        F(:,i-1,j,k-1) = F(:,i-1,j,k-1) + Fout(:)
+      end block
+    endif
   end subroutine calc_hybrid_y_in
 
 
-  attributes(global) subroutine calc_hybrid_z_in(nx, ny, nz, nbx, nby, nbz, Q, T, sensor, G)
+  attributes(global) subroutine calc_hybrid_z_in(nx, ny, nz, Q, T, sensor, G)
     use mod_constant, only : Normal_z_ff
-    integer, intent(in), value                :: nx, ny, nz, nbx, nby, nbz
+    integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz)
     real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     ! phase 3: G already holds phase-2's Gv (viscous) contribution -- accumulate.
     real(8), intent(inout), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt
     integer :: kk, k_base, idx, idx_r, offset_xy, offset_xyr
-    integer :: tile, ntiles, bx, by, bz
     integer, parameter :: sx  = threadsG%x
     integer, parameter :: sy  = threadsG%y
     integer, parameter :: sz  = threadsG%z + 2*io + 1
@@ -250,60 +233,53 @@ contains
     type(fltflt) rhol, ul, vl, wl, pl
     real(sp) fdz
     it = threadIdx%x;  jt = threadIdx%y;  kt = threadIdx%z
-    ntiles = nbx * nby * nbz
-    do tile = blockIdx%x, ntiles, gridDim%x
-      bx = mod(tile-1, nbx) + 1
-      by = mod((tile-1)/nbx, nby) + 1
-      bz = (tile-1)/(nbx*nby) + 1
-      i  = (bx-1)*blockDim%x + it + 1
-      j  = (by-1)*blockDim%y + jt + 1
-      k_base     = (bz-1)*blockDim%z
-      offset_xy  = (jt-1) * sz  + (it-1) * sz  * sy
-      offset_xyr = (jt-1) * szr + (it-1) * szr * sy
-      do kk = kt-io, threadsG%z+io+1, blockDim%z
-        k = k_base + kk
-        if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-          idx = kk + offset_xy
-          rho(idx) = fltflt_init(Q(i,1,j,k));   u(idx) = fltflt_init(Q(i,2,j,k))
-            v(idx) = fltflt_init(Q(i,3,j,k));   w(idx) = fltflt_init(Q(i,4,j,k))
-            p(idx) = fltflt_init(Q(i,5,j,k)); tmp(idx) = fltflt_init(T(i,j,k))
-        endif
-      enddo
-      call syncthreads()
-      k = k_base + kt
-      if (io+1 <= k .and. k <= nz-(io+1) .and. i <= nx-1 .and. j <= ny-1) then
-        idx   = kt + offset_xy
-        idx_r = kt + offset_xyr
-        fdz   = 0.5_sp * (sensor(i,j,k) + sensor(i,j,k+1))
-        if (fdz <= threshold) then
-          G(:,i-1,j-1,k) = G(:,i-1,j-1,k) + KEEP(id_acc, &
-                                 rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
-                                   v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
-                                   w(idx-io:idx+io+1), p(idx-io:idx+io+1), &
-                                 tmp(idx-io:idx+io+1), Normal_z_ff)
-        else
-          call delta_r(id_acc, fdz, rho(idx-io:idx+io+1), rhol, rhor(idx_r))
-          call delta_r(id_acc, fdz,   u(idx-io:idx+io+1),   ul,   ur(idx_r))
-          call delta_r(id_acc, fdz,   v(idx-io:idx+io+1),   vl,   vr(idx_r))
-          call delta_r(id_acc, fdz,   w(idx-io:idx+io+1),   wl,   wr(idx_r))
-          call delta_r(id_acc, fdz,   p(idx-io:idx+io+1),   pl,   pr(idx_r))
-        endif
+    i  = (blockIdx%x-1)*blockDim%x + it + 1
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    k_base     = (blockIdx%z-1)*blockDim%z
+    offset_xy  = (jt-1) * sz  + (it-1) * sz  * sy
+    offset_xyr = (jt-1) * szr + (it-1) * szr * sy
+    do kk = kt-io, threadsG%z+io+1, blockDim%z
+      k = k_base + kk
+      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+        idx = kk + offset_xy
+        rho(idx) = fltflt_init(Q(i,1,j,k));   u(idx) = fltflt_init(Q(i,2,j,k))
+          v(idx) = fltflt_init(Q(i,3,j,k));   w(idx) = fltflt_init(Q(i,4,j,k))
+          p(idx) = fltflt_init(Q(i,5,j,k)); tmp(idx) = fltflt_init(T(i,j,k))
       endif
-      call syncthreads()
-      if (io+1 <= k .and. k <= nz-(io+1) .and. i <= nx-1 .and. j <= ny-1 .and. fdz > threshold) then
-        rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
-        block
-          real(8) :: Gout(5)
-          associate(un1 => w(idx), un2 => wr(idx_r))
-            call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
-                      w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_z_ff, 1.0_sp, &
-                      Gout(1), Gout(2), Gout(3), Gout(4), Gout(5))
-          end associate
-          ! phase 3: G already holds phase-2's Gv (viscous) contribution -- accumulate.
-          G(:,i-1,j-1,k) = G(:,i-1,j-1,k) + Gout(:)
-        end block
-      endif
-      call syncthreads()
     enddo
+    call syncthreads()
+    k = k_base + kt
+    if (io+1 <= k .and. k <= nz-(io+1) .and. i <= nx-1 .and. j <= ny-1) then
+      idx   = kt + offset_xy
+      idx_r = kt + offset_xyr
+      fdz   = 0.5_sp * (sensor(i,j,k) + sensor(i,j,k+1))
+      if (fdz <= threshold) then
+        G(:,i-1,j-1,k) = G(:,i-1,j-1,k) + KEEP(id_acc, &
+                               rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
+                                 v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
+                                 w(idx-io:idx+io+1), p(idx-io:idx+io+1), &
+                               tmp(idx-io:idx+io+1), Normal_z_ff)
+      else
+        call delta_r(id_acc, fdz, rho(idx-io:idx+io+1), rhol, rhor(idx_r))
+        call delta_r(id_acc, fdz,   u(idx-io:idx+io+1),   ul,   ur(idx_r))
+        call delta_r(id_acc, fdz,   v(idx-io:idx+io+1),   vl,   vr(idx_r))
+        call delta_r(id_acc, fdz,   w(idx-io:idx+io+1),   wl,   wr(idx_r))
+        call delta_r(id_acc, fdz,   p(idx-io:idx+io+1),   pl,   pr(idx_r))
+      endif
+    endif
+    call syncthreads()
+    if (io+1 <= k .and. k <= nz-(io+1) .and. i <= nx-1 .and. j <= ny-1 .and. fdz > threshold) then
+      rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
+      block
+        real(8) :: Gout(5)
+        associate(un1 => w(idx), un2 => wr(idx_r))
+          call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
+                    w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_z_ff, 1.0_sp, &
+                    Gout(1), Gout(2), Gout(3), Gout(4), Gout(5))
+        end associate
+        ! phase 3: G already holds phase-2's Gv (viscous) contribution -- accumulate.
+        G(:,i-1,j-1,k) = G(:,i-1,j-1,k) + Gout(:)
+      end block
+    endif
   end subroutine calc_hybrid_z_in
 end module calc_hybrid_kernel_internal

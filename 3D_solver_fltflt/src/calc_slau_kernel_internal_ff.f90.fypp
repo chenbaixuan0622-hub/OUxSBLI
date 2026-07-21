@@ -92,15 +92,14 @@ contains
   end subroutine interp2_ff
 
 
-  attributes(global) subroutine calc_slau_x_in(nx, ny, nz, nbx, nby, nbz, Q, sensor, E)
+  attributes(global) subroutine calc_slau_x_in(nx, ny, nz, Q, sensor, E)
     use mod_constant, only : Normal_x_ff
-    integer, intent(in), value                :: nx, ny, nz, nbx, nby, nbz
+    integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
     real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt
     integer ii, i_base, idx, idx_r, offset_yz, offset_yzr, i1, i2
-    integer :: tile, ntiles, bx, by, bz
     integer, parameter :: sx  = threadsE%x + 2*io + 1
     integer, parameter :: sxr = threadsE%x
     integer, parameter :: sy  = threadsE%y
@@ -112,60 +111,52 @@ contains
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
-    ntiles = nbx * nby * nbz
-    do tile = blockIdx%x, ntiles, gridDim%x
-      bx = mod(tile-1, nbx) + 1
-      by = mod((tile-1)/nbx, nby) + 1
-      bz = (tile-1)/(nbx*nby) + 1
-      j  = (by-1)*blockDim%y + jt + 1
-      k  = (bz-1)*blockDim%z + kt + 1
-      i_base     = (bx-1)*blockDim%x
-      offset_yz  = (jt-1) * sx  + (kt-1) * sx  * sy
-      offset_yzr = (jt-1) * sxr + (kt-1) * sxr * sy
-      do ii = it-io, threadsE%x+io+1, blockDim%x
-        i = i_base + ii
-        if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-          idx = ii + offset_yz
-          rho(idx) = fltflt_init(Q(i,1,j,k)); u(idx) = fltflt_init(Q(i,2,j,k)); v(idx) = fltflt_init(Q(i,3,j,k))
-            w(idx) = fltflt_init(Q(i,4,j,k)); p(idx) = fltflt_init(Q(i,5,j,k))
-        endif
-      enddo
-      call syncthreads()
-      i = i_base + it
-      if (io+1 <= i .and. i <= nx-(io+1) .and. j <= ny-1 .and. k <= nz-1) then
-        idx   = it + offset_yz
-        idx_r = it + offset_yzr
-        i1    = idx - io
-        i2    = idx + io + 1
-        fdx   = 0.50_sp * (sensor(i,j,k) + sensor(i+1,j,k))
-        call interp(id_acc, &
-                    rho(i1:i2),  u(i1:i2),  v(i1:i2),  w(i1:i2),  p(i1:i2), &
-                    rhol,        ul,        vl,        wl,        pl, &
-                    rhor(idx_r), ur(idx_r), vr(idx_r), wr(idx_r), pr(idx_r), fdx)
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    k  = (blockIdx%z-1)*blockDim%z + kt + 1
+    i_base     = (blockIdx%x-1)*blockDim%x
+    offset_yz  = (jt-1) * sx  + (kt-1) * sx  * sy
+    offset_yzr = (jt-1) * sxr + (kt-1) * sxr * sy
+    do ii = it-io, threadsE%x+io+1, blockDim%x
+      i = i_base + ii
+      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+        idx = ii + offset_yz
+        rho(idx) = fltflt_init(Q(i,1,j,k)); u(idx) = fltflt_init(Q(i,2,j,k)); v(idx) = fltflt_init(Q(i,3,j,k))
+          w(idx) = fltflt_init(Q(i,4,j,k)); p(idx) = fltflt_init(Q(i,5,j,k))
       endif
-      call syncthreads()
-      if (io+1 <= i .and. i <= nx-(io+1) .and. j <= ny-1 .and. k <= nz-1) then
-        rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
-        associate(un1 => u(idx), un2 => ur(idx_r))
-          call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
-                    w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_x_ff, fdx, &
-                    E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
-        end associate
-      endif
-      call syncthreads()
     enddo
+    call syncthreads()
+    i = i_base + it
+    if (io+1 <= i .and. i <= nx-(io+1) .and. j <= ny-1 .and. k <= nz-1) then
+      idx   = it + offset_yz
+      idx_r = it + offset_yzr
+      i1    = idx - io
+      i2    = idx + io + 1
+      fdx   = 0.50_sp * (sensor(i,j,k) + sensor(i+1,j,k))
+      call interp(id_acc, &
+                  rho(i1:i2),  u(i1:i2),  v(i1:i2),  w(i1:i2),  p(i1:i2), &
+                  rhol,        ul,        vl,        wl,        pl, &
+                  rhor(idx_r), ur(idx_r), vr(idx_r), wr(idx_r), pr(idx_r), fdx)
+    endif
+    call syncthreads()
+    if (io+1 <= i .and. i <= nx-(io+1) .and. j <= ny-1 .and. k <= nz-1) then
+      rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
+      associate(un1 => u(idx), un2 => ur(idx_r))
+        call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
+                  w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_x_ff, fdx, &
+                  E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
+      end associate
+    endif
   end subroutine calc_slau_x_in
 
 
-  attributes(global) subroutine calc_slau_y_in(nx, ny, nz, nbx, nby, nbz, Q, sensor, F)
+  attributes(global) subroutine calc_slau_y_in(nx, ny, nz, Q, sensor, F)
     use mod_constant, only : Normal_y_ff
-    integer, intent(in), value                :: nx, ny, nz, nbx, nby, nbz
+    integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
     real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(inout), device, contiguous :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt
     integer jj, j_base, idx, idx_r, offset_xz, offset_xzr, i1, i2
-    integer :: tile, ntiles, bx, by, bz
     real(8) :: Fout(5)
     integer, parameter :: sx  = threadsF%x
     integer, parameter :: sy  = threadsF%y + 2*io + 1
@@ -178,62 +169,54 @@ contains
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
-    ntiles = nbx * nby * nbz
-    do tile = blockIdx%x, ntiles, gridDim%x
-      bx = mod(tile-1, nbx) + 1
-      by = mod((tile-1)/nbx, nby) + 1
-      bz = (tile-1)/(nbx*nby) + 1
-      i  = (bx-1)*blockDim%x + it + 1
-      k  = (bz-1)*blockDim%z + kt + 1
-      j_base     = (by-1)*blockDim%y
-      offset_xz  = (it-1) * sy  + (kt-1) * sy  * sx
-      offset_xzr = (it-1) * syr + (kt-1) * syr * sx
-      do jj = jt-io, threadsF%y+io+1, blockDim%y
-        j = j_base + jj
-        if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-          idx = jj + offset_xz
-          rho(idx) = fltflt_init(Q(i,1,j,k)); u(idx) = fltflt_init(Q(i,2,j,k)); v(idx) = fltflt_init(Q(i,3,j,k))
-            w(idx) = fltflt_init(Q(i,4,j,k)); p(idx) = fltflt_init(Q(i,5,j,k))
-        endif
-      enddo
-      call syncthreads()
-      j = j_base + jt
-      if (io+1 <= j .and. j <= ny-(io+1) .and. k <= nz-1 .and. i <= nx-1) then
-        idx   = jt + offset_xz
-        idx_r = jt + offset_xzr
-        i1    = idx - io
-        i2    = idx + io + 1
-        fdy   = 0.50_sp * (sensor(i,j,k) + sensor(i,j+1,k))
-        call interp(id_acc, &
-                    rho(i1:i2),  u(i1:i2),  v(i1:i2),  w(i1:i2),  p(i1:i2), &
-                    rhol,        ul,        vl,        wl,        pl, &
-                    rhor(idx_r), ur(idx_r), vr(idx_r), wr(idx_r), pr(idx_r), fdy)
+    i  = (blockIdx%x-1)*blockDim%x + it + 1
+    k  = (blockIdx%z-1)*blockDim%z + kt + 1
+    j_base     = (blockIdx%y-1)*blockDim%y
+    offset_xz  = (it-1) * sy  + (kt-1) * sy  * sx
+    offset_xzr = (it-1) * syr + (kt-1) * syr * sx
+    do jj = jt-io, threadsF%y+io+1, blockDim%y
+      j = j_base + jj
+      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+        idx = jj + offset_xz
+        rho(idx) = fltflt_init(Q(i,1,j,k)); u(idx) = fltflt_init(Q(i,2,j,k)); v(idx) = fltflt_init(Q(i,3,j,k))
+          w(idx) = fltflt_init(Q(i,4,j,k)); p(idx) = fltflt_init(Q(i,5,j,k))
       endif
-      call syncthreads()
-      if (io+1 <= j .and. j <= ny-(io+1) .and. k <= nz-1 .and. i <= nx-1) then
-        rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
-        associate(un1 => v(idx), un2 => vr(idx_r))
-          call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
-                    w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_y_ff, fdy, &
-                    Fout(1), Fout(2), Fout(3), Fout(4), Fout(5))
-        end associate
-        ! phase 2: F already holds phase-1's Fv (viscous) contribution -- accumulate.
-        F(:,i-1,j,k-1) = F(:,i-1,j,k-1) + Fout(:)
-      endif
-      call syncthreads()
     enddo
+    call syncthreads()
+    j = j_base + jt
+    if (io+1 <= j .and. j <= ny-(io+1) .and. k <= nz-1 .and. i <= nx-1) then
+      idx   = jt + offset_xz
+      idx_r = jt + offset_xzr
+      i1    = idx - io
+      i2    = idx + io + 1
+      fdy   = 0.50_sp * (sensor(i,j,k) + sensor(i,j+1,k))
+      call interp(id_acc, &
+                  rho(i1:i2),  u(i1:i2),  v(i1:i2),  w(i1:i2),  p(i1:i2), &
+                  rhol,        ul,        vl,        wl,        pl, &
+                  rhor(idx_r), ur(idx_r), vr(idx_r), wr(idx_r), pr(idx_r), fdy)
+    endif
+    call syncthreads()
+    if (io+1 <= j .and. j <= ny-(io+1) .and. k <= nz-1 .and. i <= nx-1) then
+      rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
+      associate(un1 => v(idx), un2 => vr(idx_r))
+        call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
+                  w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_y_ff, fdy, &
+                  Fout(1), Fout(2), Fout(3), Fout(4), Fout(5))
+      end associate
+      ! phase 2: F already holds phase-1's Fv (viscous) contribution -- accumulate.
+      F(:,i-1,j,k-1) = F(:,i-1,j,k-1) + Fout(:)
+    endif
   end subroutine calc_slau_y_in
 
 
-  attributes(global) subroutine calc_slau_z_in(nx, ny, nz, nbx, nby, nbz, Q, sensor, G)
+  attributes(global) subroutine calc_slau_z_in(nx, ny, nz, Q, sensor, G)
     use mod_constant, only : Normal_z_ff
-    integer, intent(in), value                :: nx, ny, nz, nbx, nby, nbz
+    integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
     real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
     real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt
     integer kk, k_base, idx, idx_r, offset_xy, offset_xyr, i1, i2
-    integer :: tile, ntiles, bx, by, bz
     real(8) :: Gout(5)
     integer, parameter :: sx  = threadsG%x
     integer, parameter :: sy  = threadsG%y
@@ -246,50 +229,43 @@ contains
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
-    ntiles = nbx * nby * nbz
-    do tile = blockIdx%x, ntiles, gridDim%x
-      bx = mod(tile-1, nbx) + 1
-      by = mod((tile-1)/nbx, nby) + 1
-      bz = (tile-1)/(nbx*nby) + 1
-      i  = (bx-1)*blockDim%x + it + 1
-      j  = (by-1)*blockDim%y + jt + 1
-      k_base     = (bz-1)*blockDim%z
-      offset_xy  = (jt-1) * sz  + (it-1) * sz  * sy
-      offset_xyr = (jt-1) * szr + (it-1) * szr * sy
-      do kk = kt-io, threadsG%z+io+1, blockDim%z
-        k = k_base + kk
-        if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-          idx = kk + offset_xy
-          rho(idx) = fltflt_init(Q(i,1,j,k)); u(idx) = fltflt_init(Q(i,2,j,k)); v(idx) = fltflt_init(Q(i,3,j,k))
-            w(idx) = fltflt_init(Q(i,4,j,k)); p(idx) = fltflt_init(Q(i,5,j,k))
-        endif
-      enddo
-      call syncthreads()
-      k = k_base + kt
-      if (io+1 <= k .and. k <= nz-(io+1) .and. i <= nx-1 .and. j <= ny-1) then
-        idx   = kt + offset_xy
-        idx_r = kt + offset_xyr
-        i1    = idx - io
-        i2    = idx + io + 1
-        fdz   = 0.50_sp * (sensor(i,j,k) + sensor(i,j,k+1))
-        call interp(id_acc, &
-                    rho(i1:i2),  u(i1:i2),  v(i1:i2),  w(i1:i2),  p(i1:i2), &
-                    rhol,        ul,        vl,        wl,        pl, &
-                    rhor(idx_r), ur(idx_r), vr(idx_r), wr(idx_r), pr(idx_r), fdz)
+    i  = (blockIdx%x-1)*blockDim%x + it + 1
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    k_base     = (blockIdx%z-1)*blockDim%z
+    offset_xy  = (jt-1) * sz  + (it-1) * sz  * sy
+    offset_xyr = (jt-1) * szr + (it-1) * szr * sy
+    do kk = kt-io, threadsG%z+io+1, blockDim%z
+      k = k_base + kk
+      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+        idx = kk + offset_xy
+        rho(idx) = fltflt_init(Q(i,1,j,k)); u(idx) = fltflt_init(Q(i,2,j,k)); v(idx) = fltflt_init(Q(i,3,j,k))
+          w(idx) = fltflt_init(Q(i,4,j,k)); p(idx) = fltflt_init(Q(i,5,j,k))
       endif
-      call syncthreads()
-      if (io+1 <= k .and. k <= nz-(io+1) .and. i <= nx-1 .and. j <= ny-1) then
-        rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
-        associate(un1 => w(idx), un2 => wr(idx_r))
-          call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
-                    w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_z_ff, fdz, &
-                    Gout(1), Gout(2), Gout(3), Gout(4), Gout(5))
-        end associate
-        ! phase 3: G already holds phase-2's Gv (viscous) contribution -- accumulate.
-        G(:,i-1,j-1,k) = G(:,i-1,j-1,k) + Gout(:)
-      endif
-      call syncthreads()
     enddo
+    call syncthreads()
+    k = k_base + kt
+    if (io+1 <= k .and. k <= nz-(io+1) .and. i <= nx-1 .and. j <= ny-1) then
+      idx   = kt + offset_xy
+      idx_r = kt + offset_xyr
+      i1    = idx - io
+      i2    = idx + io + 1
+      fdz   = 0.50_sp * (sensor(i,j,k) + sensor(i,j,k+1))
+      call interp(id_acc, &
+                  rho(i1:i2),  u(i1:i2),  v(i1:i2),  w(i1:i2),  p(i1:i2), &
+                  rhol,        ul,        vl,        wl,        pl, &
+                  rhor(idx_r), ur(idx_r), vr(idx_r), wr(idx_r), pr(idx_r), fdz)
+    endif
+    call syncthreads()
+    if (io+1 <= k .and. k <= nz-(io+1) .and. i <= nx-1 .and. j <= ny-1) then
+      rho(idx) = rhol; u(idx) = ul; v(idx) = vl; w(idx) = wl; p(idx) = pl
+      associate(un1 => w(idx), un2 => wr(idx_r))
+        call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
+                  w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_z_ff, fdz, &
+                  Gout(1), Gout(2), Gout(3), Gout(4), Gout(5))
+      end associate
+      ! phase 3: G already holds phase-2's Gv (viscous) contribution -- accumulate.
+      G(:,i-1,j-1,k) = G(:,i-1,j-1,k) + Gout(:)
+    endif
   end subroutine calc_slau_z_in
 
 

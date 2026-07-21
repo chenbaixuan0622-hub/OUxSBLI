@@ -3,6 +3,7 @@
   #:set VISC_ORDER = ORDER
 #:endif
 module calc_flux_base
+  use cudafor
   use mod_globals, only : sp, &
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
   & blocksEv, blocksFv, blocksGv, threadsEv, threadsFv, threadsGv
@@ -17,61 +18,23 @@ module calc_flux_base
   use calc_visc_high
   use calc_visc_high_internal
   #:endif
-  use mod_streams, only : stream_conv, stream_visc, event_E, event_Fv, event_Gv, query_nblk
+  use mod_streams, only : stream_conv, stream_visc, event_E, event_Fv, event_Gv
   use nvtx
   use set
   implicit none
   private
-  public calc_EFG, init_sensor, init_occupancy
+  public calc_EFG, init_sensor
   #:if COMMZ
   public calc_EFG_halo
   #:endif
   integer, parameter :: io_fb      = ${ORDER_IO}$
   integer, parameter :: overlap_fb = ${ORDER_IO + 1}$
   real(sp), allocatable, device, save :: sensor(:,:,:)
-  logical, save :: occupancy_initialized = .false.
-  integer, save :: nblk_conv_E, nblk_conv_F, nblk_conv_G
-  #:if VISC in ('NS', 'LES')
-  integer, save :: nblk_visc_E, nblk_visc_F, nblk_visc_G
-  #:endif
 contains
   subroutine init_sensor(nx, ny, nz)
     integer, intent(in) :: nx, ny, nz
     allocate(sensor(nx,ny,nz))
   end subroutine init_sensor
-
-
-  !> Query each convective/viscous kernel's true max resident blocks/SM
-  !> (register + static-shared-memory footprint dependent) once at startup,
-  !> replacing the flat SMs/2 guess with a properly occupancy-derived count.
-  subroutine init_occupancy()
-    #:set scheme_name = SCHEME.lower()
-    integer :: istat, numBlocksPerSM
-    if (occupancy_initialized) return
-    istat = cudaOccupancyMaxActiveBlocksPerMultiprocessor(numBlocksPerSM, &
-                calc_${scheme_name}$_x${'' if BC_X else '_in'}$, threadsE%x*threadsE%y*threadsE%z, 0)
-    nblk_conv_E = query_nblk(numBlocksPerSM)
-    istat = cudaOccupancyMaxActiveBlocksPerMultiprocessor(numBlocksPerSM, &
-                calc_${scheme_name}$_y${'' if BC_Y else '_in'}$, threadsF%x*threadsF%y*threadsF%z, 0)
-    nblk_conv_F = query_nblk(numBlocksPerSM)
-    istat = cudaOccupancyMaxActiveBlocksPerMultiprocessor(numBlocksPerSM, &
-                calc_${scheme_name}$_z${'' if BC_Z else '_in'}$, threadsG%x*threadsG%y*threadsG%z, 0)
-    nblk_conv_G = query_nblk(numBlocksPerSM)
-    print '(1x, a, 3(i0,1x))', "nblk_conv (E,F,G): ", nblk_conv_E, nblk_conv_F, nblk_conv_G
-    #:if VISC in ('NS', 'LES')
-    istat = cudaOccupancyMaxActiveBlocksPerMultiprocessor(numBlocksPerSM, &
-                calc_Ev${VISC_ORDER}$_in, threadsEv%x*threadsEv%y*threadsEv%z, 0)
-    nblk_visc_E = query_nblk(numBlocksPerSM)
-    istat = cudaOccupancyMaxActiveBlocksPerMultiprocessor(numBlocksPerSM, &
-                calc_Fv${VISC_ORDER}$_in, threadsFv%x*threadsFv%y*threadsFv%z, 0)
-    nblk_visc_F = query_nblk(numBlocksPerSM)
-    istat = cudaOccupancyMaxActiveBlocksPerMultiprocessor(numBlocksPerSM, &
-                calc_Gv${VISC_ORDER}$_in, threadsGv%x*threadsGv%y*threadsGv%z, 0)
-    nblk_visc_G = query_nblk(numBlocksPerSM)
-    print '(1x, a, 3(i0,1x))', "nblk_visc (E,F,G): ", nblk_visc_E, nblk_visc_F, nblk_visc_G
-    #:endif
-    occupancy_initialized = .true.
-  end subroutine init_occupancy
 
 
   subroutine calc_conv(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, E, F, G)
@@ -81,42 +44,54 @@ contains
     real(8), intent(out), device, contiguous :: E(5,nx-1,ny-2,nz-2)
     real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2)
     real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1)
-    integer :: nbxE, nbyE, nbzE, nbxF, nbyF, nbzF, nbxG, nbyG, nbzG
+    integer :: istat
     type(nvtxRangeId) :: id
     ! set fypp
     #:set scheme_name = SCHEME.lower()
     #:set args_t = ", T" if SCHEME in ('KEEP', 'Hybrid') else ""
     #:set args_sensor = ", sensor" if SCHEME in ('SLAU', 'Roe', 'Hybrid') else ""
-    nbxE = blocksE%x; nbyE = blocksE%y; nbzE = blocksE%z
-    nbxF = blocksF%x; nbyF = blocksF%y; nbzF = blocksF%z
-    nbxG = blocksG%x; nbyG = blocksG%y; nbzG = blocksG%z
-    ! shock sensor
-    #:if SCHEME in ('SLAU', 'Roe', 'Hybrid')
-    call calc_Ducros<<<blocks,threads,0,stream_conv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
-    #:endif
-    ! flux -- no viscous term to pair against for VISC == 'Euler': single stream,
-    ! still occupancy-tiled so the launch pattern matches the NS/LES path.
+    ! flux -- no viscous term to pair against for VISC == 'Euler': single stream.
     ! calc_*_y_in/calc_*_z_in accumulate onto F/G (`F = F + ...`) rather than
     ! overwrite -- a convention that only produces a valid result when a
     ! viscous kernel wrote a real baseline into F/G first (see
     ! calc_conv_visc_paired below). There is no such kernel on the Euler path,
     ! so zero F/G here first or the accumulate reads uninitialized device
     ! memory into the flux on every step (NaN/garbage almost immediately).
-    call init_occupancy()
     F = 0.d0
     G = 0.d0
+    ! stream_conv is a CUDA Green Context stream -- a genuinely separate CUDA
+    ! context from the one that runs this subroutine's (and calc_quantities_*'s,
+    ! just before this call) default-stream work, so it does NOT get the
+    ! implicit default-stream ordering an ordinary blocking stream would.
+    ! Without this sync, nothing guarantees Q (written by calc_quantities_3D)
+    ! or the F/G zero-fill above are actually visible yet when the
+    ! green-context kernels below start reading/accumulating into them --
+    ! a race that reads stale/garbage memory (NaN). Per NVIDIA's Green
+    ! Context docs, cudaDeviceSynchronize() called with the primary context
+    ! current (always true here) drains all green contexts too, so this is
+    ! sufficient and correct, not just a device-wide sledgehammer.
+    istat = cudaDeviceSynchronize()
+    ! shock sensor
+    #:if SCHEME in ('SLAU', 'Roe', 'Hybrid')
+    call calc_Ducros<<<blocks,threads,0,stream_conv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
+    #:endif
     id = nvtxRangeStart("E")
-    call calc_${scheme_name}$_x${'' if BC_X else '_in'}$<<<dim3(nblk_conv_E,1,1),threadsE,0,stream_conv>>>&
-         &(nx, ny, nz, nbxE, nbyE, nbzE, Q${args_t}$${args_sensor}$, E)
+    call calc_${scheme_name}$_x${'' if BC_X else '_in'}$<<<blocksE,threadsE,0,stream_conv>>>&
+         &(nx, ny, nz, Q${args_t}$${args_sensor}$, E)
     call nvtxRangeEnd(id)
     id = nvtxRangeStart("F")
-    call calc_${scheme_name}$_y${'' if BC_Y else '_in'}$<<<dim3(nblk_conv_F,1,1),threadsF,0,stream_conv>>>&
-         &(nx, ny, nz, nbxF, nbyF, nbzF, Q${args_t}$${args_sensor}$, F)
+    call calc_${scheme_name}$_y${'' if BC_Y else '_in'}$<<<blocksF,threadsF,0,stream_conv>>>&
+         &(nx, ny, nz, Q${args_t}$${args_sensor}$, F)
     call nvtxRangeEnd(id)
     id = nvtxRangeStart("G")
-    call calc_${scheme_name}$_z${'' if BC_Z else '_in'}$<<<dim3(nblk_conv_G,1,1),threadsG,0,stream_conv>>>&
-         &(nx, ny, nz, nbxG, nbyG, nbzG, Q${args_t}$${args_sensor}$, G)
+    call calc_${scheme_name}$_z${'' if BC_Z else '_in'}$<<<blocksG,threadsG,0,stream_conv>>>&
+         &(nx, ny, nz, Q${args_t}$${args_sensor}$, G)
     call nvtxRangeEnd(id)
+    ! Mirror of the entry sync: the caller (RungeKutta, calc_time_dev_ff.f90.fypp)
+    ! launches calc_step1/2_3/4 on the default stream right after this
+    ! returns, reading E/F/G -- without draining stream_conv (a different
+    ! context) first, that read can race the kernels above.
+    istat = cudaDeviceSynchronize()
   end subroutine calc_conv
 
 
@@ -124,7 +99,11 @@ contains
   #:set is_les   = (VISC == 'LES')
   #:set les_args = ', mut, qc2' if is_les else ''
   !> Interleaved convective (fltflt, stream_conv) / viscous (real8, stream_visc)
-  !> dispatch. Buffers are staggered across phases so each phase's two kernels
+  !> dispatch. Each stream is confined to its own SM partition via a CUDA
+  !> Green Context (mod_streams.f90) rather than a grid-size heuristic, so
+  !> both kernels launch at their natural full grid size (same as the
+  !> baseline solver) instead of a fraction of a shared occupancy budget.
+  !> Buffers are staggered across phases so each phase's two kernels
   !> touch disjoint E/F/G slots and can run concurrently:
   !>   phase 1: E (conv, fresh write)   || Fv (visc, fresh write)
   !>   phase 2: F (conv, accumulates)   || Gv (visc, fresh write) -- waits on Fv
@@ -139,20 +118,12 @@ contains
     #:endif
     real(8), intent(inout), device, contiguous :: E(5,nx-1,ny-2,nz-2), F(5,nx-2,ny-1,nz-2)
     real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1)
-    integer :: nbxE, nbyE, nbzE, nbxF, nbyF, nbzF, nbxG, nbyG, nbzG
-    integer :: nbxEv, nbyEv, nbzEv, nbxFv, nbyFv, nbzFv, nbxGv, nbyGv, nbzGv
     integer :: istat
     type(nvtxRangeId) :: id
     ! set fypp
     #:set scheme_name = SCHEME.lower()
     #:set args_t = ", T" if SCHEME in ('KEEP', 'Hybrid') else ""
     #:set args_sensor = ", sensor" if SCHEME in ('SLAU', 'Roe', 'Hybrid') else ""
-    nbxE  = blocksE%x;  nbyE  = blocksE%y;  nbzE  = blocksE%z
-    nbxF  = blocksF%x;  nbyF  = blocksF%y;  nbzF  = blocksF%z
-    nbxG  = blocksG%x;  nbyG  = blocksG%y;  nbzG  = blocksG%z
-    nbxEv = blocksEv%x; nbyEv = blocksEv%y; nbzEv = blocksEv%z
-    nbxFv = blocksFv%x; nbyFv = blocksFv%y; nbzFv = blocksFv%z
-    nbxGv = blocksGv%x; nbyGv = blocksGv%y; nbzGv = blocksGv%z
     ! Fv/Gv's fresh (non-koff) write only covers the range where their own
     ! cross-derivative stencil is valid (VISC_ORDER-wide halo in BOTH
     ! transverse directions, e.g. Fv needs 4<=i<=nx-3 AND 4<=k<=nz-3), which
@@ -163,46 +134,66 @@ contains
     ! sees a valid (viscous-free) baseline there instead of garbage.
     F = 0.d0
     G = 0.d0
+    ! stream_conv/stream_visc are CUDA Green Context streams -- genuinely
+    ! separate CUDA contexts from the one that runs this subroutine's (and
+    ! calc_quantities_T_3D's, calc_mut's, just before this call) default-stream
+    ! work, so neither gets the implicit default-stream ordering an ordinary
+    ! blocking stream would. Without this sync, nothing guarantees Q/T/mu
+    ! (written on the default stream) or the F/G zero-fill above are actually
+    ! visible yet when the green-context kernels below start reading/
+    ! accumulating into them -- a race that reads stale/garbage memory (NaN).
+    ! Per NVIDIA's Green Context docs, cudaDeviceSynchronize() called with the
+    ! primary context current (always true here) drains all green contexts
+    ! too, so this is sufficient and correct, not just a device-wide
+    ! sledgehammer -- and this boundary was never overlappable with anything
+    ! else anyway (quantities -> conv/visc is a strict dependency chain); it's
+    ! only the conv/visc overlap *between* stream_conv and stream_visc,
+    ! ordered below via cudaEvent/cudaStreamWaitEvent, that this doesn't touch.
+    istat = cudaDeviceSynchronize()
     ! shock sensor (stream_conv; same-stream program order puts it before phase 1
     ! with no extra sync -- must NOT be the default stream, which would insert an
     ! implicit full-device barrier every RK stage and serialize stream_visc too)
     #:if SCHEME in ('SLAU', 'Roe', 'Hybrid')
     call calc_Ducros<<<blocks,threads,0,stream_conv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
     #:endif
-    call init_occupancy()
     ! ---- phase 1: E (conv) || Fv (visc) ----
     id = nvtxRangeStart("E")
-    call calc_${scheme_name}$_x_in<<<dim3(nblk_conv_E,1,1),threadsE,0,stream_conv>>>&
-         &(nx, ny, nz, nbxE, nbyE, nbzE, Q${args_t}$${args_sensor}$, E)
+    call calc_${scheme_name}$_x_in<<<blocksE,threadsE,0,stream_conv>>>&
+         &(nx, ny, nz, Q${args_t}$${args_sensor}$, E)
     call nvtxRangeEnd(id)
     istat = cudaEventRecord(event_E, stream_conv)
     id = nvtxRangeStart("Fv")
-    call calc_Fv${VISC_ORDER}$_in<<<dim3(nblk_visc_F,1,1),threadsFv,0,stream_visc>>>&
-         &(nx, ny, nz, nbxFv, nbyFv, nbzFv, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$, F)
+    call calc_Fv${VISC_ORDER}$_in<<<blocksFv,threadsFv,0,stream_visc>>>&
+         &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$, F)
     call nvtxRangeEnd(id)
     istat = cudaEventRecord(event_Fv, stream_visc)
     ! ---- phase 2: F (conv, waits on Fv) || Gv (visc) ----
     istat = cudaStreamWaitEvent(stream_conv, event_Fv, 0)
     id = nvtxRangeStart("F")
-    call calc_${scheme_name}$_y_in<<<dim3(nblk_conv_F,1,1),threadsF,0,stream_conv>>>&
-         &(nx, ny, nz, nbxF, nbyF, nbzF, Q${args_t}$${args_sensor}$, F)
+    call calc_${scheme_name}$_y_in<<<blocksF,threadsF,0,stream_conv>>>&
+         &(nx, ny, nz, Q${args_t}$${args_sensor}$, F)
     call nvtxRangeEnd(id)
     id = nvtxRangeStart("Gv")
-    call calc_Gv${VISC_ORDER}$_in<<<dim3(nblk_visc_G,1,1),threadsGv,0,stream_visc>>>&
-         &(nx, ny, nz, nbxGv, nbyGv, nbzGv, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$, G)
+    call calc_Gv${VISC_ORDER}$_in<<<blocksGv,threadsGv,0,stream_visc>>>&
+         &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$, G)
     call nvtxRangeEnd(id)
     istat = cudaEventRecord(event_Gv, stream_visc)
     ! ---- phase 3: G (conv, waits on Gv) || Ev (visc, waits on E) ----
     istat = cudaStreamWaitEvent(stream_conv, event_Gv, 0)
     id = nvtxRangeStart("G")
-    call calc_${scheme_name}$_z_in<<<dim3(nblk_conv_G,1,1),threadsG,0,stream_conv>>>&
-         &(nx, ny, nz, nbxG, nbyG, nbzG, Q${args_t}$${args_sensor}$, G)
+    call calc_${scheme_name}$_z_in<<<blocksG,threadsG,0,stream_conv>>>&
+         &(nx, ny, nz, Q${args_t}$${args_sensor}$, G)
     call nvtxRangeEnd(id)
     istat = cudaStreamWaitEvent(stream_visc, event_E, 0)
     id = nvtxRangeStart("Ev")
-    call calc_Ev${VISC_ORDER}$_in<<<dim3(nblk_visc_E,1,1),threadsEv,0,stream_visc>>>&
-         &(nx, ny, nz, nbxEv, nbyEv, nbzEv, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$, E)
+    call calc_Ev${VISC_ORDER}$_in<<<blocksEv,threadsEv,0,stream_visc>>>&
+         &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$, E)
     call nvtxRangeEnd(id)
+    ! Mirror of the entry sync: the caller (RungeKutta, calc_time_dev_ff.f90.fypp)
+    ! launches calc_step1/2_3/4 on the default stream right after this
+    ! returns, reading E/F/G -- without draining stream_conv/stream_visc
+    ! (different contexts) first, that read can race the kernels above.
+    istat = cudaDeviceSynchronize()
   end subroutine calc_conv_visc_paired
 #:endif
 
@@ -329,7 +320,7 @@ contains
       #:for d in dirs
       #:set in_sfx = '_in' if (not d['is_bc'] and ORDER == 6) else ''
       call calc_${d['dir']}$v${VISC_ORDER}$_koff${in_sfx}$<<<blocks${d['dir']}$v,threads${d['dir']}$v>>>&           ! exchange "${in_sfx}$" and " _koff "
-           &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$,  ${d['ov']}$, nz-overlap_fb-1, ${d['dir']}$) ! moved "${d['dir']}$" 
+           &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$,  ${d['ov']}$, nz-overlap_fb-1, ${d['dir']}$) ! moved "${d['dir']}$"
       #:endfor
     #:endif
   #:endif

@@ -48,14 +48,13 @@ contains
 
   include 'calc_keep_3d_ff.f90'
 
-  attributes(global) subroutine calc_keep_x_in(nx, ny, nz, nbx, nby, nbz, Q, T, E)
+  attributes(global) subroutine calc_keep_x_in(nx, ny, nz, Q, T, E)
     use mod_constant, only : Normal_x_ff
-    integer, intent(in), value                :: nx, ny, nz, nbx, nby, nbz
+    integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
     integer i, j, k, it, jt, kt
     integer :: ii, i_base, idx, offset_yz
-    integer :: tile, ntiles, bx, by, bz
     integer, parameter :: sx = threadsE%x + 2*io + 1
     integer, parameter :: sy = threadsE%y
     integer, parameter :: sz = threadsE%z
@@ -63,47 +62,39 @@ contains
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
-    ntiles = nbx * nby * nbz
-    do tile = blockIdx%x, ntiles, gridDim%x
-      bx = mod(tile-1, nbx) + 1
-      by = mod((tile-1)/nbx, nby) + 1
-      bz = (tile-1)/(nbx*nby) + 1
-      j  = (by-1)*blockDim%y + jt + 1
-      k  = (bz-1)*blockDim%z + kt + 1
-      i_base = (bx-1)*blockDim%x
-      offset_yz = (jt-1) * sx + (kt-1) * sx * sy
-      do ii = it-io, threadsE%x+io+1, blockDim%x
-        i = i_base + ii
-        if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-          idx = ii + offset_yz
-          rho(idx) = fltflt_init(Q(i,1,j,k));   u(idx) = fltflt_init(Q(i,2,j,k))
-            v(idx) = fltflt_init(Q(i,3,j,k));   w(idx) = fltflt_init(Q(i,4,j,k))
-            p(idx) = fltflt_init(Q(i,5,j,k)); tmp(idx) = fltflt_init(T(i,j,k))
-        endif
-      enddo
-      call syncthreads()
-      i = i_base + it
-      if (io+1 <= i .and. i <= nx-(io+1) .and. j <= ny-1 .and. k <= nz-1) then
-        idx = it + offset_yz
-        E(:,i,j-1,k-1) = KEEP(id_acc, &
-                              rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
-                                v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
-                               u(idx-io:idx+io+1), p(idx-io:idx+io+1), &
-                              tmp(idx-io:idx+io+1), Normal_x_ff)
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    k  = (blockIdx%z-1)*blockDim%z + kt + 1
+    i_base = (blockIdx%x-1)*blockDim%x
+    offset_yz = (jt-1) * sx + (kt-1) * sx * sy
+    do ii = it-io, threadsE%x+io+1, blockDim%x
+      i = i_base + ii
+      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+        idx = ii + offset_yz
+        rho(idx) = fltflt_init(Q(i,1,j,k));   u(idx) = fltflt_init(Q(i,2,j,k))
+          v(idx) = fltflt_init(Q(i,3,j,k));   w(idx) = fltflt_init(Q(i,4,j,k))
+          p(idx) = fltflt_init(Q(i,5,j,k)); tmp(idx) = fltflt_init(T(i,j,k))
       endif
-      call syncthreads()
     enddo
+    call syncthreads()
+    i = i_base + it
+    if (io+1 <= i .and. i <= nx-(io+1) .and. j <= ny-1 .and. k <= nz-1) then
+      idx = it + offset_yz
+      E(:,i,j-1,k-1) = KEEP(id_acc, &
+                            rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
+                              v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
+                             u(idx-io:idx+io+1), p(idx-io:idx+io+1), &
+                            tmp(idx-io:idx+io+1), Normal_x_ff)
+    endif
   end subroutine calc_keep_x_in
 
 
-  attributes(global) subroutine calc_keep_y_in(nx, ny, nz, nbx, nby, nbz, Q, T, F)
+  attributes(global) subroutine calc_keep_y_in(nx, ny, nz, Q, T, F)
     use mod_constant, only : Normal_y_ff
-    integer, intent(in), value                :: nx, ny, nz, nbx, nby, nbz
+    integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
     integer i, j, k, it, jt, kt
     integer :: jj, j_base, idx, offset_xz
-    integer :: tile, ntiles, bx, by, bz
     integer, parameter :: sx = threadsF%x
     integer, parameter :: sy = threadsF%y + 2*io + 1
     integer, parameter :: sz = threadsF%z
@@ -111,48 +102,40 @@ contains
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
-    ntiles = nbx * nby * nbz
-    do tile = blockIdx%x, ntiles, gridDim%x
-      bx = mod(tile-1, nbx) + 1
-      by = mod((tile-1)/nbx, nby) + 1
-      bz = (tile-1)/(nbx*nby) + 1
-      i  = (bx-1)*blockDim%x + it + 1
-      k  = (bz-1)*blockDim%z + kt + 1
-      j_base = (by-1)*blockDim%y
-      offset_xz = (it-1) * sy + (kt-1) * sy * sx
-      do jj = jt-io, threadsF%y+io+1, blockDim%y
-        j = j_base + jj
-        if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-          idx = jj + offset_xz
-          rho(idx) = fltflt_init(Q(i,1,j,k));   u(idx) = fltflt_init(Q(i,2,j,k))
-            v(idx) = fltflt_init(Q(i,3,j,k));   w(idx) = fltflt_init(Q(i,4,j,k))
-            p(idx) = fltflt_init(Q(i,5,j,k)); tmp(idx) = fltflt_init(T(i,j,k))
-        endif
-      enddo
-      call syncthreads()
-      j = j_base + jt
-      if (io+1 <= j .and. j <= ny-(io+1) .and. i <= nx-1 .and. k <= nz-1) then
-        idx = jt + offset_xz
-        ! phase 2: F already holds phase-1's Fv (viscous) contribution -- accumulate.
-        F(:,i-1,j,k-1) = F(:,i-1,j,k-1) + KEEP(id_acc, &
-                              rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
-                                v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
-                               v(idx-io:idx+io+1), p(idx-io:idx+io+1), &
-                              tmp(idx-io:idx+io+1), Normal_y_ff)
+    i  = (blockIdx%x-1)*blockDim%x + it + 1
+    k  = (blockIdx%z-1)*blockDim%z + kt + 1
+    j_base = (blockIdx%y-1)*blockDim%y
+    offset_xz = (it-1) * sy + (kt-1) * sy * sx
+    do jj = jt-io, threadsF%y+io+1, blockDim%y
+      j = j_base + jj
+      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+        idx = jj + offset_xz
+        rho(idx) = fltflt_init(Q(i,1,j,k));   u(idx) = fltflt_init(Q(i,2,j,k))
+          v(idx) = fltflt_init(Q(i,3,j,k));   w(idx) = fltflt_init(Q(i,4,j,k))
+          p(idx) = fltflt_init(Q(i,5,j,k)); tmp(idx) = fltflt_init(T(i,j,k))
       endif
-      call syncthreads()
     enddo
+    call syncthreads()
+    j = j_base + jt
+    if (io+1 <= j .and. j <= ny-(io+1) .and. i <= nx-1 .and. k <= nz-1) then
+      idx = jt + offset_xz
+      ! phase 2: F already holds phase-1's Fv (viscous) contribution -- accumulate.
+      F(:,i-1,j,k-1) = F(:,i-1,j,k-1) + KEEP(id_acc, &
+                            rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
+                              v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
+                             v(idx-io:idx+io+1), p(idx-io:idx+io+1), &
+                            tmp(idx-io:idx+io+1), Normal_y_ff)
+    endif
   end subroutine calc_keep_y_in
 
 
-  attributes(global) subroutine calc_keep_z_in(nx, ny, nz, nbx, nby, nbz, Q, T, G)
+  attributes(global) subroutine calc_keep_z_in(nx, ny, nz, Q, T, G)
     use mod_constant, only : Normal_z_ff
-    integer, intent(in), value                :: nx, ny, nz, nbx, nby, nbz
+    integer, intent(in), value                :: nx, ny, nz
     real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz), T(nx,ny,nz)
     real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
     integer i, j, k, it, jt, kt
     integer :: kk, k_base, idx, offset_xy
-    integer :: tile, ntiles, bx, by, bz
     integer, parameter :: sx = threadsG%x
     integer, parameter :: sy = threadsG%y
     integer, parameter :: sz = threadsG%z + 2*io + 1
@@ -160,37 +143,30 @@ contains
     it = threadIdx%x
     jt = threadIdx%y
     kt = threadIdx%z
-    ntiles = nbx * nby * nbz
-    do tile = blockIdx%x, ntiles, gridDim%x
-      bx = mod(tile-1, nbx) + 1
-      by = mod((tile-1)/nbx, nby) + 1
-      bz = (tile-1)/(nbx*nby) + 1
-      i  = (bx-1)*blockDim%x + it + 1
-      j  = (by-1)*blockDim%y + jt + 1
-      k_base = (bz-1)*blockDim%z
-      offset_xy = (jt-1) * sz + (it-1) * sz * sy
-      do kk = kt-io, threadsG%z+io+1, blockDim%z
-        k = k_base + kk
-        if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
-          idx = kk + offset_xy
-          rho(idx) = fltflt_init(Q(i,1,j,k));   u(idx) = fltflt_init(Q(i,2,j,k))
-            v(idx) = fltflt_init(Q(i,3,j,k));   w(idx) = fltflt_init(Q(i,4,j,k))
-            p(idx) = fltflt_init(Q(i,5,j,k)); tmp(idx) = fltflt_init(T(i,j,k))
-        endif
-      enddo
-      call syncthreads()
-      k = k_base + kt
-      if (io+1 <= k .and. k <= nz-(io+1) .and. i <= nx-1 .and. j <= ny-1) then
-        idx = kt + offset_xy
-        ! phase 3: G already holds phase-2's Gv (viscous) contribution -- accumulate.
-        G(:,i-1,j-1,k) = G(:,i-1,j-1,k) + KEEP(id_acc, &
-                              rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
-                                v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
-                               w(idx-io:idx+io+1), p(idx-io:idx+io+1), &
-                              tmp(idx-io:idx+io+1), Normal_z_ff)
+    i  = (blockIdx%x-1)*blockDim%x + it + 1
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    k_base = (blockIdx%z-1)*blockDim%z
+    offset_xy = (jt-1) * sz + (it-1) * sz * sy
+    do kk = kt-io, threadsG%z+io+1, blockDim%z
+      k = k_base + kk
+      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+        idx = kk + offset_xy
+        rho(idx) = fltflt_init(Q(i,1,j,k));   u(idx) = fltflt_init(Q(i,2,j,k))
+          v(idx) = fltflt_init(Q(i,3,j,k));   w(idx) = fltflt_init(Q(i,4,j,k))
+          p(idx) = fltflt_init(Q(i,5,j,k)); tmp(idx) = fltflt_init(T(i,j,k))
       endif
-      call syncthreads()
     enddo
+    call syncthreads()
+    k = k_base + kt
+    if (io+1 <= k .and. k <= nz-(io+1) .and. i <= nx-1 .and. j <= ny-1) then
+      idx = kt + offset_xy
+      ! phase 3: G already holds phase-2's Gv (viscous) contribution -- accumulate.
+      G(:,i-1,j-1,k) = G(:,i-1,j-1,k) + KEEP(id_acc, &
+                            rho(idx-io:idx+io+1), u(idx-io:idx+io+1), &
+                              v(idx-io:idx+io+1), w(idx-io:idx+io+1), &
+                             w(idx-io:idx+io+1), p(idx-io:idx+io+1), &
+                            tmp(idx-io:idx+io+1), Normal_z_ff)
+    endif
   end subroutine calc_keep_z_in
 
 
