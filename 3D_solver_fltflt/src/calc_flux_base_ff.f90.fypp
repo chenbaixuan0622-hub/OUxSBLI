@@ -18,6 +18,7 @@ module calc_flux_base
   use calc_visc_high_internal
   #:endif
   use mod_streams, only : stream_conv, stream_visc, event_E, event_Fv, event_Gv, query_nblk
+  use nvtx
   use set
   implicit none
   private
@@ -81,6 +82,7 @@ contains
     real(8), intent(out), device, contiguous :: F(5,nx-2,ny-1,nz-2)
     real(8), intent(out), device, contiguous :: G(5,nx-2,ny-2,nz-1)
     integer :: nbxE, nbyE, nbzE, nbxF, nbyF, nbzF, nbxG, nbyG, nbzG
+    type(nvtxRangeId) :: id
     ! set fypp
     #:set scheme_name = SCHEME.lower()
     #:set args_t = ", T" if SCHEME in ('KEEP', 'Hybrid') else ""
@@ -103,12 +105,18 @@ contains
     call init_occupancy()
     F = 0.d0
     G = 0.d0
+    id = nvtxRangeStart("E")
     call calc_${scheme_name}$_x${'' if BC_X else '_in'}$<<<dim3(nblk_conv_E,1,1),threadsE,0,stream_conv>>>&
          &(nx, ny, nz, nbxE, nbyE, nbzE, Q${args_t}$${args_sensor}$, E)
+    call nvtxRangeEnd(id)
+    id = nvtxRangeStart("F")
     call calc_${scheme_name}$_y${'' if BC_Y else '_in'}$<<<dim3(nblk_conv_F,1,1),threadsF,0,stream_conv>>>&
          &(nx, ny, nz, nbxF, nbyF, nbzF, Q${args_t}$${args_sensor}$, F)
+    call nvtxRangeEnd(id)
+    id = nvtxRangeStart("G")
     call calc_${scheme_name}$_z${'' if BC_Z else '_in'}$<<<dim3(nblk_conv_G,1,1),threadsG,0,stream_conv>>>&
          &(nx, ny, nz, nbxG, nbyG, nbzG, Q${args_t}$${args_sensor}$, G)
+    call nvtxRangeEnd(id)
   end subroutine calc_conv
 
 
@@ -134,6 +142,7 @@ contains
     integer :: nbxE, nbyE, nbzE, nbxF, nbyF, nbzF, nbxG, nbyG, nbzG
     integer :: nbxEv, nbyEv, nbzEv, nbxFv, nbyFv, nbzFv, nbxGv, nbyGv, nbzGv
     integer :: istat
+    type(nvtxRangeId) :: id
     ! set fypp
     #:set scheme_name = SCHEME.lower()
     #:set args_t = ", T" if SCHEME in ('KEEP', 'Hybrid') else ""
@@ -162,26 +171,38 @@ contains
     #:endif
     call init_occupancy()
     ! ---- phase 1: E (conv) || Fv (visc) ----
+    id = nvtxRangeStart("E")
     call calc_${scheme_name}$_x_in<<<dim3(nblk_conv_E,1,1),threadsE,0,stream_conv>>>&
          &(nx, ny, nz, nbxE, nbyE, nbzE, Q${args_t}$${args_sensor}$, E)
+    call nvtxRangeEnd(id)
     istat = cudaEventRecord(event_E, stream_conv)
+    id = nvtxRangeStart("Fv")
     call calc_Fv${VISC_ORDER}$_in<<<dim3(nblk_visc_F,1,1),threadsFv,0,stream_visc>>>&
          &(nx, ny, nz, nbxFv, nbyFv, nbzFv, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$, F)
+    call nvtxRangeEnd(id)
     istat = cudaEventRecord(event_Fv, stream_visc)
     ! ---- phase 2: F (conv, waits on Fv) || Gv (visc) ----
     istat = cudaStreamWaitEvent(stream_conv, event_Fv, 0)
+    id = nvtxRangeStart("F")
     call calc_${scheme_name}$_y_in<<<dim3(nblk_conv_F,1,1),threadsF,0,stream_conv>>>&
          &(nx, ny, nz, nbxF, nbyF, nbzF, Q${args_t}$${args_sensor}$, F)
+    call nvtxRangeEnd(id)
+    id = nvtxRangeStart("Gv")
     call calc_Gv${VISC_ORDER}$_in<<<dim3(nblk_visc_G,1,1),threadsGv,0,stream_visc>>>&
          &(nx, ny, nz, nbxGv, nbyGv, nbzGv, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$, G)
+    call nvtxRangeEnd(id)
     istat = cudaEventRecord(event_Gv, stream_visc)
     ! ---- phase 3: G (conv, waits on Gv) || Ev (visc, waits on E) ----
     istat = cudaStreamWaitEvent(stream_conv, event_Gv, 0)
+    id = nvtxRangeStart("G")
     call calc_${scheme_name}$_z_in<<<dim3(nblk_conv_G,1,1),threadsG,0,stream_conv>>>&
          &(nx, ny, nz, nbxG, nbyG, nbzG, Q${args_t}$${args_sensor}$, G)
+    call nvtxRangeEnd(id)
     istat = cudaStreamWaitEvent(stream_visc, event_E, 0)
+    id = nvtxRangeStart("Ev")
     call calc_Ev${VISC_ORDER}$_in<<<dim3(nblk_visc_E,1,1),threadsEv,0,stream_visc>>>&
          &(nx, ny, nz, nbxEv, nbyEv, nbzEv, inv_dx, inv_dy, inv_dz, Q, T, mu${les_args}$, E)
+    call nvtxRangeEnd(id)
   end subroutine calc_conv_visc_paired
 #:endif
 
