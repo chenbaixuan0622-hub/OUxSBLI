@@ -5,9 +5,12 @@ module calc_keep_kernel_internal
                            c0_25_ff, c0_5_ff, &
                            c0_375_ff, c0_075_ff, c0_1875_ff, c0_0375_ff, c8_ff, c37_ff, c0_75_ff, c0_15_ff
   use fltflt
+  use cudadevice
   implicit none
   private
   public calc_keep_x_in, calc_keep_y_in, calc_keep_z_in, init_keep_ff_constants
+  include 'fltflt_operator_interfaces.f90'
+  include 'fltflt_subroutines_interfaces.f90'
   ! No compile-time initializer: nvfortran doesn't support a type(fltflt)
   ! PARAMETER (or a `constant` with a compile-time initializer) computed from
   ! an expression -- confirmed by direct test ("Too few data constants in
@@ -31,6 +34,9 @@ module calc_keep_kernel_internal
     module procedure KEEP2_ff, KEEP4_ff, KEEP6_ff
   end interface KEEP
 contains
+  include 'fltflt_operator.f90'
+  include 'fltflt_subroutines.f90'
+
   subroutine init_keep_ff_constants()
     one_24        = fltflt_init(1.d0 / 24.d0)
     one_48        = fltflt_init(1.d0 / 48.d0)

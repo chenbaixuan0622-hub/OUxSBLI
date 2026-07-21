@@ -1,13 +1,16 @@
 #:include 'config.fypp'
 module calc_slau_kernel_internal
-  use mod_globals, only : gamma, threadsE, threadsF, threadsG
+  use mod_globals, only : gamma, sp, threadsE, threadsF, threadsG
   use mod_constant, only : id_slau, over_gamma_1_ff, c0_25_ff, c0_5_ff, c1_ff, c2_ff, gamma_over_gamma_1_ff
   use calc_muscl
   use calc_hybrid
   use fltflt
+  use cudadevice
   implicit none
   private
   public calc_slau_x_in, calc_slau_y_in, calc_slau_z_in
+  include 'fltflt_operator_interfaces.f90'
+  include 'fltflt_subroutines_interfaces.f90'
   integer, parameter :: io = ${ORDER_IO}$
 
 #:if ORDER == 6
@@ -26,6 +29,8 @@ module calc_slau_kernel_internal
     module procedure SLAU1_ff, HRSLAU2_ff
   end interface SLAU
 contains
+  include 'fltflt_operator.f90'
+  include 'fltflt_subroutines.f90'
   include 'calc_slau_3d_ff.f90'
 
   ! fltflt (FP32-pair) interp family -- calc_slau_x_in/y_in/z_in all use

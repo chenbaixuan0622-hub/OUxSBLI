@@ -2,13 +2,21 @@
 !> Computes Ducros sensor for automatic scheme switching between KEEP and SLAU
 module calc_hybrid
   use cudafor
+  use cudadevice
   use mod_globals, only : gamma, sp
   use fltflt
   implicit none
+  private
+  public calc_Ducros, wiggle_detector
   interface wiggle_detector
     module procedure wiggle_detector_ff
   end interface wiggle_detector
+  include 'fltflt_operator_interfaces.f90'
+  include 'fltflt_subroutines_interfaces.f90'
 contains
+  include 'fltflt_operator.f90'
+  include 'fltflt_subroutines.f90'
+
   !> Compute Ducros shock sensor for hybrid scheme
   !> Uses ratio of dilatation (divergence) to vorticity to detect shocks
   !> Values closer to 1 indicate shock regions, close to 0 indicates smooth flow

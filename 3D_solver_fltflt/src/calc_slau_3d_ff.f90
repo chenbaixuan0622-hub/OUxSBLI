@@ -8,7 +8,6 @@
 
   attributes(device) subroutine SLAU_common_ff(rho1, rho2, over_rho1, over_rho2, u1, u2, v1, v2, w1, w2, &
                              un1, un2, p1, p2, c, over_c, Mp, Mm, bp, bm, dp, Vtp, Vtm)
-    use fltflt
     type(fltflt), intent(in)  :: rho1, rho2, over_rho1, over_rho2, u1, u2, v1, v2, w1, w2, un1, un2, p1, p2
     type(fltflt), intent(out) :: c, over_c, Mp, Mm, bp, bm, dp, Vtp, Vtm
     block
@@ -23,9 +22,9 @@
     block
       type(fltflt) g, one_g_Vt
       g   = -fltflt_max(fltflt_min(Mp, 0.0), -1.0) * fltflt_min(fltflt_max(Mm, 0.0), 1.0)
-      one_g_Vt = (c1_ff - g) * (rho1 * fltflt_abs(un1) + rho2 * fltflt_abs(un2)) / (rho1 + rho2)
-      Vtp = one_g_Vt + g * fltflt_abs(un1)
-      Vtm = one_g_Vt + g * fltflt_abs(un2)
+      one_g_Vt = (c1_ff - g) * fltflt_dot2(rho1, fltflt_abs(un1), rho2, fltflt_abs(un2)) / (rho1 + rho2)
+      Vtp = fltflt_fma(g, fltflt_abs(un1), one_g_Vt)
+      Vtm = fltflt_fma(g, fltflt_abs(un2), one_g_Vt)
     end block
     if (fltflt_abs(Mp) < 1.0) then
       bp = c0_25_ff * (c2_ff - Mp) * fltflt_square(Mp + c1_ff)
@@ -42,16 +41,14 @@
 
 
   attributes(device) function phi_ff(rho, k, p, over_rho) result(ans)
-    use fltflt
     type(fltflt), intent(in) :: rho, k, p, over_rho
     type(fltflt) :: ans
-    ans = (p * gamma_over_gamma_1_ff + rho * k) * over_rho
+    ans = fltflt_dot2(p, gamma_over_gamma_1_ff, rho, k) * over_rho
   end function phi_ff
 
 
   attributes(device) subroutine HRSLAU2_ff(id_slau, rho1, rho2, u1, u2, v1, v2, w1, w2, &
                          un1, un2, p1, p2, Norm, HR, F1, F2, F3, F4, F5)
-    use fltflt
     integer(4), intent(in), value :: id_slau
     type(fltflt), intent(in)      :: rho1, rho2, u1, u2, v1, v2, w1, w2, un1, un2, p1, p2
     type(fltflt), intent(in)      :: Norm(5)
@@ -64,25 +61,33 @@
     over_rho2 = c1_ff / rho2
     call SLAU_common_ff(rho1, rho2, over_rho1, over_rho2, u1, u2, v1, v2, w1, w2, un1, un2, &
                         p1, p2, c, over_c, Mp, Mm, bp, bm, dp, Vtp, Vtm)
-    k1   = c0_5_ff * (u1*u1 + v1*v1 + w1*w1)
-    k2   = c0_5_ff * (u2*u2 + v2*v2 + w2*w2)
+    k1   = c0_5_ff * fltflt_dot3(u1, u1, v1, v1, w1, w1)
+    k2   = c0_5_ff * fltflt_dot3(u2, u2, v2, v2, w2, w2)
     Vec2 = fltflt_sqrt(k1 + k2)
     block
-      type(fltflt) M, x
-      M  = fltflt_min(Vec2 * over_c, 1.0)
-      x  = fltflt_square(c1_ff - M)
-      mass  = c0_25_ff * (rho1 * (un1 + Vtp) + rho2 * (un2 - Vtm) - x * dp * over_c)
+      type(fltflt) M, x, s1, s2, dpc
+      M   = fltflt_min(Vec2 * over_c, 1.0)
+      x   = fltflt_square(c1_ff - M)
+      s1  = un1 + Vtp
+      s2  = un2 - Vtm
+      dpc = dp * over_c
+      mass  = c0_25_ff * fltflt_dot3(rho1, s1, rho2, s2, -x, dpc)
       mass1 = mass + fltflt_abs(mass)
       mass2 = mass - fltflt_abs(mass)
     end block
-    pres = c0_5_ff * (p1 + p2 + (bp - bm) * (-dp) + HR * Vec2 * (bp + bm - c1_ff) * c0_5_ff * (rho1 + rho2) * c)
+    block
+      type(fltflt) term2, term3
+      term2 = (bp - bm) * (-dp)
+      term3 = HR * Vec2 * (bp + bm - c1_ff) * c0_5_ff * (rho1 + rho2) * c
+      pres  = c0_5_ff * fltflt_add4(p1, p2, term2, term3)
+    end block
     phi1 = phi_ff(rho1, k1, p1, over_rho1)
     phi2 = phi_ff(rho2, k2, p2, over_rho2)
     ff_F1 = mass1 + mass2
-    ff_F2 = fltflt_fma(mass1, u1,   mass2 * u2)   + pres * Norm(2)
-    ff_F3 = fltflt_fma(mass1, v1,   mass2 * v2)   + pres * Norm(3)
-    ff_F4 = fltflt_fma(mass1, w1,   mass2 * w2)   + pres * Norm(4)
-    ff_F5 = fltflt_fma(mass1, phi1, mass2 * phi2)
+    ff_F2 = fltflt_dot3(mass1, u1,   mass2, u2,   pres, Norm(2))
+    ff_F3 = fltflt_dot3(mass1, v1,   mass2, v2,   pres, Norm(3))
+    ff_F4 = fltflt_dot3(mass1, w1,   mass2, w2,   pres, Norm(4))
+    ff_F5 = fltflt_dot2(mass1, phi1, mass2, phi2)
     F1 = real(ff_F1%hi, 8) + real(ff_F1%lo, 8)
     F2 = real(ff_F2%hi, 8) + real(ff_F2%lo, 8)
     F3 = real(ff_F3%hi, 8) + real(ff_F3%lo, 8)
@@ -93,7 +98,6 @@
 
   attributes(device) subroutine SLAU1_ff(id_slau, rho1, rho2, u1, u2, v1, v2, w1, w2, &
                                          un1, un2, p1, p2, Norm, HR, F1, F2, F3, F4, F5)
-    use fltflt
     integer(2), intent(in), value :: id_slau
     type(fltflt), intent(in)      :: rho1, rho2, u1, u2, v1, v2, w1, w2, un1, un2, p1, p2
     type(fltflt), intent(in)      :: Norm(5)
@@ -102,29 +106,35 @@
     type(fltflt) :: c, over_c, Mp, Mm, Vtp, Vtm, dp, bp, bm
     type(fltflt) :: mass, mass1, mass2, over_rho1, over_rho2, k1, k2
     type(fltflt) :: M, x, pres, phi1, phi2, ff_F1, ff_F2, ff_F3, ff_F4, ff_F5
+    type(fltflt) :: s1, s2, dpc, p12, term2, coeff
     over_rho1 = c1_ff / rho1
     over_rho2 = c1_ff / rho2
     call SLAU_common_ff(rho1, rho2, over_rho1, over_rho2, u1, u2, v1, v2, w1, w2, un1, un2, &
                         p1, p2, c, over_c, Mp, Mm, bp, bm, dp, Vtp, Vtm)
-    k1 = c0_5_ff * (u1*u1 + v1*v1 + w1*w1)
-    k2 = c0_5_ff * (u2*u2 + v2*v2 + w2*w2)
+    k1 = c0_5_ff * fltflt_dot3(u1, u1, v1, v1, w1, w1)
+    k2 = c0_5_ff * fltflt_dot3(u2, u2, v2, v2, w2, w2)
     M  = fltflt_min(fltflt_sqrt(k1 + k2) * over_c, 1.0)
     x  = fltflt_square(c1_ff - M)
-    mass  = c0_25_ff * (rho1 * (un1 + Vtp) + rho2 * (un2 - Vtm) - x * dp * over_c)
+    s1  = un1 + Vtp
+    s2  = un2 - Vtm
+    dpc = dp * over_c
+    mass  = c0_25_ff * fltflt_dot3(rho1, s1, rho2, s2, -x, dpc)
     mass1 = mass + fltflt_abs(mass)
     mass2 = mass - fltflt_abs(mass)
-    pres = c0_5_ff * (p1 + p2 + (bp - bm) * (-dp) + (c1_ff - x) * (bp + bm - c1_ff) * (p1 + p2))
+    p12   = p1 + p2
+    term2 = (bp - bm) * (-dp)
+    coeff = (c1_ff - x) * (bp + bm - c1_ff)
+    pres  = c0_5_ff * fltflt_add3(p12, term2, coeff * p12)
     phi1 = phi_ff(rho1, k1, p1, over_rho1)
     phi2 = phi_ff(rho2, k2, p2, over_rho2)
     ff_F1 = mass1 + mass2
-    ff_F2 = fltflt_fma(mass1, u1,   mass2 * u2)   + pres * Norm(2)
-    ff_F3 = fltflt_fma(mass1, v1,   mass2 * v2)   + pres * Norm(3)
-    ff_F4 = fltflt_fma(mass1, w1,   mass2 * w2)   + pres * Norm(4)
-    ff_F5 = fltflt_fma(mass1, phi1, mass2 * phi2)
+    ff_F2 = fltflt_dot3(mass1, u1,   mass2, u2,   pres, Norm(2))
+    ff_F3 = fltflt_dot3(mass1, v1,   mass2, v2,   pres, Norm(3))
+    ff_F4 = fltflt_dot3(mass1, w1,   mass2, w2,   pres, Norm(4))
+    ff_F5 = fltflt_dot2(mass1, phi1, mass2, phi2)
     F1 = real(ff_F1%hi, 8) + real(ff_F1%lo, 8)
     F2 = real(ff_F2%hi, 8) + real(ff_F2%lo, 8)
     F3 = real(ff_F3%hi, 8) + real(ff_F3%lo, 8)
     F4 = real(ff_F4%hi, 8) + real(ff_F4%lo, 8)
     F5 = real(ff_F5%hi, 8) + real(ff_F5%lo, 8)
   end subroutine SLAU1_ff
-

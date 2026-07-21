@@ -1,15 +1,18 @@
 #:include 'config.fypp'
 module calc_hybrid_kernel_internal
-  use mod_globals, only : gamma, threshold, threadsE, threadsF, threadsG
+  use mod_globals, only : gamma, sp, threshold, threadsE, threadsF, threadsG
   use mod_constant, only : id_slau, over_gamma_1_ff, R_over_gamma_1_ff, one_third_ff, one_sixth_ff, one_twelfth_ff, two_third_ff, &
                            c0_25_ff, c0_5_ff, c1_ff, c2_ff, gamma_over_gamma_1_ff, &
                            c0_375_ff, c0_075_ff, c0_1875_ff, c0_0375_ff, c8_ff, c37_ff, c0_75_ff, c0_15_ff
   use calc_muscl
   use calc_hybrid
   use fltflt
+  use cudadevice
   implicit none
   private
   public calc_hybrid_x_in, calc_hybrid_y_in, calc_hybrid_z_in
+  include 'fltflt_operator_interfaces.f90'
+  include 'fltflt_subroutines_interfaces.f90'
   integer, parameter :: io = ${ORDER_IO}$
   real(8), parameter :: one_24        = 1.d0 / 24.d0
   real(8), parameter :: one_48        = 1.d0 / 48.d0
@@ -38,6 +41,8 @@ module calc_hybrid_kernel_internal
     module procedure delta_r2_ff, delta_r4_ff, delta_r6_ff
   end interface delta_r
 contains
+  include 'fltflt_operator.f90'
+  include 'fltflt_subroutines.f90'
   include 'calc_keep_3d_ff.f90'
   include 'calc_slau_3d_ff.f90'
 

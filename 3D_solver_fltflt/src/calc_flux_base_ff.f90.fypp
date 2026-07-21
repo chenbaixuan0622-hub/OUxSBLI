@@ -94,7 +94,15 @@ contains
     #:endif
     ! flux -- no viscous term to pair against for VISC == 'Euler': single stream,
     ! still occupancy-tiled so the launch pattern matches the NS/LES path.
+    ! calc_*_y_in/calc_*_z_in accumulate onto F/G (`F = F + ...`) rather than
+    ! overwrite -- a convention that only produces a valid result when a
+    ! viscous kernel wrote a real baseline into F/G first (see
+    ! calc_conv_visc_paired below). There is no such kernel on the Euler path,
+    ! so zero F/G here first or the accumulate reads uninitialized device
+    ! memory into the flux on every step (NaN/garbage almost immediately).
     call init_occupancy()
+    F = 0.d0
+    G = 0.d0
     call calc_${scheme_name}$_x${'' if BC_X else '_in'}$<<<dim3(nblk_conv_E,1,1),threadsE,0,stream_conv>>>&
          &(nx, ny, nz, nbxE, nbyE, nbzE, Q${args_t}$${args_sensor}$, E)
     call calc_${scheme_name}$_y${'' if BC_Y else '_in'}$<<<dim3(nblk_conv_F,1,1),threadsF,0,stream_conv>>>&
