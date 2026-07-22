@@ -460,6 +460,59 @@ attributes(device) function dot6_ff(a, b, c, d, e, f, g, h, i, j, k, l) result(r
   r     = fltflt_fast_two_sum(s5%hi, lo)
 end function dot6_ff
 
+! ---- add_mul: (a + b) * c ----
+! TwoSum(a%hi,b%hi) folds a%lo/b%lo in, then the combined sum is multiplied
+! via the same TwoProdFMA + cross-term shape as mul_ff_ff -- skips fully
+! normalizing (a+b) into its own fltflt before the multiply. Uses __fmaf_rn
+! (not a bare fma()/x*y+z expression): a naive fma() here risks the optimizer
+! recognizing sh*c%hi was already computed as p%hi and folding the "-p%hi"
+! term to a CSE'd zero, silently destroying the rounding-error term -- the
+! exact same hazard fltflt_two_prod_fma's header comment warns about.
+attributes(device) function fltflt_add_mul(a, b, c) result(r)
+  type(fltflt), intent(in) :: a, b, c
+  type(fltflt) :: r, s, p
+  real(4) :: sl
+  s    = fltflt_two_sum(a%hi, b%hi)
+  sl   = s%lo + a%lo + b%lo
+  p    = fltflt_two_prod_fma(s%hi, c%hi)
+  p%lo = __fmaf_rn(s%hi, c%lo, p%lo)
+  p%lo = __fmaf_rn(sl,   c%hi, p%lo)
+  r    = fltflt_fast_two_sum(p%hi, p%lo)
+end function fltflt_add_mul
+
+! ---- sub_mul: (a - b) * c ----
+! Same shape as fltflt_add_mul, TwoSum(a%hi, -b%hi) in place of TwoSum(a%hi, b%hi).
+attributes(device) function fltflt_sub_mul(a, b, c) result(r)
+  type(fltflt), intent(in) :: a, b, c
+  type(fltflt) :: r, s, p
+  real(4) :: sl
+  s    = fltflt_two_sum(a%hi, -b%hi)
+  sl   = s%lo + a%lo - b%lo
+  p    = fltflt_two_prod_fma(s%hi, c%hi)
+  p%lo = __fmaf_rn(s%hi, c%lo, p%lo)
+  p%lo = __fmaf_rn(sl,   c%hi, p%lo)
+  r    = fltflt_fast_two_sum(p%hi, p%lo)
+end function fltflt_sub_mul
+
+! ---- add_add_mul: (a + b) * (c + d) ----
+! Both sums stay unnormalized (raw TwoSum hi/lo) through the multiply --
+! same mul_ff_ff cross-term shape, operating on the two combined sums
+! instead of two fully-normalized fltflt operands. Skips two FastTwoSum
+! normalizations compared to add_ff_ff(a,b) * add_ff_ff(c,d) via mul_ff_ff.
+attributes(device) function fltflt_add_add_mul(a, b, c, d) result(r)
+  type(fltflt), intent(in) :: a, b, c, d
+  type(fltflt) :: r, s1, s2, p
+  real(4) :: s1l, s2l
+  s1    = fltflt_two_sum(a%hi, b%hi)
+  s1l   = s1%lo + a%lo + b%lo
+  s2    = fltflt_two_sum(c%hi, d%hi)
+  s2l   = s2%lo + c%lo + d%lo
+  p     = fltflt_two_prod_fma(s1%hi, s2%hi)
+  p%lo  = __fmaf_rn(s1%hi, s2l,  p%lo)
+  p%lo  = __fmaf_rn(s1l,   s2%hi, p%lo)
+  r     = fltflt_fast_two_sum(p%hi, p%lo)
+end function fltflt_add_add_mul
+
 ! ================================================================
 ! Absolute value
 ! ================================================================
@@ -474,6 +527,28 @@ pure attributes(device) function fltflt_abs(a) result(c)
   c%hi = a%hi * s
   c%lo = a%lo * s
 end function fltflt_abs
+
+! A + abs(A): 2*A if A >= 0, else 0. Branchless via a 0/2 mask (matches
+! fltflt_abs's own branchless-sign-mask convention). Assumes normalized
+! input (sign(value) == sign(hi)).
+attributes(device) pure function fltflt_add_abs(a) result(r)
+  type(fltflt), intent(in) :: a
+  type(fltflt) :: r
+  real(4) :: mask
+  mask = merge(2.0, 0.0, a%hi >= 0.0)
+  r%hi = a%hi * mask
+  r%lo = a%lo * mask
+end function fltflt_add_abs
+
+! A - abs(A): 0 if A >= 0, else 2*A.
+attributes(device) pure function fltflt_sub_abs(a) result(r)
+  type(fltflt), intent(in) :: a
+  type(fltflt) :: r
+  real(4) :: mask
+  mask = merge(2.0, 0.0, a%hi < 0.0)
+  r%hi = a%hi * mask
+  r%lo = a%lo * mask
+end function fltflt_sub_abs
 
 ! ================================================================
 ! Square root
