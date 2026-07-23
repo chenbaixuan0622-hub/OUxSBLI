@@ -1,0 +1,224 @@
+! real(4) port of 3D_solver/src/load_smem_visc_cent.f90.fypp, VISC_ORDER=6
+! (cent6) only. The baseline loader uses pipelineMemcpyAsync (cp.async-style
+! raw byte copy, see wmma/load_smem_visc2.f90) to prefetch Q (real8) straight
+! into real8 shared tiles -- cp.async moves bytes, it cannot narrow fp64 to
+! fp32. So this loader does a plain synchronous load-and-convert instead
+! (`u(idx) = real(Q(i,2,j,k), 4)`), losing the baseline's async-prefetch
+! pipelining. This is expected for the FP32 fork, not an oversight.
+#:include 'config.fypp'
+module load_smem_visc_cent_mp
+  use mod_globals, only : threadsEv, threadsFv, threadsGv
+  implicit none
+  private
+  public load_smem_visc_cent_mp_x, load_smem_visc_cent_mp_y, &
+         load_smem_visc_cent_mp_z, load_smem_visc_cent_mp_z_koff
+  real(4), parameter :: one_sixty_mp = 1._4 / 60._4
+contains
+  attributes(device) subroutine load_smem_visc_cent_mp_x(it, jt, kt, j, k, &
+                                                       nx, ny, nz, inv_dy, inv_dz, Q, u, v, w, uy, vy, uz, wz)
+    integer, intent(in), value              :: it
+    integer, intent(in), value              :: jt
+    integer, intent(in), value              :: kt
+    integer, intent(in), value              :: j
+    integer, intent(in), value              :: k
+    integer, intent(in), value              :: nx
+    integer, intent(in), value              :: ny
+    integer, intent(in), value              :: nz
+    real(8), intent(in), device, contiguous :: inv_dy(ny-1)
+    real(8), intent(in), device, contiguous :: inv_dz(nz-1)
+    real(8), intent(in), device, contiguous :: Q(nx,5,ny,nz)
+    integer, parameter :: io_v = 2
+    integer, parameter :: sx = threadsEv%x + 2*io_v + 1
+    integer, parameter :: sy = threadsEv%y
+    integer, parameter :: sz = threadsEv%z
+    real(4), intent(inout) ::  u(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) ::  v(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) ::  w(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) :: uy(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) :: vy(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) :: uz(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) :: wz(-(io_v-1):sx*sy*sz-io_v)
+    integer i_base, ii, i, idx, offset_yz
+    i_base = (blockIdx%x-1)*blockDim%x
+    offset_yz = (jt-1)*sx + (kt-1)*sx*sy
+    do ii = it-io_v, threadsEv%x+io_v+1, blockDim%x
+      i = i_base + ii
+      idx = ii + offset_yz
+      if (1 <= i .and. i <= nx .and. j <= ny .and. k <= nz) then
+        u(idx) = real(Q(i,2,j,k), 4)
+        v(idx) = real(Q(i,3,j,k), 4)
+        w(idx) = real(Q(i,4,j,k), 4)
+      endif
+      if (1 <= i .and. i <= nx .and. 4 <= j .and. j <= ny-3 .and. k <= nz) then
+        uy(idx) = real((one_sixty_mp * (-real(Q(i,2,j-3,k),4) + real(Q(i,2,j+3,k),4)) + 0.15_4 * (real(Q(i,2,j-2,k),4) - real(Q(i,2,j+2,k),4)) &
+                        + 0.75_4 * (-real(Q(i,2,j-1,k),4) + real(Q(i,2,j+1,k),4))) * real(inv_dy(j),4), 4)
+        vy(idx) = real((one_sixty_mp * (-real(Q(i,3,j-3,k),4) + real(Q(i,3,j+3,k),4)) + 0.15_4 * (real(Q(i,3,j-2,k),4) - real(Q(i,3,j+2,k),4)) &
+                        + 0.75_4 * (-real(Q(i,3,j-1,k),4) + real(Q(i,3,j+1,k),4))) * real(inv_dy(j),4), 4)
+      endif
+      if (1 <= i .and. i <= nx .and. j <= ny .and. 4 <= k .and. k <= nz-3) then
+        uz(idx) = real((one_sixty_mp * (-real(Q(i,2,j,k-3),4) + real(Q(i,2,j,k+3),4)) + 0.15_4 * (real(Q(i,2,j,k-2),4) - real(Q(i,2,j,k+2),4)) &
+                        + 0.75_4 * (-real(Q(i,2,j,k-1),4) + real(Q(i,2,j,k+1),4))) * real(inv_dz(k),4), 4)
+        wz(idx) = real((one_sixty_mp * (-real(Q(i,4,j,k-3),4) + real(Q(i,4,j,k+3),4)) + 0.15_4 * (real(Q(i,4,j,k-2),4) - real(Q(i,4,j,k+2),4)) &
+                        + 0.75_4 * (-real(Q(i,4,j,k-1),4) + real(Q(i,4,j,k+1),4))) * real(inv_dz(k),4), 4)
+      endif
+    enddo
+    call syncthreads()
+  end subroutine load_smem_visc_cent_mp_x
+
+
+  attributes(device) subroutine load_smem_visc_cent_mp_y(it, jt, kt, i, k, &
+                                                       nx, ny, nz, inv_dx, inv_dz, Q, u, v, w, ux, vx, vz, wz)
+    integer, intent(in), value              :: it
+    integer, intent(in), value              :: jt
+    integer, intent(in), value              :: kt
+    integer, intent(in), value              :: i
+    integer, intent(in), value              :: k
+    integer, intent(in), value              :: nx
+    integer, intent(in), value              :: ny
+    integer, intent(in), value              :: nz
+    real(8), intent(in), device, contiguous :: inv_dx(nx-1)
+    real(8), intent(in), device, contiguous :: inv_dz(nz-1)
+    real(8), intent(in), device, contiguous :: Q(nx,5,ny,nz)
+    integer, parameter :: io_v = 2
+    integer, parameter :: sx = threadsFv%x
+    integer, parameter :: sy = threadsFv%y + 2*io_v + 1
+    integer, parameter :: sz = threadsFv%z
+    real(4), intent(inout) ::  u(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) ::  v(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) ::  w(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) :: ux(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) :: vx(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) :: vz(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) :: wz(-(io_v-1):sx*sy*sz-io_v)
+    integer j_base, jj, j, idx, offset_xz
+    j_base = (blockIdx%y-1)*blockDim%y
+    offset_xz = (it-1)*sy + (kt-1)*sy*sx
+    do jj = jt-io_v, threadsFv%y+io_v+1, blockDim%y
+      j = j_base + jj
+      idx = jj + offset_xz
+      if (i <= nx .and. 1 <= j .and. j <= ny .and. k <= nz) then
+        u(idx) = real(Q(i,2,j,k), 4)
+        v(idx) = real(Q(i,3,j,k), 4)
+        w(idx) = real(Q(i,4,j,k), 4)
+      endif
+      if (4 <= i .and. i <= nx-3 .and. 1 <= j .and. j <= ny .and. k <= nz) then
+        ux(idx) = real((one_sixty_mp * (-real(Q(i-3,2,j,k),4) + real(Q(i+3,2,j,k),4)) + 0.15_4 * (real(Q(i-2,2,j,k),4) - real(Q(i+2,2,j,k),4)) &
+                        + 0.75_4 * (-real(Q(i-1,2,j,k),4) + real(Q(i+1,2,j,k),4))) * real(inv_dx(i),4), 4)
+        vx(idx) = real((one_sixty_mp * (-real(Q(i-3,3,j,k),4) + real(Q(i+3,3,j,k),4)) + 0.15_4 * (real(Q(i-2,3,j,k),4) - real(Q(i+2,3,j,k),4)) &
+                        + 0.75_4 * (-real(Q(i-1,3,j,k),4) + real(Q(i+1,3,j,k),4))) * real(inv_dx(i),4), 4)
+      endif
+      if (i <= nx .and. 1 <= j .and. j <= ny .and. 4 <= k .and. k <= nz-3) then
+        vz(idx) = real((one_sixty_mp * (-real(Q(i,3,j,k-3),4) + real(Q(i,3,j,k+3),4)) + 0.15_4 * (real(Q(i,3,j,k-2),4) - real(Q(i,3,j,k+2),4)) &
+                        + 0.75_4 * (-real(Q(i,3,j,k-1),4) + real(Q(i,3,j,k+1),4))) * real(inv_dz(k),4), 4)
+        wz(idx) = real((one_sixty_mp * (-real(Q(i,4,j,k-3),4) + real(Q(i,4,j,k+3),4)) + 0.15_4 * (real(Q(i,4,j,k-2),4) - real(Q(i,4,j,k+2),4)) &
+                        + 0.75_4 * (-real(Q(i,4,j,k-1),4) + real(Q(i,4,j,k+1),4))) * real(inv_dz(k),4), 4)
+      endif
+    enddo
+    call syncthreads()
+  end subroutine load_smem_visc_cent_mp_y
+
+
+  attributes(device) subroutine load_smem_visc_cent_mp_z(it, jt, kt, i, j, &
+                                                       nx, ny, nz, inv_dx, inv_dy, Q, u, v, w, ux, wx, vy, wy)
+    integer, intent(in), value              :: it
+    integer, intent(in), value              :: jt
+    integer, intent(in), value              :: kt
+    integer, intent(in), value              :: i
+    integer, intent(in), value              :: j
+    integer, intent(in), value              :: nx
+    integer, intent(in), value              :: ny
+    integer, intent(in), value              :: nz
+    real(8), intent(in), device, contiguous :: inv_dx(nx-1)
+    real(8), intent(in), device, contiguous :: inv_dy(ny-1)
+    real(8), intent(in), device, contiguous :: Q(nx,5,ny,nz)
+    integer, parameter :: io_v = 2
+    integer, parameter :: sx = threadsGv%x
+    integer, parameter :: sy = threadsGv%y
+    integer, parameter :: sz = threadsGv%z + 2*io_v + 1
+    real(4), intent(inout) ::  u(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) ::  v(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) ::  w(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) :: ux(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) :: wx(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) :: vy(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) :: wy(-(io_v-1):sx*sy*sz-io_v)
+    integer k_base, kk, k, idx, offset_xy
+    k_base = (blockIdx%z-1)*blockDim%z
+    offset_xy = (jt-1)*sz + (it-1)*sz*sy
+    do kk = kt-io_v, threadsGv%z+io_v+1, blockDim%z
+      k = k_base + kk
+      idx = kk + offset_xy
+      if (i <= nx .and. j <= ny .and. 1 <= k .and. k <= nz) then
+        u(idx) = real(Q(i,2,j,k), 4)
+        v(idx) = real(Q(i,3,j,k), 4)
+        w(idx) = real(Q(i,4,j,k), 4)
+      endif
+      if (4 <= i .and. i <= nx-3 .and. j <= ny .and. 1 <= k .and. k <= nz) then
+        ux(idx) = real((one_sixty_mp * (-real(Q(i-3,2,j,k),4) + real(Q(i+3,2,j,k),4)) + 0.15_4 * (real(Q(i-2,2,j,k),4) - real(Q(i+2,2,j,k),4)) &
+                        + 0.75_4 * (-real(Q(i-1,2,j,k),4) + real(Q(i+1,2,j,k),4))) * real(inv_dx(i),4), 4)
+        wx(idx) = real((one_sixty_mp * (-real(Q(i-3,4,j,k),4) + real(Q(i+3,4,j,k),4)) + 0.15_4 * (real(Q(i-2,4,j,k),4) - real(Q(i+2,4,j,k),4)) &
+                        + 0.75_4 * (-real(Q(i-1,4,j,k),4) + real(Q(i+1,4,j,k),4))) * real(inv_dx(i),4), 4)
+      endif
+      if (i <= nx .and. 4 <= j .and. j <= ny-3 .and. 1 <= k .and. k <= nz) then
+        vy(idx) = real((one_sixty_mp * (-real(Q(i,3,j-3,k),4) + real(Q(i,3,j+3,k),4)) + 0.15_4 * (real(Q(i,3,j-2,k),4) - real(Q(i,3,j+2,k),4)) &
+                        + 0.75_4 * (-real(Q(i,3,j-1,k),4) + real(Q(i,3,j+1,k),4))) * real(inv_dy(j),4), 4)
+        wy(idx) = real((one_sixty_mp * (-real(Q(i,4,j-3,k),4) + real(Q(i,4,j+3,k),4)) + 0.15_4 * (real(Q(i,4,j-2,k),4) - real(Q(i,4,j+2,k),4)) &
+                        + 0.75_4 * (-real(Q(i,4,j-1,k),4) + real(Q(i,4,j+1,k),4))) * real(inv_dy(j),4), 4)
+      endif
+    enddo
+    call syncthreads()
+  end subroutine load_smem_visc_cent_mp_z
+
+
+  attributes(device) subroutine load_smem_visc_cent_mp_z_koff(it, jt, kt, i, j, &
+                                                            nx, ny, nz, inv_dx, inv_dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+    integer, intent(in), value              :: it
+    integer, intent(in), value              :: jt
+    integer, intent(in), value              :: kt
+    integer, intent(in), value              :: i
+    integer, intent(in), value              :: j
+    integer, intent(in), value              :: nx
+    integer, intent(in), value              :: ny
+    integer, intent(in), value              :: nz
+    real(8), intent(in), device, contiguous :: inv_dx(nx-1)
+    real(8), intent(in), device, contiguous :: inv_dy(ny-1)
+    real(8), intent(in), device, contiguous :: Q(nx,5,ny,nz)
+    integer, intent(in), value              :: k_lo
+    integer, parameter :: io_v = 2
+    integer, parameter :: sx = threadsGv%x
+    integer, parameter :: sy = threadsGv%y
+    integer, parameter :: sz = threadsGv%z + 2*io_v + 1
+    real(4), intent(inout) ::  u(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) ::  v(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) ::  w(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) :: ux(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) :: wx(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) :: vy(-(io_v-1):sx*sy*sz-io_v)
+    real(4), intent(inout) :: wy(-(io_v-1):sx*sy*sz-io_v)
+    integer k_base, kk, k, idx, offset_xy
+    k_base = (blockIdx%z-1)*blockDim%z + k_lo - 1
+    offset_xy = (jt-1)*sz + (it-1)*sz*sy
+    do kk = kt-io_v, threadsGv%z+io_v+1, blockDim%z
+      k = k_base + kk
+      idx = kk + offset_xy
+      if (i <= nx .and. j <= ny .and. 1 <= k .and. k <= nz) then
+        u(idx) = real(Q(i,2,j,k), 4)
+        v(idx) = real(Q(i,3,j,k), 4)
+        w(idx) = real(Q(i,4,j,k), 4)
+      endif
+      if (4 <= i .and. i <= nx-3 .and. j <= ny .and. 1 <= k .and. k <= nz) then
+        ux(idx) = real((one_sixty_mp * (-real(Q(i-3,2,j,k),4) + real(Q(i+3,2,j,k),4)) + 0.15_4 * (real(Q(i-2,2,j,k),4) - real(Q(i+2,2,j,k),4)) &
+                        + 0.75_4 * (-real(Q(i-1,2,j,k),4) + real(Q(i+1,2,j,k),4))) * real(inv_dx(i),4), 4)
+        wx(idx) = real((one_sixty_mp * (-real(Q(i-3,4,j,k),4) + real(Q(i+3,4,j,k),4)) + 0.15_4 * (real(Q(i-2,4,j,k),4) - real(Q(i+2,4,j,k),4)) &
+                        + 0.75_4 * (-real(Q(i-1,4,j,k),4) + real(Q(i+1,4,j,k),4))) * real(inv_dx(i),4), 4)
+      endif
+      if (i <= nx .and. 4 <= j .and. j <= ny-3 .and. 1 <= k .and. k <= nz) then
+        vy(idx) = real((one_sixty_mp * (-real(Q(i,3,j-3,k),4) + real(Q(i,3,j+3,k),4)) + 0.15_4 * (real(Q(i,3,j-2,k),4) - real(Q(i,3,j+2,k),4)) &
+                        + 0.75_4 * (-real(Q(i,3,j-1,k),4) + real(Q(i,3,j+1,k),4))) * real(inv_dy(j),4), 4)
+        wy(idx) = real((one_sixty_mp * (-real(Q(i,4,j-3,k),4) + real(Q(i,4,j+3,k),4)) + 0.15_4 * (real(Q(i,4,j-2,k),4) - real(Q(i,4,j+2,k),4)) &
+                        + 0.75_4 * (-real(Q(i,4,j-1,k),4) + real(Q(i,4,j+1,k),4))) * real(inv_dy(j),4), 4)
+      endif
+    enddo
+    call syncthreads()
+  end subroutine load_smem_visc_cent_mp_z_koff
+end module load_smem_visc_cent_mp

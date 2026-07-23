@@ -1,0 +1,233 @@
+! real(4)-internal port of 3D_solver/src/calc_visc_high_internal.f90.fypp,
+! VISC_ORDER=6 (cent6 stencil) and VISC='NS' (no LES) only -- matches NSTGV's
+! config.fypp exactly. calc_Ev6_in_mp/calc_Fv6_in_mp/calc_Gv6_in_mp keep the
+! IDENTICAL intent(inout) real(8) contract on E/F/G (and real(8) Q/T/mu/dx/dy/dz
+! inputs) as the baseline real(8) kernels -- only the stencil arithmetic
+! inside each kernel (loaded via load_smem_visc_cent_mp's real(4) shared
+! tiles, local mu6/T6 arrays, calc_tau_straight_mp/calc_tau_cross_mp) runs in
+! FP32. The final txx/txy/txz/kTx terms promote back to real(8) implicitly in
+! the `E(...) = E(...) - txx` accumulate. No new persistent device arrays, no
+! change to preprocess.f90.fypp/calc_steps.f90 needed.
+#:include 'config.fypp'
+module calc_visc_high_internal_mp
+  use mod_globals, only : threadsEv, threadsFv, threadsGv
+  use mod_constant, only : Cp_over_Pr
+  use load_smem_visc_cent_mp
+  implicit none
+  private
+  public calc_Ev6_in_mp, calc_Fv6_in_mp, calc_Gv6_in_mp, &
+         calc_Ev6_in_koff_mp, calc_Fv6_in_koff_mp, calc_Gv6_in_koff_mp
+  real(4), parameter :: two_third_mp = 2._4 / 3._4
+contains
+  #:include 'calc_visc_cent_mp.f90.fypp'
+
+#:for is_koff in [False, True]
+  #:set suf = '_in_koff_mp' if is_koff else '_in_mp'
+  attributes(global) subroutine calc_Ev6${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
+    #:if is_koff
+      k_lo, k_hi, &
+    #:endif
+      E)
+    integer, intent(in), value                 :: nx
+    integer, intent(in), value                 :: ny
+    integer, intent(in), value                 :: nz
+    real(8), intent(in), device, contiguous    :: dx(nx-1)
+    real(8), intent(in), device, contiguous    :: dy(ny-1)
+    real(8), intent(in), device, contiguous    :: dz(nz-1)
+    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous    :: T(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)
+    real(8), intent(inout), device, contiguous :: E(5,nx-1,ny-2,nz-2)
+    #:if is_koff
+    integer, intent(in), value                 :: k_lo
+    integer, intent(in), value                 :: k_hi
+    #:endif
+    integer, parameter :: io_v = 2
+    integer, parameter :: sx = threadsEv%x + 2*io_v + 1
+    integer, parameter :: sy = threadsEv%y
+    integer, parameter :: sz = threadsEv%z
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  u
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  v
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  w
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: uy
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: vy
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: uz
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: wz
+    integer i, j, k, it, jt, kt, idx, offset_yz
+    real(4) :: txx, txy, txz, utxx, vtxy, wtxz, kTx
+    it = threadIdx%x
+    jt = threadIdx%y
+    kt = threadIdx%z
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    #:if is_koff
+    k  = (blockIdx%z-1)*blockDim%z + kt + k_lo - 1
+    #:else
+    k  = (blockIdx%z-1)*blockDim%z + kt + 1
+    #:endif
+    offset_yz = (jt-1)*sx + (kt-1)*sx*sy
+    call load_smem_visc_cent_mp_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
+    i  = (blockIdx%x-1)*blockDim%x + it
+    idx = it + offset_yz
+    #:if is_koff
+    if (nx-1 < i .or. ny-1 < j .or. k_hi < k) return
+    #:else
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
+    #:endif
+    if (3 <= i .and. i <= nx-3 .and. 4 <= j .and. j <= ny-3 .and. 4 <= k .and. k <= nz-3) then
+      block
+        real(4) :: mu6(6), T6(6)
+        mu6(:) = real(mu(i-2:i+3, j, k), 4)
+        T6(:) = real(T(i-2:i+3, j, k), 4)
+        kTx = real(Cp_over_Pr,4) * interp6_mp(mu6) * diff6_mp(real(dx(i),4), T6)
+        call calc_tau_straight_mp(mu6, u(idx-2:idx+3), vy(idx-2:idx+3), wz(idx-2:idx+3), real(dx(i),4), txx, utxx)
+        call calc_tau_cross_mp(mu6, v(idx-2:idx+3), uy(idx-2:idx+3), real(dx(i),4), txy, vtxy)
+        call calc_tau_cross_mp(mu6, w(idx-2:idx+3), uz(idx-2:idx+3), real(dx(i),4), txz, wtxz)
+        E(2,i,j-1,k-1) = E(2,i,j-1,k-1) - txx
+        E(3,i,j-1,k-1) = E(3,i,j-1,k-1) - txy
+        E(4,i,j-1,k-1) = E(4,i,j-1,k-1) - txz
+        E(5,i,j-1,k-1) = E(5,i,j-1,k-1) - (utxx + vtxy + wtxz + kTx)
+      end block
+    endif
+  end subroutine calc_Ev6${suf}$
+#:endfor
+
+
+#:for is_koff in [False, True]
+  #:set suf = '_in_koff_mp' if is_koff else '_in_mp'
+  attributes(global) subroutine calc_Fv6${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
+    #:if is_koff
+      k_lo, k_hi, &
+    #:endif
+      F)
+    integer, intent(in), value                 :: nx
+    integer, intent(in), value                 :: ny
+    integer, intent(in), value                 :: nz
+    real(8), intent(in), device, contiguous    :: dx(nx-1)
+    real(8), intent(in), device, contiguous    :: dy(ny-1)
+    real(8), intent(in), device, contiguous    :: dz(nz-1)
+    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous    :: T(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)
+    real(8), intent(inout), device, contiguous :: F(5,nx-2,ny-1,nz-2)
+    #:if is_koff
+    integer, intent(in), value                 :: k_lo
+    integer, intent(in), value                 :: k_hi
+    #:endif
+    integer, parameter :: io_v = 2
+    integer, parameter :: sx = threadsFv%x
+    integer, parameter :: sy = threadsFv%y + 2*io_v + 1
+    integer, parameter :: sz = threadsFv%z
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  u
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  v
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  w
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: ux
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: vx
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: vz
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: wz
+    integer i, j, k, it, jt, kt, idx, offset_xz
+    real(4) :: tyx, tyy, tyz, utyx, vtyy, wtyz, kTy
+    it = threadIdx%x
+    jt = threadIdx%y
+    kt = threadIdx%z
+    i  = (blockIdx%x-1)*blockDim%x + it + 1
+    #:if is_koff
+    k  = (blockIdx%z-1)*blockDim%z + kt + k_lo - 1
+    #:else
+    k  = (blockIdx%z-1)*blockDim%z + kt + 1
+    #:endif
+    offset_xz = (it-1)*sy + (kt-1)*sy*sx
+    call load_smem_visc_cent_mp_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
+    j  = (blockIdx%y-1)*blockDim%y + jt
+    idx = jt + offset_xz
+    #:if is_koff
+    if (nx-1 < i .or. ny-1 < j .or. k_hi < k) return
+    #:else
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
+    #:endif
+    if (4 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-3 .and. 4 <= k .and. k <= nz-3) then
+      block
+        real(4) :: mu6(6), T6(6)
+        mu6(:) = real(mu(i, j-2:j+3, k), 4)
+        T6(:) = real(T(i, j-2:j+3, k), 4)
+        kTy = real(Cp_over_Pr,4) * interp6_mp(mu6) * diff6_mp(real(dy(j),4), T6)
+        call calc_tau_straight_mp(mu6, v(idx-2:idx+3), wz(idx-2:idx+3), ux(idx-2:idx+3), real(dy(j),4), tyy, vtyy)
+        call calc_tau_cross_mp(mu6, u(idx-2:idx+3), vx(idx-2:idx+3), real(dy(j),4), tyx, utyx)
+        call calc_tau_cross_mp(mu6, w(idx-2:idx+3), vz(idx-2:idx+3), real(dy(j),4), tyz, wtyz)
+        F(2,i-1,j,k-1) = F(2,i-1,j,k-1) - tyx
+        F(3,i-1,j,k-1) = F(3,i-1,j,k-1) - tyy
+        F(4,i-1,j,k-1) = F(4,i-1,j,k-1) - tyz
+        F(5,i-1,j,k-1) = F(5,i-1,j,k-1) - (utyx + vtyy + wtyz + kTy)
+      end block
+    endif
+  end subroutine calc_Fv6${suf}$
+#:endfor
+
+
+#:for is_koff in [False, True]
+  #:set suf = '_in_koff_mp' if is_koff else '_in_mp'
+  attributes(global) subroutine calc_Gv6${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
+    #:if is_koff
+      k_lo, k_hi, &
+    #:endif
+      G)
+    integer, intent(in), value                 :: nx
+    integer, intent(in), value                 :: ny
+    integer, intent(in), value                 :: nz
+    real(8), intent(in), device, contiguous    :: dx(nx-1)
+    real(8), intent(in), device, contiguous    :: dy(ny-1)
+    real(8), intent(in), device, contiguous    :: dz(nz-1)
+    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous    :: T(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)
+    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1)
+    #:if is_koff
+    integer, intent(in), value                 :: k_lo
+    integer, intent(in), value                 :: k_hi
+    #:endif
+    integer, parameter :: io_v = 2
+    integer, parameter :: sx = threadsGv%x
+    integer, parameter :: sy = threadsGv%y
+    integer, parameter :: sz = threadsGv%z + 2*io_v + 1
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  u
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  v
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  w
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: wx
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: wy
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: ux
+    real(4), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: vy
+    integer i, j, k, it, jt, kt, idx, offset_xy
+    real(4) :: tzx, tzy, tzz, utzx, vtzy, wtzz, kTz
+    it = threadIdx%x
+    jt = threadIdx%y
+    kt = threadIdx%z
+    i  = (blockIdx%x-1)*blockDim%x + it + 1
+    j  = (blockIdx%y-1)*blockDim%y + jt + 1
+    offset_xy = (jt-1)*sz + (it-1)*sz*sy
+    #:if is_koff
+    call load_smem_visc_cent_mp_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+    k  = (blockIdx%z-1)*blockDim%z + k_lo - 1 + kt
+    if (nx-1 < i .or. ny-1 < j .or. k_hi < k) return
+    #:else
+    call load_smem_visc_cent_mp_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
+    k  = (blockIdx%z-1)*blockDim%z + kt
+    if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
+    #:endif
+    idx = kt + offset_xy
+    if (4 <= i .and. i <= nx-3 .and. 4 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-3) then
+      block
+        real(4) :: mu6(6), T6(6)
+        mu6(:) = real(mu(i, j, k-2:k+3), 4)
+        T6(:) = real(T(i, j, k-2:k+3), 4)
+        kTz = real(Cp_over_Pr,4) * interp6_mp(mu6) * diff6_mp(real(dz(k),4), T6)
+        call calc_tau_straight_mp(mu6, w(idx-2:idx+3), ux(idx-2:idx+3), vy(idx-2:idx+3), real(dz(k),4), tzz, wtzz)
+        call calc_tau_cross_mp(mu6, u(idx-2:idx+3), wx(idx-2:idx+3), real(dz(k),4), tzx, utzx)
+        call calc_tau_cross_mp(mu6, v(idx-2:idx+3), wy(idx-2:idx+3), real(dz(k),4), tzy, vtzy)
+        G(2,i-1,j-1,k) = G(2,i-1,j-1,k) - tzx
+        G(3,i-1,j-1,k) = G(3,i-1,j-1,k) - tzy
+        G(4,i-1,j-1,k) = G(4,i-1,j-1,k) - tzz
+        G(5,i-1,j-1,k) = G(5,i-1,j-1,k) - (utzx + vtzy + wtzz + kTz)
+      end block
+    endif
+  end subroutine calc_Gv6${suf}$
+#:endfor
+end module calc_visc_high_internal_mp
