@@ -1,6 +1,7 @@
 !> Curvilinear SLAU flux kernels (2nd-order, no MUSCL reconstruction).
 !> E and F are area-scaled; G uses Normal_z (not area-scaled).
 module calc_slau_kernel_curv
+  use libm
   use mod_globals, only : threadsE, threadsF, threadsG
   use mod_constant, only : over_gamma_1, id_slau
   use calc_hybrid

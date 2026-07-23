@@ -2,6 +2,7 @@
 !> E and F fluxes are area-scaled: flux = KEEP2(..., unit_normal) * face_area.
 !> G flux uses uniform Normal_z (z is Cartesian); caller scales by J_2D via dt_Szeta.
 module calc_keep_kernel_curv
+  use libm
   use mod_globals, only : threadsE, threadsF, threadsG
   use mod_constant, only : R_over_gamma_1, one_third, one_sixth, one_twelfth, two_third
   implicit none
