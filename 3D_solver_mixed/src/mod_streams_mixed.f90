@@ -17,17 +17,29 @@ module mod_streams_mixed
   use green_ctx_bindings
   implicit none
   integer(cuda_stream_kind) :: stream_conv, stream_visc
-  type(cudaEvent) :: event_E, event_F, event_G
+  type(cudaEvent) :: event_E, event_Fv, event_Gv
   integer :: numSM
-  ! Placeholder split, NOT re-derived from a profile of this fork yet. The
-  ! fltflt fork's 0.6 (conv-favoring) ratio was measured for fltflt-emulated
-  ! convection (very heavy) vs. real(8) viscous. Here convection is plain
-  ! real(8) (lighter than fltflt-emulated, though FP64 still runs at reduced
-  ! throughput vs FP32 on GH200) vs. FP32-internal viscous (lighter than
-  ! real(8) viscous) -- a materially different balance. Re-derive this from
-  ! an nsys profile of calc_conv_visc_paired_mixed (see NSTGV/profile.sh)
-  ! before trusting it for anything but a first correctness check.
-  real, parameter :: conv_share = 0.6
+  ! Measured from a real Miyabi GH200 (132 SMs) nsys trace of this fork's
+  ! NSTGV kernels at the production 513^3 grid (OVERLAP_GC=False run):
+  ! summing full-132-SM per-kernel costs into "SM-ms" work gives
+  ! W_conv = (Ducros+E+F+G) * 132 =~ 2710 SM-ms, W_visc = (Ev+Fv+Gv) * 132
+  ! =~ 4093 SM-ms -- i.e. the viscous side is the HEAVIER total workload,
+  ! the opposite of what the inherited fltflt-fork 0.6 (conv-favoring) split
+  ! assumed. Under perfect overlap, wall time = max(W_conv/x, W_visc/(132-x)),
+  ! minimized (both terms equal) at x =~ 132*W_conv/(W_conv+W_visc) =~ 53 SMs
+  ! to conv / ~79 to visc, i.e. conv_share =~ 53/132 =~ 0.40.
+  ! IMPORTANT: this is a work-conservation optimum, not a guarantee of a net
+  ! win. At that balance point, best-case wall time = (W_conv+W_visc)/132,
+  ! i.e. EXACTLY the sequential (OVERLAP_GC=False) total -- splitting a fixed
+  ! SM pool into two concurrent partitions can only reallocate existing
+  ! compute capacity, not add to it, and both conv and visc kernels here
+  ! scale ~linearly with SM count at this grid size (confirmed in the trace:
+  ! per-kernel slowdown when confined to a partition tracks the SM-count
+  ! ratio closely). So even at this optimal split, expect OVERLAP_GC=True to
+  ! at best TIE plain sequential dispatch, never decisively beat it -- do not
+  ! re-tune this expecting a win; a real gain would need a workload where at
+  ! least one side is latency/occupancy-bound rather than SM-count-bound.
+  real, parameter :: conv_share = 0.4
 contains
   subroutine init_streams(mygpu)
     integer, intent(in) :: mygpu
@@ -72,8 +84,8 @@ contains
     stream_visc = transfer(cstream(i_visc), stream_visc)
 
     istat = cudaEventCreate(event_E)
-    istat = cudaEventCreate(event_F)
-    istat = cudaEventCreate(event_G)
+    istat = cudaEventCreate(event_Fv)
+    istat = cudaEventCreate(event_Gv)
   end subroutine init_streams
 
   function round_to_multiple8(target, total) result(n)

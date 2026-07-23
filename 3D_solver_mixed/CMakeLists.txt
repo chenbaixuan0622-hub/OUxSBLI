@@ -55,6 +55,7 @@ macro(add_ouxsbli_case)
   set(_SHARED_FYPP
       "load_smem_visc_cent_mp"
       "calc_visc_high_internal_mp"
+      "calc_slau_kernel_internal_acc"
       "calc_flux_base_mixed"
       "calc_time_dev_mixed")
   set(_BASELINE_FYPP

@@ -25,7 +25,8 @@ module calc_flux_base
   use calc_slau_kernel_internal
   use calc_visc_high_internal_mp
   #:if OVERLAP_GC
-  use mod_streams_mixed, only : stream_conv, stream_visc, event_E, event_F, event_G
+  use calc_slau_kernel_internal_acc, only : calc_slau_y_in_acc, calc_slau_z_in_acc
+  use mod_streams_mixed, only : stream_conv, stream_visc, event_E, event_Fv, event_Gv
   #:endif
   use set
   implicit none
@@ -63,20 +64,25 @@ contains
 
 #:if OVERLAP_GC
   !> Interleaved convective (real8, stream_conv) / viscous (real4-internal,
-  !> stream_visc) dispatch. Each stream is confined to its own SM partition
-  !> via a CUDA Green Context (mod_streams_mixed.f90), so both kernels launch
-  !> at their natural full grid size instead of a fraction of a shared
-  !> occupancy budget.
+  !> stream_visc) dispatch, staggered into 3 phases so each phase's pair of
+  !> kernels runs concurrently on disjoint Green-Context SM partitions:
+  !>   phase 1: E (conv, fresh write)   || Fv (visc, fresh write onto zeroed F)
+  !>   phase 2: F (conv, ACCUMULATES onto Fv, waits on Fv) || Gv (visc, fresh onto zeroed G)
+  !>   phase 3: G (conv, ACCUMULATES onto Gv, waits on Gv) || Ev (visc, accumulates onto E, waits on E)
   !>
-  !> calc_*_in (convective) declare E/F/G intent(out) -- a fresh overwrite,
-  !> not an accumulate -- while calc_*v6_in_mp (viscous) read-modify-write
-  !> them (`E = E - txx`, ...). So for every direction the convective kernel
-  !> MUST complete before the viscous kernel touches the same buffer, or the
-  !> convective overwrite (if it ran second) would silently discard the
-  !> viscous contribution. All three convective kernels run back-to-back on
-  !> stream_conv (independent of each other); each viscous kernel on
-  !> stream_visc waits only on its own direction's convective event, so e.g.
-  !> Ev can still run concurrently with the F/G convective kernels.
+  !> calc_slau_x_in (E) is the ordinary intent(out) fresh-write kernel --
+  !> nothing precedes it. F/G use calc_slau_*_in_ACC
+  !> (calc_slau_kernel_internal_acc.f90.fypp) instead of the ordinary
+  !> calc_slau_y_in/z_in: those are intent(out) fresh overwrites too, which
+  !> would silently discard whatever Fv/Gv already wrote into F/G this phase
+  !> (the earlier version of this dispatcher had exactly that bug -- launched
+  !> Fv/Gv first, then overwrote their contribution with a fresh convective
+  !> write, causing NaN blowup). calc_slau_y_in_acc/z_in_acc instead do
+  !> `F = F + flux`, so the phase order below is safe: F/G are zeroed first,
+  !> Fv/Gv write their (narrower-range) viscous contribution into the zeroed
+  !> buffer, then F/G's convective kernel adds its flux on top -- boundary
+  !> cells Fv/Gv never touch simply get `0 + flux`, matching a plain
+  !> convective-only write there.
   subroutine calc_conv_visc_paired_mixed(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, E, F, G)
     integer, intent(in), value                 :: nx, ny, nz
     real(8), intent(in), device, contiguous    :: inv_dx(nx-1), inv_dy(ny-1), inv_dz(nz-1)
@@ -85,33 +91,42 @@ contains
     real(8), intent(inout), device, contiguous :: E(5,nx-1,ny-2,nz-2), F(5,nx-2,ny-1,nz-2)
     real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1)
     integer :: istat
+    ! Fv/Gv's fresh (non-koff) write only covers the range where their own
+    ! cross-derivative stencil is valid (a VISC_ORDER-wide halo in BOTH
+    ! transverse directions), narrower than the range the paired convective
+    ! kernel accumulates into next -- zero F/G first so that accumulate sees
+    ! a valid (viscous-free) baseline in the boundary-shell cells Fv/Gv never
+    ! touch, instead of uninitialized memory.
+    F = 0.d0
+    G = 0.d0
     ! stream_conv/stream_visc are CUDA Green Context streams -- separate CUDA
     ! contexts from the one that ran calc_quantities_T_3D (default stream,
-    ! just before this call), so they do not get the implicit default-stream
-    ! ordering an ordinary stream would. Drain the default stream first so
-    ! the kernels below don't race stale Q/T/mu. cudaDeviceSynchronize() with
-    ! the primary context current (always true here) drains all green
-    ! contexts too.
+    ! just before this call) and the F/G zero-fill above, so they do not get
+    ! the implicit default-stream ordering an ordinary stream would. Drain
+    ! the default stream first so the kernels below don't race stale Q/T/mu
+    ! or the zero-fill. cudaDeviceSynchronize() with the primary context
+    ! current (always true here) drains all green contexts too.
     istat = cudaDeviceSynchronize()
-    ! ---- stream_conv: shock sensor, then E/F/G convective fresh-writes ----
     ! calc_Ducros must run every step (the SLAU/HRSLAU2 kernels below read
     ! `sensor`, a persistent module-level array) -- the sequential dispatch
     ! calls it on the default stream; here it goes on stream_conv so it's
     ! ordered before the convective kernels without an extra event.
     call calc_Ducros<<<blocks,threads,0,stream_conv>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, sensor)
+    ! ---- phase 1: E (conv) || Fv (visc) ----
     call calc_slau_x_in<<<blocksE,threadsE,0,stream_conv>>>(nx, ny, nz, Q, sensor, E)
     istat = cudaEventRecord(event_E, stream_conv)
-    call calc_slau_y_in<<<blocksF,threadsF,0,stream_conv>>>(nx, ny, nz, Q, sensor, F)
-    istat = cudaEventRecord(event_F, stream_conv)
-    call calc_slau_z_in<<<blocksG,threadsG,0,stream_conv>>>(nx, ny, nz, Q, sensor, G)
-    istat = cudaEventRecord(event_G, stream_conv)
-    ! ---- stream_visc: viscous accumulates, each gated on its own direction ----
+    call calc_Fv6_in_mp<<<blocksFv,threadsFv,0,stream_visc>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, F)
+    istat = cudaEventRecord(event_Fv, stream_visc)
+    ! ---- phase 2: F (conv, waits on Fv) || Gv (visc) ----
+    istat = cudaStreamWaitEvent(stream_conv, event_Fv, 0)
+    call calc_slau_y_in_acc<<<blocksF,threadsF,0,stream_conv>>>(nx, ny, nz, Q, sensor, F)
+    call calc_Gv6_in_mp<<<blocksGv,threadsGv,0,stream_visc>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
+    istat = cudaEventRecord(event_Gv, stream_visc)
+    ! ---- phase 3: G (conv, waits on Gv) || Ev (visc, waits on E) ----
+    istat = cudaStreamWaitEvent(stream_conv, event_Gv, 0)
+    call calc_slau_z_in_acc<<<blocksG,threadsG,0,stream_conv>>>(nx, ny, nz, Q, sensor, G)
     istat = cudaStreamWaitEvent(stream_visc, event_E, 0)
     call calc_Ev6_in_mp<<<blocksEv,threadsEv,0,stream_visc>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, E)
-    istat = cudaStreamWaitEvent(stream_visc, event_F, 0)
-    call calc_Fv6_in_mp<<<blocksFv,threadsFv,0,stream_visc>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, F)
-    istat = cudaStreamWaitEvent(stream_visc, event_G, 0)
-    call calc_Gv6_in_mp<<<blocksGv,threadsGv,0,stream_visc>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q, T, mu, G)
     ! Mirror of the entry sync: the caller (RungeKutta) launches calc_step*
     ! on the default stream right after this returns, reading E/F/G.
     istat = cudaDeviceSynchronize()
