@@ -1,5 +1,5 @@
 #:set N = VISC_ORDER
-  pure attributes(device) function interp${N}$(a) result(ai)
+  attributes(device) function interp${N}$(a) result(ai)
     real(8), intent(in), contiguous :: a(${N}$)
     real(8) ai
     #:if N == 4
@@ -24,7 +24,7 @@
     #:endif
   end function interp${N}$
 
-  pure attributes(device) function diff${N}$(d, a) result(da)
+  attributes(device) function diff${N}$(d, a) result(da)
     real(8), intent(in)             :: d
     real(8), intent(in), contiguous :: a(${N}$)
     real(8) da
@@ -51,7 +51,7 @@
     #:endif
   end function diff${N}$
 
-  pure attributes(device) subroutine calc_tau_straight(mu, u, vy, wz, d, t11, ut11)
+  attributes(device) subroutine calc_tau_straight(mu, u, vy, wz, d, t11, ut11)
     real(8), intent(in), contiguous :: mu(${N}$)
     real(8), intent(in), contiguous :: u(${N}$)
     real(8), intent(in), contiguous :: vy(${N}$)
@@ -68,7 +68,7 @@
     ut11 = interp${N}$(u) * t11
   end subroutine calc_tau_straight
 
-  pure attributes(device) subroutine calc_tau_straight_LES(mu, mut, u, vy, wz, d, t11, ut11)
+  attributes(device) subroutine calc_tau_straight_LES(mu, mut, u, vy, wz, d, t11, ut11)
     real(8), intent(in), contiguous :: mu(${N}$)
     real(8), intent(in), contiguous :: mut(${N}$)
     real(8), intent(in), contiguous :: u(${N}$)
@@ -88,7 +88,7 @@
     t11  = two_third * mui * (fma(2.d0, ux, -vyi - wzi))
   end subroutine calc_tau_straight_LES
 
-  pure attributes(device) subroutine calc_tau_cross(mu, v, uy, d, t12, vt12)
+  attributes(device) subroutine calc_tau_cross(mu, v, uy, d, t12, vt12)
     real(8), intent(in), contiguous :: mu(${N}$)
     real(8), intent(in), contiguous :: v(${N}$)
     real(8), intent(in), contiguous :: uy(${N}$)
@@ -103,7 +103,7 @@
     vt12 = interp${N}$(v) * t12
   end subroutine calc_tau_cross
 
-  pure attributes(device) subroutine calc_tau_cross_LES(mu, mut, v, uy, d, t12, vt12)
+  attributes(device) subroutine calc_tau_cross_LES(mu, mut, v, uy, d, t12, vt12)
     real(8), intent(in), contiguous :: mu(${N}$)
     real(8), intent(in), contiguous :: mut(${N}$)
     real(8), intent(in), contiguous :: v(${N}$)

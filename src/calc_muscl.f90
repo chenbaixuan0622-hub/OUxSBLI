@@ -17,23 +17,23 @@ module calc_muscl
     module procedure MUSCL4thnonTVD, MUSCL4thTVD, MUSCL4thThreshold
   end interface
 contains
-  pure attributes(device) function minmod2(x, y) result(ans)
+  attributes(device) function minmod2(x, y) result(ans)
     real(8), intent(in), value :: x, y
     real(8) :: ans, sgn
     sgn = copysign(1.d0, x)
-    ans = sgn * fmax(fmin(abs(x), sgn * y), 0.d0)
+    ans = sgn * max(min(abs(x), sgn * y), 0.d0)
   end function minmod2
 
 
-  pure attributes(device) function minmod3(x, y, z) result(ans)
+  attributes(device) function minmod3(x, y, z) result(ans)
     real(8), intent(in), value :: x, y, z
     real(8) :: ans, sgn
     sgn = copysign(1.d0, x)
-    ans = sgn * fmax(fmin(abs(x), sgn * y, sgn * z), 0.d0)
+    ans = sgn * max(min(abs(x), sgn * y, sgn * z), 0.d0)
   end function minmod3
 
 
-  pure attributes(device) function d33(d1, d2, d3) result(ans)
+  attributes(device) function d33(d1, d2, d3) result(ans)
     real(8), intent(in), value :: d1, d2, d3 
     real(8) :: ans
     ans =          minmod(d1, 2.d0 * d2, 2.d0 * d3) &
@@ -42,7 +42,7 @@ contains
   end function d33
 
 
-  pure attributes(device) subroutine MUSCL3rdnonTVD(id_tvd, sensor, a2, a3, d1, d2, d3, al, ar)
+  attributes(device) subroutine MUSCL3rdnonTVD(id_tvd, sensor, a2, a3, d1, d2, d3, al, ar)
     integer(kind=2), intent(in) :: id_tvd
     real(sp), intent(in)        :: sensor
     real(8), intent(in)         :: a2, a3, d1, d2, d3
@@ -52,7 +52,7 @@ contains
   end subroutine MUSCL3rdnonTVD
 
 
-  pure attributes(device) subroutine MUSCL3rdMinmod(id_tvd, sensor, a2, a3, d1, d2, d3, al, ar)
+  attributes(device) subroutine MUSCL3rdMinmod(id_tvd, sensor, a2, a3, d1, d2, d3, al, ar)
     integer(kind=4), intent(in) :: id_tvd
     real(sp), intent(in)        :: sensor
     real(8), intent(in)         :: a2, a3, d1, d2, d3
@@ -73,7 +73,7 @@ contains
   end subroutine MUSCL3rdMinmod
 
 
-  pure attributes(device) subroutine MUSCL3rdThreshold(id_tvd, sensor, a2, a3, d1, d2, d3, al, ar)
+  attributes(device) subroutine MUSCL3rdThreshold(id_tvd, sensor, a2, a3, d1, d2, d3, al, ar)
     use mod_globals, only : threshold
     integer(kind=8), intent(in) :: id_tvd
     real(sp), intent(in)        :: sensor
@@ -89,7 +89,7 @@ contains
   end subroutine MUSCL3rdThreshold
 
 
-  pure attributes(device) subroutine MUSCL4thnonTVD(id_tvd, sensor, a2, a3, d1, d2, d3, d4, d5, al, ar)
+  attributes(device) subroutine MUSCL4thnonTVD(id_tvd, sensor, a2, a3, d1, d2, d3, d4, d5, al, ar)
     integer(kind=2), intent(in) :: id_tvd
     real(sp), intent(in)        :: sensor
     real(8), intent(in)         :: a2, a3, d1, d2, d3, d4, d5
@@ -113,7 +113,7 @@ contains
   end subroutine MUSCL4thnonTVD
 
 
-  pure attributes(device) subroutine MUSCL4thTVD(id_tvd, sensor, a2, a3, d1, d2, d3, d4, d5, al, ar)
+  attributes(device) subroutine MUSCL4thTVD(id_tvd, sensor, a2, a3, d1, d2, d3, d4, d5, al, ar)
     integer(kind=4), intent(in) :: id_tvd
     real(sp), intent(in)        :: sensor
     real(8), intent(in)         :: a2, a3, d1, d2, d3, d4, d5
@@ -137,7 +137,7 @@ contains
   end subroutine MUSCL4thTVD
 
 
-  pure attributes(device) subroutine MUSCL4thThreshold(id_tvd, sensor, a2, a3, d1, d2, d3, d4, d5, al, ar)
+  attributes(device) subroutine MUSCL4thThreshold(id_tvd, sensor, a2, a3, d1, d2, d3, d4, d5, al, ar)
     use mod_globals, only : threshold
     integer(kind=8), intent(in) :: id_tvd
     real(sp), intent(in)        :: sensor
@@ -154,7 +154,7 @@ contains
   end subroutine MUSCL4thThreshold
 
 
-  pure attributes(device) subroutine delta4(sensor, a, al, ar)
+  attributes(device) subroutine delta4(sensor, a, al, ar)
     use mod_globals, only : sp
     use mod_constant, only : id_tvd
     real(sp), intent(in), value     :: sensor
@@ -168,7 +168,7 @@ contains
   end subroutine delta4
 
 
-  pure attributes(device) subroutine delta6(sensor, a, al, ar)
+  attributes(device) subroutine delta6(sensor, a, al, ar)
     use mod_globals, only : sp
     use mod_constant, only : id_tvd
     real(sp), intent(in), value     :: sensor

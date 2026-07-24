@@ -13,7 +13,7 @@
   end function KEEP2
 
 
-  pure attributes(device) function KEEP4(id_accuracy, rho, u, v, w, uu, p, T, Normal) result(F)
+  attributes(device) function KEEP4(id_accuracy, rho, u, v, w, uu, p, T, Normal) result(F)
     integer(4), intent(in), value     :: id_accuracy
     real(8), intent(in), dimension(4) :: rho, u, v, w, uu, p, T
     real(8), intent(in), dimension(5) :: Normal
@@ -66,7 +66,7 @@
 
 
   !$dir inline
-  pure attributes(device) function mom(u, pres, RV4, RV6, &
+  attributes(device) function mom(u, pres, RV4, RV6, &
                                        RV2_RV5, RV3_RV5, &
                                        RV1_RV2_RV4, RV1_RV3_RV6) result(ruu)
     real(8), intent(in)        :: u(6)
@@ -82,7 +82,7 @@
   end function mom
 
 
-  pure attributes(device) function KEEP6(id_accuracy, rho, u, v, w, uu, p, T, Normal) result(F)
+  attributes(device) function KEEP6(id_accuracy, rho, u, v, w, uu, p, T, Normal) result(F)
     integer(8), intent(in), value     :: id_accuracy
     real(8), intent(in), dimension(6) :: rho, u, v, w, uu, p, T
     real(8), intent(in), dimension(5) :: Normal

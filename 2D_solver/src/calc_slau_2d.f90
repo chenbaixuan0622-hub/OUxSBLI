@@ -38,7 +38,7 @@
   end function phi
 
 
-  pure attributes(device) subroutine SLAU1(id_slau, rho1, rho2, u1, u2, v1, v2, &
+  attributes(device) subroutine SLAU1(id_slau, rho1, rho2, u1, u2, v1, v2, &
                                            un1, un2, p1, p2, Norm, HR, F1, F2, F3, F4)
     integer(2), intent(in), value :: id_slau
     real(8), intent(in)           :: rho1, rho2, u1, u2, v1, v2, un1, un2, p1, p2, Norm(5)
@@ -84,7 +84,7 @@
   end subroutine SLAU1
 
 
-  pure attributes(device) subroutine HRSLAU2(id_slau, rho1, rho2, u1, u2, v1, v2, &
+  attributes(device) subroutine HRSLAU2(id_slau, rho1, rho2, u1, u2, v1, v2, &
                                              un1, un2, p1, p2, Norm, HR, F1, F2, F3, F4)
     integer(4), intent(in), value :: id_slau
     real(8), intent(in)           :: rho1, rho2, u1, u2, v1, v2, un1, un2, p1, p2, Norm(5)
