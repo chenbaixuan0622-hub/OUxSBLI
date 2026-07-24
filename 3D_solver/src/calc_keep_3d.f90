@@ -67,8 +67,8 @@
 
   !$dir inline
   attributes(device) function mom(u, pres, RV4, RV6, &
-                                       RV2_RV5, RV3_RV5, &
-                                       RV1_RV2_RV4, RV1_RV3_RV6) result(ruu)
+                                  RV2_RV5, RV3_RV5, &
+                                  RV1_RV2_RV4, RV1_RV3_RV6) result(ruu)
     real(8), intent(in)        :: u(6)
     real(8), intent(in), value :: pres, RV4, RV6, RV2_RV5, RV3_RV5
     real(8), intent(in), value :: RV1_RV2_RV4, RV1_RV3_RV6

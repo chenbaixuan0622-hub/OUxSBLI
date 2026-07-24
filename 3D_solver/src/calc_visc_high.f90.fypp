@@ -12,6 +12,7 @@ module calc_visc_high
 end module calc_visc_high
 #:else
 module calc_visc_high
+  use libm
   use mod_globals, only : gamma, R, Pr, Prt, dt, threadsEv, threadsFv, threadsGv
   use mod_constant, only : id_visc, Cp, gamma_1, Cp_over_Pr, one_third, two_third, one_twelfth
   use libm

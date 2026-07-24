@@ -2,6 +2,7 @@
 #:set is_les = (VISC == 'LES')
 #:set base_suf = ""
 module calc_visc2
+  use libm
   use mod_globals, only : gamma, R, Pr, Prt, dt, threadsEv, threadsFv, threadsGv
   use mod_constant, only : Cp, gamma_1, Cp_over_Pr, one_third, two_third
   use load_smem_visc2

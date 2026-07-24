@@ -1,4 +1,4 @@
-  pure attributes(device) subroutine SLAU_common(rho1, rho2, over_rho1, over_rho2, u1, u2, v1, v2, &
+  attributes(device) subroutine SLAU_common(rho1, rho2, over_rho1, over_rho2, u1, u2, v1, v2, &
                                                  un1, un2, p1, p2, c, over_c, Mp, Mm, bp, bm, dp, Vtp, Vtm)
     real(8), intent(in)  :: rho1, rho2, over_rho1, over_rho2, u1, u2, v1, v2, un1, un2, p1, p2
     real(8), intent(out) :: c, over_c, Mp, Mm, bp, bm, dp, Vtp, Vtm
@@ -13,7 +13,7 @@
     Mm  = un2 * over_c
     block
       real(8) g, one_g_Vt
-      g   = -fmax(fmin(Mp, 0.d0), -1.d0) * fmin(fmax(Mm, 0.d0), 1.d0)
+      g   = -max(min(Mp, 0.d0), -1.d0) * min(max(Mm, 0.d0), 1.d0)
       one_g_Vt = (1.d0 - g) * (rho1 * abs(un1) + rho2 * abs(un2)) / (rho1 + rho2)
       Vtp = one_g_Vt + g * abs(un1)
       Vtm = one_g_Vt + g * abs(un2)

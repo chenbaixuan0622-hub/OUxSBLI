@@ -1,4 +1,4 @@
-  pure attributes(device) subroutine SLAU_common(rho1, rho2, over_rho1, over_rho2, u1, u2, v1, v2, w1, w2, &
+  attributes(device) subroutine SLAU_common(rho1, rho2, over_rho1, over_rho2, u1, u2, v1, v2, w1, w2, &
                                                  un1, un2, p1, p2, c, over_c, Mp, Mm, bp, bm, dp, Vtp, Vtm)
     real(8), intent(in)  :: rho1, rho2, over_rho1, over_rho2, u1, u2, v1, v2, w1, w2, un1, un2, p1, p2
     real(8), intent(out) :: c, over_c, Mp, Mm, bp, bm, dp, Vtp, Vtm
