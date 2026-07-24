@@ -16,6 +16,7 @@
 ! config.fypp), so unlike the generic baseline this calls interp6/HRSLAU2
 ! directly -- no ORDER/SLAU_VARIANT dispatch needed.
 module calc_slau_kernel_internal_acc
+  use libm
   use mod_globals, only : gamma, threadsF, threadsG
   use mod_constant, only : id_slau, over_gamma_1
   use calc_muscl

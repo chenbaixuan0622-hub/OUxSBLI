@@ -12,14 +12,32 @@
   pure attributes(device) function interp6_mp(a) result(ai)
     real(4), intent(in), contiguous :: a(6)
     real(4) ai
-    ai = 0.00390625_4 * (3._4*a(1) - 25._4*a(2) + 150._4*(a(3)+a(4)) - 25._4*a(5) + 3._4*a(6))
+    block
+      real(4) s1, s2, s3, v
+      !ai = 0.00390625_4 * (3._4*a(1) - 25._4*a(2) + 150._4*(a(3)+a(4)) - 25._4*a(5) + 3._4*a(6))
+      s1 = a(1) + a(6)
+      s2 = a(2) + a(5)
+      s3 = a(3) + a(4)
+      v  = 0.01171875_4 * s1
+      v  = fma(-0.09765625_4, s2, v)
+      ai = fma(0.5859375_4,   s3, v)
+    end block
   end function interp6_mp
 
   pure attributes(device) function diff6_mp(d, a) result(da)
     real(4), intent(in)             :: d
     real(4), intent(in), contiguous :: a(6)
     real(4) da
-    da = (-0.0046875_4*a(1) + 0.065104167_4*a(2) - 1.171875_4*(a(3)-a(4)) - 0.065104167_4*a(5) + 0.0046875_4*a(6)) * d
+    block
+      real(4) s1, s2, s3, v
+      !da = (-0.0046875_4*a(1) + 0.065104167_4*a(2) - 1.171875_4*(a(3)-a(4)) - 0.065104167_4*a(5) + 0.0046875_4*a(6)) * d
+      s1 = -a(1) + a(6)
+      s2 =  a(2) - a(5)
+      s3 = -a(3) + a(4)
+      v  = 0.0046875_4 * s1
+      v  = fma(0.065104167_4, s2, v)
+      da = d * fma(1.171875_4, s3, v)
+    end block
   end function diff6_mp
 
   pure attributes(device) subroutine calc_tau_straight_mp(mu, u, vy, wz, d, t11, ut11)
@@ -35,7 +53,8 @@
     vyi  = interp6_mp(vy)
     wzi  = interp6_mp(wz)
     ux   = diff6_mp(d, u)
-    t11  = two_third_mp * mui * (2._4 * ux - vyi - wzi)
+    !t11 = two_third_mp * mui * (2._4 * ux - vyi - wzi)
+    t11  = two_third_mp * mui * fma(2._4, ux, -vyi - wzi)
     ut11 = interp6_mp(u) * t11
   end subroutine calc_tau_straight_mp
 

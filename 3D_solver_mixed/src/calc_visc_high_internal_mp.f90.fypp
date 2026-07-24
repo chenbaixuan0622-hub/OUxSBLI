@@ -10,6 +10,7 @@
 ! change to preprocess.f90.fypp/calc_steps.f90 needed.
 #:include 'config.fypp'
 module calc_visc_high_internal_mp
+  use libm
   use mod_globals, only : threadsEv, threadsFv, threadsGv
   use mod_constant, only : Cp_over_Pr
   use load_smem_visc_cent_mp
