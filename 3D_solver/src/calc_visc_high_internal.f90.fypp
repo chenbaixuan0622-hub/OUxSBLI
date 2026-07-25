@@ -42,7 +42,7 @@ contains
   #:if is_koff
     #:set suf = suf + "_koff"
   #:endif
-  attributes(global) subroutine calc_Ev${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
+  attributes(global) subroutine calc_Ev${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q_2, Q_3, Q_4, T, mu, &
     #:if is_les
       mut, qc2, &
     #:endif
@@ -56,14 +56,16 @@ contains
     real(8), intent(in), device, contiguous    :: dx(nx-1)
     real(8), intent(in), device, contiguous    :: dy(ny-1)
     real(8), intent(in), device, contiguous    :: dz(nz-1)
-    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_2(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_3(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_4(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)
     #:if is_les
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)
     #:endif
-    real(8), intent(inout), device, contiguous :: E(5,nx-1,ny-2,nz-2)
+    real(8), intent(inout), device, contiguous :: E(nx-1,ny-2,nz-2,5)
     #:if is_koff
     integer, intent(in), value                 :: k_lo
     integer, intent(in), value                 :: k_hi
@@ -99,11 +101,11 @@ contains
     #:endif
     offset_yz = (jt-1)*sx + (kt-1)*sx*sy
     #:if VISC_ORDER == 4
-    call load_smem_visc_cent4_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
+    call load_smem_visc_cent4_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q_2, Q_3, Q_4, u, v, w, uy, vy, uz, wz)
     #:elif VISC_STENCIL == 'ME4Base'
-    call load_smem_visc_me4_base_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
+    call load_smem_visc_me4_base_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q_2, Q_3, Q_4, u, v, w, uy, vy, uz, wz)
     #:else
-    call load_smem_visc_cent6_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
+    call load_smem_visc_cent6_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q_2, Q_3, Q_4, u, v, w, uy, vy, uz, wz)
     #:endif
     i  = (blockIdx%x-1)*blockDim%x + it
     idx = it + offset_yz
@@ -138,14 +140,14 @@ contains
         call calc_tau_cross(mu4, w(idx-1:idx+2), uz(idx-1:idx+2), dx(i), txz, wtxz)
         #:endif
         ! no other thread reads this address before the paired store below overwrites it: __ldlu
-        e2v = __ldlu(E(2,i,j-1,k-1))
-        call __stcg(E(2,i,j-1,k-1), e2v - txx)
-        e3v = __ldlu(E(3,i,j-1,k-1))
-        call __stcg(E(3,i,j-1,k-1), e3v - txy)
-        e4v = __ldlu(E(4,i,j-1,k-1))
-        call __stcg(E(4,i,j-1,k-1), e4v - txz)
-        e5v = __ldlu(E(5,i,j-1,k-1))
-        call __stcg(E(5,i,j-1,k-1), e5v - (utxx + vtxy + wtxz + kTx &
+        e2v = __ldlu(E(i,j-1,k-1,2))
+        call __stcg(E(i,j-1,k-1,2), e2v - txx)
+        e3v = __ldlu(E(i,j-1,k-1,3))
+        call __stcg(E(i,j-1,k-1,3), e3v - txy)
+        e4v = __ldlu(E(i,j-1,k-1,4))
+        call __stcg(E(i,j-1,k-1,4), e4v - txz)
+        e5v = __ldlu(E(i,j-1,k-1,5))
+        call __stcg(E(i,j-1,k-1,5), e5v - (utxx + vtxy + wtxz + kTx &
         #:if is_les
           + Hsgs &
         #:endif
@@ -208,14 +210,14 @@ contains
         call calc_tau_cross(mu3, w(idx-2:idx+3), uz(idx-2:idx+3), dx(i), txz, wtxz)
         #:endif
         ! no other thread reads this address before the paired store below overwrites it: __ldlu
-        e2v = __ldlu(E(2,i,j-1,k-1))
-        call __stcg(E(2,i,j-1,k-1), e2v - txx)
-        e3v = __ldlu(E(3,i,j-1,k-1))
-        call __stcg(E(3,i,j-1,k-1), e3v - txy)
-        e4v = __ldlu(E(4,i,j-1,k-1))
-        call __stcg(E(4,i,j-1,k-1), e4v - txz)
-        e5v = __ldlu(E(5,i,j-1,k-1))
-        call __stcg(E(5,i,j-1,k-1), e5v - (utxx + vtxy + wtxz + kTx &
+        e2v = __ldlu(E(i,j-1,k-1,2))
+        call __stcg(E(i,j-1,k-1,2), e2v - txx)
+        e3v = __ldlu(E(i,j-1,k-1,3))
+        call __stcg(E(i,j-1,k-1,3), e3v - txy)
+        e4v = __ldlu(E(i,j-1,k-1,4))
+        call __stcg(E(i,j-1,k-1,4), e4v - txz)
+        e5v = __ldlu(E(i,j-1,k-1,5))
+        call __stcg(E(i,j-1,k-1,5), e5v - (utxx + vtxy + wtxz + kTx &
         #:if is_les
           + Hsgs &
         #:endif
@@ -248,14 +250,14 @@ contains
         call calc_tau_cross(mu6, w(idx-2:idx+3), uz(idx-2:idx+3), dx(i), txz, wtxz)
         #:endif
         ! no other thread reads this address before the paired store below overwrites it: __ldlu
-        e2v = __ldlu(E(2,i,j-1,k-1))
-        call __stcg(E(2,i,j-1,k-1), e2v - txx)
-        e3v = __ldlu(E(3,i,j-1,k-1))
-        call __stcg(E(3,i,j-1,k-1), e3v - txy)
-        e4v = __ldlu(E(4,i,j-1,k-1))
-        call __stcg(E(4,i,j-1,k-1), e4v - txz)
-        e5v = __ldlu(E(5,i,j-1,k-1))
-        call __stcg(E(5,i,j-1,k-1), e5v - (utxx + vtxy + wtxz + kTx &
+        e2v = __ldlu(E(i,j-1,k-1,2))
+        call __stcg(E(i,j-1,k-1,2), e2v - txx)
+        e3v = __ldlu(E(i,j-1,k-1,3))
+        call __stcg(E(i,j-1,k-1,3), e3v - txy)
+        e4v = __ldlu(E(i,j-1,k-1,4))
+        call __stcg(E(i,j-1,k-1,4), e4v - txz)
+        e5v = __ldlu(E(i,j-1,k-1,5))
+        call __stcg(E(i,j-1,k-1,5), e5v - (utxx + vtxy + wtxz + kTx &
         #:if is_les
           + Hsgs &
         #:endif
@@ -272,7 +274,7 @@ contains
   #:if is_koff
     #:set suf = suf + "_koff"
   #:endif
-  attributes(global) subroutine calc_Fv${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
+  attributes(global) subroutine calc_Fv${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q_2, Q_3, Q_4, T, mu, &
     #:if is_les
       mut, qc2, &
     #:endif
@@ -286,14 +288,16 @@ contains
     real(8), intent(in), device, contiguous    :: dx(nx-1)
     real(8), intent(in), device, contiguous    :: dy(ny-1)
     real(8), intent(in), device, contiguous    :: dz(nz-1)
-    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_2(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_3(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_4(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)
     #:if is_les
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)
     #:endif
-    real(8), intent(inout), device, contiguous :: F(5,nx-2,ny-1,nz-2)
+    real(8), intent(inout), device, contiguous :: F(nx-2,ny-1,nz-2,5)
     #:if is_koff
     integer, intent(in), value                 :: k_lo
     integer, intent(in), value                 :: k_hi
@@ -329,11 +333,11 @@ contains
     #:endif
     offset_xz = (it-1)*sy + (kt-1)*sy*sx
     #:if VISC_ORDER == 4
-    call load_smem_visc_cent4_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
+    call load_smem_visc_cent4_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q_2, Q_3, Q_4, u, v, w, ux, vx, vz, wz)
     #:elif VISC_STENCIL == 'ME4Base'
-    call load_smem_visc_me4_base_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
+    call load_smem_visc_me4_base_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q_2, Q_3, Q_4, u, v, w, ux, vx, vz, wz)
     #:else
-    call load_smem_visc_cent6_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
+    call load_smem_visc_cent6_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q_2, Q_3, Q_4, u, v, w, ux, vx, vz, wz)
     #:endif
     j  = (blockIdx%y-1)*blockDim%y + jt
     idx = jt + offset_xz
@@ -369,14 +373,14 @@ contains
         call calc_tau_cross(mu4, w(idx-1:idx+2), vz(idx-1:idx+2), dy(j), tyz, wtyz)
         #:endif
         ! no other thread reads this address before the paired store below overwrites it: __ldlu
-        f2v = __ldlu(F(2,i-1,j,k-1))
-        call __stcg(F(2,i-1,j,k-1), f2v - tyx)
-        f3v = __ldlu(F(3,i-1,j,k-1))
-        call __stcg(F(3,i-1,j,k-1), f3v - tyy)
-        f4v = __ldlu(F(4,i-1,j,k-1))
-        call __stcg(F(4,i-1,j,k-1), f4v - tyz)
-        f5v = __ldlu(F(5,i-1,j,k-1))
-        call __stcg(F(5,i-1,j,k-1), f5v - (utyx + vtyy + wtyz + kTy &
+        f2v = __ldlu(F(i-1,j,k-1,2))
+        call __stcg(F(i-1,j,k-1,2), f2v - tyx)
+        f3v = __ldlu(F(i-1,j,k-1,3))
+        call __stcg(F(i-1,j,k-1,3), f3v - tyy)
+        f4v = __ldlu(F(i-1,j,k-1,4))
+        call __stcg(F(i-1,j,k-1,4), f4v - tyz)
+        f5v = __ldlu(F(i-1,j,k-1,5))
+        call __stcg(F(i-1,j,k-1,5), f5v - (utyx + vtyy + wtyz + kTy &
         #:if is_les
           + Hsgs &
         #:endif
@@ -439,14 +443,14 @@ contains
         call calc_tau_cross(mu3, w(idx-2:idx+3), vz(idx-2:idx+3), dy(j), tyz, wtyz)
         #:endif
         ! no other thread reads this address before the paired store below overwrites it: __ldlu
-        f2v = __ldlu(F(2,i-1,j,k-1))
-        call __stcg(F(2,i-1,j,k-1), f2v - tyx)
-        f3v = __ldlu(F(3,i-1,j,k-1))
-        call __stcg(F(3,i-1,j,k-1), f3v - tyy)
-        f4v = __ldlu(F(4,i-1,j,k-1))
-        call __stcg(F(4,i-1,j,k-1), f4v - tyz)
-        f5v = __ldlu(F(5,i-1,j,k-1))
-        call __stcg(F(5,i-1,j,k-1), f5v - (utyx + vtyy + wtyz + kTy &
+        f2v = __ldlu(F(i-1,j,k-1,2))
+        call __stcg(F(i-1,j,k-1,2), f2v - tyx)
+        f3v = __ldlu(F(i-1,j,k-1,3))
+        call __stcg(F(i-1,j,k-1,3), f3v - tyy)
+        f4v = __ldlu(F(i-1,j,k-1,4))
+        call __stcg(F(i-1,j,k-1,4), f4v - tyz)
+        f5v = __ldlu(F(i-1,j,k-1,5))
+        call __stcg(F(i-1,j,k-1,5), f5v - (utyx + vtyy + wtyz + kTy &
         #:if is_les
           + Hsgs &
         #:endif
@@ -479,14 +483,14 @@ contains
         call calc_tau_cross(mu6, w(idx-2:idx+3), vz(idx-2:idx+3), dy(j), tyz, wtyz)
         #:endif
         ! no other thread reads this address before the paired store below overwrites it: __ldlu
-        f2v = __ldlu(F(2,i-1,j,k-1))
-        call __stcg(F(2,i-1,j,k-1), f2v - tyx)
-        f3v = __ldlu(F(3,i-1,j,k-1))
-        call __stcg(F(3,i-1,j,k-1), f3v - tyy)
-        f4v = __ldlu(F(4,i-1,j,k-1))
-        call __stcg(F(4,i-1,j,k-1), f4v - tyz)
-        f5v = __ldlu(F(5,i-1,j,k-1))
-        call __stcg(F(5,i-1,j,k-1), f5v - (utyx + vtyy + wtyz + kTy &
+        f2v = __ldlu(F(i-1,j,k-1,2))
+        call __stcg(F(i-1,j,k-1,2), f2v - tyx)
+        f3v = __ldlu(F(i-1,j,k-1,3))
+        call __stcg(F(i-1,j,k-1,3), f3v - tyy)
+        f4v = __ldlu(F(i-1,j,k-1,4))
+        call __stcg(F(i-1,j,k-1,4), f4v - tyz)
+        f5v = __ldlu(F(i-1,j,k-1,5))
+        call __stcg(F(i-1,j,k-1,5), f5v - (utyx + vtyy + wtyz + kTy &
         #:if is_les
           + Hsgs &
         #:endif
@@ -503,7 +507,7 @@ contains
   #:if is_koff
     #:set suf = suf + "_koff"
   #:endif
-  attributes(global) subroutine calc_Gv${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
+  attributes(global) subroutine calc_Gv${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q_2, Q_3, Q_4, T, mu, &
     #:if is_les
       mut, qc2, &
     #:endif
@@ -517,14 +521,16 @@ contains
     real(8), intent(in), device, contiguous    :: dx(nx-1)
     real(8), intent(in), device, contiguous    :: dy(ny-1)
     real(8), intent(in), device, contiguous    :: dz(nz-1)
-    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_2(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_3(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_4(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)
     #:if is_les
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)
     #:endif
-    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1)
+    real(8), intent(inout), device, contiguous :: G(nx-2,ny-2,nz-1,5)
     #:if is_koff
     integer, intent(in), value                 :: k_lo
     integer, intent(in), value                 :: k_hi
@@ -557,21 +563,21 @@ contains
     offset_xy = (jt-1)*sz + (it-1)*sz*sy
     #:if is_koff
     #:if VISC_ORDER == 4
-    call load_smem_visc_cent4_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+    call load_smem_visc_cent4_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy, k_lo)
     #:elif VISC_STENCIL == 'ME4Base'
-    call load_smem_visc_me4_base_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+    call load_smem_visc_me4_base_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy, k_lo)
     #:else
-    call load_smem_visc_cent6_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+    call load_smem_visc_cent6_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy, k_lo)
     #:endif
     k  = (blockIdx%z-1)*blockDim%z + k_lo - 1 + kt
     if (nx-1 < i .or. ny-1 < j .or. k_hi < k) return
     #:else
     #:if VISC_ORDER == 4
-    call load_smem_visc_cent4_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
+    call load_smem_visc_cent4_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy)
     #:elif VISC_STENCIL == 'ME4Base'
-    call load_smem_visc_me4_base_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
+    call load_smem_visc_me4_base_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy)
     #:else
-    call load_smem_visc_cent6_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
+    call load_smem_visc_cent6_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy)
     #:endif
     k  = (blockIdx%z-1)*blockDim%z + kt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
@@ -604,14 +610,14 @@ contains
         call calc_tau_cross(mu4, v(idx-1:idx+2), wy(idx-1:idx+2), dz(k), tzy, vtzy)
         #:endif
         ! no other thread reads this address before the paired store below overwrites it: __ldlu
-        g2v = __ldlu(G(2,i-1,j-1,k))
-        call __stcg(G(2,i-1,j-1,k), g2v - tzx)
-        g3v = __ldlu(G(3,i-1,j-1,k))
-        call __stcg(G(3,i-1,j-1,k), g3v - tzy)
-        g4v = __ldlu(G(4,i-1,j-1,k))
-        call __stcg(G(4,i-1,j-1,k), g4v - tzz)
-        g5v = __ldlu(G(5,i-1,j-1,k))
-        call __stcg(G(5,i-1,j-1,k), g5v - (utzx + vtzy + wtzz + kTz &
+        g2v = __ldlu(G(i-1,j-1,k,2))
+        call __stcg(G(i-1,j-1,k,2), g2v - tzx)
+        g3v = __ldlu(G(i-1,j-1,k,3))
+        call __stcg(G(i-1,j-1,k,3), g3v - tzy)
+        g4v = __ldlu(G(i-1,j-1,k,4))
+        call __stcg(G(i-1,j-1,k,4), g4v - tzz)
+        g5v = __ldlu(G(i-1,j-1,k,5))
+        call __stcg(G(i-1,j-1,k,5), g5v - (utzx + vtzy + wtzz + kTz &
         #:if is_les
           + Hsgs &
         #:endif
@@ -674,14 +680,14 @@ contains
         call calc_tau_cross(mu3, v(idx-2:idx+3), wy(idx-2:idx+3), dz(k), tzy, vtzy)
         #:endif
         ! no other thread reads this address before the paired store below overwrites it: __ldlu
-        g2v = __ldlu(G(2,i-1,j-1,k))
-        call __stcg(G(2,i-1,j-1,k), g2v - tzx)
-        g3v = __ldlu(G(3,i-1,j-1,k))
-        call __stcg(G(3,i-1,j-1,k), g3v - tzy)
-        g4v = __ldlu(G(4,i-1,j-1,k))
-        call __stcg(G(4,i-1,j-1,k), g4v - tzz)
-        g5v = __ldlu(G(5,i-1,j-1,k))
-        call __stcg(G(5,i-1,j-1,k), g5v - (utzx + vtzy + wtzz + kTz &
+        g2v = __ldlu(G(i-1,j-1,k,2))
+        call __stcg(G(i-1,j-1,k,2), g2v - tzx)
+        g3v = __ldlu(G(i-1,j-1,k,3))
+        call __stcg(G(i-1,j-1,k,3), g3v - tzy)
+        g4v = __ldlu(G(i-1,j-1,k,4))
+        call __stcg(G(i-1,j-1,k,4), g4v - tzz)
+        g5v = __ldlu(G(i-1,j-1,k,5))
+        call __stcg(G(i-1,j-1,k,5), g5v - (utzx + vtzy + wtzz + kTz &
         #:if is_les
           + Hsgs &
         #:endif
@@ -714,14 +720,14 @@ contains
         call calc_tau_cross(mu6, v(idx-2:idx+3), wy(idx-2:idx+3), dz(k), tzy, vtzy)
         #:endif
         ! no other thread reads this address before the paired store below overwrites it: __ldlu
-        g2v = __ldlu(G(2,i-1,j-1,k))
-        call __stcg(G(2,i-1,j-1,k), g2v - tzx)
-        g3v = __ldlu(G(3,i-1,j-1,k))
-        call __stcg(G(3,i-1,j-1,k), g3v - tzy)
-        g4v = __ldlu(G(4,i-1,j-1,k))
-        call __stcg(G(4,i-1,j-1,k), g4v - tzz)
-        g5v = __ldlu(G(5,i-1,j-1,k))
-        call __stcg(G(5,i-1,j-1,k), g5v - (utzx + vtzy + wtzz + kTz &
+        g2v = __ldlu(G(i-1,j-1,k,2))
+        call __stcg(G(i-1,j-1,k,2), g2v - tzx)
+        g3v = __ldlu(G(i-1,j-1,k,3))
+        call __stcg(G(i-1,j-1,k,3), g3v - tzy)
+        g4v = __ldlu(G(i-1,j-1,k,4))
+        call __stcg(G(i-1,j-1,k,4), g4v - tzz)
+        g5v = __ldlu(G(i-1,j-1,k,5))
+        call __stcg(G(i-1,j-1,k,5), g5v - (utzx + vtzy + wtzz + kTz &
         #:if is_les
           + Hsgs &
         #:endif

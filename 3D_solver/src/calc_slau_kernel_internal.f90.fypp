@@ -82,12 +82,12 @@ contains
   end subroutine interp2
 
 
-  attributes(global) subroutine calc_slau_x_in(nx, ny, nz, Q, sensor, E)
+  attributes(global) subroutine calc_slau_x_in(nx, ny, nz, Q_1, Q_2, Q_3, Q_4, Q_5, sensor, E)
     use mod_constant, only : Normal_x
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q_1(nx,ny,nz), Q_2(nx,ny,nz), Q_3(nx,ny,nz), Q_4(nx,ny,nz), Q_5(nx,ny,nz)
     real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: E(5,nx-1,ny-2,nz-2)
+    real(8), intent(out), device, contiguous  :: E(nx-1,ny-2,nz-2,5)
     integer i, j, k, it, jt, kt
     integer ii, i_base, idx, idx_r, offset_yz, offset_yzr, i1, i2
     integer, parameter :: sx  = threadsE%x + 2*io + 1
@@ -110,8 +110,8 @@ contains
       i = i_base + ii
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = ii + offset_yz
-        rho(idx) = Q(i,1,j,k); u(idx) = Q(i,2,j,k); v(idx) = Q(i,3,j,k)
-          w(idx) = Q(i,4,j,k); p(idx) = Q(i,5,j,k)
+        rho(idx) = Q_1(i,j,k); u(idx) = Q_2(i,j,k); v(idx) = Q_3(i,j,k)
+          w(idx) = Q_4(i,j,k); p(idx) = Q_5(i,j,k)
       endif
     enddo
     call syncthreads()
@@ -133,18 +133,18 @@ contains
       associate(un1 => u(idx), un2 => ur(idx_r))
         call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
                   w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_x, fdx, &
-                  E(1,i,j-1,k-1), E(2,i,j-1,k-1), E(3,i,j-1,k-1), E(4,i,j-1,k-1), E(5,i,j-1,k-1))
+                  E(i,j-1,k-1,1), E(i,j-1,k-1,2), E(i,j-1,k-1,3), E(i,j-1,k-1,4), E(i,j-1,k-1,5))
       end associate
     endif
   end subroutine calc_slau_x_in
 
 
-  attributes(global) subroutine calc_slau_y_in(nx, ny, nz, Q, sensor, F)
+  attributes(global) subroutine calc_slau_y_in(nx, ny, nz, Q_1, Q_2, Q_3, Q_4, Q_5, sensor, F)
     use mod_constant, only : Normal_y
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q_1(nx,ny,nz), Q_2(nx,ny,nz), Q_3(nx,ny,nz), Q_4(nx,ny,nz), Q_5(nx,ny,nz)
     real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: F(5,nx-2,ny-1,nz-2)
+    real(8), intent(out), device, contiguous  :: F(nx-2,ny-1,nz-2,5)
     integer i, j, k, it, jt, kt
     integer jj, j_base, idx, idx_r, offset_xz, offset_xzr, i1, i2
     integer, parameter :: sx  = threadsF%x
@@ -167,8 +167,8 @@ contains
       j = j_base + jj
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = jj + offset_xz
-        rho(idx) = Q(i,1,j,k); u(idx) = Q(i,2,j,k); v(idx) = Q(i,3,j,k)
-          w(idx) = Q(i,4,j,k); p(idx) = Q(i,5,j,k)
+        rho(idx) = Q_1(i,j,k); u(idx) = Q_2(i,j,k); v(idx) = Q_3(i,j,k)
+          w(idx) = Q_4(i,j,k); p(idx) = Q_5(i,j,k)
       endif
     enddo
     call syncthreads()
@@ -190,18 +190,18 @@ contains
       associate(un1 => v(idx), un2 => vr(idx_r))
         call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
                   w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_y, fdy, &
-                  F(1,i-1,j,k-1), F(2,i-1,j,k-1), F(3,i-1,j,k-1), F(4,i-1,j,k-1), F(5,i-1,j,k-1))
+                  F(i-1,j,k-1,1), F(i-1,j,k-1,2), F(i-1,j,k-1,3), F(i-1,j,k-1,4), F(i-1,j,k-1,5))
       end associate
     endif
   end subroutine calc_slau_y_in
 
 
-  attributes(global) subroutine calc_slau_z_in(nx, ny, nz, Q, sensor, G)
+  attributes(global) subroutine calc_slau_z_in(nx, ny, nz, Q_1, Q_2, Q_3, Q_4, Q_5, sensor, G)
     use mod_constant, only : Normal_z
     integer, intent(in), value                :: nx, ny, nz
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q_1(nx,ny,nz), Q_2(nx,ny,nz), Q_3(nx,ny,nz), Q_4(nx,ny,nz), Q_5(nx,ny,nz)
     real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
-    real(8), intent(out), device, contiguous  :: G(5,nx-2,ny-2,nz-1)
+    real(8), intent(out), device, contiguous  :: G(nx-2,ny-2,nz-1,5)
     integer i, j, k, it, jt, kt
     integer kk, k_base, idx, idx_r, offset_xy, offset_xyr, i1, i2
     integer, parameter :: sx  = threadsG%x
@@ -224,8 +224,8 @@ contains
       k = k_base + kk
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = kk + offset_xy
-        rho(idx) = Q(i,1,j,k); u(idx) = Q(i,2,j,k); v(idx) = Q(i,3,j,k)
-          w(idx) = Q(i,4,j,k); p(idx) = Q(i,5,j,k)
+        rho(idx) = Q_1(i,j,k); u(idx) = Q_2(i,j,k); v(idx) = Q_3(i,j,k)
+          w(idx) = Q_4(i,j,k); p(idx) = Q_5(i,j,k)
       endif
     enddo
     call syncthreads()
@@ -247,18 +247,18 @@ contains
       associate(un1 => w(idx), un2 => wr(idx_r))
         call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
                   w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_z, fdz, &
-                  G(1,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(4,i-1,j-1,k), G(5,i-1,j-1,k))
+                  G(i-1,j-1,k,1), G(i-1,j-1,k,2), G(i-1,j-1,k,3), G(i-1,j-1,k,4), G(i-1,j-1,k,5))
       end associate
     endif
   end subroutine calc_slau_z_in
 
 
-  attributes(global) subroutine calc_slau_z_in_koff(nx, ny, nz, Q, sensor, G, k_lo, k_hi)
+  attributes(global) subroutine calc_slau_z_in_koff(nx, ny, nz, Q_1, Q_2, Q_3, Q_4, Q_5, sensor, G, k_lo, k_hi)
     use mod_constant, only : Normal_z
     integer, intent(in), value                :: nx, ny, nz, k_lo, k_hi
-    real(8), intent(in), device, contiguous   :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous   :: Q_1(nx,ny,nz), Q_2(nx,ny,nz), Q_3(nx,ny,nz), Q_4(nx,ny,nz), Q_5(nx,ny,nz)
     real(sp), intent(in), device, contiguous  :: sensor(nx,ny,nz)
-    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1)
+    real(8), intent(inout), device, contiguous :: G(nx-2,ny-2,nz-1,5)
     integer i, j, k, it, jt, kt
     integer kk, k_base, idx, idx_r, offset_xy, offset_xyr, i1, i2
     integer, parameter :: sx  = threadsG%x
@@ -281,8 +281,8 @@ contains
       k = k_base + kk
       if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
         idx = kk + offset_xy
-        rho(idx) = Q(i,1,j,k); u(idx) = Q(i,2,j,k); v(idx) = Q(i,3,j,k)
-          w(idx) = Q(i,4,j,k); p(idx) = Q(i,5,j,k)
+        rho(idx) = Q_1(i,j,k); u(idx) = Q_2(i,j,k); v(idx) = Q_3(i,j,k)
+          w(idx) = Q_4(i,j,k); p(idx) = Q_5(i,j,k)
       endif
     enddo
     call syncthreads()
@@ -304,7 +304,7 @@ contains
       associate(un1 => w(idx), un2 => wr(idx_r))
         call SLAU(id_slau, rho(idx), rhor(idx_r), u(idx), ur(idx_r), v(idx), vr(idx_r), &
                   w(idx), wr(idx_r), un1, un2, p(idx), pr(idx_r), Normal_z, fdz, &
-                  G(1,i-1,j-1,k), G(2,i-1,j-1,k), G(3,i-1,j-1,k), G(4,i-1,j-1,k), G(5,i-1,j-1,k))
+                  G(i-1,j-1,k,1), G(i-1,j-1,k,2), G(i-1,j-1,k,3), G(i-1,j-1,k,4), G(i-1,j-1,k,5))
       end associate
     endif
   end subroutine calc_slau_z_in_koff

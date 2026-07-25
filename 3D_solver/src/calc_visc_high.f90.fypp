@@ -42,7 +42,7 @@ contains
   #:if is_koff
     #:set suf = suf + "_koff"
   #:endif
-  attributes(global) subroutine calc_Ev${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
+  attributes(global) subroutine calc_Ev${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q_2, Q_3, Q_4, T, mu, &
     #:if is_les
       mut, qc2, &
     #:endif
@@ -56,14 +56,16 @@ contains
     real(8), intent(in), device, contiguous    :: dx(nx-1)
     real(8), intent(in), device, contiguous    :: dy(ny-1)
     real(8), intent(in), device, contiguous    :: dz(nz-1)
-    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_2(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_3(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_4(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)
     #:if is_les
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)
     #:endif
-    real(8), intent(inout), device, contiguous :: E(5,nx-1,ny-2,nz-2)
+    real(8), intent(inout), device, contiguous :: E(nx-1,ny-2,nz-2,5)
     #:if is_koff
     integer, intent(in), value                 :: k_lo
     integer, intent(in), value                 :: k_hi
@@ -99,11 +101,11 @@ contains
     #:endif
     offset_yz = (jt-1)*sx + (kt-1)*sx*sy
     #:if VISC_ORDER == 4
-    call load_smem_visc_cent4_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
+    call load_smem_visc_cent4_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q_2, Q_3, Q_4, u, v, w, uy, vy, uz, wz)
     #:elif VISC_STENCIL == 'ME4Base'
-    call load_smem_visc_me4_base_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
+    call load_smem_visc_me4_base_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q_2, Q_3, Q_4, u, v, w, uy, vy, uz, wz)
     #:else
-    call load_smem_visc_cent6_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
+    call load_smem_visc_cent6_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q_2, Q_3, Q_4, u, v, w, uy, vy, uz, wz)
     #:endif
     i  = (blockIdx%x-1)*blockDim%x + it
     idx = it + offset_yz
@@ -265,30 +267,30 @@ contains
           real(8) :: my(2)
           my(1) = 0.25d0 * (mu_cjm + mu_c + mu_ejm + mu_e)
           my(2) = 0.25d0 * (mu_c + mu_cjp + mu_e + mu_ejp)
-          muy = 0.25d0 * (my(1) * (-Q(i,2,j-1,k) + Q(i,2,j,k) - Q(i+1,2,j-1,k) + Q(i+1,2,j,k)) &
-                        + my(2) * (-Q(i,2,j,k) + Q(i,2,j+1,k) - Q(i+1,2,j,k) + Q(i+1,2,j+1,k))) * dy(j)
-          mvy = 0.25d0 * (my(1) * (-Q(i,3,j-1,k) + Q(i,3,j,k) - Q(i+1,3,j-1,k) + Q(i+1,3,j,k)) &
-                        + my(2) * (-Q(i,3,j,k) + Q(i,3,j+1,k) - Q(i+1,3,j,k) + Q(i+1,3,j+1,k))) * dy(j)
+          muy = 0.25d0 * (my(1) * (-Q_2(i,j-1,k) + Q_2(i,j,k) - Q_2(i+1,j-1,k) + Q_2(i+1,j,k)) &
+                        + my(2) * (-Q_2(i,j,k) + Q_2(i,j+1,k) - Q_2(i+1,j,k) + Q_2(i+1,j+1,k))) * dy(j)
+          mvy = 0.25d0 * (my(1) * (-Q_3(i,j-1,k) + Q_3(i,j,k) - Q_3(i+1,j-1,k) + Q_3(i+1,j,k)) &
+                        + my(2) * (-Q_3(i,j,k) + Q_3(i,j+1,k) - Q_3(i+1,j,k) + Q_3(i+1,j+1,k))) * dy(j)
           #:if is_les
-          muysgs = 0.25d0 * (mysgs(1) * (-Q(i,2,j-1,k) + Q(i,2,j,k) - Q(i+1,2,j-1,k) + Q(i+1,2,j,k)) &
-                           + mysgs(2) * (-Q(i,2,j,k) + Q(i,2,j+1,k) - Q(i+1,2,j,k) + Q(i+1,2,j+1,k))) * dy(j)
-          mvysgs = 0.25d0 * (mysgs(1) * (-Q(i,3,j-1,k) + Q(i,3,j,k) - Q(i+1,3,j-1,k) + Q(i+1,3,j,k)) &
-                           + mysgs(2) * (-Q(i,3,j,k) + Q(i,3,j+1,k) - Q(i+1,3,j,k) + Q(i+1,3,j+1,k))) * dy(j)
+          muysgs = 0.25d0 * (mysgs(1) * (-Q_2(i,j-1,k) + Q_2(i,j,k) - Q_2(i+1,j-1,k) + Q_2(i+1,j,k)) &
+                           + mysgs(2) * (-Q_2(i,j,k) + Q_2(i,j+1,k) - Q_2(i+1,j,k) + Q_2(i+1,j+1,k))) * dy(j)
+          mvysgs = 0.25d0 * (mysgs(1) * (-Q_3(i,j-1,k) + Q_3(i,j,k) - Q_3(i+1,j-1,k) + Q_3(i+1,j,k)) &
+                           + mysgs(2) * (-Q_3(i,j,k) + Q_3(i,j+1,k) - Q_3(i+1,j,k) + Q_3(i+1,j+1,k))) * dy(j)
           #:endif
         end block
         block
           real(8) :: mz(2)
           mz(1) = 0.25d0 * (mu_ckm + mu_c + mu_ekm + mu_e)
           mz(2) = 0.25d0 * (mu_c + mu_ckp + mu_e + mu_ekp)
-          muz = 0.25d0 * (mz(1) * (-Q(i,2,j,k-1) + Q(i,2,j,k) - Q(i+1,2,j,k-1) + Q(i+1,2,j,k)) &
-                        + mz(2) * (-Q(i,2,j,k) + Q(i,2,j,k+1) - Q(i+1,2,j,k) + Q(i+1,2,j,k+1))) * dz(k)
-          mwz = 0.25d0 * (mz(1) * (-Q(i,4,j,k-1) + Q(i,4,j,k) - Q(i+1,4,j,k-1) + Q(i+1,4,j,k)) &
-                        + mz(2) * (-Q(i,4,j,k) + Q(i,4,j,k+1) - Q(i+1,4,j,k) + Q(i+1,4,j,k+1))) * dz(k)
+          muz = 0.25d0 * (mz(1) * (-Q_2(i,j,k-1) + Q_2(i,j,k) - Q_2(i+1,j,k-1) + Q_2(i+1,j,k)) &
+                        + mz(2) * (-Q_2(i,j,k) + Q_2(i,j,k+1) - Q_2(i+1,j,k) + Q_2(i+1,j,k+1))) * dz(k)
+          mwz = 0.25d0 * (mz(1) * (-Q_4(i,j,k-1) + Q_4(i,j,k) - Q_4(i+1,j,k-1) + Q_4(i+1,j,k)) &
+                        + mz(2) * (-Q_4(i,j,k) + Q_4(i,j,k+1) - Q_4(i+1,j,k) + Q_4(i+1,j,k+1))) * dz(k)
           #:if is_les
-          muzsgs = 0.25d0 * (mzsgs(1) * (-Q(i,2,j,k-1) + Q(i,2,j,k) - Q(i+1,2,j,k-1) + Q(i+1,2,j,k)) &
-                           + mzsgs(2) * (-Q(i,2,j,k) + Q(i,2,j,k+1) - Q(i+1,2,j,k) + Q(i+1,2,j,k+1))) * dz(k)
-          mwzsgs = 0.25d0 * (mzsgs(1) * (-Q(i,4,j,k-1) + Q(i,4,j,k) - Q(i+1,4,j,k-1) + Q(i+1,4,j,k)) &
-                           + mzsgs(2) * (-Q(i,4,j,k) + Q(i,4,j,k+1) - Q(i+1,4,j,k) + Q(i+1,4,j,k+1))) * dz(k)
+          muzsgs = 0.25d0 * (mzsgs(1) * (-Q_2(i,j,k-1) + Q_2(i,j,k) - Q_2(i+1,j,k-1) + Q_2(i+1,j,k)) &
+                           + mzsgs(2) * (-Q_2(i,j,k) + Q_2(i,j,k+1) - Q_2(i+1,j,k) + Q_2(i+1,j,k+1))) * dz(k)
+          mwzsgs = 0.25d0 * (mzsgs(1) * (-Q_4(i,j,k-1) + Q_4(i,j,k) - Q_4(i+1,j,k-1) + Q_4(i+1,j,k)) &
+                           + mzsgs(2) * (-Q_4(i,j,k) + Q_4(i,j,k+1) - Q_4(i+1,j,k) + Q_4(i+1,j,k+1))) * dz(k)
           #:endif
         end block
         mux  = mx * (-u(idx) + u(idx+1)) * dx(i)
@@ -318,14 +320,14 @@ contains
     block
       real(8) :: e2v, e3v, e4v, e5v
       ! no other thread reads this address before the paired store below overwrites it: __ldlu
-      e2v = __ldlu(E(2,i,j-1,k-1))
-      call __stcg(E(2,i,j-1,k-1), e2v - txx)
-      e3v = __ldlu(E(3,i,j-1,k-1))
-      call __stcg(E(3,i,j-1,k-1), e3v - txy)
-      e4v = __ldlu(E(4,i,j-1,k-1))
-      call __stcg(E(4,i,j-1,k-1), e4v - txz)
-      e5v = __ldlu(E(5,i,j-1,k-1))
-      call __stcg(E(5,i,j-1,k-1), e5v - (utxx + vtxy + wtxz + kTx &
+      e2v = __ldlu(E(i,j-1,k-1,2))
+      call __stcg(E(i,j-1,k-1,2), e2v - txx)
+      e3v = __ldlu(E(i,j-1,k-1,3))
+      call __stcg(E(i,j-1,k-1,3), e3v - txy)
+      e4v = __ldlu(E(i,j-1,k-1,4))
+      call __stcg(E(i,j-1,k-1,4), e4v - txz)
+      e5v = __ldlu(E(i,j-1,k-1,5))
+      call __stcg(E(i,j-1,k-1,5), e5v - (utxx + vtxy + wtxz + kTx &
     #:if is_les
       + Hsgs &
     #:endif
@@ -340,7 +342,7 @@ contains
   #:if is_koff
     #:set suf = suf + "_koff"
   #:endif
-  attributes(global) subroutine calc_Fv${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
+  attributes(global) subroutine calc_Fv${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q_2, Q_3, Q_4, T, mu, &
     #:if is_les
       mut, qc2, &
     #:endif
@@ -354,14 +356,16 @@ contains
     real(8), intent(in), device, contiguous    :: dx(nx-1)
     real(8), intent(in), device, contiguous    :: dy(ny-1)
     real(8), intent(in), device, contiguous    :: dz(nz-1)
-    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_2(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_3(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_4(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)
     #:if is_les
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)
     #:endif
-    real(8), intent(inout), device, contiguous :: F(5,nx-2,ny-1,nz-2)
+    real(8), intent(inout), device, contiguous :: F(nx-2,ny-1,nz-2,5)
     #:if is_koff
     integer, intent(in), value                 :: k_lo
     integer, intent(in), value                 :: k_hi
@@ -397,11 +401,11 @@ contains
     #:endif
     offset_xz = (it-1)*sy + (kt-1)*sy*sx
     #:if VISC_ORDER == 4
-    call load_smem_visc_cent4_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
+    call load_smem_visc_cent4_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q_2, Q_3, Q_4, u, v, w, ux, vx, vz, wz)
     #:elif VISC_STENCIL == 'ME4Base'
-    call load_smem_visc_me4_base_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
+    call load_smem_visc_me4_base_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q_2, Q_3, Q_4, u, v, w, ux, vx, vz, wz)
     #:else
-    call load_smem_visc_cent6_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
+    call load_smem_visc_cent6_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q_2, Q_3, Q_4, u, v, w, ux, vx, vz, wz)
     #:endif
     j  = (blockIdx%y-1)*blockDim%y + jt
     idx = jt + offset_xz
@@ -564,30 +568,30 @@ contains
           real(8) :: mx(2)
           mx(1)  = 0.25d0 * (mu_wc + mu_c + mu_wn + mu_n)
           mx(2)  = 0.25d0 * (mu_c + mu_ec + mu_n + mu_en)
-          mux    = 0.25d0 * (mx(1) * (-Q(i-1,2,j,k) + Q(i,2,j,k) - Q(i-1,2,j+1,k) + Q(i,2,j+1,k)) &
-                            + mx(2) * (-Q(i,2,j,k) + Q(i+1,2,j,k) - Q(i,2,j+1,k) + Q(i+1,2,j+1,k))) * dx(i)
-          mvx    = 0.25d0 * (mx(1) * (-Q(i-1,3,j,k) + Q(i,3,j,k) - Q(i-1,3,j+1,k) + Q(i,3,j+1,k)) &
-                            + mx(2) * (-Q(i,3,j,k) + Q(i+1,3,j,k) - Q(i,3,j+1,k) + Q(i+1,3,j+1,k))) * dx(i)
+          mux    = 0.25d0 * (mx(1) * (-Q_2(i-1,j,k) + Q_2(i,j,k) - Q_2(i-1,j+1,k) + Q_2(i,j+1,k)) &
+                            + mx(2) * (-Q_2(i,j,k) + Q_2(i+1,j,k) - Q_2(i,j+1,k) + Q_2(i+1,j+1,k))) * dx(i)
+          mvx    = 0.25d0 * (mx(1) * (-Q_3(i-1,j,k) + Q_3(i,j,k) - Q_3(i-1,j+1,k) + Q_3(i,j+1,k)) &
+                            + mx(2) * (-Q_3(i,j,k) + Q_3(i+1,j,k) - Q_3(i,j+1,k) + Q_3(i+1,j+1,k))) * dx(i)
           #:if is_les
-          muxsgs = 0.25d0 * (mxsgs(1) * (-Q(i-1,2,j,k) + Q(i,2,j,k) - Q(i-1,2,j+1,k) + Q(i,2,j+1,k)) &
-                            + mxsgs(2) * (-Q(i,2,j,k) + Q(i+1,2,j,k) - Q(i,2,j+1,k) + Q(i+1,2,j+1,k))) * dx(i)
-          mvxsgs = 0.25d0 * (mxsgs(1) * (-Q(i-1,3,j,k) + Q(i,3,j,k) - Q(i-1,3,j+1,k) + Q(i,3,j+1,k)) &
-                            + mxsgs(2) * (-Q(i,3,j,k) + Q(i+1,3,j,k) - Q(i,3,j+1,k) + Q(i+1,3,j+1,k))) * dx(i)
+          muxsgs = 0.25d0 * (mxsgs(1) * (-Q_2(i-1,j,k) + Q_2(i,j,k) - Q_2(i-1,j+1,k) + Q_2(i,j+1,k)) &
+                            + mxsgs(2) * (-Q_2(i,j,k) + Q_2(i+1,j,k) - Q_2(i,j+1,k) + Q_2(i+1,j+1,k))) * dx(i)
+          mvxsgs = 0.25d0 * (mxsgs(1) * (-Q_3(i-1,j,k) + Q_3(i,j,k) - Q_3(i-1,j+1,k) + Q_3(i,j+1,k)) &
+                            + mxsgs(2) * (-Q_3(i,j,k) + Q_3(i+1,j,k) - Q_3(i,j+1,k) + Q_3(i+1,j+1,k))) * dx(i)
           #:endif
         end block
         block
           real(8) :: mz(2)
           mz(1)  = 0.25d0 * (mu_ckm + mu_c + mu_nkm + mu_n)
           mz(2)  = 0.25d0 * (mu_c + mu_ckp + mu_n + mu_nkp)
-          mvz    = 0.25d0 * (mz(1) * (-Q(i,3,j,k-1) + Q(i,3,j,k) - Q(i,3,j+1,k-1) + Q(i,3,j+1,k)) &
-                            + mz(2) * (-Q(i,3,j,k) + Q(i,3,j,k+1) - Q(i,3,j+1,k) + Q(i,3,j+1,k+1))) * dz(k)
-          mwz    = 0.25d0 * (mz(1) * (-Q(i,4,j,k-1) + Q(i,4,j,k) - Q(i,4,j+1,k-1) + Q(i,4,j+1,k)) &
-                            + mz(2) * (-Q(i,4,j,k) + Q(i,4,j,k+1) - Q(i,4,j+1,k) + Q(i,4,j+1,k+1))) * dz(k)
+          mvz    = 0.25d0 * (mz(1) * (-Q_3(i,j,k-1) + Q_3(i,j,k) - Q_3(i,j+1,k-1) + Q_3(i,j+1,k)) &
+                            + mz(2) * (-Q_3(i,j,k) + Q_3(i,j,k+1) - Q_3(i,j+1,k) + Q_3(i,j+1,k+1))) * dz(k)
+          mwz    = 0.25d0 * (mz(1) * (-Q_4(i,j,k-1) + Q_4(i,j,k) - Q_4(i,j+1,k-1) + Q_4(i,j+1,k)) &
+                            + mz(2) * (-Q_4(i,j,k) + Q_4(i,j,k+1) - Q_4(i,j+1,k) + Q_4(i,j+1,k+1))) * dz(k)
           #:if is_les
-          mvzsgs = 0.25d0 * (mzsgs(1) * (-Q(i,3,j,k-1) + Q(i,3,j,k) - Q(i,3,j+1,k-1) + Q(i,3,j+1,k)) &
-                            + mzsgs(2) * (-Q(i,3,j,k) + Q(i,3,j,k+1) - Q(i,3,j+1,k) + Q(i,3,j+1,k+1))) * dz(k)
-          mwzsgs = 0.25d0 * (mzsgs(1) * (-Q(i,4,j,k-1) + Q(i,4,j,k) - Q(i,4,j+1,k-1) + Q(i,4,j+1,k)) &
-                            + mzsgs(2) * (-Q(i,4,j,k) + Q(i,4,j,k+1) - Q(i,4,j+1,k) + Q(i,4,j+1,k+1))) * dz(k)
+          mvzsgs = 0.25d0 * (mzsgs(1) * (-Q_3(i,j,k-1) + Q_3(i,j,k) - Q_3(i,j+1,k-1) + Q_3(i,j+1,k)) &
+                            + mzsgs(2) * (-Q_3(i,j,k) + Q_3(i,j,k+1) - Q_3(i,j+1,k) + Q_3(i,j+1,k+1))) * dz(k)
+          mwzsgs = 0.25d0 * (mzsgs(1) * (-Q_4(i,j,k-1) + Q_4(i,j,k) - Q_4(i,j+1,k-1) + Q_4(i,j+1,k)) &
+                            + mzsgs(2) * (-Q_4(i,j,k) + Q_4(i,j,k+1) - Q_4(i,j+1,k) + Q_4(i,j+1,k+1))) * dz(k)
           #:endif
         end block
         muy  = my * (-u(idx) + u(idx+1)) * dy(j)
@@ -617,14 +621,14 @@ contains
     block
       real(8) :: f2v, f3v, f4v, f5v
       ! no other thread reads this address before the paired store below overwrites it: __ldlu
-      f2v = __ldlu(F(2,i-1,j,k-1))
-      call __stcg(F(2,i-1,j,k-1), f2v - tyx)
-      f3v = __ldlu(F(3,i-1,j,k-1))
-      call __stcg(F(3,i-1,j,k-1), f3v - tyy)
-      f4v = __ldlu(F(4,i-1,j,k-1))
-      call __stcg(F(4,i-1,j,k-1), f4v - tyz)
-      f5v = __ldlu(F(5,i-1,j,k-1))
-      call __stcg(F(5,i-1,j,k-1), f5v - (utyx + vtyy + wtyz + kTy &
+      f2v = __ldlu(F(i-1,j,k-1,2))
+      call __stcg(F(i-1,j,k-1,2), f2v - tyx)
+      f3v = __ldlu(F(i-1,j,k-1,3))
+      call __stcg(F(i-1,j,k-1,3), f3v - tyy)
+      f4v = __ldlu(F(i-1,j,k-1,4))
+      call __stcg(F(i-1,j,k-1,4), f4v - tyz)
+      f5v = __ldlu(F(i-1,j,k-1,5))
+      call __stcg(F(i-1,j,k-1,5), f5v - (utyx + vtyy + wtyz + kTy &
     #:if is_les
       + Hsgs &
     #:endif
@@ -639,7 +643,7 @@ contains
   #:if is_koff
     #:set suf = suf + "_koff"
   #:endif
-  attributes(global) subroutine calc_Gv${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
+  attributes(global) subroutine calc_Gv${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q_2, Q_3, Q_4, T, mu, &
     #:if is_les
       mut, qc2, &
     #:endif
@@ -653,14 +657,16 @@ contains
     real(8), intent(in), device, contiguous    :: dx(nx-1)
     real(8), intent(in), device, contiguous    :: dy(ny-1)
     real(8), intent(in), device, contiguous    :: dz(nz-1)
-    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_2(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_3(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_4(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)
     #:if is_les
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)
     #:endif
-    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1)
+    real(8), intent(inout), device, contiguous :: G(nx-2,ny-2,nz-1,5)
     #:if is_koff
     integer, intent(in), value                 :: k_lo
     integer, intent(in), value                 :: k_hi
@@ -693,21 +699,21 @@ contains
     offset_xy = (jt-1)*sz + (it-1)*sz*sy
     #:if is_koff
     #:if VISC_ORDER == 4
-    call load_smem_visc_cent4_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+    call load_smem_visc_cent4_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy, k_lo)
     #:elif VISC_STENCIL == 'ME4Base'
-    call load_smem_visc_me4_base_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+    call load_smem_visc_me4_base_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy, k_lo)
     #:else
-    call load_smem_visc_cent6_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+    call load_smem_visc_cent6_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy, k_lo)
     #:endif
     k  = (blockIdx%z-1)*blockDim%z + k_lo - 1 + kt
     if (nx-1 < i .or. ny-1 < j .or. k_hi < k) return
     #:else
     #:if VISC_ORDER == 4
-    call load_smem_visc_cent4_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
+    call load_smem_visc_cent4_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy)
     #:elif VISC_STENCIL == 'ME4Base'
-    call load_smem_visc_me4_base_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
+    call load_smem_visc_me4_base_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy)
     #:else
-    call load_smem_visc_cent6_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
+    call load_smem_visc_cent6_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy)
     #:endif
     k  = (blockIdx%z-1)*blockDim%z + kt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
@@ -864,30 +870,30 @@ contains
           real(8) :: mx(2)
           mx(1) = 0.25d0 * (mu_wc + mu_c + mu_wt + mu_t)
           mx(2) = 0.25d0 * (mu_c + mu_ec + mu_t + mu_et)
-          mux = 0.25d0 * (mx(1) * (-Q(i-1,2,j,k) + Q(i,2,j,k) - Q(i-1,2,j,k+1) + Q(i,2,j,k+1)) &
-                        + mx(2) * (-Q(i,2,j,k) + Q(i+1,2,j,k) - Q(i,2,j,k+1) + Q(i+1,2,j,k+1))) * dx(i)
-          mwx = 0.25d0 * (mx(1) * (-Q(i-1,4,j,k) + Q(i,4,j,k) - Q(i-1,4,j,k+1) + Q(i,4,j,k+1)) &
-                        + mx(2) * (-Q(i,4,j,k) + Q(i+1,4,j,k) - Q(i,4,j,k+1) + Q(i+1,4,j,k+1))) * dx(i)
+          mux = 0.25d0 * (mx(1) * (-Q_2(i-1,j,k) + Q_2(i,j,k) - Q_2(i-1,j,k+1) + Q_2(i,j,k+1)) &
+                        + mx(2) * (-Q_2(i,j,k) + Q_2(i+1,j,k) - Q_2(i,j,k+1) + Q_2(i+1,j,k+1))) * dx(i)
+          mwx = 0.25d0 * (mx(1) * (-Q_4(i-1,j,k) + Q_4(i,j,k) - Q_4(i-1,j,k+1) + Q_4(i,j,k+1)) &
+                        + mx(2) * (-Q_4(i,j,k) + Q_4(i+1,j,k) - Q_4(i,j,k+1) + Q_4(i+1,j,k+1))) * dx(i)
           #:if is_les
-          muxsgs = 0.25d0 * (mxsgs(1) * (-Q(i-1,2,j,k) + Q(i,2,j,k) - Q(i-1,2,j,k+1) + Q(i,2,j,k+1)) &
-                            + mxsgs(2) * (-Q(i,2,j,k) + Q(i+1,2,j,k) - Q(i,2,j,k+1) + Q(i+1,2,j,k+1))) * dx(i)
-          mwxsgs = 0.25d0 * (mxsgs(1) * (-Q(i-1,4,j,k) + Q(i,4,j,k) - Q(i-1,4,j,k+1) + Q(i,4,j,k+1)) &
-                            + mxsgs(2) * (-Q(i,4,j,k) + Q(i+1,4,j,k) - Q(i,4,j,k+1) + Q(i+1,4,j,k+1))) * dx(i)
+          muxsgs = 0.25d0 * (mxsgs(1) * (-Q_2(i-1,j,k) + Q_2(i,j,k) - Q_2(i-1,j,k+1) + Q_2(i,j,k+1)) &
+                            + mxsgs(2) * (-Q_2(i,j,k) + Q_2(i+1,j,k) - Q_2(i,j,k+1) + Q_2(i+1,j,k+1))) * dx(i)
+          mwxsgs = 0.25d0 * (mxsgs(1) * (-Q_4(i-1,j,k) + Q_4(i,j,k) - Q_4(i-1,j,k+1) + Q_4(i,j,k+1)) &
+                            + mxsgs(2) * (-Q_4(i,j,k) + Q_4(i+1,j,k) - Q_4(i,j,k+1) + Q_4(i+1,j,k+1))) * dx(i)
           #:endif
         end block
         block
           real(8) :: my(2)
           my(1) = 0.25d0 * (mu_sc + mu_c + mu_st + mu_t)
           my(2) = 0.25d0 * (mu_c + mu_nc + mu_t + mu_nt)
-          mvy = 0.25d0 * (my(1) * (-Q(i,3,j-1,k) + Q(i,3,j,k) - Q(i,3,j-1,k+1) + Q(i,3,j,k+1)) &
-                        + my(2) * (-Q(i,3,j,k) + Q(i,3,j+1,k) - Q(i,3,j,k+1) + Q(i,3,j+1,k+1))) * dy(j)
-          mwy = 0.25d0 * (my(1) * (-Q(i,4,j-1,k) + Q(i,4,j,k) - Q(i,4,j-1,k+1) + Q(i,4,j,k+1)) &
-                        + my(2) * (-Q(i,4,j,k) + Q(i,4,j+1,k) - Q(i,4,j,k+1) + Q(i,4,j+1,k+1))) * dy(j)
+          mvy = 0.25d0 * (my(1) * (-Q_3(i,j-1,k) + Q_3(i,j,k) - Q_3(i,j-1,k+1) + Q_3(i,j,k+1)) &
+                        + my(2) * (-Q_3(i,j,k) + Q_3(i,j+1,k) - Q_3(i,j,k+1) + Q_3(i,j+1,k+1))) * dy(j)
+          mwy = 0.25d0 * (my(1) * (-Q_4(i,j-1,k) + Q_4(i,j,k) - Q_4(i,j-1,k+1) + Q_4(i,j,k+1)) &
+                        + my(2) * (-Q_4(i,j,k) + Q_4(i,j+1,k) - Q_4(i,j,k+1) + Q_4(i,j+1,k+1))) * dy(j)
           #:if is_les
-          mvysgs = 0.25d0 * (mysgs(1) * (-Q(i,3,j-1,k) + Q(i,3,j,k) - Q(i,3,j-1,k+1) + Q(i,3,j,k+1)) &
-                            + mysgs(2) * (-Q(i,3,j,k) + Q(i,3,j+1,k) - Q(i,3,j,k+1) + Q(i,3,j+1,k+1))) * dy(j)
-          mwysgs = 0.25d0 * (mysgs(1) * (-Q(i,4,j-1,k) + Q(i,4,j,k) - Q(i,4,j-1,k+1) + Q(i,4,j,k+1)) &
-                            + mysgs(2) * (-Q(i,4,j,k) + Q(i,4,j+1,k) - Q(i,4,j,k+1) + Q(i,4,j+1,k+1))) * dy(j)
+          mvysgs = 0.25d0 * (mysgs(1) * (-Q_3(i,j-1,k) + Q_3(i,j,k) - Q_3(i,j-1,k+1) + Q_3(i,j,k+1)) &
+                            + mysgs(2) * (-Q_3(i,j,k) + Q_3(i,j+1,k) - Q_3(i,j,k+1) + Q_3(i,j+1,k+1))) * dy(j)
+          mwysgs = 0.25d0 * (mysgs(1) * (-Q_4(i,j-1,k) + Q_4(i,j,k) - Q_4(i,j-1,k+1) + Q_4(i,j,k+1)) &
+                            + mysgs(2) * (-Q_4(i,j,k) + Q_4(i,j+1,k) - Q_4(i,j,k+1) + Q_4(i,j+1,k+1))) * dy(j)
           #:endif
         end block
         mz   = 0.5d0 * (mu_c + mu_t)
@@ -921,14 +927,14 @@ contains
     block
       real(8) :: g2v, g3v, g4v, g5v
       ! no other thread reads this address before the paired store below overwrites it: __ldlu
-      g2v = __ldlu(G(2,i-1,j-1,k))
-      call __stcg(G(2,i-1,j-1,k), g2v - tzx)
-      g3v = __ldlu(G(3,i-1,j-1,k))
-      call __stcg(G(3,i-1,j-1,k), g3v - tzy)
-      g4v = __ldlu(G(4,i-1,j-1,k))
-      call __stcg(G(4,i-1,j-1,k), g4v - tzz)
-      g5v = __ldlu(G(5,i-1,j-1,k))
-      call __stcg(G(5,i-1,j-1,k), g5v - (utzx + vtzy + wtzz + kTz &
+      g2v = __ldlu(G(i-1,j-1,k,2))
+      call __stcg(G(i-1,j-1,k,2), g2v - tzx)
+      g3v = __ldlu(G(i-1,j-1,k,3))
+      call __stcg(G(i-1,j-1,k,3), g3v - tzy)
+      g4v = __ldlu(G(i-1,j-1,k,4))
+      call __stcg(G(i-1,j-1,k,4), g4v - tzz)
+      g5v = __ldlu(G(i-1,j-1,k,5))
+      call __stcg(G(i-1,j-1,k,5), g5v - (utzx + vtzy + wtzz + kTz &
     #:if is_les
       + Hsgs &
     #:endif
