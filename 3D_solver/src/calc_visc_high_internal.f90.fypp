@@ -15,6 +15,7 @@ module calc_visc_high_internal
   use libm
   use mod_globals, only : gamma, R, Pr, Prt, dt, threadsEv, threadsFv, threadsGv
   use mod_constant, only : id_visc, Cp, gamma_1, Cp_over_Pr, one_third, two_third, one_twelfth
+  use libm
   #:if VISC_ORDER == 4
   use load_smem_visc_cent4
   #:elif VISC_STENCIL == 'ME4Base'
@@ -41,7 +42,7 @@ contains
   #:if is_koff
     #:set suf = suf + "_koff"
   #:endif
-  attributes(global) subroutine calc_Ev${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
+  attributes(global) subroutine calc_Ev${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q_2, Q_3, Q_4, T, mu, &
     #:if is_les
       mut, qc2, &
     #:endif
@@ -55,14 +56,16 @@ contains
     real(8), intent(in), device, contiguous    :: dx(nx-1)
     real(8), intent(in), device, contiguous    :: dy(ny-1)
     real(8), intent(in), device, contiguous    :: dz(nz-1)
-    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_2(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_3(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_4(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)
     #:if is_les
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)
     #:endif
-    real(8), intent(inout), device, contiguous :: E(5,nx-1,ny-2,nz-2)
+    real(8), intent(inout), device, contiguous :: E(nx-1,ny-2,nz-2,5)
     #:if is_koff
     integer, intent(in), value                 :: k_lo
     integer, intent(in), value                 :: k_hi
@@ -98,11 +101,11 @@ contains
     #:endif
     offset_yz = (jt-1)*sx + (kt-1)*sx*sy
     #:if VISC_ORDER == 4
-    call load_smem_visc_cent4_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
+    call load_smem_visc_cent4_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q_2, Q_3, Q_4, u, v, w, uy, vy, uz, wz)
     #:elif VISC_STENCIL == 'ME4Base'
-    call load_smem_visc_me4_base_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
+    call load_smem_visc_me4_base_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q_2, Q_3, Q_4, u, v, w, uy, vy, uz, wz)
     #:else
-    call load_smem_visc_cent6_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q, u, v, w, uy, vy, uz, wz)
+    call load_smem_visc_cent6_x(it, jt, kt, j, k, nx, ny, nz, dy, dz, Q_2, Q_3, Q_4, u, v, w, uy, vy, uz, wz)
     #:endif
     i  = (blockIdx%x-1)*blockDim%x + it
     idx = it + offset_yz
@@ -115,6 +118,7 @@ contains
     if (2 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
       block
         real(8) :: mu4(4)
+        real(8) :: e2v, e3v, e4v, e5v
         #:if is_les
         real(8) :: mut4(4)
         mut4(:) = mut(i-1:i+2, j, k)
@@ -135,28 +139,60 @@ contains
         call calc_tau_cross(mu4, v(idx-1:idx+2), uy(idx-1:idx+2), dx(i), txy, vtxy)
         call calc_tau_cross(mu4, w(idx-1:idx+2), uz(idx-1:idx+2), dx(i), txz, wtxz)
         #:endif
-        E(2,i,j-1,k-1) = E(2,i,j-1,k-1) - txx
-        E(3,i,j-1,k-1) = E(3,i,j-1,k-1) - txy
-        E(4,i,j-1,k-1) = E(4,i,j-1,k-1) - txz
-        E(5,i,j-1,k-1) = E(5,i,j-1,k-1) - (utxx + vtxy + wtxz + kTx &
+        ! no other thread reads this address before the paired store below overwrites it: __ldlu
+        e2v = __ldlu(E(i,j-1,k-1,2))
+        call __stcg(E(i,j-1,k-1,2), e2v - txx)
+        e3v = __ldlu(E(i,j-1,k-1,3))
+        call __stcg(E(i,j-1,k-1,3), e3v - txy)
+        e4v = __ldlu(E(i,j-1,k-1,4))
+        call __stcg(E(i,j-1,k-1,4), e4v - txz)
+        e5v = __ldlu(E(i,j-1,k-1,5))
+        call __stcg(E(i,j-1,k-1,5), e5v - (utxx + vtxy + wtxz + kTx &
         #:if is_les
           + Hsgs &
         #:endif
-        )
+        ))
       end block
     #:elif VISC_STENCIL == 'ME4Base'
     if (3 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
       block
         real(8) :: mu3(3)
+        real(8) :: mum2, mum1, mu0, mup1, mup2, mup3
+        real(8) :: Tm2, Tm1, T0, Tp1, Tp2, Tp3
+        real(8) :: e2v, e3v, e4v, e5v
         #:if is_les
         real(8) :: mut3(3)
-        mut3(:) = 0.0625d0 * (9.d0 * (mut(i-1:i+1,j,k) + mut(i:i+2,j,k)) - (mut(i-2:i,j,k) + mut(i+1:i+3,j,k)))
+        real(8) :: mutm2, mutm1, mut0, mutp1, mutp2, mutp3
+        mutm2 = mut(i-2,j,k)
+        mutm1 = mut(i-1,j,k)
+        mut0  = mut(i,  j,k)
+        mutp1 = mut(i+1,j,k)
+        mutp2 = mut(i+2,j,k)
+        mutp3 = mut(i+3,j,k)
+        mut3(1) = 0.0625d0 * fma(9.d0, mutm1+mut0,  -(mutm2+mutp1))
+        mut3(2) = 0.0625d0 * fma(9.d0, mut0 +mutp1, -(mutm1+mutp2))
+        mut3(3) = 0.0625d0 * fma(9.d0, mutp1+mutp2, -(mut0 +mutp3))
         #:endif
-        mu3(:)  = 0.0625d0 * (9.d0 * ( mu(i-1:i+1,j,k) +  mu(i:i+2,j,k)) - ( mu(i-2:i,j,k) +  mu(i+1:i+3,j,k)))
+        mum2 = mu(i-2,j,k)
+        mum1 = mu(i-1,j,k)
+        mu0  = mu(i,  j,k)
+        mup1 = mu(i+1,j,k)
+        mup2 = mu(i+2,j,k)
+        mup3 = mu(i+3,j,k)
+        mu3(1) = 0.0625d0 * fma(9.d0, mum1+mu0,  -(mum2+mup1))
+        mu3(2) = 0.0625d0 * fma(9.d0, mu0 +mup1, -(mum1+mup2))
+        mu3(3) = 0.0625d0 * fma(9.d0, mup1+mup2, -(mu0 +mup3))
+        Tm2 = T(i-2,j,k)
+        Tm1 = T(i-1,j,k)
+        T0  = T(i,  j,k)
+        Tp1 = T(i+1,j,k)
+        Tp2 = T(i+2,j,k)
+        Tp3 = T(i+3,j,k)
         block ! dQdx
           real(8) :: kTx3(3)
-          kTx3(:) = Cp_over_Pr * mu3(:) * &
-                    (1.125d0 * (-T(i-1:i+1,j,k) + T(i:i+2,j,k)) - (-T(i-2:i,j,k) + T(i+1:i+3,j,k)) * one_24) * dx(i)
+          kTx3(1) = Cp_over_Pr * mu3(1) * fma(1.125d0, T0 -Tm1, -one_24*(Tp1-Tm2)) * dx(i)
+          kTx3(2) = Cp_over_Pr * mu3(2) * fma(1.125d0, Tp1-T0,  -one_24*(Tp2-Tm1)) * dx(i)
+          kTx3(3) = Cp_over_Pr * mu3(3) * fma(1.125d0, Tp2-Tp1, -one_24*(Tp3-T0))  * dx(i)
           kTx     = flux4(kTx3(:))
         end block
         #:if is_les
@@ -165,7 +201,7 @@ contains
         call calc_tau_cross_LES(mu3, mut3, w(idx-2:idx+3), uz(idx-2:idx+3), dx(i), txz, wtxz)
         block
           real(8) :: H(4)
-          H(:) = Cp * T(i-1:i+2,j,k) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i-1:i+2,j,k)
+          H(:) = Cp * (/Tm1, T0, Tp1, Tp2/) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i-1:i+2,j,k)
           Hsgs = -flux4(mut3) * (1.125d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_24) * dx(i) / Prt
         end block
         #:else
@@ -173,32 +209,39 @@ contains
         call calc_tau_cross(mu3, v(idx-2:idx+3), uy(idx-2:idx+3), dx(i), txy, vtxy)
         call calc_tau_cross(mu3, w(idx-2:idx+3), uz(idx-2:idx+3), dx(i), txz, wtxz)
         #:endif
-        E(2,i,j-1,k-1) = E(2,i,j-1,k-1) - txx
-        E(3,i,j-1,k-1) = E(3,i,j-1,k-1) - txy
-        E(4,i,j-1,k-1) = E(4,i,j-1,k-1) - txz
-        E(5,i,j-1,k-1) = E(5,i,j-1,k-1) - (utxx + vtxy + wtxz + kTx &
+        ! no other thread reads this address before the paired store below overwrites it: __ldlu
+        e2v = __ldlu(E(i,j-1,k-1,2))
+        call __stcg(E(i,j-1,k-1,2), e2v - txx)
+        e3v = __ldlu(E(i,j-1,k-1,3))
+        call __stcg(E(i,j-1,k-1,3), e3v - txy)
+        e4v = __ldlu(E(i,j-1,k-1,4))
+        call __stcg(E(i,j-1,k-1,4), e4v - txz)
+        e5v = __ldlu(E(i,j-1,k-1,5))
+        call __stcg(E(i,j-1,k-1,5), e5v - (utxx + vtxy + wtxz + kTx &
         #:if is_les
           + Hsgs &
         #:endif
-        )
+        ))
       end block
     #:else
     if (3 <= i .and. i <= nx-3 .and. 4 <= j .and. j <= ny-3 .and. 4 <= k .and. k <= nz-3) then
       block
-        real(8) :: mu6(6)
+        real(8) :: mu6(6), T6(6)
+        real(8) :: e2v, e3v, e4v, e5v
         #:if is_les
         real(8) :: mut6(6)
         mut6(:) = mut(i-2:i+3, j, k)
         #:endif
         mu6(:) = mu(i-2:i+3, j, k)
-        kTx = Cp_over_Pr * interp6(mu6) * diff6(dx(i), T(i-2:i+3, j, k))
+        T6(:) = T(i-2:i+3, j, k)
+        kTx = Cp_over_Pr * interp6(mu6) * diff6(dx(i), T6)
         #:if is_les
         call calc_tau_straight_LES(mu6, mut6, u(idx-2:idx+3), vy(idx-2:idx+3), wz(idx-2:idx+3), dx(i), txx, utxx)
         call calc_tau_cross_LES(mu6, mut6, v(idx-2:idx+3), uy(idx-2:idx+3), dx(i), txy, vtxy)
         call calc_tau_cross_LES(mu6, mut6, w(idx-2:idx+3), uz(idx-2:idx+3), dx(i), txz, wtxz)
         block
           real(8) :: H(6)
-          H(:) = Cp * T(i-2:i+3,j,k) + 0.5d0 * (u(idx-2:idx+3)**2 + v(idx-2:idx+3)**2 + w(idx-2:idx+3)**2) + qc2(i-2:i+3,j,k)
+          H(:) = Cp * T6(:) + 0.5d0 * (u(idx-2:idx+3)**2 + v(idx-2:idx+3)**2 + w(idx-2:idx+3)**2) + qc2(i-2:i+3,j,k)
           Hsgs = -interp6(mut6) * diff6(dx(i), H) / Prt
         end block
         #:else
@@ -206,14 +249,19 @@ contains
         call calc_tau_cross(mu6, v(idx-2:idx+3), uy(idx-2:idx+3), dx(i), txy, vtxy)
         call calc_tau_cross(mu6, w(idx-2:idx+3), uz(idx-2:idx+3), dx(i), txz, wtxz)
         #:endif
-        E(2,i,j-1,k-1) = E(2,i,j-1,k-1) - txx
-        E(3,i,j-1,k-1) = E(3,i,j-1,k-1) - txy
-        E(4,i,j-1,k-1) = E(4,i,j-1,k-1) - txz
-        E(5,i,j-1,k-1) = E(5,i,j-1,k-1) - (utxx + vtxy + wtxz + kTx &
+        ! no other thread reads this address before the paired store below overwrites it: __ldlu
+        e2v = __ldlu(E(i,j-1,k-1,2))
+        call __stcg(E(i,j-1,k-1,2), e2v - txx)
+        e3v = __ldlu(E(i,j-1,k-1,3))
+        call __stcg(E(i,j-1,k-1,3), e3v - txy)
+        e4v = __ldlu(E(i,j-1,k-1,4))
+        call __stcg(E(i,j-1,k-1,4), e4v - txz)
+        e5v = __ldlu(E(i,j-1,k-1,5))
+        call __stcg(E(i,j-1,k-1,5), e5v - (utxx + vtxy + wtxz + kTx &
         #:if is_les
           + Hsgs &
         #:endif
-        )
+        ))
       end block
     #:endif
     endif
@@ -226,7 +274,7 @@ contains
   #:if is_koff
     #:set suf = suf + "_koff"
   #:endif
-  attributes(global) subroutine calc_Fv${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
+  attributes(global) subroutine calc_Fv${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q_2, Q_3, Q_4, T, mu, &
     #:if is_les
       mut, qc2, &
     #:endif
@@ -240,14 +288,16 @@ contains
     real(8), intent(in), device, contiguous    :: dx(nx-1)
     real(8), intent(in), device, contiguous    :: dy(ny-1)
     real(8), intent(in), device, contiguous    :: dz(nz-1)
-    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_2(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_3(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_4(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)
     #:if is_les
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)
     #:endif
-    real(8), intent(inout), device, contiguous :: F(5,nx-2,ny-1,nz-2)
+    real(8), intent(inout), device, contiguous :: F(nx-2,ny-1,nz-2,5)
     #:if is_koff
     integer, intent(in), value                 :: k_lo
     integer, intent(in), value                 :: k_hi
@@ -283,11 +333,11 @@ contains
     #:endif
     offset_xz = (it-1)*sy + (kt-1)*sy*sx
     #:if VISC_ORDER == 4
-    call load_smem_visc_cent4_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
+    call load_smem_visc_cent4_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q_2, Q_3, Q_4, u, v, w, ux, vx, vz, wz)
     #:elif VISC_STENCIL == 'ME4Base'
-    call load_smem_visc_me4_base_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
+    call load_smem_visc_me4_base_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q_2, Q_3, Q_4, u, v, w, ux, vx, vz, wz)
     #:else
-    call load_smem_visc_cent6_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q, u, v, w, ux, vx, vz, wz)
+    call load_smem_visc_cent6_y(it, jt, kt, i, k, nx, ny, nz, dx, dz, Q_2, Q_3, Q_4, u, v, w, ux, vx, vz, wz)
     #:endif
     j  = (blockIdx%y-1)*blockDim%y + jt
     idx = jt + offset_xz
@@ -300,6 +350,7 @@ contains
     if (3 <= i .and. i <= nx-2 .and. 2 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-2) then
       block
         real(8) :: mu4(4), T4(4)
+        real(8) :: f2v, f3v, f4v, f5v
         #:if is_les
         real(8) :: mut4(4)
         mut4(:) = mut(i, j-1:j+2, k)
@@ -313,7 +364,7 @@ contains
         call calc_tau_cross_LES(mu4, mut4, w(idx-1:idx+2), vz(idx-1:idx+2), dy(j), tyz, wtyz)
         block
           real(8) :: H(4)
-          H(:) = Cp * T(i,j-1:j+2,k) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i,j-1:j+2,k)
+          H(:) = Cp * T4(:) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i,j-1:j+2,k)
           Hsgs = -interp4(mut4) * diff4(dy(j), H) / Prt
         end block
         #:else
@@ -321,28 +372,60 @@ contains
         call calc_tau_cross(mu4, u(idx-1:idx+2), vx(idx-1:idx+2), dy(j), tyx, utyx)
         call calc_tau_cross(mu4, w(idx-1:idx+2), vz(idx-1:idx+2), dy(j), tyz, wtyz)
         #:endif
-        F(2,i-1,j,k-1) = F(2,i-1,j,k-1) - tyx
-        F(3,i-1,j,k-1) = F(3,i-1,j,k-1) - tyy
-        F(4,i-1,j,k-1) = F(4,i-1,j,k-1) - tyz
-        F(5,i-1,j,k-1) = F(5,i-1,j,k-1) - (utyx + vtyy + wtyz + kTy &
+        ! no other thread reads this address before the paired store below overwrites it: __ldlu
+        f2v = __ldlu(F(i-1,j,k-1,2))
+        call __stcg(F(i-1,j,k-1,2), f2v - tyx)
+        f3v = __ldlu(F(i-1,j,k-1,3))
+        call __stcg(F(i-1,j,k-1,3), f3v - tyy)
+        f4v = __ldlu(F(i-1,j,k-1,4))
+        call __stcg(F(i-1,j,k-1,4), f4v - tyz)
+        f5v = __ldlu(F(i-1,j,k-1,5))
+        call __stcg(F(i-1,j,k-1,5), f5v - (utyx + vtyy + wtyz + kTy &
         #:if is_les
           + Hsgs &
         #:endif
-        )
+        ))
       end block
     #:elif VISC_STENCIL == 'ME4Base'
     if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-2) then
       block
         real(8) :: mu3(3)
+        real(8) :: mum2, mum1, mu0, mup1, mup2, mup3
+        real(8) :: Tm2, Tm1, T0, Tp1, Tp2, Tp3
+        real(8) :: f2v, f3v, f4v, f5v
         #:if is_les
         real(8) :: mut3(3)
-        mut3(:) = 0.0625d0 * (9.d0 * (mut(i,j-1:j+1,k) + mut(i,j:j+2,k)) - (mut(i,j-2:j,k) + mut(i,j+1:j+3,k)))
+        real(8) :: mutm2, mutm1, mut0, mutp1, mutp2, mutp3
+        mutm2 = mut(i,j-2,k)
+        mutm1 = mut(i,j-1,k)
+        mut0  = mut(i,j,  k)
+        mutp1 = mut(i,j+1,k)
+        mutp2 = mut(i,j+2,k)
+        mutp3 = mut(i,j+3,k)
+        mut3(1) = 0.0625d0 * fma(9.d0, mutm1+mut0,  -(mutm2+mutp1))
+        mut3(2) = 0.0625d0 * fma(9.d0, mut0 +mutp1, -(mutm1+mutp2))
+        mut3(3) = 0.0625d0 * fma(9.d0, mutp1+mutp2, -(mut0 +mutp3))
         #:endif
-        mu3(:)  = 0.0625d0 * (9.d0 * ( mu(i,j-1:j+1,k) +  mu(i,j:j+2,k)) - ( mu(i,j-2:j,k) +  mu(i,j+1:j+3,k)))
+        mum2 = mu(i,j-2,k)
+        mum1 = mu(i,j-1,k)
+        mu0  = mu(i,j,  k)
+        mup1 = mu(i,j+1,k)
+        mup2 = mu(i,j+2,k)
+        mup3 = mu(i,j+3,k)
+        mu3(1) = 0.0625d0 * fma(9.d0, mum1+mu0,  -(mum2+mup1))
+        mu3(2) = 0.0625d0 * fma(9.d0, mu0 +mup1, -(mum1+mup2))
+        mu3(3) = 0.0625d0 * fma(9.d0, mup1+mup2, -(mu0 +mup3))
+        Tm2 = T(i,j-2,k)
+        Tm1 = T(i,j-1,k)
+        T0  = T(i,j,  k)
+        Tp1 = T(i,j+1,k)
+        Tp2 = T(i,j+2,k)
+        Tp3 = T(i,j+3,k)
         block ! dQdy
           real(8) :: kTy3(3)
-          kTy3(:) = Cp_over_Pr * mu3(:) * &
-                    (1.125d0 * (-T(i,j-1:j+1,k) + T(i,j:j+2,k)) - (-T(i,j-2:j,k) + T(i,j+1:j+3,k)) * one_24) * dy(j)
+          kTy3(1) = Cp_over_Pr * mu3(1) * fma(1.125d0, T0 -Tm1, -one_24*(Tp1-Tm2)) * dy(j)
+          kTy3(2) = Cp_over_Pr * mu3(2) * fma(1.125d0, Tp1-T0,  -one_24*(Tp2-Tm1)) * dy(j)
+          kTy3(3) = Cp_over_Pr * mu3(3) * fma(1.125d0, Tp2-Tp1, -one_24*(Tp3-T0))  * dy(j)
           kTy     = flux4(kTy3(:))
         end block
         #:if is_les
@@ -351,7 +434,7 @@ contains
         call calc_tau_cross_LES(mu3, mut3, w(idx-2:idx+3), vz(idx-2:idx+3), dy(j), tyz, wtyz)
         block
           real(8) :: H(4)
-          H(:) = Cp * T(i,j-1:j+2,k) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i,j-1:j+2,k)
+          H(:) = Cp * (/Tm1, T0, Tp1, Tp2/) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i,j-1:j+2,k)
           Hsgs = -flux4(mut3) * (1.125d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_24) * dy(j) / Prt
         end block
         #:else
@@ -359,19 +442,25 @@ contains
         call calc_tau_cross(mu3, u(idx-2:idx+3), vx(idx-2:idx+3), dy(j), tyx, utyx)
         call calc_tau_cross(mu3, w(idx-2:idx+3), vz(idx-2:idx+3), dy(j), tyz, wtyz)
         #:endif
-        F(2,i-1,j,k-1) = F(2,i-1,j,k-1) - tyx
-        F(3,i-1,j,k-1) = F(3,i-1,j,k-1) - tyy
-        F(4,i-1,j,k-1) = F(4,i-1,j,k-1) - tyz
-        F(5,i-1,j,k-1) = F(5,i-1,j,k-1) - (utyx + vtyy + wtyz + kTy &
+        ! no other thread reads this address before the paired store below overwrites it: __ldlu
+        f2v = __ldlu(F(i-1,j,k-1,2))
+        call __stcg(F(i-1,j,k-1,2), f2v - tyx)
+        f3v = __ldlu(F(i-1,j,k-1,3))
+        call __stcg(F(i-1,j,k-1,3), f3v - tyy)
+        f4v = __ldlu(F(i-1,j,k-1,4))
+        call __stcg(F(i-1,j,k-1,4), f4v - tyz)
+        f5v = __ldlu(F(i-1,j,k-1,5))
+        call __stcg(F(i-1,j,k-1,5), f5v - (utyx + vtyy + wtyz + kTy &
         #:if is_les
           + Hsgs &
         #:endif
-        )
+        ))
       end block
     #:else
     if (4 <= i .and. i <= nx-3 .and. 3 <= j .and. j <= ny-3 .and. 4 <= k .and. k <= nz-3) then
       block
         real(8) :: mu6(6), T6(6)
+        real(8) :: f2v, f3v, f4v, f5v
         #:if is_les
         real(8) :: mut6(6)
         mut6(:) = mut(i, j-2:j+3, k)
@@ -385,7 +474,7 @@ contains
         call calc_tau_cross_LES(mu6, mut6, w(idx-2:idx+3), vz(idx-2:idx+3), dy(j), tyz, wtyz)
         block
           real(8) :: H(6)
-          H(:) = Cp * T(i,j-2:j+3,k) + 0.5d0 * (u(idx-2:idx+3)**2 + v(idx-2:idx+3)**2 + w(idx-2:idx+3)**2) + qc2(i,j-2:j+3,k)
+          H(:) = Cp * T6(:) + 0.5d0 * (u(idx-2:idx+3)**2 + v(idx-2:idx+3)**2 + w(idx-2:idx+3)**2) + qc2(i,j-2:j+3,k)
           Hsgs = -interp6(mut6) * diff6(dy(j), H) / Prt
         end block
         #:else
@@ -393,14 +482,19 @@ contains
         call calc_tau_cross(mu6, u(idx-2:idx+3), vx(idx-2:idx+3), dy(j), tyx, utyx)
         call calc_tau_cross(mu6, w(idx-2:idx+3), vz(idx-2:idx+3), dy(j), tyz, wtyz)
         #:endif
-        F(2,i-1,j,k-1) = F(2,i-1,j,k-1) - tyx
-        F(3,i-1,j,k-1) = F(3,i-1,j,k-1) - tyy
-        F(4,i-1,j,k-1) = F(4,i-1,j,k-1) - tyz
-        F(5,i-1,j,k-1) = F(5,i-1,j,k-1) - (utyx + vtyy + wtyz + kTy &
+        ! no other thread reads this address before the paired store below overwrites it: __ldlu
+        f2v = __ldlu(F(i-1,j,k-1,2))
+        call __stcg(F(i-1,j,k-1,2), f2v - tyx)
+        f3v = __ldlu(F(i-1,j,k-1,3))
+        call __stcg(F(i-1,j,k-1,3), f3v - tyy)
+        f4v = __ldlu(F(i-1,j,k-1,4))
+        call __stcg(F(i-1,j,k-1,4), f4v - tyz)
+        f5v = __ldlu(F(i-1,j,k-1,5))
+        call __stcg(F(i-1,j,k-1,5), f5v - (utyx + vtyy + wtyz + kTy &
         #:if is_les
           + Hsgs &
         #:endif
-        )
+        ))
       end block
     #:endif
     endif
@@ -413,7 +507,7 @@ contains
   #:if is_koff
     #:set suf = suf + "_koff"
   #:endif
-  attributes(global) subroutine calc_Gv${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q, T, mu, &
+  attributes(global) subroutine calc_Gv${VISC_ORDER}$${suf}$(nx, ny, nz, dx, dy, dz, Q_2, Q_3, Q_4, T, mu, &
     #:if is_les
       mut, qc2, &
     #:endif
@@ -427,14 +521,16 @@ contains
     real(8), intent(in), device, contiguous    :: dx(nx-1)
     real(8), intent(in), device, contiguous    :: dy(ny-1)
     real(8), intent(in), device, contiguous    :: dz(nz-1)
-    real(8), intent(in), device, contiguous    :: Q(nx,5,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_2(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_3(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_4(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: T(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)
     #:if is_les
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)
     #:endif
-    real(8), intent(inout), device, contiguous :: G(5,nx-2,ny-2,nz-1)
+    real(8), intent(inout), device, contiguous :: G(nx-2,ny-2,nz-1,5)
     #:if is_koff
     integer, intent(in), value                 :: k_lo
     integer, intent(in), value                 :: k_hi
@@ -467,21 +563,21 @@ contains
     offset_xy = (jt-1)*sz + (it-1)*sz*sy
     #:if is_koff
     #:if VISC_ORDER == 4
-    call load_smem_visc_cent4_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+    call load_smem_visc_cent4_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy, k_lo)
     #:elif VISC_STENCIL == 'ME4Base'
-    call load_smem_visc_me4_base_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+    call load_smem_visc_me4_base_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy, k_lo)
     #:else
-    call load_smem_visc_cent6_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+    call load_smem_visc_cent6_z_koff(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy, k_lo)
     #:endif
     k  = (blockIdx%z-1)*blockDim%z + k_lo - 1 + kt
     if (nx-1 < i .or. ny-1 < j .or. k_hi < k) return
     #:else
     #:if VISC_ORDER == 4
-    call load_smem_visc_cent4_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
+    call load_smem_visc_cent4_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy)
     #:elif VISC_STENCIL == 'ME4Base'
-    call load_smem_visc_me4_base_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
+    call load_smem_visc_me4_base_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy)
     #:else
-    call load_smem_visc_cent6_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q, u, v, w, ux, wx, vy, wy)
+    call load_smem_visc_cent6_z(it, jt, kt, i, j, nx, ny, nz, dx, dy, Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy)
     #:endif
     k  = (blockIdx%z-1)*blockDim%z + kt
     if (nx-1 < i .or. ny-1 < j .or. nz-1 < k) return
@@ -491,6 +587,7 @@ contains
     if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 2 <= k .and. k <= nz-2) then
       block
         real(8) :: mu4(4), T4(4)
+        real(8) :: g2v, g3v, g4v, g5v
         #:if is_les
         real(8) :: mut4(4)
         mut4(:) = mut(i, j, k-1:k+2)
@@ -504,7 +601,7 @@ contains
         call calc_tau_cross_LES(mu4, mut4, v(idx-1:idx+2), wy(idx-1:idx+2), dz(k), tzy, vtzy)
         block
           real(8) :: H(4)
-          H(:) = Cp * T(i,j,k-1:k+2) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i,j,k-1:k+2)
+          H(:) = Cp * T4(:) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i,j,k-1:k+2)
           Hsgs = -interp4(mut4) * diff4(dz(k), H) / Prt
         end block
         #:else
@@ -512,28 +609,60 @@ contains
         call calc_tau_cross(mu4, u(idx-1:idx+2), wx(idx-1:idx+2), dz(k), tzx, utzx)
         call calc_tau_cross(mu4, v(idx-1:idx+2), wy(idx-1:idx+2), dz(k), tzy, vtzy)
         #:endif
-        G(2,i-1,j-1,k) = G(2,i-1,j-1,k) - tzx
-        G(3,i-1,j-1,k) = G(3,i-1,j-1,k) - tzy
-        G(4,i-1,j-1,k) = G(4,i-1,j-1,k) - tzz
-        G(5,i-1,j-1,k) = G(5,i-1,j-1,k) - (utzx + vtzy + wtzz + kTz &
+        ! no other thread reads this address before the paired store below overwrites it: __ldlu
+        g2v = __ldlu(G(i-1,j-1,k,2))
+        call __stcg(G(i-1,j-1,k,2), g2v - tzx)
+        g3v = __ldlu(G(i-1,j-1,k,3))
+        call __stcg(G(i-1,j-1,k,3), g3v - tzy)
+        g4v = __ldlu(G(i-1,j-1,k,4))
+        call __stcg(G(i-1,j-1,k,4), g4v - tzz)
+        g5v = __ldlu(G(i-1,j-1,k,5))
+        call __stcg(G(i-1,j-1,k,5), g5v - (utzx + vtzy + wtzz + kTz &
         #:if is_les
           + Hsgs &
         #:endif
-        )
+        ))
       end block
     #:elif VISC_STENCIL == 'ME4Base'
     if (3 <= i .and. i <= nx-2 .and. 3 <= j .and. j <= ny-2 .and. 3 <= k .and. k <= nz-3) then
       block
         real(8) :: mu3(3)
+        real(8) :: mum2, mum1, mu0, mup1, mup2, mup3
+        real(8) :: Tm2, Tm1, T0, Tp1, Tp2, Tp3
+        real(8) :: g2v, g3v, g4v, g5v
         #:if is_les
         real(8) :: mut3(3)
-        mut3(:) = 0.0625d0 * (9.d0 * (mut(i,j,k-1:k+1) + mut(i,j,k:k+2)) - (mut(i,j,k-2:k) + mut(i,j,k+1:k+3)))
+        real(8) :: mutm2, mutm1, mut0, mutp1, mutp2, mutp3
+        mutm2 = mut(i,j,k-2)
+        mutm1 = mut(i,j,k-1)
+        mut0  = mut(i,j,k  )
+        mutp1 = mut(i,j,k+1)
+        mutp2 = mut(i,j,k+2)
+        mutp3 = mut(i,j,k+3)
+        mut3(1) = 0.0625d0 * fma(9.d0, mutm1+mut0,  -(mutm2+mutp1))
+        mut3(2) = 0.0625d0 * fma(9.d0, mut0 +mutp1, -(mutm1+mutp2))
+        mut3(3) = 0.0625d0 * fma(9.d0, mutp1+mutp2, -(mut0 +mutp3))
         #:endif
-        mu3(:)  = 0.0625d0 * (9.d0 * ( mu(i,j,k-1:k+1) +  mu(i,j,k:k+2)) - ( mu(i,j,k-2:k) +  mu(i,j,k+1:k+3)))
+        mum2 = mu(i,j,k-2)
+        mum1 = mu(i,j,k-1)
+        mu0  = mu(i,j,k  )
+        mup1 = mu(i,j,k+1)
+        mup2 = mu(i,j,k+2)
+        mup3 = mu(i,j,k+3)
+        mu3(1) = 0.0625d0 * fma(9.d0, mum1+mu0,  -(mum2+mup1))
+        mu3(2) = 0.0625d0 * fma(9.d0, mu0 +mup1, -(mum1+mup2))
+        mu3(3) = 0.0625d0 * fma(9.d0, mup1+mup2, -(mu0 +mup3))
+        Tm2 = T(i,j,k-2)
+        Tm1 = T(i,j,k-1)
+        T0  = T(i,j,k  )
+        Tp1 = T(i,j,k+1)
+        Tp2 = T(i,j,k+2)
+        Tp3 = T(i,j,k+3)
         block ! dQdz
           real(8) :: kTz3(3)
-          kTz3(:) = Cp_over_Pr * mu3(:) * &
-                    (1.125d0 * (-T(i,j,k-1:k+1) + T(i,j,k:k+2)) - (-T(i,j,k-2:k) + T(i,j,k+1:k+3)) * one_24) * dz(k)
+          kTz3(1) = Cp_over_Pr * mu3(1) * fma(1.125d0, T0 -Tm1, -one_24*(Tp1-Tm2)) * dz(k)
+          kTz3(2) = Cp_over_Pr * mu3(2) * fma(1.125d0, Tp1-T0,  -one_24*(Tp2-Tm1)) * dz(k)
+          kTz3(3) = Cp_over_Pr * mu3(3) * fma(1.125d0, Tp2-Tp1, -one_24*(Tp3-T0))  * dz(k)
           kTz     = flux4(kTz3(:))
         end block
         #:if is_les
@@ -542,7 +671,7 @@ contains
         call calc_tau_cross_LES(mu3, mut3, v(idx-2:idx+3), wy(idx-2:idx+3), dz(k), tzy, vtzy)
         block
           real(8) :: H(4)
-          H(:) = Cp * T(i,j,k-1:k+2) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i,j,k-1:k+2)
+          H(:) = Cp * (/Tm1, T0, Tp1, Tp2/) + 0.5d0 * (u(idx-1:idx+2)**2 + v(idx-1:idx+2)**2 + w(idx-1:idx+2)**2) + qc2(i,j,k-1:k+2)
           Hsgs = -flux4(mut3) * (1.125d0 * (-H(2) + H(3)) - (-H(1) + H(4)) * one_24) * dz(k) / Prt
         end block
         #:else
@@ -550,19 +679,25 @@ contains
         call calc_tau_cross(mu3, u(idx-2:idx+3), wx(idx-2:idx+3), dz(k), tzx, utzx)
         call calc_tau_cross(mu3, v(idx-2:idx+3), wy(idx-2:idx+3), dz(k), tzy, vtzy)
         #:endif
-        G(2,i-1,j-1,k) = G(2,i-1,j-1,k) - tzx
-        G(3,i-1,j-1,k) = G(3,i-1,j-1,k) - tzy
-        G(4,i-1,j-1,k) = G(4,i-1,j-1,k) - tzz
-        G(5,i-1,j-1,k) = G(5,i-1,j-1,k) - (utzx + vtzy + wtzz + kTz &
+        ! no other thread reads this address before the paired store below overwrites it: __ldlu
+        g2v = __ldlu(G(i-1,j-1,k,2))
+        call __stcg(G(i-1,j-1,k,2), g2v - tzx)
+        g3v = __ldlu(G(i-1,j-1,k,3))
+        call __stcg(G(i-1,j-1,k,3), g3v - tzy)
+        g4v = __ldlu(G(i-1,j-1,k,4))
+        call __stcg(G(i-1,j-1,k,4), g4v - tzz)
+        g5v = __ldlu(G(i-1,j-1,k,5))
+        call __stcg(G(i-1,j-1,k,5), g5v - (utzx + vtzy + wtzz + kTz &
         #:if is_les
           + Hsgs &
         #:endif
-        )
+        ))
       end block
     #:else
     if (4 <= i .and. i <= nx-3 .and. 4 <= j .and. j <= ny-3 .and. 3 <= k .and. k <= nz-3) then
       block
         real(8) :: mu6(6), T6(6)
+        real(8) :: g2v, g3v, g4v, g5v
         #:if is_les
         real(8) :: mut6(6)
         mut6(:) = mut(i, j, k-2:k+3)
@@ -576,7 +711,7 @@ contains
         call calc_tau_cross_LES(mu6, mut6, v(idx-2:idx+3), wy(idx-2:idx+3), dz(k), tzy, vtzy)
         block
           real(8) :: H(6)
-          H(:) = Cp * T(i,j,k-2:k+3) + 0.5d0 * (u(idx-2:idx+3)**2 + v(idx-2:idx+3)**2 + w(idx-2:idx+3)**2) + qc2(i,j,k-2:k+3)
+          H(:) = Cp * T6(:) + 0.5d0 * (u(idx-2:idx+3)**2 + v(idx-2:idx+3)**2 + w(idx-2:idx+3)**2) + qc2(i,j,k-2:k+3)
           Hsgs = -interp6(mut6) * diff6(dz(k), H) / Prt
         end block
         #:else
@@ -584,14 +719,19 @@ contains
         call calc_tau_cross(mu6, u(idx-2:idx+3), wx(idx-2:idx+3), dz(k), tzx, utzx)
         call calc_tau_cross(mu6, v(idx-2:idx+3), wy(idx-2:idx+3), dz(k), tzy, vtzy)
         #:endif
-        G(2,i-1,j-1,k) = G(2,i-1,j-1,k) - tzx
-        G(3,i-1,j-1,k) = G(3,i-1,j-1,k) - tzy
-        G(4,i-1,j-1,k) = G(4,i-1,j-1,k) - tzz
-        G(5,i-1,j-1,k) = G(5,i-1,j-1,k) - (utzx + vtzy + wtzz + kTz &
+        ! no other thread reads this address before the paired store below overwrites it: __ldlu
+        g2v = __ldlu(G(i-1,j-1,k,2))
+        call __stcg(G(i-1,j-1,k,2), g2v - tzx)
+        g3v = __ldlu(G(i-1,j-1,k,3))
+        call __stcg(G(i-1,j-1,k,3), g3v - tzy)
+        g4v = __ldlu(G(i-1,j-1,k,4))
+        call __stcg(G(i-1,j-1,k,4), g4v - tzz)
+        g5v = __ldlu(G(i-1,j-1,k,5))
+        call __stcg(G(i-1,j-1,k,5), g5v - (utzx + vtzy + wtzz + kTz &
         #:if is_les
           + Hsgs &
         #:endif
-        )
+        ))
       end block
     #:endif
     endif

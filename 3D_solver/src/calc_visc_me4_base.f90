@@ -1,7 +1,7 @@
   !> Pure device function: 4th-order accurate flux reconstruction from 3-point stencil
   !> Uses compact central difference: F(i+1/2) = (-F_i + 26*F_{i+1/2} - F_{i+1})/24
   !> Achieves O(dx^4) accuracy with implicit stencil via dispersion relation optimization
-  pure attributes(device) function flux4(a) result(ans)
+  attributes(device) function flux4(a) result(ans)
     real(8), intent(in) :: a(3) !< 3-point array of flux values
     real(8) ans                 !< 4th-order flux result (-a1 + 26*a2 - a3) / 24
     !ans = (-a(1) + 26.d0 * a(2) - a(3)) * one_24
@@ -12,7 +12,7 @@
   !> Diagonal: t_ii = (2/3)*mu*(2*u_i,i - u_j,j - u_k,k) [with bulk viscosity correction]
   !> Uses 6-point stencil for strain rates and 3-point for viscosity averaging
   !> Computes work term ut_ii = u_i * t_ii needed for energy equation viscous contribution
-  pure attributes(device) subroutine calc_tau_straight(mu, u, vy, wz, d, t11, ut11)
+  attributes(device) subroutine calc_tau_straight(mu, u, vy, wz, d, t11, ut11)
     real(8), intent(in), contiguous :: mu(3) !< viscosity at 3 stencil points
     real(8), intent(in), contiguous :: u(6)  !< velocity u at 6-point stencil
     real(8), intent(in), contiguous :: vy(6) !< dv/dy at 6-point stencil
@@ -59,7 +59,7 @@
   !> Pure device subroutine: Compute diagonal stress with Smagorinsky LES turbulent viscosity
   !> Combines molecular + turbulent (SGS) viscosity: nu_total = nu + nu_t
   !> Turbulent part nu_t captures unresolved subgrid energy dissipation
-  pure attributes(device) subroutine calc_tau_straight_LES(mu, mut, u, vy, wz, d, t11, ut11)
+  attributes(device) subroutine calc_tau_straight_LES(mu, mut, u, vy, wz, d, t11, ut11)
     real(8), intent(in), contiguous :: mu(3)  !< molecular viscosity at 3 stencil points
     real(8), intent(in), contiguous :: mut(3) !< turbulent viscosity at 3 stencil points
     real(8), intent(in), contiguous :: u(6)   !< velocity u at 6-point stencil
@@ -103,7 +103,7 @@
   !> Pure device subroutine: Compute shear (off-diagonal) stress tensor components
   !> Shear: t_ij = mu*(u_i,j + u_j,i) for i != j components
   !> 4th-order stencil preserves cross-derivatives symmetry (t_12 = t_21)
-  pure attributes(device) subroutine calc_tau_cross(mu, v, uy, d, t12, vt12)
+  attributes(device) subroutine calc_tau_cross(mu, v, uy, d, t12, vt12)
     real(8), intent(in), contiguous :: mu(3) !< viscosity at 3 stencil points
     real(8), intent(in), contiguous :: v(6)  !< velocity v at 6-point stencil
     real(8), intent(in), contiguous :: uy(6) !< du/dy at 6-point stencil
@@ -142,7 +142,7 @@
 
   !> Pure device subroutine: Compute shear stress with Smagorinsky LES turbulent model
   !> Off-diagonal components including both molecular and subgrid turbulent dissipation
-  pure attributes(device) subroutine calc_tau_cross_LES(mu, mut, v, uy, d, t12, vt12)
+  attributes(device) subroutine calc_tau_cross_LES(mu, mut, v, uy, d, t12, vt12)
     real(8), intent(in), contiguous :: mu(3)  !< molecular viscosity at 3 stencil points    
     real(8), intent(in), contiguous :: mut(3) !< turbulent viscosity at 3 stencil points
     real(8), intent(in), contiguous :: v(6)   !< velocity v at 6-point stencil
