@@ -35,6 +35,7 @@ contains
     real(8), intent(out), device, contiguous  :: E(nx-1,ny-2,nz-2,5)
     integer i, j, k, it, jt, kt
     integer :: ii, i_base, idx, offset_yz
+    logical :: jk_in_range
     integer, parameter :: sx = threadsE%x + 2*io + 1
     integer, parameter :: sy = threadsE%y
     integer, parameter :: sz = threadsE%z
@@ -46,9 +47,10 @@ contains
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     i_base = (blockIdx%x-1)*blockDim%x
     offset_yz = (jt-1) * sx + (kt-1) * sx * sy
+    jk_in_range = (j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz)
     do ii = it-io, threadsE%x+io+1, blockDim%x
       i = i_base + ii
-      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+      if (i >= 1 .and. i <= nx .and. jk_in_range) then
         idx = ii + offset_yz
         rho(idx) = Q_1(i,j,k);   u(idx) = Q_2(i,j,k)
           v(idx) = Q_3(i,j,k);   w(idx) = Q_4(i,j,k)
@@ -77,6 +79,7 @@ contains
     real(8), intent(out), device, contiguous  :: F(nx-2,ny-1,nz-2,5)
     integer i, j, k, it, jt, kt
     integer :: jj, j_base, idx, offset_xz
+    logical :: ik_in_range
     integer, parameter :: sx = threadsF%x
     integer, parameter :: sy = threadsF%y + 2*io + 1
     integer, parameter :: sz = threadsF%z
@@ -88,9 +91,10 @@ contains
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     j_base = (blockIdx%y-1)*blockDim%y
     offset_xz = (it-1) * sy + (kt-1) * sy * sx
+    ik_in_range = (i >= 1 .and. i <= nx .and. k >= 1 .and. k <= nz)
     do jj = jt-io, threadsF%y+io+1, blockDim%y
       j = j_base + jj
-      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+      if (ik_in_range .and. j >= 1 .and. j <= ny) then
         idx = jj + offset_xz
         rho(idx) = Q_1(i,j,k);   u(idx) = Q_2(i,j,k)
           v(idx) = Q_3(i,j,k);   w(idx) = Q_4(i,j,k)
@@ -119,6 +123,7 @@ contains
     real(8), intent(out), device, contiguous  :: G(nx-2,ny-2,nz-1,5)
     integer i, j, k, it, jt, kt
     integer :: kk, k_base, idx, offset_xy
+    logical :: ij_in_range
     integer, parameter :: sx = threadsG%x
     integer, parameter :: sy = threadsG%y
     integer, parameter :: sz = threadsG%z + 2*io + 1
@@ -130,9 +135,10 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     k_base = (blockIdx%z-1)*blockDim%z
     offset_xy = (jt-1) * sz + (it-1) * sz * sy
+    ij_in_range = (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny)
     do kk = kt-io, threadsG%z+io+1, blockDim%z
       k = k_base + kk
-      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+      if (ij_in_range .and. k >= 1 .and. k <= nz) then
         idx = kk + offset_xy
         rho(idx) = Q_1(i,j,k);   u(idx) = Q_2(i,j,k)
           v(idx) = Q_3(i,j,k);   w(idx) = Q_4(i,j,k)
@@ -161,6 +167,7 @@ contains
     real(8), intent(inout), device, contiguous :: G(nx-2,ny-2,nz-1,5)
     integer i, j, k, it, jt, kt
     integer :: kk, k_base, idx, offset_xy
+    logical :: ij_in_range
     integer, parameter :: sx = threadsG%x
     integer, parameter :: sy = threadsG%y
     integer, parameter :: sz = threadsG%z + 2*io + 1
@@ -172,9 +179,10 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     k_base = (blockIdx%z-1)*blockDim%z + k_lo - 1
     offset_xy = (jt-1) * sz + (it-1) * sz * sy
+    ij_in_range = (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny)
     do kk = kt-io, threadsG%z+io+1, blockDim%z
       k = k_base + kk
-      if (i >= 1 .and. i <= nx .and. j >= 1 .and. j <= ny .and. k >= 1 .and. k <= nz) then
+      if (ij_in_range .and. k >= 1 .and. k <= nz) then
         idx = kk + offset_xy
         rho(idx) = Q_1(i,j,k);   u(idx) = Q_2(i,j,k)
           v(idx) = Q_3(i,j,k);   w(idx) = Q_4(i,j,k)
