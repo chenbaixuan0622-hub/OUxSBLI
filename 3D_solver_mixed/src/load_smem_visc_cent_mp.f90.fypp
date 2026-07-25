@@ -2,9 +2,16 @@
 ! (cent6) only. The baseline loader uses pipelineMemcpyAsync (cp.async-style
 ! raw byte copy, see wmma/load_smem_visc2.f90) to prefetch Q (real8) straight
 ! into real8 shared tiles -- cp.async moves bytes, it cannot narrow fp64 to
-! fp32. So this loader does a plain synchronous load-and-convert instead
-! (`u(idx) = real(Q(i,2,j,k), 4)`), losing the baseline's async-prefetch
-! pipelining. This is expected for the FP32 fork, not an oversight.
+! fp32. So this loader does a plain synchronous load instead, but now reads
+! directly from the persistent real(4) mirrors u_r4/v_r4/w_r4
+! (calc_physical_quantities_mixed) and the real(4) grid-metric mirrors
+! inv_dx_r4/inv_dy_r4/inv_dz_r4 (populated once per RK stage / once at
+! startup respectively) instead of casting real(8) Q/inv_dx down on every
+! thread (`u(idx) = real(Q(i,2,j,k), 4)`) -- this was the redundant
+! per-thread real(8)->real(4) cast this fork's mixed-precision task set out
+! to eliminate. Only the two transverse inv_d* mirrors each direction's
+! loader actually needs are threaded through (matching the old inv_dy/inv_dz
+! etc. signatures).
 #:include 'config.fypp'
 module load_smem_visc_cent_mp
   use mod_globals, only : threadsEv, threadsFv, threadsGv
@@ -15,7 +22,7 @@ module load_smem_visc_cent_mp
   real(4), parameter :: one_sixty_mp = 1._4 / 60._4
 contains
   attributes(device) subroutine load_smem_visc_cent_mp_x(it, jt, kt, j, k, &
-                                                       nx, ny, nz, inv_dy, inv_dz, Q, u, v, w, uy, vy, uz, wz)
+                                                       nx, ny, nz, inv_dy_r4, inv_dz_r4, u_r4, v_r4, w_r4, u, v, w, uy, vy, uz, wz)
     integer, intent(in), value              :: it
     integer, intent(in), value              :: jt
     integer, intent(in), value              :: kt
@@ -24,9 +31,11 @@ contains
     integer, intent(in), value              :: nx
     integer, intent(in), value              :: ny
     integer, intent(in), value              :: nz
-    real(8), intent(in), device, contiguous :: inv_dy(ny-1)
-    real(8), intent(in), device, contiguous :: inv_dz(nz-1)
-    real(8), intent(in), device, contiguous :: Q(nx,5,ny,nz)
+    real(4), intent(in), device, contiguous :: inv_dy_r4(ny-1)
+    real(4), intent(in), device, contiguous :: inv_dz_r4(nz-1)
+    real(4), intent(in), device, contiguous :: u_r4(nx,ny,nz)
+    real(4), intent(in), device, contiguous :: v_r4(nx,ny,nz)
+    real(4), intent(in), device, contiguous :: w_r4(nx,ny,nz)
     integer, parameter :: io_v = 2
     integer, parameter :: sx = threadsEv%x + 2*io_v + 1
     integer, parameter :: sy = threadsEv%y
@@ -45,21 +54,21 @@ contains
       i = i_base + ii
       idx = ii + offset_yz
       if (1 <= i .and. i <= nx .and. j <= ny .and. k <= nz) then
-        u(idx) = real(Q(i,2,j,k), 4)
-        v(idx) = real(Q(i,3,j,k), 4)
-        w(idx) = real(Q(i,4,j,k), 4)
+        u(idx) = u_r4(i,j,k)
+        v(idx) = v_r4(i,j,k)
+        w(idx) = w_r4(i,j,k)
       endif
       if (1 <= i .and. i <= nx .and. 4 <= j .and. j <= ny-3 .and. k <= nz) then
-        uy(idx) = real((one_sixty_mp * (-real(Q(i,2,j-3,k),4) + real(Q(i,2,j+3,k),4)) + 0.15_4 * (real(Q(i,2,j-2,k),4) - real(Q(i,2,j+2,k),4)) &
-                        + 0.75_4 * (-real(Q(i,2,j-1,k),4) + real(Q(i,2,j+1,k),4))) * real(inv_dy(j),4), 4)
-        vy(idx) = real((one_sixty_mp * (-real(Q(i,3,j-3,k),4) + real(Q(i,3,j+3,k),4)) + 0.15_4 * (real(Q(i,3,j-2,k),4) - real(Q(i,3,j+2,k),4)) &
-                        + 0.75_4 * (-real(Q(i,3,j-1,k),4) + real(Q(i,3,j+1,k),4))) * real(inv_dy(j),4), 4)
+        uy(idx) = (one_sixty_mp * (-u_r4(i,j-3,k) + u_r4(i,j+3,k)) + 0.15_4 * (u_r4(i,j-2,k) - u_r4(i,j+2,k)) &
+                   + 0.75_4 * (-u_r4(i,j-1,k) + u_r4(i,j+1,k))) * inv_dy_r4(j)
+        vy(idx) = (one_sixty_mp * (-v_r4(i,j-3,k) + v_r4(i,j+3,k)) + 0.15_4 * (v_r4(i,j-2,k) - v_r4(i,j+2,k)) &
+                   + 0.75_4 * (-v_r4(i,j-1,k) + v_r4(i,j+1,k))) * inv_dy_r4(j)
       endif
       if (1 <= i .and. i <= nx .and. j <= ny .and. 4 <= k .and. k <= nz-3) then
-        uz(idx) = real((one_sixty_mp * (-real(Q(i,2,j,k-3),4) + real(Q(i,2,j,k+3),4)) + 0.15_4 * (real(Q(i,2,j,k-2),4) - real(Q(i,2,j,k+2),4)) &
-                        + 0.75_4 * (-real(Q(i,2,j,k-1),4) + real(Q(i,2,j,k+1),4))) * real(inv_dz(k),4), 4)
-        wz(idx) = real((one_sixty_mp * (-real(Q(i,4,j,k-3),4) + real(Q(i,4,j,k+3),4)) + 0.15_4 * (real(Q(i,4,j,k-2),4) - real(Q(i,4,j,k+2),4)) &
-                        + 0.75_4 * (-real(Q(i,4,j,k-1),4) + real(Q(i,4,j,k+1),4))) * real(inv_dz(k),4), 4)
+        uz(idx) = (one_sixty_mp * (-u_r4(i,j,k-3) + u_r4(i,j,k+3)) + 0.15_4 * (u_r4(i,j,k-2) - u_r4(i,j,k+2)) &
+                   + 0.75_4 * (-u_r4(i,j,k-1) + u_r4(i,j,k+1))) * inv_dz_r4(k)
+        wz(idx) = (one_sixty_mp * (-w_r4(i,j,k-3) + w_r4(i,j,k+3)) + 0.15_4 * (w_r4(i,j,k-2) - w_r4(i,j,k+2)) &
+                   + 0.75_4 * (-w_r4(i,j,k-1) + w_r4(i,j,k+1))) * inv_dz_r4(k)
       endif
     enddo
     call syncthreads()
@@ -67,7 +76,7 @@ contains
 
 
   attributes(device) subroutine load_smem_visc_cent_mp_y(it, jt, kt, i, k, &
-                                                       nx, ny, nz, inv_dx, inv_dz, Q, u, v, w, ux, vx, vz, wz)
+                                                       nx, ny, nz, inv_dx_r4, inv_dz_r4, u_r4, v_r4, w_r4, u, v, w, ux, vx, vz, wz)
     integer, intent(in), value              :: it
     integer, intent(in), value              :: jt
     integer, intent(in), value              :: kt
@@ -76,9 +85,11 @@ contains
     integer, intent(in), value              :: nx
     integer, intent(in), value              :: ny
     integer, intent(in), value              :: nz
-    real(8), intent(in), device, contiguous :: inv_dx(nx-1)
-    real(8), intent(in), device, contiguous :: inv_dz(nz-1)
-    real(8), intent(in), device, contiguous :: Q(nx,5,ny,nz)
+    real(4), intent(in), device, contiguous :: inv_dx_r4(nx-1)
+    real(4), intent(in), device, contiguous :: inv_dz_r4(nz-1)
+    real(4), intent(in), device, contiguous :: u_r4(nx,ny,nz)
+    real(4), intent(in), device, contiguous :: v_r4(nx,ny,nz)
+    real(4), intent(in), device, contiguous :: w_r4(nx,ny,nz)
     integer, parameter :: io_v = 2
     integer, parameter :: sx = threadsFv%x
     integer, parameter :: sy = threadsFv%y + 2*io_v + 1
@@ -97,21 +108,21 @@ contains
       j = j_base + jj
       idx = jj + offset_xz
       if (i <= nx .and. 1 <= j .and. j <= ny .and. k <= nz) then
-        u(idx) = real(Q(i,2,j,k), 4)
-        v(idx) = real(Q(i,3,j,k), 4)
-        w(idx) = real(Q(i,4,j,k), 4)
+        u(idx) = u_r4(i,j,k)
+        v(idx) = v_r4(i,j,k)
+        w(idx) = w_r4(i,j,k)
       endif
       if (4 <= i .and. i <= nx-3 .and. 1 <= j .and. j <= ny .and. k <= nz) then
-        ux(idx) = real((one_sixty_mp * (-real(Q(i-3,2,j,k),4) + real(Q(i+3,2,j,k),4)) + 0.15_4 * (real(Q(i-2,2,j,k),4) - real(Q(i+2,2,j,k),4)) &
-                        + 0.75_4 * (-real(Q(i-1,2,j,k),4) + real(Q(i+1,2,j,k),4))) * real(inv_dx(i),4), 4)
-        vx(idx) = real((one_sixty_mp * (-real(Q(i-3,3,j,k),4) + real(Q(i+3,3,j,k),4)) + 0.15_4 * (real(Q(i-2,3,j,k),4) - real(Q(i+2,3,j,k),4)) &
-                        + 0.75_4 * (-real(Q(i-1,3,j,k),4) + real(Q(i+1,3,j,k),4))) * real(inv_dx(i),4), 4)
+        ux(idx) = (one_sixty_mp * (-u_r4(i-3,j,k) + u_r4(i+3,j,k)) + 0.15_4 * (u_r4(i-2,j,k) - u_r4(i+2,j,k)) &
+                   + 0.75_4 * (-u_r4(i-1,j,k) + u_r4(i+1,j,k))) * inv_dx_r4(i)
+        vx(idx) = (one_sixty_mp * (-v_r4(i-3,j,k) + v_r4(i+3,j,k)) + 0.15_4 * (v_r4(i-2,j,k) - v_r4(i+2,j,k)) &
+                   + 0.75_4 * (-v_r4(i-1,j,k) + v_r4(i+1,j,k))) * inv_dx_r4(i)
       endif
       if (i <= nx .and. 1 <= j .and. j <= ny .and. 4 <= k .and. k <= nz-3) then
-        vz(idx) = real((one_sixty_mp * (-real(Q(i,3,j,k-3),4) + real(Q(i,3,j,k+3),4)) + 0.15_4 * (real(Q(i,3,j,k-2),4) - real(Q(i,3,j,k+2),4)) &
-                        + 0.75_4 * (-real(Q(i,3,j,k-1),4) + real(Q(i,3,j,k+1),4))) * real(inv_dz(k),4), 4)
-        wz(idx) = real((one_sixty_mp * (-real(Q(i,4,j,k-3),4) + real(Q(i,4,j,k+3),4)) + 0.15_4 * (real(Q(i,4,j,k-2),4) - real(Q(i,4,j,k+2),4)) &
-                        + 0.75_4 * (-real(Q(i,4,j,k-1),4) + real(Q(i,4,j,k+1),4))) * real(inv_dz(k),4), 4)
+        vz(idx) = (one_sixty_mp * (-v_r4(i,j,k-3) + v_r4(i,j,k+3)) + 0.15_4 * (v_r4(i,j,k-2) - v_r4(i,j,k+2)) &
+                   + 0.75_4 * (-v_r4(i,j,k-1) + v_r4(i,j,k+1))) * inv_dz_r4(k)
+        wz(idx) = (one_sixty_mp * (-w_r4(i,j,k-3) + w_r4(i,j,k+3)) + 0.15_4 * (w_r4(i,j,k-2) - w_r4(i,j,k+2)) &
+                   + 0.75_4 * (-w_r4(i,j,k-1) + w_r4(i,j,k+1))) * inv_dz_r4(k)
       endif
     enddo
     call syncthreads()
@@ -119,7 +130,7 @@ contains
 
 
   attributes(device) subroutine load_smem_visc_cent_mp_z(it, jt, kt, i, j, &
-                                                       nx, ny, nz, inv_dx, inv_dy, Q, u, v, w, ux, wx, vy, wy)
+                                                       nx, ny, nz, inv_dx_r4, inv_dy_r4, u_r4, v_r4, w_r4, u, v, w, ux, wx, vy, wy)
     integer, intent(in), value              :: it
     integer, intent(in), value              :: jt
     integer, intent(in), value              :: kt
@@ -128,9 +139,11 @@ contains
     integer, intent(in), value              :: nx
     integer, intent(in), value              :: ny
     integer, intent(in), value              :: nz
-    real(8), intent(in), device, contiguous :: inv_dx(nx-1)
-    real(8), intent(in), device, contiguous :: inv_dy(ny-1)
-    real(8), intent(in), device, contiguous :: Q(nx,5,ny,nz)
+    real(4), intent(in), device, contiguous :: inv_dx_r4(nx-1)
+    real(4), intent(in), device, contiguous :: inv_dy_r4(ny-1)
+    real(4), intent(in), device, contiguous :: u_r4(nx,ny,nz)
+    real(4), intent(in), device, contiguous :: v_r4(nx,ny,nz)
+    real(4), intent(in), device, contiguous :: w_r4(nx,ny,nz)
     integer, parameter :: io_v = 2
     integer, parameter :: sx = threadsGv%x
     integer, parameter :: sy = threadsGv%y
@@ -149,21 +162,21 @@ contains
       k = k_base + kk
       idx = kk + offset_xy
       if (i <= nx .and. j <= ny .and. 1 <= k .and. k <= nz) then
-        u(idx) = real(Q(i,2,j,k), 4)
-        v(idx) = real(Q(i,3,j,k), 4)
-        w(idx) = real(Q(i,4,j,k), 4)
+        u(idx) = u_r4(i,j,k)
+        v(idx) = v_r4(i,j,k)
+        w(idx) = w_r4(i,j,k)
       endif
       if (4 <= i .and. i <= nx-3 .and. j <= ny .and. 1 <= k .and. k <= nz) then
-        ux(idx) = real((one_sixty_mp * (-real(Q(i-3,2,j,k),4) + real(Q(i+3,2,j,k),4)) + 0.15_4 * (real(Q(i-2,2,j,k),4) - real(Q(i+2,2,j,k),4)) &
-                        + 0.75_4 * (-real(Q(i-1,2,j,k),4) + real(Q(i+1,2,j,k),4))) * real(inv_dx(i),4), 4)
-        wx(idx) = real((one_sixty_mp * (-real(Q(i-3,4,j,k),4) + real(Q(i+3,4,j,k),4)) + 0.15_4 * (real(Q(i-2,4,j,k),4) - real(Q(i+2,4,j,k),4)) &
-                        + 0.75_4 * (-real(Q(i-1,4,j,k),4) + real(Q(i+1,4,j,k),4))) * real(inv_dx(i),4), 4)
+        ux(idx) = (one_sixty_mp * (-u_r4(i-3,j,k) + u_r4(i+3,j,k)) + 0.15_4 * (u_r4(i-2,j,k) - u_r4(i+2,j,k)) &
+                   + 0.75_4 * (-u_r4(i-1,j,k) + u_r4(i+1,j,k))) * inv_dx_r4(i)
+        wx(idx) = (one_sixty_mp * (-w_r4(i-3,j,k) + w_r4(i+3,j,k)) + 0.15_4 * (w_r4(i-2,j,k) - w_r4(i+2,j,k)) &
+                   + 0.75_4 * (-w_r4(i-1,j,k) + w_r4(i+1,j,k))) * inv_dx_r4(i)
       endif
       if (i <= nx .and. 4 <= j .and. j <= ny-3 .and. 1 <= k .and. k <= nz) then
-        vy(idx) = real((one_sixty_mp * (-real(Q(i,3,j-3,k),4) + real(Q(i,3,j+3,k),4)) + 0.15_4 * (real(Q(i,3,j-2,k),4) - real(Q(i,3,j+2,k),4)) &
-                        + 0.75_4 * (-real(Q(i,3,j-1,k),4) + real(Q(i,3,j+1,k),4))) * real(inv_dy(j),4), 4)
-        wy(idx) = real((one_sixty_mp * (-real(Q(i,4,j-3,k),4) + real(Q(i,4,j+3,k),4)) + 0.15_4 * (real(Q(i,4,j-2,k),4) - real(Q(i,4,j+2,k),4)) &
-                        + 0.75_4 * (-real(Q(i,4,j-1,k),4) + real(Q(i,4,j+1,k),4))) * real(inv_dy(j),4), 4)
+        vy(idx) = (one_sixty_mp * (-v_r4(i,j-3,k) + v_r4(i,j+3,k)) + 0.15_4 * (v_r4(i,j-2,k) - v_r4(i,j+2,k)) &
+                   + 0.75_4 * (-v_r4(i,j-1,k) + v_r4(i,j+1,k))) * inv_dy_r4(j)
+        wy(idx) = (one_sixty_mp * (-w_r4(i,j-3,k) + w_r4(i,j+3,k)) + 0.15_4 * (w_r4(i,j-2,k) - w_r4(i,j+2,k)) &
+                   + 0.75_4 * (-w_r4(i,j-1,k) + w_r4(i,j+1,k))) * inv_dy_r4(j)
       endif
     enddo
     call syncthreads()
@@ -171,7 +184,7 @@ contains
 
 
   attributes(device) subroutine load_smem_visc_cent_mp_z_koff(it, jt, kt, i, j, &
-                                                            nx, ny, nz, inv_dx, inv_dy, Q, u, v, w, ux, wx, vy, wy, k_lo)
+                                                            nx, ny, nz, inv_dx_r4, inv_dy_r4, u_r4, v_r4, w_r4, u, v, w, ux, wx, vy, wy, k_lo)
     integer, intent(in), value              :: it
     integer, intent(in), value              :: jt
     integer, intent(in), value              :: kt
@@ -180,9 +193,11 @@ contains
     integer, intent(in), value              :: nx
     integer, intent(in), value              :: ny
     integer, intent(in), value              :: nz
-    real(8), intent(in), device, contiguous :: inv_dx(nx-1)
-    real(8), intent(in), device, contiguous :: inv_dy(ny-1)
-    real(8), intent(in), device, contiguous :: Q(nx,5,ny,nz)
+    real(4), intent(in), device, contiguous :: inv_dx_r4(nx-1)
+    real(4), intent(in), device, contiguous :: inv_dy_r4(ny-1)
+    real(4), intent(in), device, contiguous :: u_r4(nx,ny,nz)
+    real(4), intent(in), device, contiguous :: v_r4(nx,ny,nz)
+    real(4), intent(in), device, contiguous :: w_r4(nx,ny,nz)
     integer, intent(in), value              :: k_lo
     integer, parameter :: io_v = 2
     integer, parameter :: sx = threadsGv%x
@@ -202,21 +217,21 @@ contains
       k = k_base + kk
       idx = kk + offset_xy
       if (i <= nx .and. j <= ny .and. 1 <= k .and. k <= nz) then
-        u(idx) = real(Q(i,2,j,k), 4)
-        v(idx) = real(Q(i,3,j,k), 4)
-        w(idx) = real(Q(i,4,j,k), 4)
+        u(idx) = u_r4(i,j,k)
+        v(idx) = v_r4(i,j,k)
+        w(idx) = w_r4(i,j,k)
       endif
       if (4 <= i .and. i <= nx-3 .and. j <= ny .and. 1 <= k .and. k <= nz) then
-        ux(idx) = real((one_sixty_mp * (-real(Q(i-3,2,j,k),4) + real(Q(i+3,2,j,k),4)) + 0.15_4 * (real(Q(i-2,2,j,k),4) - real(Q(i+2,2,j,k),4)) &
-                        + 0.75_4 * (-real(Q(i-1,2,j,k),4) + real(Q(i+1,2,j,k),4))) * real(inv_dx(i),4), 4)
-        wx(idx) = real((one_sixty_mp * (-real(Q(i-3,4,j,k),4) + real(Q(i+3,4,j,k),4)) + 0.15_4 * (real(Q(i-2,4,j,k),4) - real(Q(i+2,4,j,k),4)) &
-                        + 0.75_4 * (-real(Q(i-1,4,j,k),4) + real(Q(i+1,4,j,k),4))) * real(inv_dx(i),4), 4)
+        ux(idx) = (one_sixty_mp * (-u_r4(i-3,j,k) + u_r4(i+3,j,k)) + 0.15_4 * (u_r4(i-2,j,k) - u_r4(i+2,j,k)) &
+                   + 0.75_4 * (-u_r4(i-1,j,k) + u_r4(i+1,j,k))) * inv_dx_r4(i)
+        wx(idx) = (one_sixty_mp * (-w_r4(i-3,j,k) + w_r4(i+3,j,k)) + 0.15_4 * (w_r4(i-2,j,k) - w_r4(i+2,j,k)) &
+                   + 0.75_4 * (-w_r4(i-1,j,k) + w_r4(i+1,j,k))) * inv_dx_r4(i)
       endif
       if (i <= nx .and. 4 <= j .and. j <= ny-3 .and. 1 <= k .and. k <= nz) then
-        vy(idx) = real((one_sixty_mp * (-real(Q(i,3,j-3,k),4) + real(Q(i,3,j+3,k),4)) + 0.15_4 * (real(Q(i,3,j-2,k),4) - real(Q(i,3,j+2,k),4)) &
-                        + 0.75_4 * (-real(Q(i,3,j-1,k),4) + real(Q(i,3,j+1,k),4))) * real(inv_dy(j),4), 4)
-        wy(idx) = real((one_sixty_mp * (-real(Q(i,4,j-3,k),4) + real(Q(i,4,j+3,k),4)) + 0.15_4 * (real(Q(i,4,j-2,k),4) - real(Q(i,4,j+2,k),4)) &
-                        + 0.75_4 * (-real(Q(i,4,j-1,k),4) + real(Q(i,4,j+1,k),4))) * real(inv_dy(j),4), 4)
+        vy(idx) = (one_sixty_mp * (-v_r4(i,j-3,k) + v_r4(i,j+3,k)) + 0.15_4 * (v_r4(i,j-2,k) - v_r4(i,j+2,k)) &
+                   + 0.75_4 * (-v_r4(i,j-1,k) + v_r4(i,j+1,k))) * inv_dy_r4(j)
+        wy(idx) = (one_sixty_mp * (-w_r4(i,j-3,k) + w_r4(i,j+3,k)) + 0.15_4 * (w_r4(i,j-2,k) - w_r4(i,j+2,k)) &
+                   + 0.75_4 * (-w_r4(i,j-1,k) + w_r4(i,j+1,k))) * inv_dy_r4(j)
       endif
     enddo
     call syncthreads()

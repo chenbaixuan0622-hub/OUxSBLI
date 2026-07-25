@@ -49,7 +49,7 @@ macro(add_ouxsbli_case)
     set(_CASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
   endif()
 
-  set(FYPP_FLAGS "-I${_CASE_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}/../src" "-I${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src")
+  set(FYPP_FLAGS "-I${_CASE_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}/../src" "-I${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src" "-DMIXED_FORK=True")
 
   set(_PARENT_FYPP "mod_constant" "calc_muscl")
   set(_SHARED_FYPP
@@ -114,7 +114,7 @@ macro(add_ouxsbli_case)
       "${CMAKE_CURRENT_SOURCE_DIR}/set.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpu_gpu_mpi.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../src/set_coordinate.f90"
-      "${CMAKE_CURRENT_SOURCE_DIR}/../../src/calc_physical_quantities.f90"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_physical_quantities_mixed.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../src/print.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src/calc_hybrid.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src/calc_steps.f90"
