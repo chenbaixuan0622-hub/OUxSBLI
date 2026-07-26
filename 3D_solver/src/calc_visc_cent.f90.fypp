@@ -12,17 +12,36 @@
     end block
     #:else
     block
-      real(8) s1, s2, s3, v
+      real(8) v
       !ai = 0.00390625d0 * (3.d0*a(1) - 25.d0*a(2) + 150.d0*(a(3)+a(4)) - 25.d0*a(5) + 3.d0*a(6))
-      s1 = a(1) + a(6)
-      s2 = a(2) + a(5)
-      s3 = a(3) + a(4)
-      v  = 0.01171875d0 * s1
-      v  = fma(-0.09765625d0, s2, v)
-      ai = fma(0.5859375d0,   s3, v)
+      v  = 0.01171875d0 * (a(1) + a(6))
+      v  = fma(-0.09765625d0, (a(2) + a(5)), v)
+      ai = fma(0.5859375d0,   (a(3) + a(4)), v)
     end block
     #:endif
   end function interp${N}$
+
+  attributes(device) function interp2_${N}$(a, b) result(ai)
+    real(8), intent(in), contiguous :: a(${N}$), b(${N}$)
+    real(8) ai
+    #:if N == 4
+    block
+      real(8) s1, s2
+      !ai = 0.0625d0 * (-a(1) + 9.d0 * (a(2) + a(3)) - a(4))
+      s1 = a(2) + a(3) + b(2) + b(3)
+      s2 = a(1) + a(4) + b(1) + b(4)
+      ai = 0.0625d0 * fma(9.d0, s1, -s2)
+    end block
+    #:else
+    block
+      real(8) v
+      !ai = 0.00390625d0 * (3.d0*a(1) - 25.d0*a(2) + 150.d0*(a(3)+a(4)) - 25.d0*a(5) + 3.d0*a(6))
+      v  = 0.01171875d0 * (a(1) + a(6) + b(1) + b(6))
+      v  = fma(-0.09765625d0, (a(2) + a(5) + b(2) + b(5)), v)
+      ai = fma(0.5859375d0,   (a(3) + a(4) + b(3) + b(4)), v)
+    end block
+    #:endif
+  end function interp2_${N}$
 
   attributes(device) function diff${N}$(d, a) result(da)
     real(8), intent(in)             :: d
@@ -30,23 +49,19 @@
     real(8) da
     #:if N == 4
     block
-      real(8) factor, s1, s2
+      real(8) s1, s2
       !da = (a(1) - 27.d0 * (a(2) - a(3)) - a(4)) * one_24 * d
-      factor = one_24 * d
       s1 = a(2) - a(3)
       s2 = a(1) - a(4)
-      da = factor * fma(-27.d0, s1, s2)
+      da = one_24 * d * fma(-27.d0, s1, s2)
     end block
     #:else
     block
-      real(8) s1, s2, s3, v
+      real(8) v
       !da = (-0.0046875d0*a(1) + 0.065104167d0*a(2) - 1.171875d0*(a(3)-a(4)) - 0.065104167d0*a(5) + 0.0046875d0*a(6)) * d
-      s1 = -a(1) + a(6)
-      s2 =  a(2) - a(5)
-      s3 = -a(3) + a(4)
-      v  = 0.0046875d0 * s1
-      v  = fma(0.065104167d0, s2, v)
-      da = d * fma(1.171875d0, s3, v)
+      v  = 0.0046875d0 * (-a(1) + a(6))
+      v  = fma(0.065104167d0,   a(2) - a(5), v)
+      da = d * fma(1.171875d0, -a(3) + a(4), v)
     end block
     #:endif
   end function diff${N}$
@@ -57,45 +72,35 @@
   ! (nx,ny,nz) array are not contiguous, so an array-section actual argument
   ! would violate the `contiguous` dummy attribute above; scalar element
   ! references have no such restriction).
+  ! Pairwise-presummed variants of interp${N}$_s/diff${N}$_s: same arithmetic
+  ! as interp${N}$/diff${N}$, but the caller forms the symmetric pairs
+  ! (s1=a1+a6, s2=a2+a5, s3=a3+a4, etc.) right after each pair of scalar
+  ! loads, instead of holding all N raw loads live simultaneously until a
+  ! single N-argument call.
   #:if N == 4
-  attributes(device) function interp${N}$_s(a1, a2, a3, a4) result(ai)
-    real(8), intent(in) :: a1, a2, a3, a4
+  attributes(device) function interp${N}$_s(s1, s2) result(ai)
+    real(8), intent(in) :: s1, s2
     real(8) ai
-    real(8) s1, s2
-    s1 = a2 + a3
-    s2 = a1 + a4
     ai = 0.0625d0 * fma(9.d0, s1, -s2)
   end function interp${N}$_s
 
-  attributes(device) function diff${N}$_s(d, a1, a2, a3, a4) result(da)
-    real(8), intent(in) :: d, a1, a2, a3, a4
+  attributes(device) function diff${N}$_s(d, s1, s2) result(da)
+    real(8), intent(in) :: d, s1, s2
     real(8) da
-    real(8) factor, s1, s2
-    factor = one_24 * d
-    s1 = a2 - a3
-    s2 = a1 - a4
-    da = factor * fma(-27.d0, s1, s2)
+    da = one_24 * d * fma(-27.d0, s1, s2)
   end function diff${N}$_s
   #:else
-  attributes(device) function interp${N}$_s(a1, a2, a3, a4, a5, a6) result(ai)
-    real(8), intent(in) :: a1, a2, a3, a4, a5, a6
-    real(8) ai
-    real(8) s1, s2, s3, v
-    s1 = a1 + a6
-    s2 = a2 + a5
-    s3 = a3 + a4
+  attributes(device) function interp${N}$_s(s1, s2, s3) result(ai)
+    real(8), intent(in) :: s1, s2, s3
+    real(8) ai, v
     v  = 0.01171875d0 * s1
     v  = fma(-0.09765625d0, s2, v)
     ai = fma(0.5859375d0,   s3, v)
   end function interp${N}$_s
 
-  attributes(device) function diff${N}$_s(d, a1, a2, a3, a4, a5, a6) result(da)
-    real(8), intent(in) :: d, a1, a2, a3, a4, a5, a6
-    real(8) da
-    real(8) s1, s2, s3, v
-    s1 = -a1 + a6
-    s2 =  a2 - a5
-    s3 = -a3 + a4
+  attributes(device) function diff${N}$_s(d, s1, s2, s3) result(da)
+    real(8), intent(in) :: d, s1, s2, s3
+    real(8) da, v
     v  = 0.0046875d0 * s1
     v  = fma(0.065104167d0, s2, v)
     da = d * fma(1.171875d0, s3, v)
@@ -110,11 +115,10 @@
     real(8), intent(in)             :: d
     real(8), intent(out)            :: t11
     real(8), intent(out)            :: ut11
-    real(8) vyi, wzi, ux
-    vyi  = interp${N}$(vy)
-    wzi  = interp${N}$(wz)
+    real(8) vywz, ux
+    vywz = interp2_${N}$(vy, wz)
     ux   = diff${N}$(d, u)
-    t11  = two_third * mui * (fma(2.d0, ux, -vyi - wzi))
+    t11  = two_third * mui * (fma(2.d0, ux, -vywz))
     ut11 = interp${N}$(u) * t11
   end subroutine calc_tau_straight
 
@@ -127,14 +131,13 @@
     real(8), intent(in)             :: d
     real(8), intent(out)            :: t11
     real(8), intent(out)            :: ut11
-    real(8) vyi, wzi, ux, mui_blend
-    vyi  = interp${N}$(vy)
-    wzi  = interp${N}$(wz)
+    real(8) vywz, ux, mui_blend
+    vywz = interp2_${N}$(vy, wz)
     ux   = diff${N}$(d, u)
-    t11  = two_third * mui * (fma(2.d0, ux, -vyi - wzi))
+    t11  = two_third * mui * (fma(2.d0, ux, -vywz))
     ut11 = interp${N}$(u) * t11
     mui_blend = 0.5d0 * (mui + muti)
-    t11  = two_third * mui_blend * (fma(2.d0, ux, -vyi - wzi))
+    t11  = two_third * mui_blend * (fma(2.d0, ux, -vywz))
   end subroutine calc_tau_straight_LES
 
   attributes(device) subroutine calc_tau_cross(mui, v, uy, d, t12, vt12)
