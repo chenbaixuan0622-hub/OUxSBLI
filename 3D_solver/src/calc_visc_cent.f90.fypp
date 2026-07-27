@@ -159,6 +159,27 @@
   end function diff${N}$_s
   #:endif
 
+  ! Two-array scalar sibling of interp2_${N}$: each sK pair below is one
+  ! array's OWN symmetric pair-sum (same shape as interp${N}$_s's s1/s2[/s3]),
+  ! kept separate per array so every call-site argument stays a single
+  ! 2-read/1-add expression; the two arrays are combined here, mirroring
+  ! interp2_${N}$'s own a(k)+b(k) pairing.
+  #:if N == 4
+  attributes(device) function interp2_${N}$_s(sa1, sb1, sa2, sb2) result(ai)
+    real(8), intent(in) :: sa1, sb1, sa2, sb2
+    real(8) ai
+    ai = 0.0625d0 * fma(9.d0, (sa1 + sb1), -(sa2 + sb2))
+  end function interp2_${N}$_s
+  #:else
+  attributes(device) function interp2_${N}$_s(sa1, sb1, sa2, sb2, sa3, sb3) result(ai)
+    real(8), intent(in) :: sa1, sb1, sa2, sb2, sa3, sb3
+    real(8) ai, v
+    v  = 0.01171875d0 * (sa1 + sb1)
+    v  = fma(-0.09765625d0, (sa2 + sb2), v)
+    ai = fma(0.5859375d0,   (sa3 + sb3), v)
+  end function interp2_${N}$_s
+  #:endif
+
   attributes(device) subroutine calc_tau_straight(mui, u, vy, wz, d, t11, ut11)
     real(8), intent(in), value      :: mui
     real(8), intent(in), contiguous :: u(${N}$)
@@ -191,6 +212,74 @@
     mui_blend = 0.5d0 * (mui + muti)
     t11  = two_third * mui_blend * (fma(2.d0, ux, -vywz))
   end subroutine calc_tau_straight_LES
+
+  ! Scalar-argument sibling of calc_tau_straight, for non-contiguous
+  ! (y/z-strided) reads of the two cross-direction gradient fields -- see
+  ! interp2_${N}$_s above. `u` is unaffected: it's always the sweep
+  ! direction's own contiguous shared-memory slice.
+  #:if N == 4
+  attributes(device) subroutine calc_tau_straight_s(mui, u, sa1, sb1, sa2, sb2, d, t11, ut11)
+    real(8), intent(in), value      :: mui
+    real(8), intent(in), contiguous :: u(${N}$)
+    real(8), intent(in)             :: sa1, sb1, sa2, sb2
+    real(8), intent(in)             :: d
+    real(8), intent(out)            :: t11
+    real(8), intent(out)            :: ut11
+    real(8) vywz, ux
+    vywz = interp2_${N}$_s(sa1, sb1, sa2, sb2)
+    ux   = diff${N}$(d, u)
+    t11  = two_third * mui * (fma(2.d0, ux, -vywz))
+    ut11 = interp${N}$(u) * t11
+  end subroutine calc_tau_straight_s
+
+  attributes(device) subroutine calc_tau_straight_LES_s(mui, muti, u, sa1, sb1, sa2, sb2, d, t11, ut11)
+    real(8), intent(in), value      :: mui
+    real(8), intent(in), value      :: muti
+    real(8), intent(in), contiguous :: u(${N}$)
+    real(8), intent(in)             :: sa1, sb1, sa2, sb2
+    real(8), intent(in)             :: d
+    real(8), intent(out)            :: t11
+    real(8), intent(out)            :: ut11
+    real(8) vywz, ux, mui_blend
+    vywz = interp2_${N}$_s(sa1, sb1, sa2, sb2)
+    ux   = diff${N}$(d, u)
+    t11  = two_third * mui * (fma(2.d0, ux, -vywz))
+    ut11 = interp${N}$(u) * t11
+    mui_blend = 0.5d0 * (mui + muti)
+    t11  = two_third * mui_blend * (fma(2.d0, ux, -vywz))
+  end subroutine calc_tau_straight_LES_s
+  #:else
+  attributes(device) subroutine calc_tau_straight_s(mui, u, sa1, sb1, sa2, sb2, sa3, sb3, d, t11, ut11)
+    real(8), intent(in), value      :: mui
+    real(8), intent(in), contiguous :: u(${N}$)
+    real(8), intent(in)             :: sa1, sb1, sa2, sb2, sa3, sb3
+    real(8), intent(in)             :: d
+    real(8), intent(out)            :: t11
+    real(8), intent(out)            :: ut11
+    real(8) vywz, ux
+    vywz = interp2_${N}$_s(sa1, sb1, sa2, sb2, sa3, sb3)
+    ux   = diff${N}$(d, u)
+    t11  = two_third * mui * (fma(2.d0, ux, -vywz))
+    ut11 = interp${N}$(u) * t11
+  end subroutine calc_tau_straight_s
+
+  attributes(device) subroutine calc_tau_straight_LES_s(mui, muti, u, sa1, sb1, sa2, sb2, sa3, sb3, d, t11, ut11)
+    real(8), intent(in), value      :: mui
+    real(8), intent(in), value      :: muti
+    real(8), intent(in), contiguous :: u(${N}$)
+    real(8), intent(in)             :: sa1, sb1, sa2, sb2, sa3, sb3
+    real(8), intent(in)             :: d
+    real(8), intent(out)            :: t11
+    real(8), intent(out)            :: ut11
+    real(8) vywz, ux, mui_blend
+    vywz = interp2_${N}$_s(sa1, sb1, sa2, sb2, sa3, sb3)
+    ux   = diff${N}$(d, u)
+    t11  = two_third * mui * (fma(2.d0, ux, -vywz))
+    ut11 = interp${N}$(u) * t11
+    mui_blend = 0.5d0 * (mui + muti)
+    t11  = two_third * mui_blend * (fma(2.d0, ux, -vywz))
+  end subroutine calc_tau_straight_LES_s
+  #:endif
 
   attributes(device) subroutine calc_tau_cross(mui, v, uy, d, t12, vt12)
     real(8), intent(in), value      :: mui

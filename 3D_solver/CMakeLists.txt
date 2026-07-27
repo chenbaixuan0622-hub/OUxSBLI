@@ -75,6 +75,7 @@ macro(add_ouxsbli_case)
       "${CMAKE_CURRENT_SOURCE_DIR}/../../src/calc_physical_quantities.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../src/load_smem_visc2.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../src/load_smem_visc_me4_base.f90"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_div.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_les.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_hybrid.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_steps.f90"

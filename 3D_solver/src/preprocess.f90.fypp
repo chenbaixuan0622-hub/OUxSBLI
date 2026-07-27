@@ -19,13 +19,14 @@ contains
 
 
   subroutine allocate_device_mem(myrank, nx, ny, nz, dtdxdy, dtdydz, dtdzdx, xix, etay, zetaz, Jacobian, &
-                                 Q_1, Q_2, Q_3, Q_4, Q_5, T, mu, mut, qc2, E, F, G)
+                                 Q_1, Q_2, Q_3, Q_4, Q_5, T, mu, mut, qc2, ux, vy, wz, E, F, G)
     integer, intent(in)                       :: myrank, nx, ny, nz
     real(8), intent(out), allocatable, device :: dtdxdy(:,:), dtdydz(:,:), dtdzdx(:,:)
     real(8), intent(out), allocatable, device :: xix(:), etay(:), zetaz(:)
     real(8), intent(out), allocatable, device :: Jacobian(:,:)
     real(8), intent(out), allocatable, device :: Q_1(:,:,:), Q_2(:,:,:), Q_3(:,:,:), Q_4(:,:,:), Q_5(:,:,:)
     real(8), intent(out), allocatable, device :: T(:,:,:), mu(:,:,:), mut(:,:,:), qc2(:,:,:)
+    real(8), intent(out), allocatable, device :: ux(:,:,:), vy(:,:,:), wz(:,:,:)
     real(8), intent(out), allocatable, device :: E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
     integer ierr
     allocate(Q_1(nx,ny,nz), Q_2(nx,ny,nz), Q_3(nx,ny,nz), Q_4(nx,ny,nz), Q_5(nx,ny,nz), &
@@ -33,10 +34,13 @@ contains
     allocate(dtdxdy(nx-2,ny-2), dtdydz(ny-2,nz-2), dtdzdx(nx-2,nz-2), xix(nx-1), etay(ny-1), zetaz(nz-1), Jacobian(nx,ny), stat=ierr)
 #:if VISC == 'Euler'
     allocate(T(nx,ny,nz), mu(1,1,1), mut(1,1,1), qc2(1,1,1), stat=ierr)
+    allocate(ux(1,1,1), vy(1,1,1), wz(1,1,1), stat=ierr)
 #:elif VISC == 'NS'
     allocate(T(nx,ny,nz), mu(nx,ny,nz), mut(1,1,1), qc2(1,1,1), stat=ierr)
+    allocate(ux(nx,ny,nz), vy(nx,ny,nz), wz(nx,ny,nz), stat=ierr)
 #:elif VISC == 'LES'
     allocate(T(nx,ny,nz), mu(nx,ny,nz), mut(nx,ny,nz), qc2(nx,ny,nz), stat=ierr)
+    allocate(ux(nx,ny,nz), vy(nx,ny,nz), wz(nx,ny,nz), stat=ierr)
 #:endif
     call init_sensor(nx, ny, nz)
     if (ierr /= 0) then

@@ -41,6 +41,7 @@ contains
     #:if is_les
       mut, qc2, &
     #:endif
+    vy, wz, &
     #:if is_koff
       k_lo, k_hi, &
     #:endif
@@ -60,6 +61,8 @@ contains
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)
     #:endif
+    real(8), intent(in), device, contiguous    :: vy(nx,ny,nz) !< dv/dy at cell-center, precomputed by calc_div (interior branch only)
+    real(8), intent(in), device, contiguous    :: wz(nx,ny,nz) !< dw/dz at cell-center, precomputed by calc_div (interior branch only)
     real(8), intent(inout), device, contiguous :: E(nx-1,ny-2,nz-2,5)
     #:if is_koff
     integer, intent(in), value                 :: k_lo
@@ -77,9 +80,7 @@ contains
     real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  v
     real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  w
     real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: uy
-    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: vy
     real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: uz
-    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: wz
     integer i, j, k, it, jt, kt, idx, offset_yz
     logical :: valid, interior
     real(8) :: kTx, utau_sum, mui
@@ -102,7 +103,7 @@ contains
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     #:endif
     offset_yz = (jt-1)*sx + (kt-1)*sx*sy
-    call load_smem_visc_cent${VISC_ORDER}$_x(it, jt, kt, j, k, nx, ny, nz, dy(j), dz(k), Q_2, Q_3, Q_4, u, v, w, uy, vy, uz, wz)
+    call load_smem_visc_cent${VISC_ORDER}$_x(it, jt, kt, j, k, nx, ny, nz, dy(j), dz(k), Q_2, Q_3, Q_4, u, v, w, uy, uz)
     i  = (blockIdx%x-1)*blockDim%x + it
     idx = it + offset_yz
     #:if is_koff
@@ -146,9 +147,9 @@ contains
         block
           real(8) :: tau, utau
           #:if is_les
-          call calc_tau_straight_LES(mui, muti, u(idx-io_v:idx+io_v+1), vy(idx-io_v:idx+io_v+1), wz(idx-io_v:idx+io_v+1), dx(i), tau, utau)
+          call calc_tau_straight_LES(mui, muti, u(idx-io_v:idx+io_v+1), vy(i-io_v:i+io_v+1,j,k), wz(i-io_v:i+io_v+1,j,k), dx(i), tau, utau)
           #:else
-          call calc_tau_straight(mui, u(idx-io_v:idx+io_v+1), vy(idx-io_v:idx+io_v+1), wz(idx-io_v:idx+io_v+1), dx(i), tau, utau)
+          call calc_tau_straight(mui, u(idx-io_v:idx+io_v+1), vy(i-io_v:i+io_v+1,j,k), wz(i-io_v:i+io_v+1,j,k), dx(i), tau, utau)
           #:endif
           call __stcg(E(i,j-1,k-1,2), __ldlu(E(i,j-1,k-1,2)) - tau)
           utau_sum = utau
@@ -352,6 +353,7 @@ contains
     #:if is_les
       mut, qc2, &
     #:endif
+    ux, wz, &
     #:if is_koff
       k_lo, k_hi, &
     #:endif
@@ -371,6 +373,8 @@ contains
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)
     #:endif
+    real(8), intent(in), device, contiguous    :: ux(nx,ny,nz) !< du/dx at cell-center, precomputed by calc_div (interior branch only)
+    real(8), intent(in), device, contiguous    :: wz(nx,ny,nz) !< dw/dz at cell-center, precomputed by calc_div (interior branch only)
     real(8), intent(inout), device, contiguous :: F(nx-2,ny-1,nz-2,5)
     #:if is_koff
     integer, intent(in), value                 :: k_lo
@@ -388,8 +392,6 @@ contains
     real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  v
     real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  w
     real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: vx
-    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: wz
-    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: ux
     real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: vz
     integer i, j, k, it, jt, kt, idx, offset_xz
     logical :: valid, interior
@@ -413,7 +415,7 @@ contains
     k  = (blockIdx%z-1)*blockDim%z + kt + 1
     #:endif
     offset_xz = (it-1)*sy + (kt-1)*sy*sx
-    call load_smem_visc_cent${VISC_ORDER}$_y(it, jt, kt, i, k, nx, ny, nz, dx(i), dz(k), Q_2, Q_3, Q_4, u, v, w, ux, vx, vz, wz)
+    call load_smem_visc_cent${VISC_ORDER}$_y(it, jt, kt, i, k, nx, ny, nz, dx(i), dz(k), Q_2, Q_3, Q_4, u, v, w, vx, vz)
     j  = (blockIdx%y-1)*blockDim%y + jt
     idx = jt + offset_xz
     #:if is_koff
@@ -456,10 +458,32 @@ contains
         kTy = Cp_over_Pr * mui * Tx
         block
           real(8) :: tau, utau
+          #:if VISC_ORDER == 4
           #:if is_les
-          call calc_tau_straight_LES(mui, muti, v(idx-io_v:idx+io_v+1), wz(idx-io_v:idx+io_v+1), ux(idx-io_v:idx+io_v+1), dy(j), tau, utau)
+          call calc_tau_straight_LES_s(mui, muti, v(idx-io_v:idx+io_v+1), &
+               wz(i,j,k)+wz(i,j+1,k), ux(i,j,k)+ux(i,j+1,k), &
+               wz(i,j-1,k)+wz(i,j+2,k), ux(i,j-1,k)+ux(i,j+2,k), &
+               dy(j), tau, utau)
           #:else
-          call calc_tau_straight(mui, v(idx-io_v:idx+io_v+1), wz(idx-io_v:idx+io_v+1), ux(idx-io_v:idx+io_v+1), dy(j), tau, utau)
+          call calc_tau_straight_s(mui, v(idx-io_v:idx+io_v+1), &
+               wz(i,j,k)+wz(i,j+1,k), ux(i,j,k)+ux(i,j+1,k), &
+               wz(i,j-1,k)+wz(i,j+2,k), ux(i,j-1,k)+ux(i,j+2,k), &
+               dy(j), tau, utau)
+          #:endif
+          #:else
+          #:if is_les
+          call calc_tau_straight_LES_s(mui, muti, v(idx-io_v:idx+io_v+1), &
+               wz(i,j-2,k)+wz(i,j+3,k), ux(i,j-2,k)+ux(i,j+3,k), &
+               wz(i,j-1,k)+wz(i,j+2,k), ux(i,j-1,k)+ux(i,j+2,k), &
+               wz(i,j,  k)+wz(i,j+1,k), ux(i,j,  k)+ux(i,j+1,k), &
+               dy(j), tau, utau)
+          #:else
+          call calc_tau_straight_s(mui, v(idx-io_v:idx+io_v+1), &
+               wz(i,j-2,k)+wz(i,j+3,k), ux(i,j-2,k)+ux(i,j+3,k), &
+               wz(i,j-1,k)+wz(i,j+2,k), ux(i,j-1,k)+ux(i,j+2,k), &
+               wz(i,j,  k)+wz(i,j+1,k), ux(i,j,  k)+ux(i,j+1,k), &
+               dy(j), tau, utau)
+          #:endif
           #:endif
           call __stcg(F(i-1,j,k-1,3), __ldlu(F(i-1,j,k-1,3)) - tau)
           utau_sum = utau
@@ -663,6 +687,7 @@ contains
     #:if is_les
       mut, qc2, &
     #:endif
+    ux, vy, &
     #:if is_koff
       k_lo, k_hi, &
     #:endif
@@ -682,6 +707,8 @@ contains
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: qc2(nx,ny,nz)
     #:endif
+    real(8), intent(in), device, contiguous    :: ux(nx,ny,nz) !< du/dx at cell-center, precomputed by calc_div (interior branch only)
+    real(8), intent(in), device, contiguous    :: vy(nx,ny,nz) !< dv/dy at cell-center, precomputed by calc_div (interior branch only)
     real(8), intent(inout), device, contiguous :: G(nx-2,ny-2,nz-1,5)
     #:if is_koff
     integer, intent(in), value                 :: k_lo
@@ -700,8 +727,6 @@ contains
     real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared ::  w
     real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: wx
     real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: wy
-    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: ux
-    real(8), dimension(-(io_v-1):sx*sy*sz-io_v), shared :: vy
     integer i, j, k, it, jt, kt, idx, offset_xy
     logical :: valid, interior
     real(8) :: kTz, utau_sum, mui
@@ -721,11 +746,11 @@ contains
     j  = (blockIdx%y-1)*blockDim%y + jt + 1
     offset_xy = (jt-1)*sz + (it-1)*sz*sy
     #:if is_koff
-    call load_smem_visc_cent${VISC_ORDER}$_z_koff(it, jt, kt, i, j, nx, ny, nz, dx(i), dy(j), Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy, k_lo)
+    call load_smem_visc_cent${VISC_ORDER}$_z_koff(it, jt, kt, i, j, nx, ny, nz, dx(i), dy(j), Q_2, Q_3, Q_4, u, v, w, wx, wy, k_lo)
     k  = (blockIdx%z-1)*blockDim%z + k_lo - 1 + kt
     valid = .not. (nx-1 < i .or. ny-1 < j .or. k_hi < k)
     #:else
-    call load_smem_visc_cent${VISC_ORDER}$_z(it, jt, kt, i, j, nx, ny, nz, dx(i), dy(j), Q_2, Q_3, Q_4, u, v, w, ux, wx, vy, wy)
+    call load_smem_visc_cent${VISC_ORDER}$_z(it, jt, kt, i, j, nx, ny, nz, dx(i), dy(j), Q_2, Q_3, Q_4, u, v, w, wx, wy)
     k  = (blockIdx%z-1)*blockDim%z + kt
     valid = .not. (nx-1 < i .or. ny-1 < j .or. nz-1 < k)
     #:endif
@@ -765,10 +790,32 @@ contains
         kTz = Cp_over_Pr * mui * Tx
         block
           real(8) :: tau, utau
+          #:if VISC_ORDER == 4
           #:if is_les
-          call calc_tau_straight_LES(mui, muti, w(idx-io_v:idx+io_v+1), ux(idx-io_v:idx+io_v+1), vy(idx-io_v:idx+io_v+1), dz(k), tau, utau)
+          call calc_tau_straight_LES_s(mui, muti, w(idx-io_v:idx+io_v+1), &
+               ux(i,j,k)+ux(i,j,k+1), vy(i,j,k)+vy(i,j,k+1), &
+               ux(i,j,k-1)+ux(i,j,k+2), vy(i,j,k-1)+vy(i,j,k+2), &
+               dz(k), tau, utau)
           #:else
-          call calc_tau_straight(mui, w(idx-io_v:idx+io_v+1), ux(idx-io_v:idx+io_v+1), vy(idx-io_v:idx+io_v+1), dz(k), tau, utau)
+          call calc_tau_straight_s(mui, w(idx-io_v:idx+io_v+1), &
+               ux(i,j,k)+ux(i,j,k+1), vy(i,j,k)+vy(i,j,k+1), &
+               ux(i,j,k-1)+ux(i,j,k+2), vy(i,j,k-1)+vy(i,j,k+2), &
+               dz(k), tau, utau)
+          #:endif
+          #:else
+          #:if is_les
+          call calc_tau_straight_LES_s(mui, muti, w(idx-io_v:idx+io_v+1), &
+               ux(i,j,k-2)+ux(i,j,k+3), vy(i,j,k-2)+vy(i,j,k+3), &
+               ux(i,j,k-1)+ux(i,j,k+2), vy(i,j,k-1)+vy(i,j,k+2), &
+               ux(i,j,k  )+ux(i,j,k+1), vy(i,j,k  )+vy(i,j,k+1), &
+               dz(k), tau, utau)
+          #:else
+          call calc_tau_straight_s(mui, w(idx-io_v:idx+io_v+1), &
+               ux(i,j,k-2)+ux(i,j,k+3), vy(i,j,k-2)+vy(i,j,k+3), &
+               ux(i,j,k-1)+ux(i,j,k+2), vy(i,j,k-1)+vy(i,j,k+2), &
+               ux(i,j,k  )+ux(i,j,k+1), vy(i,j,k  )+vy(i,j,k+1), &
+               dz(k), tau, utau)
+          #:endif
           #:endif
           call __stcg(G(i-1,j-1,k,4), __ldlu(G(i-1,j-1,k,4)) - tau)
           utau_sum = utau
