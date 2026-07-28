@@ -22,7 +22,7 @@ module calc_flux_base
   use calc_visc_high_internal
   #:endif
   #:if VISC in ('NS', 'LES') and VISC_ORDER > 2
-  use calc_div, only : calc_div_${VISC_ORDER}$_in
+  use calc_div, only : calc_div_ux_${VISC_ORDER}$_in, calc_div_vy_${VISC_ORDER}$_in, calc_div_wz_${VISC_ORDER}$_in
   #:endif
   #:if VISC == 'LES'
   use calc_les
@@ -175,11 +175,17 @@ contains
     #:if VISC_ORDER > 2
     ! ux/vy/wz (cell-center velocity gradients) are precomputed once here and
     ! reused by calc_Ev/Fv/Gv below instead of each direction independently
-    ! recomputing the other two -- see calc_div.f90. Only wired into the
-    ! non-COMMZ path below: no current case combines COMMZ with NS/LES (the
-    ! only COMMZ=True case, STZ, is Euler-only), so the COMMZ branch below is
-    ! left on the old per-kernel recompute path as a known follow-up.
-    call calc_div_${VISC_ORDER}$_in(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_2, Q_3, Q_4, ux, vy, wz)
+    ! recomputing the other two -- see calc_div.f90. Split into 3
+    ! single-component kernels (each with a directly-bounded loop in its own
+    ! margin direction, no branching) rather than one combined kernel, to
+    ! keep each kernel's register footprint to just the one component it
+    ! computes. Only wired into the non-COMMZ path below: no current case
+    ! combines COMMZ with NS/LES (the only COMMZ=True case, STZ, is
+    ! Euler-only), so the COMMZ branch below is left on the old per-kernel
+    ! recompute path as a known follow-up.
+    call calc_div_ux_${VISC_ORDER}$_in(nx, ny, nz, inv_dx, Q_2, ux)
+    call calc_div_vy_${VISC_ORDER}$_in(nx, ny, nz, inv_dy, Q_3, vy)
+    call calc_div_wz_${VISC_ORDER}$_in(nx, ny, nz, inv_dz, Q_4, wz)
     #:endif
     ! ===================================================================
     ! whole domain or koff

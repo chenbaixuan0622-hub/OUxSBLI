@@ -11,7 +11,7 @@
       !s2 = a(1) + a(4)
       !ai = 0.0625d0 * fma(9.d0, s1, -s2)
       ! register efficiency
-      !real(8) v
+      real(8) v
       v  = -a(1)
       v  = fma(9.d0, a(2), v)
       v  = fma(9.d0, a(3), v)
