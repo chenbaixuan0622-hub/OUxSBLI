@@ -21,6 +21,9 @@ module calc_flux_base
   use calc_visc_high
   use calc_visc_high_internal
   #:endif
+  #:if VISC in ('NS', 'LES') and VISC_ORDER > 2
+  use calc_div, only : calc_div_ux_${VISC_ORDER}$_in, calc_div_vy_${VISC_ORDER}$_in, calc_div_wz_${VISC_ORDER}$_in
+  #:endif
   #:if VISC == 'LES'
   use calc_les
   #:endif
@@ -110,7 +113,7 @@ contains
 
 
   subroutine calc_EFG(nx, ny, nz, inv_dx, inv_dy, inv_dz, Jacobian, &
-                       QJ_1, QJ_2, QJ_3, QJ_4, QJ_5, Q_1, Q_2, Q_3, Q_4, Q_5, T, mu, mut, qc2, E, F, G, k_lo_G, k_hi_G)
+                       QJ_1, QJ_2, QJ_3, QJ_4, QJ_5, Q_1, Q_2, Q_3, Q_4, Q_5, T, mu, mut, qc2, ux, vy, wz, E, F, G, k_lo_G, k_hi_G)
     integer, intent(in), value                 :: nx, ny, nz
     real(8), intent(in), device, contiguous    :: inv_dx(nx-1), inv_dy(ny-1), inv_dz(nz-1)
     real(8), intent(in), device, contiguous    :: Jacobian(nx,ny)
@@ -120,11 +123,14 @@ contains
     real(8), intent(inout), device, contiguous :: Q_4(nx,ny,nz), Q_5(nx,ny,nz), T(nx,ny,nz)
     #:if VISC == 'Euler'
     real(8), intent(inout), device, contiguous :: mu(1,1,1), mut(1,1,1), qc2(1,1,1)
+    real(8), intent(inout), device, contiguous :: ux(1,1,1), vy(1,1,1), wz(1,1,1)
     #:elif VISC == 'NS'
     real(8), intent(inout), device, contiguous :: mu(nx,ny,nz)
     real(8), intent(inout), device, contiguous :: mut(1,1,1), qc2(1,1,1)
+    real(8), intent(inout), device, contiguous :: ux(nx,ny,nz), vy(nx,ny,nz), wz(nx,ny,nz)
     #:elif VISC == 'LES'
     real(8), intent(inout), device, contiguous :: mu(nx,ny,nz), mut(nx,ny,nz), qc2(nx,ny,nz)
+    real(8), intent(inout), device, contiguous :: ux(nx,ny,nz), vy(nx,ny,nz), wz(nx,ny,nz)
     #:endif
     real(8), intent(inout), device, contiguous :: E(nx-1,ny-2,nz-2,5), F(nx-2,ny-1,nz-2,5)
     real(8), intent(inout), device, contiguous :: G(nx-2,ny-2,nz-1,5)
@@ -154,9 +160,9 @@ contains
     ! axis
     ! ===================================================================
     #:set dirs = [ &
-      {'dir': 'E', 'is_bc': BC_X, 'ov': 'overlap_fb+2'}, &
-      {'dir': 'F', 'is_bc': BC_Y, 'ov': 'overlap_fb+2'}, &
-      {'dir': 'G', 'is_bc': BC_Z, 'ov': 'overlap_fb+1'} &
+      {'dir': 'E', 'is_bc': BC_X, 'ov': 'overlap_fb+2', 'grad': 'vy, wz'}, &
+      {'dir': 'F', 'is_bc': BC_Y, 'ov': 'overlap_fb+2', 'grad': 'ux, wz'}, &
+      {'dir': 'G', 'is_bc': BC_Z, 'ov': 'overlap_fb+1', 'grad': 'ux, vy'} &
     ]
     #:if is_les
     mut = 0.d0
@@ -166,6 +172,21 @@ contains
     ! main part (NS and LES)
     ! ===================================================================
     call calc_quantities_T_3D(nx, ny, nz, Jacobian, QJ_1, QJ_2, QJ_3, QJ_4, QJ_5, Q_1, Q_2, Q_3, Q_4, Q_5, T, mu, 1, nz)
+    #:if VISC_ORDER > 2
+    ! ux/vy/wz (cell-center velocity gradients) are precomputed once here and
+    ! reused by calc_Ev/Fv/Gv below instead of each direction independently
+    ! recomputing the other two -- see calc_div.f90. Split into 3
+    ! single-component kernels (each with a directly-bounded loop in its own
+    ! margin direction, no branching) rather than one combined kernel, to
+    ! keep each kernel's register footprint to just the one component it
+    ! computes. Only wired into the non-COMMZ path below: no current case
+    ! combines COMMZ with NS/LES (the only COMMZ=True case, STZ, is
+    ! Euler-only), so the COMMZ branch below is left on the old per-kernel
+    ! recompute path as a known follow-up.
+    call calc_div_ux_${VISC_ORDER}$_in(nx, ny, nz, inv_dx, Q_2, ux)
+    call calc_div_vy_${VISC_ORDER}$_in(nx, ny, nz, inv_dy, Q_3, vy)
+    call calc_div_wz_${VISC_ORDER}$_in(nx, ny, nz, inv_dz, Q_4, wz)
+    #:endif
     ! ===================================================================
     ! whole domain or koff
     ! ===================================================================
@@ -178,8 +199,9 @@ contains
 
       #:for d in dirs
       #:set in_sfx = '_in' if (not d['is_bc'] and ORDER == 6) else ''
+      #:set grad_args = ', ' + d['grad'] if VISC_ORDER > 2 else ''
       call calc_${d['dir']}$v${VISC_ORDER}$${in_sfx}$<<<blocks${d['dir']}$v,threads${d['dir']}$v>>>&
-           &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_2, Q_3, Q_4, T, mu${les_args}$, ${d['dir']}$)
+           &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_2, Q_3, Q_4, T, mu${les_args}$${grad_args}$, ${d['dir']}$)
       #:endfor
     #:else
       call calc_conv_EF(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_1, Q_2, Q_3, Q_4, Q_5, T, E, F)
