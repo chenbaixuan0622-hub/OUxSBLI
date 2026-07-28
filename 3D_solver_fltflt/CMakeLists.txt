@@ -113,6 +113,7 @@ macro(add_ouxsbli_case)
       "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_hybrid_ff.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src/load_smem_visc2.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src/load_smem_visc_me4_base.f90"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src/calc_div.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src/calc_steps.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src/set_bc_common.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../src/print.f90")

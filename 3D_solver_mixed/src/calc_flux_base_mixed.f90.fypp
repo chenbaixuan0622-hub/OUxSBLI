@@ -36,6 +36,7 @@ module calc_flux_base
   use calc_hybrid
   use calc_slau_kernel_internal
   use calc_visc_high_internal_mp
+  use calc_div_mp
   #:if OVERLAP_GC
   use calc_slau_kernel_internal_acc, only : calc_slau_y_in_acc, calc_slau_z_in_acc
   use mod_streams_mixed, only : stream_conv, stream_visc, event_E, event_Fv, event_Gv
@@ -58,22 +59,23 @@ contains
   !> kernels accumulate onto the same buffers. No manual sync needed: default-
   !> stream launches are implicitly ordered by the CUDA runtime.
   subroutine calc_conv_visc_seq(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_1, Q_2, Q_3, Q_4, Q_5, mu, &
-                                 inv_dx_r4, inv_dy_r4, inv_dz_r4, E, F, G)
+                                 inv_dx_r4, inv_dy_r4, inv_dz_r4, ux, vy, wz, E, F, G)
     integer, intent(in), value                 :: nx, ny, nz
     real(8), intent(in), device, contiguous    :: inv_dx(nx-1), inv_dy(ny-1), inv_dz(nz-1)
     real(8), intent(in), device, contiguous    :: Q_1(nx,ny,nz), Q_2(nx,ny,nz), Q_3(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: Q_4(nx,ny,nz), Q_5(nx,ny,nz)
     real(4), intent(in), device, contiguous    :: mu(nx,ny,nz)
     real(4), intent(in), device, contiguous    :: inv_dx_r4(nx-1), inv_dy_r4(ny-1), inv_dz_r4(nz-1)
+    real(4), intent(in), device, contiguous    :: ux(nx,ny,nz), vy(nx,ny,nz), wz(nx,ny,nz)
     real(8), intent(inout), device, contiguous :: E(nx-1,ny-2,nz-2,5), F(nx-2,ny-1,nz-2,5)
     real(8), intent(inout), device, contiguous :: G(nx-2,ny-2,nz-1,5)
     call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_2, Q_3, Q_4, sensor)
     call calc_slau_x_in<<<blocksE,threadsE>>>(nx, ny, nz, Q_1, Q_2, Q_3, Q_4, Q_5, sensor, E)
     call calc_slau_y_in<<<blocksF,threadsF>>>(nx, ny, nz, Q_1, Q_2, Q_3, Q_4, Q_5, sensor, F)
     call calc_slau_z_in<<<blocksG,threadsG>>>(nx, ny, nz, Q_1, Q_2, Q_3, Q_4, Q_5, sensor, G)
-    call calc_Ev6_in_mp<<<blocksEv,threadsEv>>>(nx, ny, nz, inv_dx_r4, inv_dy_r4, inv_dz_r4, u_r4, v_r4, w_r4, T_r4, mu, E)
-    call calc_Fv6_in_mp<<<blocksFv,threadsFv>>>(nx, ny, nz, inv_dx_r4, inv_dy_r4, inv_dz_r4, u_r4, v_r4, w_r4, T_r4, mu, F)
-    call calc_Gv6_in_mp<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx_r4, inv_dy_r4, inv_dz_r4, u_r4, v_r4, w_r4, T_r4, mu, G)
+    call calc_Ev6_in_mp<<<blocksEv,threadsEv>>>(nx, ny, nz, inv_dx_r4, inv_dy_r4, inv_dz_r4, u_r4, v_r4, w_r4, T_r4, mu, vy, wz, E)
+    call calc_Fv6_in_mp<<<blocksFv,threadsFv>>>(nx, ny, nz, inv_dx_r4, inv_dy_r4, inv_dz_r4, u_r4, v_r4, w_r4, T_r4, mu, ux, wz, F)
+    call calc_Gv6_in_mp<<<blocksGv,threadsGv>>>(nx, ny, nz, inv_dx_r4, inv_dy_r4, inv_dz_r4, u_r4, v_r4, w_r4, T_r4, mu, ux, vy, G)
   end subroutine calc_conv_visc_seq
 
 
@@ -99,13 +101,14 @@ contains
   !> cells Fv/Gv never touch simply get `0 + flux`, matching a plain
   !> convective-only write there.
   subroutine calc_conv_visc_paired_mixed(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_1, Q_2, Q_3, Q_4, Q_5, mu, &
-                                          inv_dx_r4, inv_dy_r4, inv_dz_r4, E, F, G)
+                                          inv_dx_r4, inv_dy_r4, inv_dz_r4, ux, vy, wz, E, F, G)
     integer, intent(in), value                 :: nx, ny, nz
     real(8), intent(in), device, contiguous    :: inv_dx(nx-1), inv_dy(ny-1), inv_dz(nz-1)
     real(8), intent(in), device, contiguous    :: Q_1(nx,ny,nz), Q_2(nx,ny,nz), Q_3(nx,ny,nz)
     real(8), intent(in), device, contiguous    :: Q_4(nx,ny,nz), Q_5(nx,ny,nz)
     real(4), intent(in), device, contiguous    :: mu(nx,ny,nz)
     real(4), intent(in), device, contiguous    :: inv_dx_r4(nx-1), inv_dy_r4(ny-1), inv_dz_r4(nz-1)
+    real(4), intent(in), device, contiguous    :: ux(nx,ny,nz), vy(nx,ny,nz), wz(nx,ny,nz)
     real(8), intent(inout), device, contiguous :: E(nx-1,ny-2,nz-2,5), F(nx-2,ny-1,nz-2,5)
     real(8), intent(inout), device, contiguous :: G(nx-2,ny-2,nz-1,5)
     integer :: istat
@@ -133,18 +136,18 @@ contains
     ! ---- phase 1: E (conv) || Fv (visc) ----
     call calc_slau_x_in<<<blocksE,threadsE,0,stream_conv>>>(nx, ny, nz, Q_1, Q_2, Q_3, Q_4, Q_5, sensor, E)
     istat = cudaEventRecord(event_E, stream_conv)
-    call calc_Fv6_in_mp<<<blocksFv,threadsFv,0,stream_visc>>>(nx, ny, nz, inv_dx_r4, inv_dy_r4, inv_dz_r4, u_r4, v_r4, w_r4, T_r4, mu, F)
+    call calc_Fv6_in_mp<<<blocksFv,threadsFv,0,stream_visc>>>(nx, ny, nz, inv_dx_r4, inv_dy_r4, inv_dz_r4, u_r4, v_r4, w_r4, T_r4, mu, ux, wz, F)
     istat = cudaEventRecord(event_Fv, stream_visc)
     ! ---- phase 2: F (conv, waits on Fv) || Gv (visc) ----
     istat = cudaStreamWaitEvent(stream_conv, event_Fv, 0)
     call calc_slau_y_in_acc<<<blocksF,threadsF,0,stream_conv>>>(nx, ny, nz, Q_1, Q_2, Q_3, Q_4, Q_5, sensor, F)
-    call calc_Gv6_in_mp<<<blocksGv,threadsGv,0,stream_visc>>>(nx, ny, nz, inv_dx_r4, inv_dy_r4, inv_dz_r4, u_r4, v_r4, w_r4, T_r4, mu, G)
+    call calc_Gv6_in_mp<<<blocksGv,threadsGv,0,stream_visc>>>(nx, ny, nz, inv_dx_r4, inv_dy_r4, inv_dz_r4, u_r4, v_r4, w_r4, T_r4, mu, ux, vy, G)
     istat = cudaEventRecord(event_Gv, stream_visc)
     ! ---- phase 3: G (conv, waits on Gv) || Ev (visc, waits on E) ----
     istat = cudaStreamWaitEvent(stream_conv, event_Gv, 0)
     call calc_slau_z_in_acc<<<blocksG,threadsG,0,stream_conv>>>(nx, ny, nz, Q_1, Q_2, Q_3, Q_4, Q_5, sensor, G)
     istat = cudaStreamWaitEvent(stream_visc, event_E, 0)
-    call calc_Ev6_in_mp<<<blocksEv,threadsEv,0,stream_visc>>>(nx, ny, nz, inv_dx_r4, inv_dy_r4, inv_dz_r4, u_r4, v_r4, w_r4, T_r4, mu, E)
+    call calc_Ev6_in_mp<<<blocksEv,threadsEv,0,stream_visc>>>(nx, ny, nz, inv_dx_r4, inv_dy_r4, inv_dz_r4, u_r4, v_r4, w_r4, T_r4, mu, vy, wz, E)
     ! Mirror of the entry sync: the caller (RungeKutta) launches calc_step*
     ! on the default stream right after this returns, reading E/F/G.
     istat = cudaDeviceSynchronize()
@@ -154,7 +157,7 @@ contains
 
   subroutine calc_EFG(nx, ny, nz, inv_dx, inv_dy, inv_dz, Jacobian, &
                        QJ_1, QJ_2, QJ_3, QJ_4, QJ_5, Q_1, Q_2, Q_3, Q_4, Q_5, T, mu, mut, qc2, &
-                       inv_dx_r4, inv_dy_r4, inv_dz_r4, E, F, G, k_lo_G, k_hi_G)
+                       inv_dx_r4, inv_dy_r4, inv_dz_r4, ux, vy, wz, E, F, G, k_lo_G, k_hi_G)
     integer, intent(in), value                 :: nx, ny, nz
     real(8), intent(in), device, contiguous    :: inv_dx(nx-1), inv_dy(ny-1), inv_dz(nz-1)
     real(8), intent(in), device, contiguous    :: Jacobian(nx,ny)
@@ -165,16 +168,23 @@ contains
     real(4), intent(inout), device, contiguous :: mu(nx,ny,nz)
     real(8), intent(inout), device, contiguous :: mut(1,1,1), qc2(1,1,1)
     real(4), intent(in), device, contiguous    :: inv_dx_r4(nx-1), inv_dy_r4(ny-1), inv_dz_r4(nz-1)
+    real(4), intent(inout), device, contiguous :: ux(nx,ny,nz), vy(nx,ny,nz), wz(nx,ny,nz)
     real(8), intent(inout), device, contiguous :: E(nx-1,ny-2,nz-2,5), F(nx-2,ny-1,nz-2,5)
     real(8), intent(inout), device, contiguous :: G(nx-2,ny-2,nz-1,5)
     integer, intent(in)                        :: k_lo_G, k_hi_G
     call calc_quantities_T_3D_mixed(nx, ny, nz, Jacobian, QJ_1, QJ_2, QJ_3, QJ_4, QJ_5, Q_1, Q_2, Q_3, Q_4, Q_5, T, mu, 1, nz)
+    ! ux/vy/wz (cell-center velocity gradients, real(4)) precomputed once here
+    ! and reused by calc_Ev/Fv/Gv6_in_mp below -- see calc_div_mp.f90, ported
+    ! from 3D_solver/src/calc_div.f90's calc_div_{ux,vy,wz}_6_in.
+    call calc_div_ux_6_in_mp(nx, ny, nz, inv_dx_r4, u_r4, ux)
+    call calc_div_vy_6_in_mp(nx, ny, nz, inv_dy_r4, v_r4, vy)
+    call calc_div_wz_6_in_mp(nx, ny, nz, inv_dz_r4, w_r4, wz)
     #:if OVERLAP_GC
     call calc_conv_visc_paired_mixed(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_1, Q_2, Q_3, Q_4, Q_5, mu, &
-                                      inv_dx_r4, inv_dy_r4, inv_dz_r4, E, F, G)
+                                      inv_dx_r4, inv_dy_r4, inv_dz_r4, ux, vy, wz, E, F, G)
     #:else
     call calc_conv_visc_seq(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_1, Q_2, Q_3, Q_4, Q_5, mu, &
-                             inv_dx_r4, inv_dy_r4, inv_dz_r4, E, F, G)
+                             inv_dx_r4, inv_dy_r4, inv_dz_r4, ux, vy, wz, E, F, G)
     #:endif
   end subroutine calc_EFG
 end module calc_flux_base

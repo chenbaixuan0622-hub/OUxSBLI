@@ -18,6 +18,9 @@ module calc_flux_base
   use calc_visc_high
   use calc_visc_high_internal
   #:endif
+  #:if VISC in ('NS', 'LES') and VISC_ORDER > 2
+  use calc_div, only : calc_div_ux_${VISC_ORDER}$_in, calc_div_vy_${VISC_ORDER}$_in, calc_div_wz_${VISC_ORDER}$_in
+  #:endif
   use mod_streams, only : stream_conv, stream_visc, event_E, event_Fv, event_Gv
   use nvtx
   use set
@@ -109,7 +112,11 @@ contains
   !>   phase 1: E (conv, fresh write)   || Fv (visc, fresh write)
   !>   phase 2: F (conv, accumulates)   || Gv (visc, fresh write) -- waits on Fv
   !>   phase 3: G (conv, accumulates)   || Ev (visc, accumulates) -- wait on Gv, E
-  subroutine calc_conv_visc_paired(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_1, Q_2, Q_3, Q_4, Q_5, T, mu${les_args}$, E, F, G)
+  subroutine calc_conv_visc_paired(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_1, Q_2, Q_3, Q_4, Q_5, T, mu${les_args}$, &
+                                    #:if VISC_ORDER > 2
+                                    ux, vy, wz, &
+                                    #:endif
+                                    E, F, G)
     integer, intent(in), value                 :: nx, ny, nz
     real(8), intent(in), device, contiguous    :: inv_dx(nx-1), inv_dy(ny-1), inv_dz(nz-1)
     real(8), intent(in), device, contiguous    :: Q_1(nx,ny,nz), Q_2(nx,ny,nz), Q_3(nx,ny,nz)
@@ -117,6 +124,9 @@ contains
     real(8), intent(in), device, contiguous    :: mu(nx,ny,nz)
     #:if is_les
     real(8), intent(in), device, contiguous    :: mut(nx,ny,nz), qc2(nx,ny,nz)
+    #:endif
+    #:if VISC_ORDER > 2
+    real(8), intent(in), device, contiguous    :: ux(nx,ny,nz), vy(nx,ny,nz), wz(nx,ny,nz)
     #:endif
     real(8), intent(inout), device, contiguous :: E(nx-1,ny-2,nz-2,5), F(nx-2,ny-1,nz-2,5)
     real(8), intent(inout), device, contiguous :: G(nx-2,ny-2,nz-1,5)
@@ -126,6 +136,9 @@ contains
     #:set scheme_name = SCHEME.lower()
     #:set args_t = ", T" if SCHEME in ('KEEP', 'Hybrid') else ""
     #:set args_sensor = ", sensor" if SCHEME in ('SLAU', 'Roe', 'Hybrid') else ""
+    #:set grad_ev = ', vy, wz' if VISC_ORDER > 2 else ''
+    #:set grad_fv = ', ux, wz' if VISC_ORDER > 2 else ''
+    #:set grad_gv = ', ux, vy' if VISC_ORDER > 2 else ''
     ! Fv/Gv's fresh (non-koff) write only covers the range where their own
     ! cross-derivative stencil is valid (VISC_ORDER-wide halo in BOTH
     ! transverse directions, e.g. Fv needs 4<=i<=nx-3 AND 4<=k<=nz-3), which
@@ -166,7 +179,7 @@ contains
     istat = cudaEventRecord(event_E, stream_conv)
     id = nvtxRangeStart("Fv")
     call calc_Fv${VISC_ORDER}$_in<<<blocksFv,threadsFv,0,stream_visc>>>&
-         &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_2, Q_3, Q_4, T, mu${les_args}$, F)
+         &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_2, Q_3, Q_4, T, mu${les_args}$${grad_fv}$, F)
     call nvtxRangeEnd(id)
     istat = cudaEventRecord(event_Fv, stream_visc)
     ! ---- phase 2: F (conv, waits on Fv) || Gv (visc) ----
@@ -177,7 +190,7 @@ contains
     call nvtxRangeEnd(id)
     id = nvtxRangeStart("Gv")
     call calc_Gv${VISC_ORDER}$_in<<<blocksGv,threadsGv,0,stream_visc>>>&
-         &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_2, Q_3, Q_4, T, mu${les_args}$, G)
+         &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_2, Q_3, Q_4, T, mu${les_args}$${grad_gv}$, G)
     call nvtxRangeEnd(id)
     istat = cudaEventRecord(event_Gv, stream_visc)
     ! ---- phase 3: G (conv, waits on Gv) || Ev (visc, waits on E) ----
@@ -189,7 +202,7 @@ contains
     istat = cudaStreamWaitEvent(stream_visc, event_E, 0)
     id = nvtxRangeStart("Ev")
     call calc_Ev${VISC_ORDER}$_in<<<blocksEv,threadsEv,0,stream_visc>>>&
-         &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_2, Q_3, Q_4, T, mu${les_args}$, E)
+         &(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_2, Q_3, Q_4, T, mu${les_args}$${grad_ev}$, E)
     call nvtxRangeEnd(id)
     ! Mirror of the entry sync: the caller (RungeKutta, calc_time_dev_ff.f90.fypp)
     ! launches calc_step1/2_3/4 on the default stream right after this
@@ -246,7 +259,7 @@ contains
 
 
   subroutine calc_EFG(nx, ny, nz, inv_dx, inv_dy, inv_dz, Jacobian, &
-                       QJ_1, QJ_2, QJ_3, QJ_4, QJ_5, Q_1, Q_2, Q_3, Q_4, Q_5, T, mu, mut, qc2, E, F, G, k_lo_G, k_hi_G)
+                       QJ_1, QJ_2, QJ_3, QJ_4, QJ_5, Q_1, Q_2, Q_3, Q_4, Q_5, T, mu, mut, qc2, ux, vy, wz, E, F, G, k_lo_G, k_hi_G)
     integer, intent(in), value                 :: nx, ny, nz
     real(8), intent(in), device, contiguous    :: inv_dx(nx-1), inv_dy(ny-1), inv_dz(nz-1)
     real(8), intent(in), device, contiguous    :: Jacobian(nx,ny)
@@ -256,11 +269,14 @@ contains
     real(8), intent(inout), device, contiguous :: Q_4(nx,ny,nz), Q_5(nx,ny,nz), T(nx,ny,nz)
     #:if VISC == 'Euler'
     real(8), intent(inout), device, contiguous :: mu(1,1,1), mut(1,1,1), qc2(1,1,1)
+    real(8), intent(inout), device, contiguous :: ux(1,1,1), vy(1,1,1), wz(1,1,1)
     #:elif VISC == 'NS'
     real(8), intent(inout), device, contiguous :: mu(nx,ny,nz)
     real(8), intent(inout), device, contiguous :: mut(1,1,1), qc2(1,1,1)
+    real(8), intent(inout), device, contiguous :: ux(nx,ny,nz), vy(nx,ny,nz), wz(nx,ny,nz)
     #:elif VISC == 'LES'
     real(8), intent(inout), device, contiguous :: mu(nx,ny,nz), mut(nx,ny,nz), qc2(nx,ny,nz)
+    real(8), intent(inout), device, contiguous :: ux(nx,ny,nz), vy(nx,ny,nz), wz(nx,ny,nz)
     #:endif
     real(8), intent(inout), device, contiguous :: E(nx-1,ny-2,nz-2,5), F(nx-2,ny-1,nz-2,5)
     real(8), intent(inout), device, contiguous :: G(nx-2,ny-2,nz-1,5)
@@ -302,6 +318,14 @@ contains
     ! main part (NS and LES)
     ! ===================================================================
     call calc_quantities_T_3D(nx, ny, nz, Jacobian, QJ_1, QJ_2, QJ_3, QJ_4, QJ_5, Q_1, Q_2, Q_3, Q_4, Q_5, T, mu, 1, nz)
+    #:if VISC_ORDER > 2
+    ! ux/vy/wz (cell-center velocity gradients) precomputed once here and
+    ! reused by calc_Ev/Fv/Gv below -- see 3D_solver/src/calc_div.f90. Only
+    ! wired into the non-COMMZ path below, mirroring base's calc_flux_base.f90.fypp.
+    call calc_div_ux_${VISC_ORDER}$_in(nx, ny, nz, inv_dx, Q_2, ux)
+    call calc_div_vy_${VISC_ORDER}$_in(nx, ny, nz, inv_dy, Q_3, vy)
+    call calc_div_wz_${VISC_ORDER}$_in(nx, ny, nz, inv_dz, Q_4, wz)
+    #:endif
     ! ===================================================================
     ! whole domain or koff
     ! ===================================================================
@@ -310,7 +334,11 @@ contains
       call calc_mut<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_1, Q_2, Q_3, Q_4, mut, qc2)
       call set_bc_mut(nx, ny, nz, mut, qc2)
       #:endif
-      call calc_conv_visc_paired(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_1, Q_2, Q_3, Q_4, Q_5, T, mu${les_args}$, E, F, G)
+      call calc_conv_visc_paired(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_1, Q_2, Q_3, Q_4, Q_5, T, mu${les_args}$, &
+                                  #:if VISC_ORDER > 2
+                                  ux, vy, wz, &
+                                  #:endif
+                                  E, F, G)
     #:else
       call calc_conv_EF(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_1, Q_2, Q_3, Q_4, Q_5, T, E, F)
       call calc_conv_G_koff(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_1, Q_2, Q_3, Q_4, Q_5, T, G, k_lo_G, k_hi_G)

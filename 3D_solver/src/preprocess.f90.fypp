@@ -22,14 +22,25 @@ contains
 
 
   subroutine allocate_device_mem(myrank, nx, ny, nz, dtdxdy, dtdydz, dtdzdx, xix, etay, zetaz, Jacobian, &
-                                 Q_1, Q_2, Q_3, Q_4, Q_5, T, mu, mut, qc2, ux, vy, wz, E, F, G)
+                                 Q_1, Q_2, Q_3, Q_4, Q_5, T, mu, mut, qc2, ux, vy, wz, E, F, G &
+                                 #:if MIXED_FORK
+                                 , xix_r4, etay_r4, zetaz_r4 &
+                                 #:endif
+                                 )
     integer, intent(in)                       :: myrank, nx, ny, nz
     real(8), intent(out), allocatable, device :: dtdxdy(:,:), dtdydz(:,:), dtdzdx(:,:)
     real(8), intent(out), allocatable, device :: xix(:), etay(:), zetaz(:)
     real(8), intent(out), allocatable, device :: Jacobian(:,:)
     real(8), intent(out), allocatable, device :: Q_1(:,:,:), Q_2(:,:,:), Q_3(:,:,:), Q_4(:,:,:), Q_5(:,:,:)
-    real(8), intent(out), allocatable, device :: T(:,:,:), mu(:,:,:), mut(:,:,:), qc2(:,:,:)
+    real(8), intent(out), allocatable, device :: T(:,:,:), mut(:,:,:), qc2(:,:,:)
+    #:if MIXED_FORK
+    real(4), intent(out), allocatable, device :: mu(:,:,:)
+    real(4), intent(out), allocatable, device :: ux(:,:,:), vy(:,:,:), wz(:,:,:)
+    real(4), intent(out), allocatable, device :: xix_r4(:), etay_r4(:), zetaz_r4(:)
+    #:else
+    real(8), intent(out), allocatable, device :: mu(:,:,:)
     real(8), intent(out), allocatable, device :: ux(:,:,:), vy(:,:,:), wz(:,:,:)
+    #:endif
     real(8), intent(out), allocatable, device :: E(:,:,:,:), F(:,:,:,:), G(:,:,:,:)
     integer ierr
     allocate(Q_1(nx,ny,nz), Q_2(nx,ny,nz), Q_3(nx,ny,nz), Q_4(nx,ny,nz), Q_5(nx,ny,nz), &

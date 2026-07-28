@@ -115,6 +115,7 @@ macro(add_ouxsbli_case)
       "${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpu_gpu_mpi.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../src/set_coordinate.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_physical_quantities_mixed.f90"
+      "${CMAKE_CURRENT_SOURCE_DIR}/../src/calc_div_mp.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../src/print.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src/calc_hybrid.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src/calc_steps.f90"
