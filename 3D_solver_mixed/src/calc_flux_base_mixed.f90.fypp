@@ -25,9 +25,13 @@
 ! real(8)->real(4) casts calc_visc_high_internal_mp.f90.fypp /
 ! load_smem_visc_cent_mp.f90.fypp used to perform on Q/T/mu themselves.
 #:include 'config.fypp'
+#:if not defined('OVERLAP_MODE')
+  #:set OVERLAP_MODE = 'gc' if OVERLAP_GC else 'none'
+#:endif
 module calc_flux_base
   #:if OVERLAP_GC
   use cudafor
+  use nvtx
   #:endif
   use mod_globals, only : sp, &
   & blocks, threads, blocksE, blocksF, blocksG, threadsE, threadsF, threadsG, &
@@ -37,9 +41,11 @@ module calc_flux_base
   use calc_slau_kernel_internal
   use calc_visc_high_internal_mp
   use calc_div_mp
-  #:if OVERLAP_GC
+  #:if OVERLAP_MODE == 'gc'
   use calc_slau_kernel_internal_acc, only : calc_slau_y_in_acc, calc_slau_z_in_acc
   use mod_streams_mixed, only : stream_conv, stream_visc, event_E, event_Fv, event_Gv
+  #:elif OVERLAP_MODE == 'streams'
+  use mod_streams_mixed, only : stream_dir
   #:endif
   use set
   implicit none
@@ -79,7 +85,79 @@ contains
   end subroutine calc_conv_visc_seq
 
 
-#:if OVERLAP_GC
+#:if OVERLAP_MODE == 'streams'
+  !> Per-direction dispatch on three ordinary (non-Green-Context) streams: each
+  !> stream owns one flux array end to end and runs its convective kernel then
+  !> its viscous kernel.
+  !>
+  !>   stream_dir(1): calc_slau_x_in -> calc_Ev6_in_mp   (owns E)
+  !>   stream_dir(2): calc_slau_y_in -> calc_Fv6_in_mp   (owns F)
+  !>   stream_dir(3): calc_slau_z_in -> calc_Gv6_in_mp   (owns G)
+  !>
+  !> Properties that make this preferable to the Green-Context 3-phase dispatch
+  !> below (all measured on GH200 513^3, see 3D_solver_mixed/nsys_ncu_SoA/):
+  !>
+  !>  * No cross-stream dependency at all, hence no events and no
+  !>    cudaStreamWaitEvent. Within a stream the order is conv-then-visc, which
+  !>    is exactly what calc_conv_visc_seq does per array.
+  !>  * Numerically identical to the sequential path by construction: per array
+  !>    the write order is unchanged (convective fresh write, then the viscous
+  !>    kernel accumulating onto it). The 3-phase dispatch inverts that order,
+  !>    which is why it needs the F/G zero-fill and the accumulate-variant
+  !>    convective kernels -- and why it took two rounds of fixes to get right.
+  !>  * Drops both of those costs: the zero-fill measured 3.06 ms/RK stage and
+  !>    the _acc read-modify-write ~10.5 ms/stage.
+  !>  * No SM partition, so blocks from the FP64 convective and FP32 viscous
+  !>    kernels may co-reside on the same SM. Because the three streams' kernels
+  !>    have different durations they naturally stagger, so at a given instant
+  !>    one stream is typically in its FP32 viscous kernel while another is in
+  !>    its FP64 convective kernel. Partitioning SMs (the 'gc' mode) is
+  !>    provably work-conserving and can only tie sequential; sharing them is
+  !>    the one mechanism with headroom above that -- the FP32/FP64 co-execution
+  !>    microbenchmarks in 3D_solver_mixed/fp32fp64_report/ measured 4-28% wall
+  !>    reduction vs serial on this exact GPU.
+  subroutine calc_conv_visc_streamed(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_1, Q_2, Q_3, Q_4, Q_5, mu, &
+                                      inv_dx_r4, inv_dy_r4, inv_dz_r4, ux, vy, wz, E, F, G)
+    integer, intent(in), value                 :: nx, ny, nz
+    real(8), intent(in), device, contiguous    :: inv_dx(nx-1), inv_dy(ny-1), inv_dz(nz-1)
+    real(8), intent(in), device, contiguous    :: Q_1(nx,ny,nz), Q_2(nx,ny,nz), Q_3(nx,ny,nz)
+    real(8), intent(in), device, contiguous    :: Q_4(nx,ny,nz), Q_5(nx,ny,nz)
+    real(4), intent(in), device, contiguous    :: mu(nx,ny,nz)
+    real(4), intent(in), device, contiguous    :: inv_dx_r4(nx-1), inv_dy_r4(ny-1), inv_dz_r4(nz-1)
+    real(4), intent(in), device, contiguous    :: ux(nx,ny,nz), vy(nx,ny,nz), wz(nx,ny,nz)
+    real(8), intent(inout), device, contiguous :: E(nx-1,ny-2,nz-2,5), F(nx-2,ny-1,nz-2,5)
+    real(8), intent(inout), device, contiguous :: G(nx-2,ny-2,nz-1,5)
+    integer :: istat
+    type(nvtxRangeId) :: id
+    ! stream_dir are cudaStreamNonBlocking streams, so they do NOT pick up the
+    ! legacy default stream's implicit ordering. calc_quantities_T_3D_mixed,
+    ! calc_div_* and calc_Ducros all ran on the default stream just before this
+    ! call and every kernel below reads their output (Q/T_r4/mu, ux/vy/wz,
+    ! sensor) -- drain it first or the launches below race stale data.
+    istat = cudaDeviceSynchronize()
+    ! Each pair is independent of the other two; the only ordering that matters
+    ! is conv-before-visc within a stream, which same-stream program order gives
+    ! for free.
+    id = nvtxRangeStart("E+Ev")
+    call calc_slau_x_in<<<blocksE,threadsE,0,stream_dir(1)>>>(nx, ny, nz, Q_1, Q_2, Q_3, Q_4, Q_5, sensor, E)
+    call calc_Ev6_in_mp<<<blocksEv,threadsEv,0,stream_dir(1)>>>(nx, ny, nz, inv_dx_r4, inv_dy_r4, inv_dz_r4, u_r4, v_r4, w_r4, T_r4, mu, vy, wz, E)
+    call nvtxRangeEnd(id)
+    id = nvtxRangeStart("F+Fv")
+    call calc_slau_y_in<<<blocksF,threadsF,0,stream_dir(2)>>>(nx, ny, nz, Q_1, Q_2, Q_3, Q_4, Q_5, sensor, F)
+    call calc_Fv6_in_mp<<<blocksFv,threadsFv,0,stream_dir(2)>>>(nx, ny, nz, inv_dx_r4, inv_dy_r4, inv_dz_r4, u_r4, v_r4, w_r4, T_r4, mu, ux, wz, F)
+    call nvtxRangeEnd(id)
+    id = nvtxRangeStart("G+Gv")
+    call calc_slau_z_in<<<blocksG,threadsG,0,stream_dir(3)>>>(nx, ny, nz, Q_1, Q_2, Q_3, Q_4, Q_5, sensor, G)
+    call calc_Gv6_in_mp<<<blocksGv,threadsGv,0,stream_dir(3)>>>(nx, ny, nz, inv_dx_r4, inv_dy_r4, inv_dz_r4, u_r4, v_r4, w_r4, T_r4, mu, ux, vy, G)
+    call nvtxRangeEnd(id)
+    ! Mirror of the entry drain: RungeKutta launches calc_step* on the default
+    ! stream immediately after this returns, reading E/F/G.
+    istat = cudaDeviceSynchronize()
+  end subroutine calc_conv_visc_streamed
+#:endif
+
+
+#:if OVERLAP_MODE == 'gc'
   !> Interleaved convective (real8, stream_conv) / viscous (real4-internal,
   !> stream_visc) dispatch, staggered into 3 phases so each phase's pair of
   !> kernels runs concurrently on disjoint Green-Context SM partitions:
@@ -179,9 +257,18 @@ contains
     call calc_div_ux_6_in_mp(nx, ny, nz, inv_dx_r4, u_r4, ux)
     call calc_div_vy_6_in_mp(nx, ny, nz, inv_dy_r4, v_r4, vy)
     call calc_div_wz_6_in_mp(nx, ny, nz, inv_dz_r4, w_r4, wz)
-    #:if OVERLAP_GC
+    #:if OVERLAP_MODE == 'gc'
     call calc_conv_visc_paired_mixed(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_1, Q_2, Q_3, Q_4, Q_5, mu, &
                                       inv_dx_r4, inv_dy_r4, inv_dz_r4, ux, vy, wz, E, F, G)
+    #:elif OVERLAP_MODE == 'streams'
+    ! calc_Ducros writes `sensor`, which all three convective kernels read, so it
+    ! must precede the fan-out. It goes on the default stream (full chip) rather
+    ! than inside one of the three streams: putting it in a stream would make the
+    ! other two wait on an event for no benefit, since nothing can start before
+    ! it anyway.
+    call calc_Ducros<<<blocks,threads>>>(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_2, Q_3, Q_4, sensor)
+    call calc_conv_visc_streamed(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_1, Q_2, Q_3, Q_4, Q_5, mu, &
+                                  inv_dx_r4, inv_dy_r4, inv_dz_r4, ux, vy, wz, E, F, G)
     #:else
     call calc_conv_visc_seq(nx, ny, nz, inv_dx, inv_dy, inv_dz, Q_1, Q_2, Q_3, Q_4, Q_5, mu, &
                              inv_dx_r4, inv_dy_r4, inv_dz_r4, ux, vy, wz, E, F, G)

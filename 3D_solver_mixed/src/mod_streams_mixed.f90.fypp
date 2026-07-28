@@ -1,0 +1,180 @@
+!> Stream infrastructure for concurrent convective (real8) / viscous
+!> (real4-internal) kernel execution. Which streams get created depends on the
+!> case's config.fypp OVERLAP_MODE:
+!>
+!>   'gc'      -- stream_conv/stream_visc are each bound to their own CUDA Green
+!>                Context (green_ctx_bindings_mixed.f90), giving disjoint,
+!>                hardware-partitioned SM sets. Consumed by
+!>                calc_conv_visc_paired_mixed's 3-phase dispatch, together with
+!>                the event_E/event_Fv/event_Gv ordering events.
+!>   'streams' -- stream_dir(1:3), three ordinary non-blocking streams, one per
+!>                flux direction, each running conv-then-visc for its own array
+!>                (calc_conv_visc_streamed). No SM partition and no cross-stream
+!>                dependency, so no events are needed; blocks from the FP64
+!>                convective and FP32 viscous kernels are free to co-reside on
+!>                the same SM, which is the only mechanism that can beat
+!>                sequential dispatch here (see the conv_share comment below).
+!>
+!> Adapted from 3D_solver_fltflt/src/mod_streams_ff.f90; the Green-Context
+!> mechanism carries over unchanged (convection stays plain real(8), so the
+!> fltflt-constant-init calls at the end of its init_streams are dropped).
+#:include 'config.fypp'
+#:if not defined('OVERLAP_MODE')
+  #:set OVERLAP_MODE = 'gc' if OVERLAP_GC else 'none'
+#:endif
+module mod_streams_mixed
+  use cudafor
+  use iso_c_binding
+  use green_ctx_bindings
+  implicit none
+#:if OVERLAP_MODE == 'streams'
+  !> One stream per flux direction: (1)=E/Ev, (2)=F/Fv, (3)=G/Gv.
+  integer(cuda_stream_kind) :: stream_dir(3)
+#:else
+  integer(cuda_stream_kind) :: stream_conv, stream_visc
+  type(cudaEvent) :: event_E, event_Fv, event_Gv
+#:endif
+  integer :: numSM
+#:if OVERLAP_MODE == 'gc'
+  ! Fraction of the SMs given to the convective partition.
+  !
+  ! Derived from the Miyabi GH200 (132 SM) 513^3 captures in
+  ! 3D_solver_mixed/nsys_ncu_SoA/ (post-SoA, post-calc_div_mp). Per RK stage the
+  ! full-chip (OVERLAP_MODE='none') nsys timeline gives conv (Ducros+E+F+G)
+  ! 20.76 ms and visc (Ev+Fv+Gv) 21.88 ms, i.e. W_conv =~ 2740 and
+  ! W_visc =~ 2888 SM-ms. Under perfect overlap wall = max(W_conv/x,
+  ! W_visc/(132-x)), minimized at x =~ 132*W_conv/(W_conv+W_visc) =~ 64 SMs to
+  ! conv / 68 to visc -- conv_share =~ 0.48, which round_to_multiple8 maps to
+  ! exactly 64.
+  !
+  ! Two corrections to the previous value (0.4) and its rationale:
+  !  1. 0.4 resolved to a 56/76 split, not the 53/79 its comment claimed, and it
+  !     starved the wrong side. The GC=True timeline shows conv taking 60.0 ms on
+  !     56 SMs while visc finished in 39.8 ms on 76 and then sat idle for 20.2 ms
+  !     -- a third of the overlap region wasted.
+  !  2. The old W_visc =~ 4093 SM-ms came from a pre-SoA, pre-calc_div_mp trace;
+  !     calc_div_mp removed a large slice of the viscous kernels' global-memory
+  !     traffic, so viscous is no longer the heavier side.
+  !
+  ! IMPORTANT -- still a work-conservation optimum, not a net win. At the balance
+  ! point best-case wall = (W_conv+W_visc)/132, i.e. exactly the sequential
+  ! total. This is now confirmed rather than assumed: measured against perfectly
+  ! linear SM scaling in the GC=True timeline, conv (excluding the _acc
+  ! read-modify-write) lands at 101.2% of linear and visc at 104.7%, so both
+  ! sides really are SM-count-bound under genuine concurrency. (Per-kernel
+  ! .ncu-rep counters suggest the viscous kernels scale *sub*-linearly, which
+  ! would imply spare capacity -- that is an artifact of ncu serializing kernels
+  ! for replay, which hands a 76-SM kernel the entire memory system. Only the
+  ! nsys timeline answers this question.) Expect 'gc' at this split to TIE
+  ! 'none', never beat it; use OVERLAP_MODE='streams' for a real win.
+  real, parameter :: conv_share = 0.48
+#:endif
+contains
+  subroutine init_streams(mygpu)
+    integer, intent(in) :: mygpu
+    type(cudaDeviceProp) :: prop
+    integer :: istat
+    integer :: i
+#:if OVERLAP_MODE == 'gc'
+    integer, parameter :: i_conv = 1, i_visc = 2
+    integer(c_int) :: cires, dev, nbGroups, nb_conv_sm
+    type(CUdevResource) :: whole_sm, sm_parts(2)
+    type(c_ptr) :: desc(2), gctx(2), cstream(2)
+#:endif
+    istat = cudaGetDeviceProperties(prop, mygpu)
+    call check_cuda(istat, "cudaGetDeviceProperties")
+    numSM = prop%multiProcessorCount
+    print '(1x, a, i0)', "SMs: ", numSM
+
+#:if OVERLAP_MODE == 'streams'
+    ! Plain non-blocking streams -- no SM partition. cudaStreamNonBlocking keeps
+    ! them from implicitly synchronizing with the legacy default stream, matching
+    ! the green-context streams' behavior, so the explicit cudaDeviceSynchronize()
+    ! bracketing in calc_flux_base_mixed.f90.fypp remains the (only, and
+    ! required) ordering against the default-stream prologue/epilogue.
+    do i = 1, 3
+      istat = cudaStreamCreateWithFlags(stream_dir(i), cudaStreamNonBlocking)
+      call check_cuda(istat, "cudaStreamCreateWithFlags")
+    end do
+    print '(1x, a)', "Dispatch: 3 plain non-blocking streams (one per flux direction), no SM partition"
+#:elif OVERLAP_MODE == 'gc'
+    ! Partition SMs into disjoint conv/visc green contexts. minCount is
+    ! rounded to a multiple of 8 (valid on both the cc9.0+ rule -- min 8,
+    ! multiple of 8 -- and the coarser cc8.x rule -- min 4, multiple of 2 --
+    ! since every multiple of 8 also satisfies the latter); any SMs left
+    ! over from that rounding go unused rather than into either context, per
+    ! cuDevSmResourceSplitByCount's documented behavior.
+    nb_conv_sm = round_to_multiple8(int(conv_share * numSM), numSM)
+    cires = cuInit(0)
+    call check_cu(cires, "cuInit")
+    cires = cuDeviceGet(dev, mygpu)
+    call check_cu(cires, "cuDeviceGet")
+    cires = cuDeviceGetDevResource(dev, whole_sm, CU_DEV_RESOURCE_TYPE_SM)
+    call check_cu(cires, "cuDeviceGetDevResource")
+    nbGroups = 1
+    ! "1 group + remaining" pattern: sm_parts(1) gets exactly nb_conv_sm SMs,
+    ! sm_parts(2) captures whatever is left. Loop bounds below are the fixed
+    ! i_conv/i_visc indices, not nbGroups -- nbGroups is only the *first*
+    ! split call's group count (1 here, since the second partition comes
+    ! from `remaining`), and keying a creation loop off it would silently
+    ! skip the second green context.
+    cires = cuDevSmResourceSplitByCount(sm_parts(i_conv:i_conv), nbGroups, whole_sm, sm_parts(i_visc), 0, nb_conv_sm)
+    call check_cu(cires, "cuDevSmResourceSplitByCount")
+    print '(1x, a, i0, a, i0)', "Green Context SM split -- conv: ", sm_count(sm_parts(i_conv)), &
+                                 "  visc: ", sm_count(sm_parts(i_visc))
+
+    do i = 1, 2
+      cires = cuDevResourceGenerateDesc(desc(i), sm_parts(i:i), 1)
+      call check_cu(cires, "cuDevResourceGenerateDesc")
+      cires = cuGreenCtxCreate(gctx(i), desc(i), dev, CU_GREEN_CTX_DEFAULT_STREAM)
+      call check_cu(cires, "cuGreenCtxCreate")
+      cires = cuGreenCtxStreamCreate(cstream(i), gctx(i), CU_STREAM_NON_BLOCKING, 0)
+      call check_cu(cires, "cuGreenCtxStreamCreate")
+    end do
+    stream_conv = transfer(cstream(i_conv), stream_conv)
+    stream_visc = transfer(cstream(i_visc), stream_visc)
+
+    ! Ordering-only events -- cudaEventDisableTiming drops the timestamp
+    ! bookkeeping plain cudaEventCreate would do on every record.
+    istat = cudaEventCreateWithFlags(event_E,  cudaEventDisableTiming)
+    call check_cuda(istat, "cudaEventCreateWithFlags(event_E)")
+    istat = cudaEventCreateWithFlags(event_Fv, cudaEventDisableTiming)
+    call check_cuda(istat, "cudaEventCreateWithFlags(event_Fv)")
+    istat = cudaEventCreateWithFlags(event_Gv, cudaEventDisableTiming)
+    call check_cuda(istat, "cudaEventCreateWithFlags(event_Gv)")
+#:endif
+  end subroutine init_streams
+
+
+  !> Abort loudly on a failed runtime-API call. Previously every status in this
+  !> module was discarded, so a failed stream/green-context create silently left
+  !> a null handle behind and the run produced meaningless timings with no
+  !> diagnostic at all.
+  subroutine check_cuda(istat, what)
+    integer, intent(in)          :: istat
+    character(len=*), intent(in) :: what
+    if (istat /= cudaSuccess) then
+      print '(1x, a, a, a, i0, a, a)', "FATAL: ", what, " failed (", istat, "): ", &
+                                        trim(cudaGetErrorString(istat))
+      stop 1
+    endif
+  end subroutine check_cuda
+
+#:if OVERLAP_MODE == 'gc'
+  !> Same, for the CUDA *driver* API (green contexts) -- CUresult, not cudaError_t.
+  subroutine check_cu(cires, what)
+    integer(c_int), intent(in)   :: cires
+    character(len=*), intent(in) :: what
+    if (cires /= 0) then
+      print '(1x, a, a, a, i0, a)', "FATAL: ", what, " failed (CUresult ", cires, ")"
+      stop 1
+    endif
+  end subroutine check_cu
+
+  function round_to_multiple8(target, total) result(n)
+    integer, intent(in) :: target, total
+    integer :: n
+    n = max(8, min(((target + 4) / 8) * 8, total - 8))
+  end function round_to_multiple8
+#:endif
+end module mod_streams_mixed

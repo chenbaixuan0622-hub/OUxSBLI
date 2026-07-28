@@ -13,7 +13,7 @@ if(NOT DEFINED CASE_MAIN_SOURCE)
 endif()
 
 set(SUBROUTINES "name:calc_tau_straight_mp,calc_tau_cross_mp,interp6_mp,diff6_mp")
-set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cuda -acc -fast -Mpreprocess -Mchkptr -Minline=reshape,${SUBROUTINES} -Minfo=accel,inline -gpu=ptxinfo,rdc,lto,cc${CASE_GPU_CC},lineinfo")
+set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cuda -acc -fast -Mpreprocess -Mchkptr -Minline=reshape,${SUBROUTINES} -Minfo=accel,inline -gpu=ptxinfo,rdc,lto,cc${CASE_GPU_CC},lineinfo -lnvhpcwrapnvtx")
 
 find_package(MPI REQUIRED Fortran)
 find_program(FYPP_EXE fypp REQUIRED)
@@ -53,6 +53,7 @@ macro(add_ouxsbli_case)
 
   set(_PARENT_FYPP "mod_constant" "calc_muscl")
   set(_SHARED_FYPP
+      "mod_streams_mixed"
       "load_smem_visc_cent_mp"
       "calc_visc_high_internal_mp"
       "calc_slau_kernel_internal_acc"
@@ -94,21 +95,23 @@ macro(add_ouxsbli_case)
     list(APPEND _GEN ${_out})
   endforeach()
 
-  # green_ctx_bindings_mixed.f90/mod_streams_mixed.f90 (and the CUDA driver
-  # lib below) are ALWAYS compiled/linked, regardless of the case's
-  # config.fypp OVERLAP_GC value. OVERLAP_GC only gates fypp `#:if` content
-  # inside calc_flux_base_mixed.f90.fypp/calc_time_dev_mixed.f90.fypp (whether
-  # calc_conv_visc_paired_mixed/init_streams are compiled in) -- it must NOT
-  # also gate which source files CMake puts in the target, because that
-  # decision is only re-evaluated at `cmake -B` configure time. Editing
-  # config.fypp and re-running `cmake --build` alone (the normal workflow for
-  # every other flag here -- SCHEME/RESCALE/COMMZ) does NOT rerun that
-  # configure-time parse, so a CMake-level OVERLAP_GC gate would silently
-  # leave mod_streams_mixed.f90 out of the build after flipping the flag,
-  # producing "Unable to open MODULE file mod_streams_mixed.mod" the moment
-  # the freshly fypp-regenerated calc_flux_base_mixed.f90 tries to `use` it.
-  # Compiling these two small files unconditionally costs nothing and keeps
-  # OVERLAP_GC consistent with how every other config.fypp flag behaves.
+  # green_ctx_bindings_mixed.f90 (here) and mod_streams_mixed.f90.fypp (in
+  # _SHARED_FYPP above, and the CUDA driver lib below) are ALWAYS
+  # compiled/linked, regardless of the case's config.fypp OVERLAP_MODE.
+  # OVERLAP_MODE only gates fypp `#:if` content *inside* those sources (which
+  # streams get created, and whether calc_conv_visc_paired_mixed /
+  # calc_conv_visc_streamed are compiled in) -- it must NOT also gate which
+  # source files CMake puts in the target, because that decision is only
+  # re-evaluated at `cmake -B` configure time. Editing config.fypp and re-running
+  # `cmake --build` alone (the normal workflow for every other flag here --
+  # SCHEME/RESCALE/COMMZ) does NOT rerun that configure-time parse, so a
+  # CMake-level OVERLAP_MODE gate would silently drop mod_streams_mixed after a
+  # flag flip, producing "Unable to open MODULE file mod_streams_mixed.mod" the
+  # moment the freshly fypp-regenerated calc_flux_base_mixed.f90 tries to `use`
+  # it. Compiling these two small files unconditionally costs nothing and keeps
+  # OVERLAP_MODE consistent with how every other config.fypp flag behaves.
+  # (green_ctx_bindings_mixed.f90 needs no fypp -- it is pure driver-API
+  # bindings, unused but harmless when OVERLAP_MODE is 'none' or 'streams'.)
   set(_BASE
       "${_CASE_DIR}/mod_globals.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/set.f90"
@@ -120,8 +123,7 @@ macro(add_ouxsbli_case)
       "${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src/calc_hybrid.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src/calc_steps.f90"
       "${CMAKE_CURRENT_SOURCE_DIR}/../../3D_solver/src/set_bc_common.f90"
-      "${CMAKE_CURRENT_SOURCE_DIR}/../src/green_ctx_bindings_mixed.f90"
-      "${CMAKE_CURRENT_SOURCE_DIR}/../src/mod_streams_mixed.f90")
+      "${CMAKE_CURRENT_SOURCE_DIR}/../src/green_ctx_bindings_mixed.f90")
 
   get_filename_component(_CASE "${CMAKE_CURRENT_SOURCE_DIR}" NAME)
   add_executable(${_CASE} ${_BASE} ${CASE_MAIN_SOURCE} ${CASE_EXTRA_SOURCES} ${_GEN})

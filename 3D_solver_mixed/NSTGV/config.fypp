@@ -12,4 +12,15 @@
 #:set TVD = 'hybrid'
 #:set SLAU_VARIANT = 'HRSLAU2'
 #:set ORDER_IO = ORDER // 2 - 1
-#:set OVERLAP_GC = True
+! Convective/viscous dispatch overlap strategy:
+!   'none'    -- calc_conv_visc_seq: sequential, single default stream.
+!   'gc'      -- calc_conv_visc_paired_mixed: CUDA Green Contexts hard-partition
+!                the SMs between a convective and a viscous stream (conv_share in
+!                mod_streams_mixed.f90.fypp sets the split).
+!   'streams' -- calc_conv_visc_streamed: three ordinary non-blocking streams, one
+!                per flux direction, each running conv-then-visc for its own array.
+!                No SM partition, so blocks from the FP64 convective and FP32
+!                viscous kernels can co-reside on the same SM.
+#:set OVERLAP_MODE = 'streams'
+! Derived: every existing `#:if OVERLAP_GC` site means "not the sequential path".
+#:set OVERLAP_GC = (OVERLAP_MODE != 'none')
