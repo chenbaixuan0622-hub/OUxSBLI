@@ -30,7 +30,8 @@ macro(add_ouxsbli_1d_case)
       "calc_time_dev"
       "preprocess"
       "calc_keep_kernel"
-      "calc_visc2")
+      "calc_visc2"
+      "calc_fused_kernel")
 
   set(_GEN "")
   foreach(_f ${_PARENT_FYPP})

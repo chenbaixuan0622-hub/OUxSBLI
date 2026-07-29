@@ -1,0 +1,41 @@
+#:include 'config.fypp'
+!> Fused convective (KEEP) + viscous (Navier-Stokes) flux kernel: one shared-
+!> memory load pass and one launch compute both, instead of the split
+!> calc_keep_x + calc_Ev2 pair. Selected via config.fypp's KERNEL_MODE.
+module calc_fused_kernel
+  use mod_globals, only : threadsE, dx
+  use mod_constant, only : R_over_gamma_1, Cp_over_Pr, two_third
+  implicit none
+  private
+  public calc_fused_x
+contains
+  include 'calc_keep_1d.f90'
+  include 'calc_visc_1d.f90'
+
+  attributes(global) subroutine calc_fused_x(nx, Q, T, mu, E)
+    integer, intent(in), value               :: nx
+    real(8), intent(in), device, contiguous  :: Q(nx,3), T(nx), mu(nx)
+    real(8), intent(out), device, contiguous :: E(3,nx-1)
+    integer i, it, ii, i_base, idx
+    integer, parameter :: sx = threadsE%x + 1
+    real(8), dimension(1:sx), shared :: rho, u, p, tmp
+    real(8) Fk(3), Fv(2)
+    it = threadIdx%x
+    i_base = (blockIdx%x-1)*blockDim%x
+    do ii = it, threadsE%x+1, blockDim%x
+      i = i_base + ii
+      if (i >= 1 .and. i <= nx) then
+        rho(ii) = Q(i,1); u(ii) = Q(i,2); p(ii) = Q(i,3); tmp(ii) = T(i)
+      endif
+    enddo
+    call syncthreads()
+    i = i_base + it
+    if (nx-1 < i) return
+    idx = it
+    Fk = KEEP2(rho(idx:idx+1), u(idx:idx+1), p(idx:idx+1), tmp(idx:idx+1))
+    Fv = VISC2(u(idx:idx+1), tmp(idx:idx+1), [mu(i), mu(i+1)])
+    E(1,i) = Fk(1)
+    E(2,i) = Fk(2) - Fv(1)
+    E(3,i) = Fk(3) - Fv(2)
+  end subroutine calc_fused_x
+end module calc_fused_kernel

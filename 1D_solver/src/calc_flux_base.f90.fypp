@@ -6,6 +6,9 @@ module calc_flux_base
   use calc_physical_quantities
   use calc_keep_kernel
   use calc_visc2
+  #:if KERNEL_MODE == 'fused'
+  use calc_fused_kernel
+  #:endif
   implicit none
   private
   public calc_E
@@ -28,7 +31,11 @@ contains
     real(8), intent(out), device, contiguous :: mu(nx)
     real(8), intent(out), device, contiguous :: E(3,nx-1)
     call calc_quantities_T_1D(nx, Q, ruvwp, T, mu)
+    #:if KERNEL_MODE == 'fused'
+    call calc_fused_x<<<blocksE,threadsE>>>(nx, ruvwp, T, mu, E)
+    #:else
     call calc_conv(nx, ruvwp, T, E)
     call calc_Ev2<<<blocksEv,threadsEv>>>(nx, ruvwp, T, mu, E)
+    #:endif
   end subroutine calc_E
 end module calc_flux_base
