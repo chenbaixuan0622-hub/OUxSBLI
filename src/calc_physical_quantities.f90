@@ -57,6 +57,31 @@ contains
   end subroutine calc_quantities_T_2D
 
 
+  !> 1D: no Jacobian (uniform grid) -- decode primitive rho/u/p and Sutherland's
+  !> mu(T) directly from the conservative Q(rho, rho*u, E)
+  subroutine calc_quantities_T_1D(nx, Q, ruvwp, T, mu)
+    integer, intent(in), value               :: nx
+    real(8), intent(in), device, contiguous  :: Q(nx,3)
+    real(8), intent(out), device, contiguous :: ruvwp(nx,3)
+    real(8), intent(out), device, contiguous :: T(nx)
+    real(8), intent(out), device, contiguous :: mu(nx)
+    integer i
+    real(8) :: rho, u, p, temp
+    !$cuf kernel do(1) <<<*,128>>>
+    do i = 1, nx
+      rho        = Q(i,1)
+      u          = Q(i,2) / rho
+      p          = gamma_1 * (Q(i,3) - 0.5d0 * rho * u*u)
+      ruvwp(i,1) = rho
+      ruvwp(i,2) = u
+      ruvwp(i,3) = p
+      temp       = p / (R * rho)
+      T(i)       = temp
+      mu(i)      = mu0_T0_S_over_T0_2_3 / (temp + 111.d0) * (temp * sqrt(temp))
+    enddo
+  end subroutine calc_quantities_T_1D
+
+
   subroutine calc_quantities_3D(nx, ny, nz, Jacobian, QJ_1, QJ_2, QJ_3, QJ_4, QJ_5, &
                                  Q_1, Q_2, Q_3, Q_4, Q_5, T, k_lo, k_hi)
     integer, intent(in), value                 :: nx, ny, nz, k_lo, k_hi

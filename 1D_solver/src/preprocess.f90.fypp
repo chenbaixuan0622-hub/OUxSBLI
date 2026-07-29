@@ -1,0 +1,32 @@
+#:include 'config.fypp'
+!> GPU device setup and memory allocation for the 1D solver.
+module preprocess
+  use cudafor
+  implicit none
+contains
+  !> Check GPU device properties and availability
+  subroutine check_gpu(mygpu)
+    integer, intent(in) :: mygpu
+    integer ilen, stat
+    type(cudaDeviceProp) prop
+    stat = cudaSetDevice(mygpu)
+    stat = cudaGetDeviceProperties(prop, mygpu)
+    ilen = verify(prop%name, ' ', .true.)
+    print '(1x, a, a, i1, a)', prop%name(1:ilen), " (GPU", mygpu, ") is available"
+  end subroutine check_gpu
+
+
+  !> Allocate GPU device memory for simulation variables (VISC='NS' only)
+  subroutine allocate_device_mem(nx, ruvwp, T, mu, E)
+    integer, intent(in)                       :: nx
+    real(8), intent(out), allocatable, device :: ruvwp(:,:)  !< primitive rho, u, p
+    real(8), intent(out), allocatable, device :: T(:)        !< temperature
+    real(8), intent(out), allocatable, device :: mu(:)       !< molecular viscosity
+    real(8), intent(out), allocatable, device :: E(:,:)      !< flux
+    integer ierr
+    allocate(ruvwp(nx,3), T(nx), mu(nx), E(3,nx-1), stat=ierr)
+    if (ierr /= 0) then
+      print *, "device memory allocation failed", ierr
+    endif
+  end subroutine allocate_device_mem
+end module preprocess

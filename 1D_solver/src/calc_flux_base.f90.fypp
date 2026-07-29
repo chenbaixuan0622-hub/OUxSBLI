@@ -1,0 +1,34 @@
+#:include 'config.fypp'
+!> Convective (KEEP) + viscous (Navier-Stokes, Sutherland's law) flux
+!> dispatcher for the 1D solver.
+module calc_flux_base
+  use mod_globals, only : blocksE, threadsE, blocksEv, threadsEv
+  use calc_physical_quantities
+  use calc_keep_kernel
+  use calc_visc2
+  implicit none
+  private
+  public calc_E
+contains
+  subroutine calc_conv(nx, Q, T, E)
+    integer, intent(in), value               :: nx
+    real(8), intent(in), device, contiguous  :: Q(nx,3)
+    real(8), intent(in), device, contiguous  :: T(nx)
+    real(8), intent(out), device, contiguous :: E(3,nx-1)
+    call calc_keep_x<<<blocksE,threadsE>>>(nx, Q, T, E)
+  end subroutine calc_conv
+
+
+  !> Compute convective + viscous flux for the compressible NS equations
+  subroutine calc_E(nx, Q, ruvwp, T, mu, E)
+    integer, intent(in), value               :: nx
+    real(8), intent(in), device, contiguous  :: Q(nx,3)
+    real(8), intent(out), device, contiguous :: ruvwp(nx,3)
+    real(8), intent(out), device, contiguous :: T(nx)
+    real(8), intent(out), device, contiguous :: mu(nx)
+    real(8), intent(out), device, contiguous :: E(3,nx-1)
+    call calc_quantities_T_1D(nx, Q, ruvwp, T, mu)
+    call calc_conv(nx, ruvwp, T, E)
+    call calc_Ev2<<<blocksEv,threadsEv>>>(nx, ruvwp, T, mu, E)
+  end subroutine calc_E
+end module calc_flux_base

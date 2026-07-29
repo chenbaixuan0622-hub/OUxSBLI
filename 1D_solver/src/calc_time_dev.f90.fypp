@@ -1,0 +1,60 @@
+!> Module for time-stepping orchestration.
+!> Implements 3rd-order TVD Runge-Kutta (Shu-Osher) time stepping.
+#:include 'config.fypp'
+#:if RK != 3
+$:error('1D_solver only implements 3rd-order TVD Runge-Kutta; config.fypp must set RK = 3')
+#:endif
+module calc_time_dev
+  use cudafor
+  use mod_globals, only : nt, blocks, threads, blocksE, threadsE, blocksEv, threadsEv
+  use mod_constant, only : one_third
+  use calc_flux_base
+  use calc_steps
+  use set
+  use preprocess
+  implicit none
+contains
+  !> 3rd-order TVD Runge-Kutta time stepping
+  !> Stages: Q(1) = Q^n + dt*RHS(Q^n); Q(2) = (3/4)*Q^n + (1/4)*Q(1) + (1/4)*dt*RHS(Q(1))
+  !>         Q^(n+1) = (1/3)*Q^n + (2/3)*Q(2) + (2/3)*dt*RHS(Q(2))
+  subroutine RungeKutta(myrank, mygpu, nx, Q)
+    integer, intent(in)    :: myrank             !< MPI rank
+    integer, intent(in)    :: mygpu              !< GPU index for this rank
+    integer, intent(in)    :: nx                 !< grid dimension
+    real(8), intent(inout) :: Q(nx,3)            !< conservative variables on host
+    real(8), allocatable, device :: Q1(:,:), Q2(:,:), ruvwp(:,:), T(:), mu(:), E(:,:)
+    integer t1, ierr
+
+    call check_gpu(mygpu)
+    call allocate_device_mem(nx, ruvwp, T, mu, E)
+    allocate(Q1(nx,3), Q2(nx,3), stat=ierr)
+    if (ierr /= 0) then
+      print *, "myrank is ", myrank, " memory allocation failed", ierr
+    else
+      print *, "myrank is ", myrank, " memory allocation has completed"
+    endif
+    Q1 = Q ! host -> device
+
+    print *, "myrank is ", myrank, " start Runge-Kutta"
+    do t1 = 1, nt
+      ! Stage 1
+      call calc_E(nx, Q1, ruvwp, T, mu, E)
+      call calc_step1<<<blocks,threads>>>(nx, 1.d0, E, Q1, Q2)
+      call set_bc(myrank, nx, Q2)
+
+      ! Stage 2
+      call calc_E(nx, Q2, ruvwp, T, mu, E)
+      call calc_step2_3<<<blocks,threads>>>(nx, 0.75d0, 0.25d0, 0.25d0, 1.d0, E, Q1, Q2)
+      call set_bc(myrank, nx, Q2)
+
+      ! Stage 3
+      call calc_E(nx, Q2, ruvwp, T, mu, E)
+      call calc_step2_3<<<blocks,threads>>>(nx, 2.d0, 1.d0, 2.d0, one_third, E, Q2, Q1)
+      call set_bc(myrank, nx, Q1)
+    enddo
+
+    Q = Q1 ! device -> host
+    deallocate(Q1, Q2, ruvwp, T, mu, E)
+    print *, "myrank is ", myrank, " deallocate GPU memory"
+  end subroutine RungeKutta
+end module calc_time_dev
