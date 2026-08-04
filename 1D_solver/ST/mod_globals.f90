@@ -7,9 +7,9 @@ module mod_globals
   ! mesh
   integer, parameter :: nx = 4096
 
-  type(dim3), parameter :: threadsE  = dim3(128,1,1)
-  type(dim3), parameter :: threadsEv = dim3(128,1,1)
-  type(dim3), parameter :: threads   = dim3(128,1,1)
+  type(dim3), parameter :: threadsE  = dim3(64,1,1)
+  type(dim3), parameter :: threadsEv = dim3(64,1,1)
+  type(dim3), parameter :: threads   = dim3(64,1,1)
   type(dim3) :: blocksE, blocksEv, blocks
 
   ! physical properties
@@ -35,5 +35,5 @@ module mod_globals
   real(8), parameter :: CFL  = 0.1d0
   real(8), parameter :: dt   = CFL * dx / a
 
-  integer, parameter :: nt = 2500
+  integer, parameter :: nt = 1!2500
 end module mod_globals

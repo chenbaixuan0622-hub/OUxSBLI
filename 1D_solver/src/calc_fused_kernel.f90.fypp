@@ -12,30 +12,58 @@ contains
   include 'calc_keep_1d.f90'
   include 'calc_visc_1d.f90'
 
-  attributes(global) subroutine calc_fused_x(nx, Q, T, mu, E)
+  attributes(global) subroutine calc_fused_x(nx, ruvwp, T, mu, E)
     integer, intent(in), value               :: nx
-    real(8), intent(in), device, contiguous  :: Q(nx,3), T(nx), mu(nx)
+    real(8), intent(in), device, contiguous  :: ruvwp(nx,3), T(nx), mu(nx)
     real(8), intent(out), device, contiguous :: E(3,nx-1)
     integer i, it, ii, i_base, idx
-    integer, parameter :: sx = threadsE%x + 1
-    real(8), dimension(1:sx), shared :: rho, u, p, tmp
-    real(8) Fk(3), Fv(2)
+    integer, parameter :: half_threads = 32 
+    integer, parameter :: sx = half_threads + 1
+    real(4), dimension(1:sx), shared :: rho4, u4, p4, tmp4
+    real(4), dimension(3, half_threads), shared :: Fk_sh
+    real(8), dimension(2, half_threads), shared :: Fv_sh
     it = threadIdx%x
-    i_base = (blockIdx%x-1)*blockDim%x
-    do ii = it, threadsE%x+1, blockDim%x
-      i = i_base + ii
+    idx = mod(it - 1, half_threads) + 1
+    i_base = (blockIdx%x-1)*half_threads
+    if (it <= sx) then
+      i = i_base + it
       if (i >= 1 .and. i <= nx) then
-        rho(ii) = Q(i,1); u(ii) = Q(i,2); p(ii) = Q(i,3); tmp(ii) = T(i)
+        rho4(it) = real(ruvwp(i,1), 4)
+        u4(it)   = real(ruvwp(i,2), 4)
+        p4(it)   = real(ruvwp(i,3), 4)
+        tmp4(it) = real(T(i), 4)
       endif
-    enddo
+    endif
     call syncthreads()
-    i = i_base + it
+
+    ! 計算全域索引 i
+    i = i_base + idx
     if (nx-1 < i) return
-    idx = it
-    Fk = KEEP2(rho(idx:idx+1), u(idx:idx+1), p(idx:idx+1), tmp(idx:idx+1))
-    Fv = VISC2(u(idx:idx+1), tmp(idx:idx+1), [mu(i), mu(i+1)])
-    E(1,i) = Fk(1)
-    E(2,i) = Fk(2) - Fv(1)
-    E(3,i) = Fk(3) - Fv(2)
+
+    ! ==========================================
+    ! Warp 分流計算 (完美對應手稿)
+    ! ==========================================
+    if (it <= half_threads) then
+      ! Thread 1 ~ 32 : 用 FP32 (real(4)) 算 Conv
+      Fk_sh(:, idx) = KEEP2(rho4(idx:idx+1), u4(idx:idx+1), p4(idx:idx+1), tmp4(idx:idx+1))
+      
+    else if (it <= 64) then
+      ! Thread 33 ~ 64 : 用 FP64 (real(8)) 算 Visc
+      ! 直接從 real(8) 的 Global memory 讀取，保持完整精度
+      Fv_sh(:, idx) = VISC2(ruvwp(i:i+1, 2), T(i:i+1), mu(i:i+1))
+    end if
+    
+    ! 等待 Conv 與 Visc 都計算完畢
+    call syncthreads()
+
+    ! ==========================================
+    ! 合併寫回 Global Memory
+    ! ==========================================
+    if (it <= half_threads) then
+      ! E 是 real(8)，所以將 Fk (FP32) 轉回 FP64，然後扣除 Fv (FP64)
+      E(1,i) = real(Fk_sh(1, idx), 8)
+      E(2,i) = real(Fk_sh(2, idx), 8) - Fv_sh(1, idx)
+      E(3,i) = real(Fk_sh(3, idx), 8) - Fv_sh(2, idx)
+    end if
   end subroutine calc_fused_x
 end module calc_fused_kernel

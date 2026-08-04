@@ -12,11 +12,11 @@ contains
 
   attributes(global) subroutine calc_keep_x(nx, Q, T, E)
     integer, intent(in), value               :: nx
-    real(8), intent(in), device, contiguous  :: Q(nx,3), T(nx)
-    real(8), intent(out), device, contiguous :: E(3,nx-1)
+    real(4), intent(in), device, contiguous  :: Q(nx,3), T(nx)
+    real(4), intent(out), device, contiguous :: E(3,nx-1)
     integer i, it, ii, i_base, idx
     integer, parameter :: sx = threadsE%x + 1
-    real(8), dimension(1:sx), shared :: rho, u, p, tmp
+    real(4), dimension(1:sx), shared :: rho, u, p, tmp
     it = threadIdx%x
     i_base = (blockIdx%x-1)*blockDim%x
     do ii = it, threadsE%x+1, blockDim%x
