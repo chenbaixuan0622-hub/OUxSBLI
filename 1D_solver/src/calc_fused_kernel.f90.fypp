@@ -1,7 +1,4 @@
 #:include 'config.fypp'
-!> Fused convective (KEEP) + viscous (Navier-Stokes) flux kernel: one shared-
-!> memory load pass and one launch compute both, instead of the split
-!> calc_keep_x + calc_Ev2 pair. Selected via config.fypp's KERNEL_MODE.
 module calc_fused_kernel
   use mod_globals, only : threadsE, dx
   use mod_constant, only : R_over_gamma_1, Cp_over_Pr, two_third
@@ -16,15 +13,25 @@ contains
     integer, intent(in), value               :: nx
     real(8), intent(in), device, contiguous  :: ruvwp(nx,3), T(nx), mu(nx)
     real(8), intent(out), device, contiguous :: E(3,nx-1)
+    
     integer i, it, ii, i_base, idx
-    integer, parameter :: half_threads = 32 
+    ! 🔥 調整：將 half_threads 改為 64 (總執行緒數 128)
+    integer, parameter :: half_threads = 64 
     integer, parameter :: sx = half_threads + 1
+    
+    ! 🔥 調整：擴大 Shared Memory 容納 64 個執行緒
+    real(4), dimension(half_threads, 3), shared :: Fk_sh
+    real(8), dimension(half_threads, 2), shared :: Fv_sh
+    
     real(4), dimension(1:sx), shared :: rho4, u4, p4, tmp4
-    real(4), dimension(3, half_threads), shared :: Fk_sh
-    real(8), dimension(2, half_threads), shared :: Fv_sh
+    
     it = threadIdx%x
     idx = mod(it - 1, half_threads) + 1
     i_base = (blockIdx%x-1)*half_threads
+    
+    ! ==========================================
+    ! 載入資料到 Shared Memory
+    ! ==========================================
     if (it <= sx) then
       i = i_base + it
       if (i >= 1 .and. i <= nx) then
@@ -41,29 +48,26 @@ contains
     if (nx-1 < i) return
 
     ! ==========================================
-    ! Warp 分流計算 (完美對應手稿)
+    ! 執行緒分流計算 (總共 128 執行緒)
     ! ==========================================
     if (it <= half_threads) then
-      ! Thread 1 ~ 32 : 用 FP32 (real(4)) 算 Conv
-      Fk_sh(:, idx) = KEEP2(rho4(idx:idx+1), u4(idx:idx+1), p4(idx:idx+1), tmp4(idx:idx+1))
+      ! Thread 1 ~ 64 : 計算對流項
+      Fk_sh(idx, :) = KEEP2(rho4(idx:idx+1), u4(idx:idx+1), p4(idx:idx+1), tmp4(idx:idx+1))
       
-    else if (it <= 64) then
-      ! Thread 33 ~ 64 : 用 FP64 (real(8)) 算 Visc
-      ! 直接從 real(8) 的 Global memory 讀取，保持完整精度
-      Fv_sh(:, idx) = VISC2(ruvwp(i:i+1, 2), T(i:i+1), mu(i:i+1))
+    else if (it <= 128) then
+      ! Thread 65 ~ 128 : 計算黏性項
+      Fv_sh(idx, :) = VISC2(ruvwp(i:i+1, 2), T(i:i+1), mu(i:i+1))
     end if
     
-    ! 等待 Conv 與 Visc 都計算完畢
     call syncthreads()
 
     ! ==========================================
     ! 合併寫回 Global Memory
     ! ==========================================
     if (it <= half_threads) then
-      ! E 是 real(8)，所以將 Fk (FP32) 轉回 FP64，然後扣除 Fv (FP64)
-      E(1,i) = real(Fk_sh(1, idx), 8)
-      E(2,i) = real(Fk_sh(2, idx), 8) - Fv_sh(1, idx)
-      E(3,i) = real(Fk_sh(3, idx), 8) - Fv_sh(2, idx)
+      E(1,i) = real(Fk_sh(idx, 1), 8)
+      E(2,i) = real(Fk_sh(idx, 2), 8) - Fv_sh(idx, 1)
+      E(3,i) = real(Fk_sh(idx, 3), 8) - Fv_sh(idx, 2)
     end if
   end subroutine calc_fused_x
 end module calc_fused_kernel
