@@ -1,13 +1,12 @@
 #:include 'config.fypp'
 module calc_fused_kernel
+  use cudafor  ! Required to support CUDA Fortran intrinsics and __stcs
   use mod_globals, only : threadsE, dx
   use mod_constant, only : R_over_gamma_1, Cp_over_Pr, two_third
   implicit none
   private
   public calc_fused_x
 contains
-  include 'calc_keep_1d.f90'
-  include 'calc_visc_1d.f90'
 
   attributes(global) subroutine calc_fused_x(nx, ruvwp, T, mu, E)
     integer, intent(in), value               :: nx
@@ -15,59 +14,77 @@ contains
     real(8), intent(out), device, contiguous :: E(3,nx-1)
     
     integer i, it, ii, i_base, idx
-    ! 🔥 調整：將 half_threads 改為 64 (總執行緒數 128)
-    integer, parameter :: half_threads = 64 
-    integer, parameter :: sx = half_threads + 1
+    integer, parameter :: block_threads = 128
+    ! 1. Shared Memory Padding (+2 elements for 64-bit memory bank boundary alignment)
+    integer, parameter :: sx = block_threads + 2 
     
-    ! 🔥 調整：擴大 Shared Memory 容納 64 個執行緒
-    real(4), dimension(half_threads, 3), shared :: Fk_sh
-    real(8), dimension(half_threads, 2), shared :: Fv_sh
+    ! Shared Memory Declarations
+    real(8), dimension(1:sx), shared :: rho_d, u_d, p_d, tmp_d
+    real(4), dimension(1:sx), shared :: mu_s
     
-    real(4), dimension(1:sx), shared :: rho4, u4, p4, tmp4
+    ! Declare independent local registers to break instruction dependency chains (reduces NOPs)
+    real(8) :: fk1, fk2, fk3
+    real(8) :: e_internal, p_diff, e_kin
+    real(4) :: fv1_temp, fv2_temp, fv2_final
+    real(4) :: mudx_s, mux_s
     
     it = threadIdx%x
-    idx = mod(it - 1, half_threads) + 1
-    i_base = (blockIdx%x-1)*half_threads
+    i_base = (blockIdx%x-1) * block_threads
     
     ! ==========================================
-    ! 載入資料到 Shared Memory
+    ! 2. Load data into Shared Memory
+    ! (intent(in) arrays automatically generate LDG read-only cache instructions under NVFORTRAN -fast)
     ! ==========================================
-    if (it <= sx) then
-      i = i_base + it
+    do ii = it, sx, block_threads
+      i = i_base + ii
       if (i >= 1 .and. i <= nx) then
-        rho4(it) = real(ruvwp(i,1), 4)
-        u4(it)   = real(ruvwp(i,2), 4)
-        p4(it)   = real(ruvwp(i,3), 4)
-        tmp4(it) = real(T(i), 4)
+        rho_d(ii) = ruvwp(i,1)
+        u_d(ii)   = ruvwp(i,2)
+        p_d(ii)   = ruvwp(i,3)
+        tmp_d(ii) = T(i)
+        mu_s(ii)  = real(mu(i), 4)
       endif
-    endif
-    call syncthreads()
-
-    ! 計算全域索引 i
-    i = i_base + idx
-    if (nx-1 < i) return
-
-    ! ==========================================
-    ! 執行緒分流計算 (總共 128 執行緒)
-    ! ==========================================
-    if (it <= half_threads) then
-      ! Thread 1 ~ 64 : 計算對流項
-      Fk_sh(idx, :) = KEEP2(rho4(idx:idx+1), u4(idx:idx+1), p4(idx:idx+1), tmp4(idx:idx+1))
-      
-    else if (it <= 128) then
-      ! Thread 65 ~ 128 : 計算黏性項
-      Fv_sh(idx, :) = VISC2(ruvwp(i:i+1, 2), T(i:i+1), mu(i:i+1))
-    end if
+    enddo
     
     call syncthreads()
 
+    i = i_base + it
+    if (nx-1 < i) return
+    idx = it
+
     ! ==========================================
-    ! 合併寫回 Global Memory
+    ! 3. Instruction-Level Interleaved Calculations
     ! ==========================================
-    if (it <= half_threads) then
-      E(1,i) = real(Fk_sh(idx, 1), 8)
-      E(2,i) = real(Fk_sh(idx, 2), 8) - Fv_sh(idx, 1)
-      E(3,i) = real(Fk_sh(idx, 3), 8) - Fv_sh(idx, 2)
-    end if
+    
+    ! Interleave 1: Mass Convection (FP64) + Viscous Coefficient (FP32)
+    fk1    = 0.25d0 * (rho_d(idx) + rho_d(idx+1)) * (u_d(idx) + u_d(idx+1))
+    mudx_s = 0.5_4 * (mu_s(idx) + mu_s(idx+1)) / real(dx, 4)
+
+    ! Interleave 2: Momentum Convection (FP64) + Thermal Conduction Viscosity (FP32)
+    fk2      = 0.5d0 * (fk1 * (u_d(idx) + u_d(idx+1)) + (p_d(idx) + p_d(idx+1)))
+    fv2_temp = real(Cp_over_Pr, 4) * mudx_s * (-real(tmp_d(idx), 4) + real(tmp_d(idx+1), 4))
+
+    ! Interleave 3: Internal Energy Convection (FP64) + Velocity Gradient (FP32)
+    e_internal = fk1 * 0.5d0 * (tmp_d(idx) + tmp_d(idx+1)) * R_over_gamma_1
+    mux_s      = mudx_s * (-real(u_d(idx), 4) + real(u_d(idx+1), 4))
+
+    ! Interleave 4: Pressure Diffusion (FP64) + Viscous Stress (FP32)
+    p_diff   = 0.5d0 * (u_d(idx) * p_d(idx+1) + u_d(idx+1) * p_d(idx))
+    fv1_temp = real(two_third, 4) * 2.0_4 * mux_s
+
+    ! Interleave 5: Kinetic Energy Convection (FP64) + Total Viscous Work (FP32)
+    e_kin     = 0.5d0 * fk1 * (u_d(idx) * u_d(idx+1))
+    fv2_final = fv2_temp + 0.5d0 * real(u_d(idx) + u_d(idx+1), 4) * fv1_temp
+
+    ! Combine energy flux components
+    fk3 = e_internal + p_diff + e_kin
+
+    ! ==========================================
+    ! 4. Write back results using Streaming Store (__stcs)
+    ! ==========================================
+    call __stcs(E(1,i), fk1)
+    call __stcs(E(2,i), fk2 - real(fv1_temp, 8))
+    call __stcs(E(3,i), fk3 - real(fv2_final, 8))
+
   end subroutine calc_fused_x
 end module calc_fused_kernel
