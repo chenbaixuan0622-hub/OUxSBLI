@@ -19,15 +19,8 @@ contains
     real(8), intent(in), device, contiguous  :: T(nx)
     real(8), intent(out), device, contiguous :: E(3,nx-1)
 
-    real(4), device, allocatable :: Q_f32(:,:), T_f32(:), E_f32(:,:)
-    allocate(Q_f32(nx,3), T_f32(nx), E_f32(3,nx-1))
-    Q_f32 = real(Q, 4)
-    T_f32 = real(T, 4)
-     call calc_keep_x<<<blocksE,threadsE>>>(nx, Q_f32, T_f32, E_f32)
-     E = real(E_f32, 8)
-     deallocate(Q_f32, T_f32, E_f32)
+    call calc_keep_x<<<blocksE,threadsE>>>(nx, Q, T, E)
   end subroutine calc_conv
-
 
   !> Compute convective + viscous flux for the compressible NS equations
   subroutine calc_E(nx, Q, ruvwp, T, mu, E)
@@ -37,17 +30,19 @@ contains
     real(8), intent(out), device, contiguous :: T(nx)
     real(8), intent(out), device, contiguous :: mu(nx)
     real(8), intent(out), device, contiguous :: E(3,nx-1)
+    
     call calc_quantities_T_1D(nx, Q, ruvwp, T, mu)
+    
     #:if KERNEL_MODE == 'fused'
     block 
       type(dim3) :: blocks_fused
-      ! 每個 Block 推進 32 個點，所以網格數要除以 32
-      blocks_fused = dim3((nx - 1 + 32 - 1) / 32, 1, 1)
-      ! 強制使用 64 個 Threads (Warp 1 算 conv，Warp 2 算 visc)
-      call calc_fused_x<<<blocks_fused, 64>>>(nx, ruvwp, T, mu, E)
+      ! 調整 Grid 大小，以 64 (對應 half_threads = 64) 作為區塊切分單位
+      blocks_fused = dim3((nx - 1 + 64 - 1) / 64, 1, 1)
+      ! 將執行緒數量提升至 128
+      call calc_fused_x<<<blocks_fused, 128>>>(nx, ruvwp, T, mu, E)
     end block
-   #:else
-    call calc_conv(nx, ruvwp, T, E)
+    #:else
+    call calc_conv(nx, Q, T, E)
     call calc_Ev2<<<blocksEv,threadsEv>>>(nx, ruvwp, T, mu, E)
     #:endif
   end subroutine calc_E
